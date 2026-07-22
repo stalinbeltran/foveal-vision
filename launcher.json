@@ -1,0 +1,21 @@
+{
+  "name": "foveal-vision",
+  "description": "Red foveada de dos ramas para deteccion de esquinas de parrafo, con recorridos automaticos. Backend FastAPI + front Vite/React.",
+  "processes": [
+    {
+      "name": "backend",
+      "cmd": ".\\.venv\\Scripts\\python.exe -m fv.api --host 127.0.0.1 --port {PORT_API}"
+    },
+    {
+      "name": "frontend",
+      "cwd": "web",
+      "cmd": "npm run dev -- --port {PORT_WEB}",
+      "env": { "FV_API_URL": "http://127.0.0.1:{PORT_API}" }
+    }
+  ],
+  "ports": [
+    { "name": "PORT_API", "preferred": 8010 },
+    { "name": "PORT_WEB", "preferred": 5173 }
+  ],
+  "open": "http://localhost:{PORT_WEB}"
+}
