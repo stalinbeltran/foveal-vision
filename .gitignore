@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- foveal-vision: se versiona la descripcion, se ignora la carga
+# (docs/formatos.md §5). Manifests, split.json, config/metrics de runs y
+# spec.json de sweeps SI van a git.
+/data/cache/
+/data/sources/
+/data/ui-shots/
+/data/window-datasets/*/windows.npz
+/runs/*/*.pt
+
+/web/node_modules/
+/web/.vite/

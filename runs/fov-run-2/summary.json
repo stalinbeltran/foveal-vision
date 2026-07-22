@@ -1,0 +1,17 @@
+{
+  "run": "fov-run-2",
+  "epochs_run": 12,
+  "epochs_requested": 12,
+  "stopped_early": false,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.24046212993562222,
+  "best_epoch": 8,
+  "seconds_per_epoch": 4.163,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}

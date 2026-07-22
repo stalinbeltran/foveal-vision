@@ -1,0 +1,17 @@
+{
+  "run": "cli-run-1",
+  "epochs_run": 3,
+  "epochs_requested": 3,
+  "stopped_early": false,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.2976200031116605,
+  "best_epoch": 3,
+  "seconds_per_epoch": 3.959,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}

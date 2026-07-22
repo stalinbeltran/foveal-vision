@@ -1,0 +1,12 @@
+# Receta de recorrido de ejemplo: barre el downsample de la periferia (rango
+# calculado) y dos lr, con B fijo. Version corta para CPU; en la GPU, sube
+# budget.epochs y quita points.
+window_dataset: synth-b16
+base_network: fov-16
+base_recipe: corta
+space:
+  d: auto
+  lr: [0.002, 0.004]
+strategy: grid
+objective: f1
+budget: {points: 3, epochs: 2}

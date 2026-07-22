@@ -1,0 +1,46 @@
+{
+  "format_version": 1,
+  "fingerprint": "sha256:d761f310564f131e2c9c5afa7aed4fb13d970487e301b89604fbd053b4c3c467",
+  "has_images": true,
+  "images": {
+    "shape": [
+      60,
+      72,
+      96
+    ],
+    "bytes": 414720,
+    "budget_bytes": 1000000000
+  },
+  "source_id": "local/synth-01",
+  "config": {
+    "source": "local/synth-01",
+    "window_size": 16,
+    "stride": 8,
+    "target_kinds": [
+      "paragraph"
+    ],
+    "val_frac": 0.15,
+    "test_frac": 0.15,
+    "seed": 1
+  },
+  "num_samples": 60,
+  "num_windows": 5280,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ],
+  "label_window": "center",
+  "windows_per_split": {
+    "train": 3696,
+    "val": 792,
+    "test": 792
+  },
+  "positives_per_corner": {
+    "TL": 433,
+    "TR": 443,
+    "BR": 423,
+    "BL": 418
+  }
+}
