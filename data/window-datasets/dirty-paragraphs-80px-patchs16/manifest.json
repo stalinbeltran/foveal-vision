@@ -1,0 +1,46 @@
+{
+  "format_version": 1,
+  "fingerprint": "sha256:3d9fc33eaff80f8e9387aa62a24284b982df274671bb3acc6f0441aa85c7e7bf",
+  "has_images": true,
+  "images": {
+    "shape": [
+      20000,
+      60,
+      80
+    ],
+    "bytes": 96000000,
+    "budget_bytes": 1000000000
+  },
+  "source_id": "local/dirty-paragraphs-80ancho",
+  "config": {
+    "source": "local/dirty-paragraphs-80ancho",
+    "window_size": 16,
+    "stride": 5,
+    "target_kinds": [
+      "paragraph"
+    ],
+    "val_frac": 0.2,
+    "test_frac": 0.2,
+    "seed": 1
+  },
+  "num_samples": 20000,
+  "num_windows": 2800000,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ],
+  "label_window": "center",
+  "windows_per_split": {
+    "train": 1680000,
+    "val": 560000,
+    "test": 560000
+  },
+  "positives_per_corner": {
+    "TL": 348252,
+    "TR": 358215,
+    "BR": 388928,
+    "BL": 378930
+  }
+}
