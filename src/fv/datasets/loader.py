@@ -53,9 +53,9 @@ class SourceError(ValueError):
 
 def _roots() -> list[tuple[str, Path]]:
     roots: list[tuple[str, Path]] = []
-    ext = settings.external_datasets_root()
-    if ext and ext.exists():
-        roots.append(("", ext))
+    # ext = settings.external_datasets_root()
+    # if ext and ext.exists():
+    #     roots.append(("", ext))
     local = settings.local_sources_root()
     if local.exists():
         roots.append(("local/", local))
