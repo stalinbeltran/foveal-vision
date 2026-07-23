@@ -1,0 +1,89 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "lr": 0.002,
+    "optimizer": "adam",
+    "momentum": 0.9,
+    "weight_decay": 0.0,
+    "batch_size": 64,
+    "epochs": 20,
+    "scheduler": "none",
+    "patience": 0,
+    "lambda_pos": 1.0,
+    "pos_weight": 1.0,
+    "smooth_l1_beta": 0.08,
+    "monitor": "val_loss",
+    "seed": 1
+  },
+  "network": {
+    "N": 20,
+    "c_frac": 0.8,
+    "d": 2,
+    "pen_frac": 0.1,
+    "n_layers": 2,
+    "k_center": 3,
+    "k_periph": 3,
+    "s_center": 1,
+    "s_periph": 1,
+    "ch1": 16,
+    "ch2": 32,
+    "merge": "concat",
+    "pool_mode": "avg",
+    "pad_mode": "edge"
+  },
+  "execution": {
+    "device": "cpu",
+    "num_workers": 0
+  },
+  "provenance": {
+    "window_dataset": {
+      "name": "dirty-paragraphs-fast-80px",
+      "fingerprint": "sha256:22dfee1e5e07f93a34c207f66df2f0171440924c8d391e232b502fdd19678cf2"
+    },
+    "network": {
+      "name": "fov-16",
+      "value": {
+        "N": 20,
+        "c_frac": 0.8,
+        "d": 2,
+        "pen_frac": 0.1,
+        "n_layers": 2,
+        "k_center": 3,
+        "k_periph": 3,
+        "s_center": 1,
+        "s_periph": 1,
+        "ch1": 16,
+        "ch2": 32,
+        "merge": "concat",
+        "pool_mode": "avg",
+        "pad_mode": "edge"
+      }
+    },
+    "recipe": {
+      "name": "media",
+      "value": {
+        "lr": 0.002,
+        "optimizer": "adam",
+        "momentum": 0.9,
+        "weight_decay": 0.0,
+        "batch_size": 64,
+        "epochs": 20,
+        "scheduler": "none",
+        "patience": 0,
+        "lambda_pos": 1.0,
+        "pos_weight": 1.0,
+        "smooth_l1_beta": 0.08,
+        "monitor": "val_loss",
+        "seed": 1
+      }
+    },
+    "sweep": "dirty-80px-fast_kcenter_2",
+    "git_commit": "d816ab10abeb0366343301bf52482fbaae0f2f77",
+    "environment": {
+      "python": "3.12.10",
+      "torch": "2.13.0+cpu",
+      "platform": "win32",
+      "device": "cpu"
+    }
+  }
+}

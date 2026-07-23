@@ -1,0 +1,15 @@
+format_version: 1
+N: 20
+c_frac: 0.7
+d: 2
+pen_frac: 0.1
+n_layers: 2
+k_center: 3
+k_periph: 3
+s_center: 1
+s_periph: 1
+ch1: 16
+ch2: 32
+merge: concat
+pool_mode: avg
+pad_mode: edge
