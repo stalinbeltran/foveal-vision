@@ -146,11 +146,21 @@ En un YAML de red van **solo los parámetros fundamentales** (organizacion.md §
 derivados (`center_out`, `original_size`, `padding`…) no se escriben nunca: se calculan en
 `fv.fovea.derive_dims` — un derivado escrito es una copia que diverge.
 
+**Canales por capa (D-C3).** El vector `channels` (longitud = `n_layers`) reemplaza los escalares
+`ch1/ch2`. El lector **acepta ambos** —`ch1=16, ch2=32` se lee como `channels=[16,32]`— y
+**escribe siempre `channels`** (aditivo, sin bump: §2). El default de una red **derivada** es
+`channels = [16]*n_layers` (constante 16 — D-C2); ⚠ **difiere** del `[16,32]` histórico, por eso
+el test de no-regresión del builder usa `channels=[16,32]` **explícito**, no el default.
+
 ### 4.4 `sweeps/<name>/` — el recorrido (H)
 
 - **`spec.json`** — nuestro: lo fijo (B + huella), el espacio (campos de C/D con rango o
   `"auto"` → `build_search_space`), estrategia, objetivo (+ dirección), presupuesto (y su
-  unidad: épocas o segundos), estado.
+  unidad: épocas o segundos), estado. **La red base va por nombre o inline** (D-H2): con nombre,
+  `base_network: "<red>"`; inline (recorrido generado por un estudio), `base_network: null` +
+  `base_network_value` (config C entero) + `base_label` (etiqueta sintética, separador guion) +
+  bloque `derivation { window_size, fractions, field_origin }` — la procedencia del generador
+  (contrato ③). El lector **exige** uno de los dos (nombre XOR valor): ausente ≠ cero (§1).
 - **`optuna.db`** — del motor. **La frontera importa**: los trials de optuna no son nuestros
   runs; un trial lanza un run (`{sweep}-{trial:04d}`) y guarda su nombre.
 
@@ -185,6 +195,25 @@ Mismo formato de A + bloque `derived`:
 (`upscale_not_allowed`, comprobado contra **todas** las muestras). Cuidado medido: reducir mucho
 borra la tinta aunque la geometría siga bien — mirar una derivada antes de extraer de ella.
 
+### 4.7 `studies/<name>/` — el estudio (I)
+
+El plan OAT y su progreso. **No hay motor propio**: un estudio genera recorridos (H) y lee sus
+rankings; su almacén son dos ficheros.
+
+- **`plan.json`** — el schedule, **comiteable** (es descripción, no carga — §5): `window_dataset`
+  (B fijo), `base_recipe` (D), `objective`, `seeds` (sondeo/confirmación, default 3 — D-M1), y
+  `axes[]` **ordenados** (orden = orden de barrido, U6): cada eje con su `range` (`"auto"` o lista
+  explícita — U5) y un `depends_on` opcional (el eje que lo desbloquea). El plan **no ejecuta**:
+  la herramienta lo lee para pre-rellenar el siguiente recorrido.
+- **`progress.json`** — el estado de la cadena, reescribible (temporal + `os.replace`, con
+  reintento en ambos lados como el resto — §4.2): por paso, el recorrido generado, el **ganador
+  confirmado** por el usuario, y qué sub-ejes desbloqueó. Reconstruye la cadena para auditar por
+  qué cada campo de una base inline valía lo que valía. La **longitud es dinámica**: no se conoce
+  hasta correr la cadena (un ganador puede expandir un eje en varios sub-pasos).
+
+Los recorridos que genera son H de primera clase (`sweeps/<name>/`), con `provenance.sweep` y un
+puntero al estudio en su spec.
+
 ## 5. Qué se versiona en git
 
 > **Se versiona la descripción, se ignora la carga.**
@@ -197,6 +226,8 @@ borra la tinta aunque la geometría siga bien — mirar una derivada antes de ex
 # config.json, metrics.jsonl, summary.json de runs → versionados
 /sweeps/*/optuna.db
 # spec.json → versionado
+/studies/*/progress.json
+# plan.json → versionado (la descripción del estudio; progress.json es estado vivo)
 ```
 
 Medido en el hermano: descripción 105 KB vs carga 38,5 MB — el 0,3 % del peso, y es el registro

@@ -52,6 +52,7 @@ de [plan.md](plan.md) que quita cada xfail:
 | ⑨ | objetivo del recorrido | spec con `objective` dependiente de un peso barrido → `objective_varies_with_space`; con objetivo de tarea → pasa; validación **sin cargar optuna** | 7 |
 | ⑩ | X fuera de D | dos runs que solo difieren en `device` tienen la misma identidad de receta | 3 |
 | ⑪ | reproducibilidad | misma semilla + misma config ⇒ mismos pesos (init **y** entrenamiento, con **control** de otra semilla que difiere) | 4 |
+| ⑫ | estudio planifica, recorrido ejecuta | `next-sweep` deriva la base (`center_out==window_size`, ①a) y la valida con `check_run` **sin reservar**; un recorrido con **base inline** (sin `base_network`, solo `base_network_value`) se prepara/corre/rankea igual que uno con red nombrada (mismo gate); el generador del siguiente eje fija el ganador y registra `field_origin` | H (barrido) |
 
 Además, del muestreo foveado (nacen con la fase 2, sin xfail largo):
 

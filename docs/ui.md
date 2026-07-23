@@ -12,7 +12,7 @@ parámetros, y probar los resultados.*
 
 ## 0. Las dos reglas (heredadas, probadas)
 
-**Regla 1 — una pantalla, un dominio.** Cada sustantivo (A, B, C, D, E, H) tiene su pantalla:
+**Regla 1 — una pantalla, un dominio.** Cada sustantivo (A, B, C, D, E, H, I) tiene su pantalla:
 listar, crear, nombrar, borrar. Un formulario que mezcla dos dominios es un bug de organización.
 
 **Regla 2 — toda vista de análisis declara `(qué fija, qué varía, qué mide)`.** Un recorrido
@@ -43,12 +43,20 @@ capa. Si no puedes decir qué fija una vista, la vista no sabe lo que enseña.
 | | Recetas | D |
 | **Entrenar** | Entrenar | B×C×D + X → E |
 | | Recorridos | H |
+| | Barrido por ejes | I (estudio OAT; genera recorridos H, guía paso a paso) |
 | | Runs | E (lista + detalle) |
 | **Analizar** | Diagnóstico | E×B |
 | | Predecir | F |
 
 Sin números de paso: en investigación no se recorre un pipeline, se **itera sobre un punto** y
 se vuelve.
+
+**La pantalla Barrido por ejes (I)** —`(fija: B + receta D; varía: un eje a la vez; mide: el
+objetivo con la regla coste/calidad)`— deriva la base del problema (`window_size` → `N`/geometría),
+muestra el config base con el **origen por campo** (`default | winner | user`), lleva la
+**escalera** de ejes ordenados (§6 de barrido-por-ejes.md) y, por paso, propone el ganador que el
+usuario confirma. Reutiliza la tabla de ranking de Recorridos. Diseño visual de referencia: el
+mockup de esta sesión (chrome real de la app, cada decisión encarnada en un control).
 
 **Estado de UI recordado (defaults, no fuente de verdad).** Los filtros y los valores de
 formulario de cada pantalla se recuerdan en `localStorage` (per-browser, listo para multi-usuario

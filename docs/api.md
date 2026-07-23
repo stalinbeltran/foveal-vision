@@ -32,8 +32,12 @@ los CLI (`fv-extract`, `fv-train`, `fv-sweep`) lo prueban. Regla mecánica: **si
   reenvía el historial; `GET /runs/{name}` no incluye métricas.
 - **R6 — Los agregados se calculan en el servidor.** El navegador nunca recibe 10⁵ filas; las
   tablas van filtradas y paginadas con `limit` acotado por la ruta.
-- **R7 — Si se entrenó con ello, tiene nombre.** `POST /runs` y `POST /sweeps` aceptan nombres
-  de red y receta, no valores inline. Es lo que hace que la procedencia se sostenga sola.
+- **R7 — Si se entrenó con ello, tiene identidad reproducible.** `POST /runs` y `POST /sweeps`
+  aceptan **nombres** de red y receta. **Excepción única: la base inline de un recorrido generado
+  por un estudio** (I, D-H2): sin nombre de catálogo, pero con `base_label` (agrupa) +
+  `base_network_value` (reproduce) + `derivation.field_origin` (audita de dónde salió cada campo)
+  — la procedencia se sostiene igual (contrato ③). Ninguna **otra** puerta acepta valores inline;
+  `POST /runs` sigue exigiendo nombres.
 
 ## 2. El mapa de recursos
 
@@ -46,6 +50,7 @@ los CLI (`fv-extract`, `fv-train`, `fv-sweep`) lo prueban. Regla mecánica: **si
 | **E** Run | `/runs` |
 | **E×B** Diagnóstico | `/runs/{name}/diagnostics/*` — caché, todo GET idempotente |
 | **H** Recorrido | `/sweeps` |
+| **I** Estudio (schedule OAT) | `/studies` (plan comiteable; genera recorridos, no ejecuta) |
 | **F** Inferencia | `/runs/{name}/predict` |
 | **X** Jobs | `/jobs` (+ `POST /jobs/{id}/cancel`, cooperativo) |
 | **UI** Estado recordado | `/ui-state` (`GET`/`PUT`) — blob opaco de filtros/formularios, NO dominio |
@@ -137,10 +142,42 @@ deja un run apuntando a un padre inexistente.
 
 - `space` admite campos de **C y/o D**; los rangos de geometría admiten `"auto"` (los pone
   `build_search_space(N, …)`).
+- **Red base por nombre o inline** (D-H2, R7): el cuerpo lleva `base_network` (nombre) **o**
+  `base_network` `null` + `base_network_value` + `base_label` + `derivation` (lo genera un estudio).
+  El API **exige uno de los dos** (nombre XOR valor): `base_missing` si faltan ambos,
+  `base_ambiguous` si vienen los dos. El validador `check_run`/`check_network` corre igual sobre el
+  config resuelto — inline no es una puerta más laxa (contrato ⑫).
 - 400 **antes de reservar nada**: `objective_varies_with_space` (⑨),
   `objective_depends_on_geometry` (⑨-extensión), puntos de geometría inválidos se **descartan
   declarándolos** en el spec resultante (no silenciosamente).
 - Sobrevive a reinicios: el `lifespan` re-encola lo que quedó a medias desde disco.
+
+### `/studies` (I) — el estudio planifica, no ejecuta
+
+El schedule OAT como recurso. **No lanza jobs propios**: guía la generación de recorridos (H) paso
+a paso (D-H1, contrato ⑫).
+
+```
+GET  /studies
+POST /studies                    {name, window_dataset, base_recipe, objective, seeds, axes[]}
+GET  /studies/{name}             plan + progreso (pasos, ganadores confirmados, sub-ejes desbloqueados)
+POST /studies/{name}/next-sweep  → deriva la base del problema + arrastra ganadores → devuelve el
+                                   spec de recorrido (base inline) PROPUESTO; no lo lanza
+POST /studies/{name}/confirm     {step, winner} fija el ganador CONFIRMADO por el usuario y lo
+                                   arrastra al siguiente paso (D-W1: la herramienta sugiere, el
+                                   usuario aprieta el gatillo)
+DELETE /studies/{name}           borra el plan; 409 si un recorrido hijo corre (no huérfanos)
+```
+
+- **`next-sweep` no reserva nada**: devuelve el spec para que el usuario lo revise y lance con
+  `POST /sweeps` (base inline). La derivación (`window_size` → `N`/geometría) pasa por `check_run`;
+  si el default estático es inválido para ese `W` cae al válido con su razón, y si ningún `N` es
+  factible **afloja `c_frac` con la razón registrada** (D-G3) o devuelve 400.
+- **El ganador lo propone el servidor, lo confirma el cliente**: `GET /studies/{name}` incluye,
+  por paso terminado, la sugerencia coste/calidad (`δ`, métrica de coste) y los candidatos de la
+  **frontera** con sus N semillas — pero no arrastra nada hasta el `confirm`.
+- **Longitud dinámica**: fijar un ganador puede expandir un eje en sub-pasos (`channels[i]`); el
+  progreso lo refleja, el presupuesto se cuenta al correr la cadena.
 
 ### `/runs/{name}/predict` (F)
 
@@ -166,7 +203,9 @@ esquema de dominio dependen de su contenido.
 | ⑧ huella | diagnostics → 409 `window_dataset_changed` |
 | ⑨ objetivo | `POST /sweeps` → 400, validación pura sin optuna |
 | ⑩ X fuera de D | `device` fuera de `/recipes`, en el cuerpo de `POST /runs` |
-| R7 | `POST /runs` y `POST /sweeps` exigen nombres |
+| ⑫ I planifica, H ejecuta | `POST /studies/{n}/next-sweep` deriva+valida (`check_run`), no reserva; `confirm` arrastra el ganador |
+| ③ base inline reproducible | `POST /sweeps` acepta `base_label`+`base_network_value`+`derivation` (nombre XOR valor) |
+| R7 | `POST /runs` exige nombres; `POST /sweeps` nombre **o** base inline con procedencia (única excepción) |
 
 > La regla que sostiene ① no es el endpoint: es que **todas las puertas** (`POST /runs`,
 > `fv-train`, cada punto del recorrido) preguntan a la misma función **antes de reservar el

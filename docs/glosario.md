@@ -24,8 +24,8 @@ Regla: cuando una palabra tiene dos significados, **en prosa y en la UI se cuali
 - **`seed` — el de B fija el split (fijo en un recorrido); el de D es el eje de réplica.**
   Confundirlos hace que cada punto se evalúe sobre un split distinto: mides el ruido del split.
 - **`kernel` — el tamaño (`k_center: 3`), el tensor de pesos («los kernels de la capa 1»), o
-  cuántos hay (`ch1: 32`).** `kernel_size` para el tamaño, **filtros** para el número, kernel a
-  secas solo para el tensor.
+  cuántos hay (`channels[i]`).** `kernel_size` para el tamaño, **filtros** para el número, kernel a
+  secas solo para el tensor. (`channels` es la lista por capa que reemplaza a `ch1/ch2` — D-C3.)
 - **`run` / `job` / `trial` / punto** — el **run** es el artefacto en disco; el **job** es la
   ejecución en la cola; el **trial** es vocabulario de optuna; el **punto** es un elemento del
   espacio de un recorrido. **Un trial no es un run**: lanza uno y guarda su nombre.
@@ -60,6 +60,12 @@ Regla: cuando una palabra tiene dos significados, **en prosa y en la UI se cuali
 | **máscara de cobertura** | La fracción real por celda del relleno en bordes de imagen. Acompaña al canal que puede tener relleno; jamás binarizada, jamás blanco |
 | **rangos calculados** | `kernel_range`/`stride_range`/`downsample_range`/`build_search_space`: los espacios de búsqueda como funciones de `N`, nunca constantes |
 | **recorrido** | H: un espacio sobre C y/o D con B fijo, con nombre, reanudable, desatendido («receta de recorrido») |
+| **estudio** | I: un plan ordenado de ejes (schedule OAT) sobre H con B fijo; comiteable, guía paso a paso, **no ejecuta**. Encadena recorridos como un recorrido encadena runs. No confundir con **recorrido** (un solo eje) |
+| **barrido por ejes / OAT** | Descenso por coordenadas: un eje a la vez, se fija el ganador, se pasa al siguiente. Coste = **suma** de ejes, no producto |
+| **base inline** | Red base de un recorrido dada **por valor** (config C derivado) en vez de por nombre; identificada por `base_label` sintético (p. ej. `ws16-p2-d2-L2`, separador guion). Contrapone a **red base con nombre** |
+| **arrastre del ganador / carry-forward** | Fijar el ganador confirmado de un paso como base del siguiente. La base **evoluciona** a lo largo de la cadena (por eso el efecto de cada eje es condicional a los ganadores previos) |
+| **field_origin** | Por campo de una base inline: `default` \| `winner(from=…)` \| `user`. Reconstruye por qué cada campo vale lo que vale — sin esto, un `n_layers=3` inline es inauditable |
+| **ganador (coste/calidad)** | El punto que **sugiere** el estudio: el más barato cuya calidad no sea peor que la del mejor por más de `δ` (1-SE/Pareto, D-W1). Lo **confirma el usuario**. Distinto del `best.pt` (mejor monitor intra-run) |
 | **huella / fingerprint** | Hash del contenido de un B; distingue un dataset reconstruido bajo el mismo nombre (contrato ⑧) |
 | **knob barato** | Parámetro de F ajustable post-hoc sin reentrenar |
 | **suelo de ruido** | La diferencia mínima creíble, medida con N semillas; por debajo, empate |

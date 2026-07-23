@@ -20,15 +20,17 @@ borrar) y **una sola razón para cambiar**. Donde dos dominios comparten un valo
 | **D** | **Receta** | Hiperparámetros de entrenamiento que definen el resultado | `<name>.yaml` | `configs/recipes/*.yaml` |
 | **E** | **Run** | El modelo entrenado: pesos + métricas + procedencia | `<name>` = subdir | `runs/<name>/` |
 | **H** | **Recorrido** | Un espacio sobre **C y/o D** con B fijo → muchos E | `<name>` | `sweeps/<name>/` |
+| **I** | **Estudio (schedule OAT)** | Un plan ordenado de ejes sobre **H** con B fijo → muchos recorridos, guiado paso a paso; **NO ejecuta** | `<name>` | `studies/<name>/` |
 | **F** | **Inferencia** | Aplicar un E a una imagen completa | — (operación, no cosa) | — |
 | **G** | **Geometría foveada** | Lo que *todos* comparten: dimensiones derivadas, construcción de la vista, máscaras, rangos | — | `src/fv/fovea/` |
 | **X** | **Ejecución** | `device`, `num_workers`, concurrencia. Cuesta tiempo, no cambia el resultado | — (transversal) | `src/fv/api/jobs.py` |
 
 Observaciones que ordenan todo lo demás:
 
-- **C, D y H son sustantivos**: se nombran, se guardan, se comparan y se reutilizan. Es la
+- **C, D, H e I son sustantivos**: se nombran, se guardan, se comparan y se reutilizan. Es la
   condición para que un recorrido exista («un espacio sobre C/D con B fijo» exige poder nombrar
-  C y D) y para que la procedencia de un run se sostenga sola.
+  C y D) y para que la procedencia de un run se sostenga sola. Un **estudio (I) encadena
+  recorridos (H)** igual que un recorrido encadena runs (E): un nivel más arriba.
 - **F es un verbo**: no tiene almacén; es una llamada sobre un E. En la UI es un panel de
   resultados, no una entidad listable.
 - **G nace como módulo el día 0, no cuando duela.** En el proyecto hermano la geometría de la
@@ -88,13 +90,12 @@ N: 20            # lado de la entrada compuesta
 c_frac: 0.8      # fracción del centro
 d: 2             # downsampling de la periferia
 pen_frac: 0.1    # penetración hacia el centro
-n_layers: 2      # capas conv por rama
+n_layers: 2      # capas conv por rama (honrado por el builder paramétrico — D-C3/D-S2)
 k_center: 3      # kernel de la rama central   (impar; rango calculado)
 k_periph: 3      # kernel de la rama periférica
-s_center: 1      # stride rama central          (rango calculado)
+s_center: 1      # stride rama central: se aplica en la 1ª capa (D-S1); rango calculado
 s_periph: 1
-ch1: 32
-ch2: 64
+channels: [16, 32]  # canales POR CAPA (longitud = n_layers). Lee ch1/ch2 viejo (D-C3)
 merge: concat    # sum | concat  (§7 de instructionsNewNN.md; concat si strides difieren)
 pool_mode: avg   # avg | max  para reducir la periferia (decisión abierta, se barre)
 head: corners    # 4×[exists, x, y] por tipo TL/TR/BR/BL (C9, decisiones.md)
@@ -113,6 +114,11 @@ calcula un tensor dummy, como el `_infer_flat_features` del hermano).
   `downsample_range`, `build_search_space`) y viven en `fv.fovea`, no en el runner del
   recorrido: H los consume, no los define.
 - **No posee**: pesos (E), `lr`/`epochs` (D), de dónde salen las ventanas (B).
+- **`n_layers` y `channels` son reales** (builder paramétrico — barrido-por-ejes.md §3, D-C3/
+  D-S1/D-S2): `channels` es una **lista por capa** de longitud `n_layers` (el lector acepta
+  `ch1/ch2` viejo y lo mapea a `[ch1, ch2]`); el stride de rama va **solo en la 1ª capa** (por eso
+  `n_layers` **no** entra en `stride_range`); `n_layers` es único y simétrico para ambas ramas.
+  Antes `n_layers` era fantasma (estaba en el config y el modelo no lo leía).
 - Es config puro: `build_model(dict)` construye desde un diccionario, listable y comparable sin
   tocar un dataset.
 
@@ -188,6 +194,38 @@ cancelación cooperativa.
 Esto es lo que el usuario llama **«recetas de recorrido»**: specs con nombre que encadenan la
 serie completa sin intervención humana — versión corta en CPU para validar el instrumento, el
 mismo spec con más presupuesto en GPU.
+
+**Base con nombre o inline** (D-H2, barrido-por-ejes.md §8): el recorrido fija su red base por
+**nombre** (`base_network`, una red C del catálogo) **o inline** (config C ya derivado, sin
+nombre) cuando lo genera un estudio (I). En el caso inline, `base_network = null`, una **etiqueta
+sintética** `base_label` (p. ej. `ws16-p2-d2-L2`, separador guion) hace de clave de agrupación en
+la UI, y el bloque `derivation` (con `field_origin` por campo: `default | winner | user`) preserva
+la procedencia (contrato ③). El resto del recorrido —validación previa, expansión, descarte con
+razón, ejecución secuencial, reanudación, ranking, borrado en cascada— **no cambia**.
+
+### I — Estudio (schedule OAT)
+
+**Automatiza al humano que barría un eje a la vez.** El flujo manual era: escribir a mano una red
+C completa, barrer un solo eje, mirar el ranking, fijar el ganador, repetir (descenso por
+coordenadas / OAT). Un estudio es ese plan hecho **objeto de primera clase, comiteable, que NO
+ejecuta**: describe el orden de ejes y sus dependencias, y **guía** al usuario paso a paso.
+
+Lo define (detalle en barrido-por-ejes.md §6; formato en formatos.md §4.7):
+
+- **Lo fijo**: un B (contrato ⑧), una receta base D, el objetivo, y el `N` de **semillas de
+  confirmación** (configurable, default 3 — D-M1).
+- **Los ejes, ordenados** (orden = orden de barrido, U6): cada uno con su rango (`"auto"` o lista
+  explícita, U5) y un `depends_on` opcional. La longitud del estudio es **dinámica**: un ganador
+  puede desbloquear sub-ejes (fijar `n_layers=3` crea `channels[0..2]`).
+- **La base de cada paso se deriva del problema** (dominio G): `window_size` de B → `N`/geometría,
+  sin escribir dimensiones a mano; sobre ella se aplican los **ganadores arrastrados** de los
+  pasos previos (carry-forward).
+- **El ganador lo sugiere la herramienta y lo confirma el usuario** (regla coste/calidad con `δ`,
+  D-W1): «el más barato cuya calidad no sea peor que la del mejor por más de `δ`». La confirmación
+  exige las N semillas en **ambos** candidatos de la frontera, no solo el provisional.
+
+Un estudio **reutiliza H entero**: por cada paso genera un recorrido (base inline) y lo corre con
+la maquinaria existente. No es una puerta más laxa (contrato ⑫).
 
 ### F — Inferencia
 
@@ -271,6 +309,12 @@ ruta **más la huella del contenido**. Sin el nombre no se puede preguntar «¿q
 red X?» — la pregunta que H hace todo el rato. Sin la huella, un B reconstruido bajo el mismo
 nombre es indistinguible (⑧).
 
+**Con base inline** (recorrido generado por un estudio I, D-H2) el nombre de red es `null`: su
+lugar de agrupación lo toma `base_label` (la etiqueta sintética) y su procedencia,
+`derivation.field_origin` (de dónde salió cada campo: `default | winner | user`). El **valor
+sigue entero**, así que «valor para reproducir, algo para agrupar» se cumple igual — la red se
+reconstruye del valor, no del nombre (contrato ④).
+
 ### ④ E → F — el checkpoint se describe solo
 
 `load_model()` lee `ckpt["config"]["model"]` y reconstruye la red **incluida su geometría de
@@ -328,6 +372,18 @@ su procedencia (`resumed_at`). Reanudar desde `{model, config, epoch}` sin optim
 scheduler y `best_monitor` produce un run con la misma procedencia y **otros pesos**, en
 silencio. Reanudar el **recorrido** (re-encolar puntos) sí es seguro y es lo que se construye;
 reanudar dentro de un run es diseño aplazado (formatos.md §4.2.2) hasta que se mida el ahorro.
+
+### ⑫ I ↔ H — el estudio planifica, el recorrido ejecuta
+
+Un estudio (I) **describe** el orden de ejes con dependencias y **no ejecuta**. Por cada paso:
+deriva la base del problema (`window_size` de B → `N`/geometría, dominio G), fija los **ganadores
+arrastrados** de los pasos previos, y **genera un recorrido H** (base inline) que corre con toda
+la maquinaria de H sin cambios. El **generador no es una puerta más laxa**: valida la base con
+`check_run` y cada punto con `check_network`, igual que H, **antes** de reservar nada. El
+**ganador** de cada paso lo **sugiere** la herramienta (regla coste/calidad con `δ`, D-W1) y **lo
+confirma el usuario** antes de arrastrarlo — coherente con «no ejecuta, guía». La longitud del
+estudio es **dinámica** (un ganador desbloquea sub-ejes), así que el presupuesto se cuenta al
+correr la cadena, no antes.
 
 ---
 

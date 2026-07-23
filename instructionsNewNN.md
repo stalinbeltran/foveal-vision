@@ -294,6 +294,15 @@ class FoveatedRegionalNN(nn.Module):
         return self.classifier(feat)
 ```
 
+> **Nota — builder paramétrico (decidido 2026-07-23).** Este `__init__` es **referencia
+> ilustrativa**: fija dos capas y `ch1/ch2` escalares. El builder real las **parametriza** y ese
+> código **no manda** sobre el número de capas ni la forma de los canales — igual que la cabeza
+> (C9 sustituye `classifier` + `adaptive_avg_pool2d`, que destruye la posición, por
+> `4×[exists,x,y]`). Lo que manda: [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) §3 y §13.
+> En concreto: `channels` es una **lista por capa** de longitud `n_layers` (D-C3, lee `ch1/ch2`
+> viejo), el stride de rama se aplica **solo en la 1ª capa** (D-S1, por lo que `n_layers` **sale**
+> de `stride_range`), y `n_layers` es **único y simétrico** para ambas ramas (D-S2).
+
 ---
 
 ## 7. Suma vs. concatenación cuando los strides difieren

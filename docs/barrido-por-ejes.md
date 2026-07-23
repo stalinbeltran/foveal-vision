@@ -13,7 +13,7 @@
 
 El flujo real de trabajo hasta hoy ha sido **manual y lento**: para probar una variante de red el
 usuario escribe a mano una definición C completa (~14 campos: `N, c_frac, d, pen_frac, n_layers,
-k_center, k_periph, s_center, s_periph, ch1, ch2, merge, pool_mode, pad_mode`), la nombra, lanza
+k_center, k_periph, s_center, s_periph, channels, merge, pool_mode, pad_mode`), la nombra, lanza
 un recorrido de un solo eje, mira el ranking, y repite. La evidencia está en
 [sweeps/](../sweeps/): `dirty-80px-fast_kcenter`, `_kperiph_1`, `_s_center_1`, `_s_periph_1`,
 `_14-k_center_1`… cada uno es un barrido de **un eje** con todo lo demás fijo. Eso es **descenso
@@ -394,15 +394,16 @@ y el espacio barre un peso de la pérdida, se rechaza. El generador no lo elude:
 | Builder paramétrico (`n_layers`, canales) | **C** | `src/fv/models/builder.py`, `configs/networks/*` | — |
 | Rango auto de `n_layers`/canales | **G** | `src/fv/fovea/__init__.py` | (calculado, no a mano) |
 | Derivador de base desde `window_size` | **G/C** | nuevo módulo (p. ej. `src/fv/models/derive.py`) | ①a (`center_out==window_size`) |
-| Base inline en el recorrido | **H** | `src/fv/sweeps/spec.py`, `runner.py`, `api/app.py` | ⑧ (B fijo), ⑨ |
+| Base inline en el recorrido | **H** | `src/fv/sweeps/spec.py`, `runner.py`, `api/app.py` | ③ (nombre/valor), ⑧ (B fijo), ⑨ |
 | Generador de receta (P1) | **H** | nuevo (p. ej. `src/fv/sweeps/generate.py` + CLI `fv-oat`) | — |
-| Schedule OAT (plan) | **dominio nuevo `studies/`** | plan comiteable, guía al recorrido | — |
-| Arrastre del ganador | **H** | `src/fv/sweeps/runner.py` (lee ganador), generador | — |
-| Etiqueta sintética + filtros | **UI** | `web/src/screens/Sweeps.tsx` | — |
+| Schedule OAT (plan) | **dominio nuevo `studies/` (I)** | plan comiteable, guía al recorrido | ⑫ (I ↔ H) |
+| Arrastre del ganador | **I/H** | `src/fv/sweeps/runner.py` (lee ganador), generador del estudio | ⑫ |
+| Etiqueta sintética + filtros | **UI** | `web/src/screens/Sweeps.tsx` + pantalla nueva del estudio | — |
 
-**Antes de codificar hay que escribir en [organizacion.md](organizacion.md):** (a) que H puede
-tener **base inline** (no solo red con nombre) y qué contrato lo cubre; (b) el **dominio nuevo
-`studies/`** (D-H1) y su frontera con H. No dejarlo implícito.
+**Ya escrito en [organizacion.md](organizacion.md)** (2026-07-23, prerequisito de §9 cumplido):
+(a) H con **base inline** (§1-H) y su cobertura por el contrato **③**; (b) el **dominio nuevo `I —
+Estudio (`studies/`)`** (§1-I) y su frontera con H, el contrato **⑫**. El formato en disco está en
+[formatos.md](formatos.md) §4.7 (`plan.json`/`progress.json`) y §4.3 (`channels`).
 
 **Relación con decisiones abiertas existentes** ([decisiones.md](decisiones.md)):
 - **F5** (¿`c_frac`/`pen_frac` barribles?): OAT los alcanza como ejes con **rango explícito**, un
