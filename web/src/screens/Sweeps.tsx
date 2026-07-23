@@ -17,6 +17,7 @@ export default function Sweeps() {
   const [error, setError] = useState<unknown>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [trials, setTrials] = useState<any>(null);
+  const [baseDims, setBaseDims] = useState<any>(null);
   const [sf, setSf] = usePersistedState("sweeps.filters", {
     window_dataset: "", base_network: "", base_recipe: "", objective: "", q: "",
   });
@@ -59,6 +60,22 @@ export default function Sweeps() {
     const t = setInterval(load, 3000);
     return () => clearInterval(t);
   }, [sel]);
+
+  // The NN of each point = base network + the "punto". The base is the part FIXED
+  // across all points, so show it once (name + resolved config + derived dims via
+  // the same validator as Redes); each row's "punto" column carries what varies.
+  const selSweep = (sweeps ?? []).find((s) => s.name === sel);
+  const baseNet = selSweep?.spec?.base_network_value ?? null;
+  const baseNetName = selSweep?.spec?.base_network ?? null;
+  const baseRecipeName = selSweep?.spec?.base_recipe ?? null;
+  const spaceKeys = Object.keys(selSweep?.spec?.space ?? {});
+  const baseKey = baseNet ? JSON.stringify(baseNet) : "";
+  useEffect(() => {
+    if (!baseNet) { setBaseDims(null); return; }
+    api.post("/networks/validate", baseNet)
+      .then((v) => setBaseDims(v?.trace?.dims ?? null))
+      .catch(() => setBaseDims(null));
+  }, [baseKey]);
 
   const space: any = {};
   GEO_AXES.forEach((a) => { if (form.axes[a]) space[a] = "auto"; });
@@ -277,6 +294,35 @@ export default function Sweeps() {
           {sel && trials ? (
             <div style={{ marginTop: 14 }}>
               <h4>{sel} — ranking por {trials.objective} ({trials.direction})</h4>
+              <div data-testid="base-nn" style={{
+                margin: "0 0 12px", padding: "8px 12px",
+                background: "var(--surface-2)", border: "1px solid var(--border)",
+                borderRadius: 8,
+              }}>
+                <div>
+                  <strong>red base (C): {baseNetName ?? "—"}</strong>
+                  {baseRecipeName ? <span className="sub" style={{ margin: 0 }}>
+                    {"  ·  receta base (D): "}{baseRecipeName}</span> : null}
+                </div>
+                {baseNet ? (
+                  <div className="mono" style={{ marginTop: 5, color: "var(--text)" }}>
+                    {Object.entries(baseNet)
+                      .filter(([k]) => !spaceKeys.includes(k))
+                      .map(([k, v]) => `${k}=${v}`).join("   ")}
+                  </div>
+                ) : null}
+                {baseDims ? (
+                  <div className="sub" style={{ margin: "5px 0 0" }}>
+                    dims: fóvea {baseDims.center_out}px · anillo {baseDims.periph_out}px
+                    {" "}(ve {baseDims.periph_real}px reales) · penetración {baseDims.penetration}px
+                    {" "}· recorte {baseDims.original_size}px
+                  </div>
+                ) : null}
+                <div className="sub" style={{ margin: "5px 0 0" }}>
+                  ejes barridos (varían por fila, columna «punto»):{" "}
+                  <span className="mono">{spaceKeys.length ? spaceKeys.join(", ") : "—"}</span>
+                </div>
+              </div>
               <table className="data" data-testid="trials-table">
                 <thead><tr><th>#</th><th>run</th><th>punto</th><th>{trials.objective}</th>
                   <th>estado</th><th>s/época</th></tr></thead>

@@ -1,0 +1,17 @@
+{
+  "run": "demo-seeds-0004",
+  "epochs_run": 2,
+  "epochs_requested": 2,
+  "stopped_early": false,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.33078503981232643,
+  "best_epoch": 2,
+  "seconds_per_epoch": 4.633,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
