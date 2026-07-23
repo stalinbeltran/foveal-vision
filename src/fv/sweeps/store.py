@@ -74,6 +74,18 @@ class SweepStore:
                                   f"no existe el recorrido '{name}'", "")
         write_json_atomic(self.path(name) / "stop.json", {"requested_at": time.time()})
 
+    def delete(self, name: str) -> None:
+        """Remove the sweep dir ONLY. The child runs are the caller's problem —
+        deleting a sweep without its runs would orphan them, so the orchestration
+        (guards + cascade) lives in runner.delete_sweep, never here."""
+        d = self.path(name)
+        if not self.exists(name):
+            raise SweepStoreError("sweep_not_found",
+                                  f"no existe el recorrido '{name}'", "nada que borrar")
+        for f in sorted(d.rglob("*"), reverse=True):
+            f.unlink() if f.is_file() else f.rmdir()
+        d.rmdir()
+
     def clear_stop(self, name: str) -> None:
         (self.path(name) / "stop.json").unlink(missing_ok=True)
 

@@ -1,5 +1,7 @@
 """H: expansion with declared discards, sequential run, resume, ranking."""
 
+import pytest
+
 from tests.conftest import TINY_NET
 
 
@@ -51,6 +53,35 @@ def test_sweep_runs_ranks_and_resumes(world):
     # resume is idempotent: finished points are counted, not redone
     state2 = run_sweep("sw1", store, rstore)
     assert state2["done"] == 2
+
+
+def test_delete_sweep_cascades_and_leaves_no_orphan(world):
+    from fv.sweeps.runner import delete_sweep, prepare_sweep, run_sweep
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    store, rstore = SweepStore(), RunStore()
+    prepare_sweep("swd", _spec(world, points=1, epochs=1), TINY_NET, store)
+    run_sweep("swd", store, rstore)
+    assert rstore.exists("swd-0000")
+    out = delete_sweep("swd", store, rstore)
+    assert out["deleted"] == "swd" and out["runs_deleted"] == ["swd-0000"]
+    # both gone: the sweep AND its child — nothing points at a missing parent
+    assert not store.exists("swd")
+    assert not rstore.exists("swd-0000")
+    assert rstore.used_by_sweep("swd") == []
+
+
+def test_delete_running_sweep_is_refused(world):
+    from fv.sweeps.runner import delete_sweep
+    from fv.sweeps.store import SweepStore, SweepStoreError
+    from fv.training.registry import RunStore
+    store, rstore = SweepStore(), RunStore()
+    store.create("live", _spec(world, points=1, epochs=1))
+    store.set_state("live", "running", done=0, total=1)
+    with pytest.raises(SweepStoreError) as e:
+        delete_sweep("live", store, rstore)
+    assert e.value.code == "sweep_is_running"
+    assert store.exists("live")   # refused, nothing removed
 
 
 def test_sweep_stop_between_points(world):

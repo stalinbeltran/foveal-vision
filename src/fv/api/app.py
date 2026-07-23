@@ -26,7 +26,7 @@ from fv.inference.predict import predict_image
 from fv.metrics import corner_evidence
 from fv.models.builder import full_config, network_trace
 from fv.models.store import NetworkStore, NetworkStoreError
-from fv.sweeps.runner import prepare_sweep, run_sweep, sweep_trials
+from fv.sweeps.runner import delete_sweep, prepare_sweep, run_sweep, sweep_trials
 from fv.sweeps.spec import SweepError
 from fv.sweeps.store import SweepStore, SweepStoreError
 from fv.training.loop import train
@@ -45,7 +45,7 @@ NOT_FOUND_CODES = {"source_not_found", "sample_not_found", "window_dataset_missi
 CONFLICT_CODES = {"window_dataset_exists", "window_dataset_in_use", "network_exists",
                   "recipe_exists", "run_exists", "run_is_running", "sweep_exists",
                   "run_without_provenance", "run_has_no_checkpoint",
-                  "window_dataset_changed", "split_empty"}
+                  "window_dataset_changed", "split_empty", "sweep_is_running"}
 
 
 def _http_error(e) -> HTTPException:
@@ -459,6 +459,12 @@ def create_app() -> FastAPI:
     def stop_sweep(name: str):
         sstore.request_stop(name)
         return {"stopping": name}
+
+    @app.delete("/sweeps/{name}")
+    def delete_sweep_ep(name: str):
+        # cascade: a child run can't be deleted alone (its points compare
+        # together), so the sweep owns them — orchestration in the runner
+        return delete_sweep(name, sstore, runs)
 
     @app.post("/sweeps/{name}/resume", status_code=202)
     def resume_sweep(name: str):

@@ -118,8 +118,14 @@ def test_sweep_over_http(world, client):
     trials = client.get("/sweeps/s1/trials").json()
     assert len(trials["trials"]) == 2
     assert trials["trials"][0]["value"] is not None
-    # a sweep child cannot be deleted alone
+    # a sweep child cannot be deleted alone (would orphan it from its siblings)
     assert client.delete("/runs/s1-0000").status_code == 409
+    # deleting the sweep cascades to its runs — the supported path, no orphan left
+    d = client.delete("/sweeps/s1")
+    assert d.status_code == 200
+    assert set(d.json()["runs_deleted"]) == {"s1-0000", "s1-0001"}
+    assert client.get("/sweeps/s1").status_code == 404
+    assert client.get("/runs/s1-0000").status_code == 404
 
 
 def test_network_validate_returns_dims_and_ranges(world, client):

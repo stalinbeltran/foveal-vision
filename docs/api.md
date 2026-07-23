@@ -125,7 +125,14 @@ GET  /sweeps/{name}             spec + progreso
 GET  /sweeps/{name}/trials      tabla ordenada por objetivo
 POST /sweeps/{name}/stop        cooperativo (corta entre puntos)
 POST /sweeps/{name}/resume → job  (retira la petición de parada; 409 si corre o si cumplió presupuesto)
+DELETE /sweeps/{name}           cascada: borra el recorrido Y sus runs hijos (409 si algo corre)
 ```
+
+**Borrar en cascada, no huérfanos.** Un run hijo se niega a borrarse solo (`DELETE /runs/{n}` →
+409: sus puntos se comparan juntos); el recorrido es su dueño, así que `DELETE /sweeps/{n}` los
+borra a todos —hijos primero, padre después— y devuelve `{deleted, runs_deleted}`. Se niega con
+`sweep_is_running` si el recorrido o cualquier hijo sigue en marcha: nunca borra trabajo vivo ni
+deja un run apuntando a un padre inexistente.
 
 - `space` admite campos de **C y/o D**; los rangos de geometría admiten `"auto"` (los pone
   `build_search_space(N, …)`).

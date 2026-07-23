@@ -16,6 +16,10 @@ export default function Sweeps() {
   const [error, setError] = useState<unknown>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [trials, setTrials] = useState<any>(null);
+  const [sf, setSf] = useState({
+    window_dataset: "", base_network: "", base_recipe: "", objective: "", q: "",
+  });
+  const [foldDone, setFoldDone] = useState(false);
   const [form, setForm] = useState<any>({
     name: "", window_dataset: "", base_network: "", base_recipe: "",
     objective: "f1", strategy: "grid", points: 0, epochs: 2,
@@ -60,6 +64,18 @@ export default function Sweeps() {
   const nineViolated = form.objective === "loss" &&
     ["lambda_pos", "pos_weight", "smooth_l1_beta"].some((k) => k in space);
 
+  const removeSweep = (s: any) => {
+    const n = s.state?.done ?? 0;
+    if (!window.confirm(
+      `¿Borrar el recorrido '${s.name}' y sus runs (${n} completados)? ` +
+      `Se borran en cascada — no se puede deshacer.`)) return;
+    setError(null);
+    api.del(`/sweeps/${s.name}`).then(() => {
+      if (sel === s.name) { setSel(null); setTrials(null); }
+      refresh();
+    }).catch(setError);
+  };
+
   const launch = async () => {
     setError(null);
     try {
@@ -73,6 +89,34 @@ export default function Sweeps() {
       setSel(form.name);
     } catch (e) { setError(e); }
   };
+
+  // Facets over the sweep list: same idea as Runs (B/C/D + objetivo + buscar).
+  // Estado is not a facet here — it drives the partition into Activos/Terminados.
+  const allSweeps = sweeps ?? [];
+  const sdistinct = (path: (s: any) => any) =>
+    [...new Set(allSweeps.map(path).filter((v) => v != null))].sort() as string[];
+  const sopts = {
+    window_dataset: sdistinct((s) => s.spec.window_dataset),
+    base_network: sdistinct((s) => s.spec.base_network),
+    base_recipe: sdistinct((s) => s.spec.base_recipe),
+    objective: sdistinct((s) => s.spec.objective),
+  };
+  const ACTIVE = ["running", "queued"];
+  const sfiltered = allSweeps.filter((s) => {
+    if (sf.window_dataset && s.spec.window_dataset !== sf.window_dataset) return false;
+    if (sf.base_network && s.spec.base_network !== sf.base_network) return false;
+    if (sf.base_recipe && s.spec.base_recipe !== sf.base_recipe) return false;
+    if (sf.objective && s.spec.objective !== sf.objective) return false;
+    if (sf.q && !s.name.toLowerCase().includes(sf.q.toLowerCase())) return false;
+    return true;
+  });
+  const bucketOf = (s: any) => (ACTIVE.includes(s.state?.status) ? 0 : 1);
+  const ssorted = [...sfiltered].sort((a, b) =>
+    bucketOf(a) - bucketOf(b) || a.name.localeCompare(b.name));
+  const activeCount = sfiltered.filter((s) => bucketOf(s) === 0).length;
+  const doneCount = sfiltered.length - activeCount;
+  const sAnyFilter = Object.values(sf).some((v) => v !== "");
+  let lastBucket = -1;
 
   return (
     <div>
@@ -142,33 +186,87 @@ export default function Sweeps() {
         </div>
         <div className="card grow">
           <h3 style={{ marginTop: 0 }}>Recorridos</h3>
+          <div className="filters" style={{ marginBottom: 12 }}>
+            <select value={sf.window_dataset}
+              onChange={(e) => setSf({ ...sf, window_dataset: e.target.value })}>
+              <option value="">B: todos</option>
+              {sopts.window_dataset.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <select value={sf.base_network}
+              onChange={(e) => setSf({ ...sf, base_network: e.target.value })}>
+              <option value="">C: todas</option>
+              {sopts.base_network.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <select value={sf.base_recipe}
+              onChange={(e) => setSf({ ...sf, base_recipe: e.target.value })}>
+              <option value="">D: todas</option>
+              {sopts.base_recipe.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <select value={sf.objective}
+              onChange={(e) => setSf({ ...sf, objective: e.target.value })}>
+              <option value="">Objetivo: todos</option>
+              {sopts.objective.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <input placeholder="buscar…" value={sf.q}
+              onChange={(e) => setSf({ ...sf, q: e.target.value })} />
+            {sAnyFilter ? <button className="secondary" onClick={() =>
+              setSf({ window_dataset: "", base_network: "", base_recipe: "", objective: "", q: "" })
+            }>limpiar</button> : null}
+          </div>
           <Working on={!sweeps} />
           {sweeps ? (
             <table className="data" data-testid="sweeps-table">
               <thead><tr><th>nombre</th><th>estado</th><th>progreso</th><th>objetivo</th>
                 <th></th></tr></thead>
               <tbody>
-                {sweeps.map((s) => (
-                  <tr key={s.name} className={sel === s.name ? "sel" : ""}
-                      onClick={() => setSel(s.name)}>
-                    <td>{s.name}</td>
-                    <td><Badge status={s.state.status} /></td>
-                    <td>{s.state.done ?? 0}/{s.state.total ?? s.spec.points?.length ?? "?"}</td>
-                    <td>{s.spec.objective}</td>
-                    <td>
-                      <button className="secondary" onClick={(ev) => {
-                        ev.stopPropagation();
-                        api.post(`/sweeps/${s.name}/stop`).then(refresh).catch(setError);
-                      }}>parar</button>{" "}
-                      <button className="secondary" onClick={(ev) => {
-                        ev.stopPropagation();
-                        api.post(`/sweeps/${s.name}/resume`).then(refresh).catch(setError);
-                      }}>reanudar</button>
-                    </td>
-                  </tr>
-                ))}
+                {ssorted.flatMap((s) => {
+                  const bucket = bucketOf(s);
+                  const rows: React.ReactNode[] = [];
+                  if (bucket !== lastBucket) {
+                    lastBucket = bucket;
+                    const isDone = bucket === 1;
+                    rows.push(
+                      <tr key={`hdr-${bucket}`} className="grouprow"
+                          onClick={() => isDone && setFoldDone(!foldDone)}
+                          style={isDone ? { cursor: "pointer" } : undefined}>
+                        <td colSpan={5}>
+                          <span className="glabel">{isDone ? "Terminados" : "Activos"}</span>
+                          {isDone ? doneCount : activeCount}
+                          {isDone ? <span className="sub"> · {foldDone ? "▸ mostrar" : "▾ plegar"}</span> : null}
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (bucket === 1 && foldDone) return rows;
+                  rows.push(
+                    <tr key={s.name} className={sel === s.name ? "sel" : ""}
+                        onClick={() => setSel(s.name)}>
+                      <td>{s.name}</td>
+                      <td><Badge status={s.state.status} /></td>
+                      <td>{s.state.done ?? 0}/{s.state.total ?? s.spec.points?.length ?? "?"}</td>
+                      <td>{s.spec.objective}</td>
+                      <td className="rowactions">
+                        <button className="linkbtn" onClick={(ev) => {
+                          ev.stopPropagation();
+                          api.post(`/sweeps/${s.name}/stop`).then(refresh).catch(setError);
+                        }}>parar</button>
+                        <button className="linkbtn" onClick={(ev) => {
+                          ev.stopPropagation();
+                          api.post(`/sweeps/${s.name}/resume`).then(refresh).catch(setError);
+                        }}>reanudar</button>
+                        <button className="linkbtn danger" onClick={(ev) => {
+                          ev.stopPropagation(); removeSweep(s);
+                        }}>borrar</button>
+                      </td>
+                    </tr>
+                  );
+                  return rows;
+                })}
               </tbody>
             </table>
+          ) : null}
+          {sweeps && !sfiltered.length ? (
+            <p className="sub">{allSweeps.length ? "Ningún recorrido pasa los filtros." : "No hay recorridos."}</p>
           ) : null}
           {sel && trials ? (
             <div style={{ marginTop: 14 }}>

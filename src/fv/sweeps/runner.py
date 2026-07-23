@@ -11,7 +11,7 @@ import dataclasses
 
 from fv.ioutils import read_json_retrying
 from fv.sweeps.spec import OBJECTIVES, SweepError, check_sweep, expand_points
-from fv.sweeps.store import SweepStore
+from fv.sweeps.store import SweepStore, SweepStoreError
 from fv.training.loop import train
 from fv.training.recipe import Recipe
 from fv.training.registry import RunError, RunStore
@@ -92,6 +92,37 @@ def run_sweep(name: str, store: SweepStore | None = None,
             progress(done, len(valid), run_name)
     store.set_state(name, "done", done=done, total=len(valid))
     return store.state(name)
+
+
+def delete_sweep(name: str, store: SweepStore | None = None,
+                 run_store: RunStore | None = None) -> dict:
+    """Delete a sweep AND its child runs, as one unit. A child run refuses to be
+    deleted on its own (it belongs to the sweep — its points are compared
+    together), so the sweep owns them: removing the sweep cascades to its runs.
+    Refuses while anything is live, with the reason and the fix — never orphans a
+    run and never deletes work in progress."""
+    store = store or SweepStore()
+    run_store = run_store or RunStore()
+    if not store.exists(name):
+        raise SweepStoreError("sweep_not_found",
+                              f"no existe el recorrido '{name}'", "nada que borrar")
+    state = store.state(name).get("status")
+    if state in ("running", "queued"):
+        raise SweepStoreError(
+            "sweep_is_running", f"el recorrido '{name}' esta {state}",
+            "paralo antes de borrarlo")
+    children = run_store.used_by_sweep(name)
+    live = [c for c in children
+            if run_store.status(c).get("status") in ("running", "queued")]
+    if live:
+        raise SweepStoreError(
+            "sweep_is_running",
+            f"runs del recorrido aun en marcha: {', '.join(live)}",
+            "paralos antes de borrar el recorrido")
+    for c in children:            # cascade: hijos primero, luego el padre
+        run_store.delete(c)
+    store.delete(name)
+    return {"deleted": name, "runs_deleted": children}
 
 
 def sweep_trials(name: str, store: SweepStore | None = None,

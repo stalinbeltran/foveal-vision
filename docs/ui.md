@@ -80,10 +80,19 @@ polling, negativas con `hint` visible.)*
   ofrecen **desde los rangos calculados** (marcar cuáles entran, restringirlos, o `auto`);
   estrategia, objetivo (con el bloqueo del ⑨ activo en el formulario), presupuesto **con su
   unidad declarada** (épocas o segundos); tabla de puntos ordenada por objetivo; parar/reanudar.
-  Muestra el límite de workers y por qué en CPU es 1.
-- **Runs (E)**: lista (una fila: estado, procedencia por nombre, monitor, s/época) y detalle
-  (procedencia entera, `execution`, curvas en small multiples, todas las épocas). Renombrar
-  navega a la URL nueva.
+  Muestra el límite de workers y por qué en CPU es 1. La **lista** ofrece las mismas facetas que
+  Runs que aplican (B, C, D, objetivo, búsqueda) y se **parte por estado**: Activos arriba,
+  Terminados debajo (plegable). **Borrar un recorrido borra en cascada sus runs hijos** (un run
+  hijo no se borra solo: sus puntos se comparan juntos) — se confirma antes y se niega si algo
+  está en marcha, para no dejar huérfanos.
+- **Runs (E)**: lista y detalle. La lista **agrupa por jerarquía de dominio B → C → D** (el árbol
+  colapsa solo los niveles con un único valor tras filtrar), ofrece por fila **renombrar y borrar**
+  (borrar se niega con su razón si el run pertenece a un recorrido), y expone **facetas** —B, C, D,
+  recorrido (con "sin recorrido"), estado, monitor y búsqueda por nombre— que podan el conjunto;
+  las opciones de cada faceta salen de los valores presentes, nunca ofrecen vacío. Filtrar hasta
+  una sola combinación degrada el árbol a tabla plana. Una fila: estado, recorrido padre, monitor,
+  best, s/época. El detalle: procedencia entera, `execution`, curvas en small multiples, todas
+  las épocas. Renombrar navega a la URL nueva.
 - **Diagnóstico (E×B)**: elegir run y split; las vistas leen la tabla-caché por ventana. La
   galería va peor-primero y filtra por resultado al umbral puesto — mover el umbral no recalcula
   nada.

@@ -146,6 +146,13 @@ class RunStore:
                 out.append(r["name"])
         return out
 
+    def used_by_sweep(self, sweep_name: str) -> list[str]:
+        out = []
+        for r in self.list():
+            if r.get("sweep") == sweep_name:
+                out.append(r["name"])
+        return out
+
     def rename(self, name: str, new_name: str) -> None:
         if self.status(name).get("status") == "running":
             raise RunError("run_is_running", f"'{name}' esta corriendo",
