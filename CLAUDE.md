@@ -85,6 +85,7 @@ Los demás documentos, en orden de lectura:
 | [docs/protocolo.md](docs/protocolo.md) | Cuándo un resultado es creíble. **Léelo antes de sacar conclusiones de un entrenamiento** |
 | [docs/api.md](docs/api.md) · [docs/ui.md](docs/ui.md) | La organización proyectada sobre HTTP y sobre pantallas |
 | [docs/plan.md](docs/plan.md) | El plan de ejecución, por fases verticales |
+| [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) | **DISEÑO, sin implementar.** Barrido OAT (un eje a la vez) con base derivada del problema, defaults estáticos, arrastre del ganador y schedule. El código se genera en otra sesión |
 | [docs/formatos.md](docs/formatos.md) · [docs/tests.md](docs/tests.md) | Los artefactos en disco; qué se testea |
 | [docs/decisiones.md](docs/decisiones.md) | Lo que sigue sin decidir, y qué bloquea. **No tomes tú una decisión que esté ahí: pregunta** |
 | [docs/glosario.md](docs/glosario.md) | Las palabras que significan dos cosas |
