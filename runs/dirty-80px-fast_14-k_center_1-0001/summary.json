@@ -1,0 +1,17 @@
+{
+  "run": "dirty-80px-fast_14-k_center_1-0001",
+  "epochs_run": 12,
+  "epochs_requested": 12,
+  "stopped_early": false,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.4051353862652412,
+  "best_epoch": 12,
+  "seconds_per_epoch": 13.674,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
