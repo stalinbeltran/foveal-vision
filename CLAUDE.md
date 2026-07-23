@@ -157,7 +157,8 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
 
 - **Idioma**: el usuario se comunica en español; documentación de alto nivel en español. El
   código (identificadores, docstrings) en inglés.
-- **Commits**: cada tarea terminada acaba en un commit descriptivo.
+- **Commits**: cada tarea terminada acaba en un commit descriptivo. Además, **cada cambio
+  solicitado por el usuario, una vez completado, se cierra con su propio commit descriptivo.**
 - **Stack**: Python 3.12 (PyTorch no tiene wheels para 3.14) + PyTorch + FastAPI + Vite/React.
   En Windows el intérprete será `.\.venv\Scripts\python.exe`. Paquete `fv`, layout `src/`.
 - **Tests**: `.\.venv\Scripts\python -m pytest -q` desde la raíz, antes de commitear código.
