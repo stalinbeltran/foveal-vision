@@ -1,11 +1,13 @@
 # Barrido por ejes (OAT) con base derivada del problema
 
-> **Estado: DISEÑO, sin implementar.** Este documento especifica una funcionalidad cuyo código
-> se generará en otra sesión. No asume nada: donde una regla no está fijada, se marca
-> **[DECISIÓN ABIERTA]** y no debe inventarse al codificar — se pregunta.
+> **Estado: DISEÑO, decisiones cerradas — sin implementar.** Este documento especifica una
+> funcionalidad cuyo código se generará en otra sesión. **Las decisiones abiertas se resolvieron
+> con el usuario el 2026-07-23; los valores fijados están en §13 y mandan.** Los marcadores
+> `[DECIDIDO D-xx]` del cuerpo llevan el valor elegido; lo no listado en §13 se sigue preguntando,
+> no se inventa.
 >
 > Cuando la funcionalidad se construya y verifique, actualícese el bloque «Estado actual» de
-> [CLAUDE.md](../CLAUDE.md) y ciérrense aquí las decisiones abiertas.
+> [CLAUDE.md](../CLAUDE.md).
 
 ## 0. Qué es esto y por qué
 
@@ -107,33 +109,32 @@ Para cada rama (centro y periferia), con `L = n_layers` capas conv apiladas:
   capas del centro; `k_periph` para todas las de la periferia), con `padding = k // 2` (como hoy).
 - **Canales por capa:** un vector de longitud `L`. Entrada de la capa 1 = 1 canal (imagen
   compuesta enmascarada); la capa `i` produce `channels[i]`.
-- **Stride por capa:** **[DECISIÓN ABIERTA D-S1]** — dónde caen los strides con `L` capas. La
-  regla que **preserva el comportamiento actual** (y por tanto la recomendada por defecto) es:
-  *el stride de la rama (`s_center` / `s_periph`) se aplica en la **primera** capa; las
-  siguientes van con stride 1.* Debe confirmarse antes de codificar; si se elige otra
-  distribución, `stride_range` (que ya recibe `n_layers`) sigue acotando el producto acumulado.
+- **Stride por capa: [DECIDIDO D-S1]** — *el stride de la rama (`s_center` / `s_periph`) se aplica
+  en la **primera** capa; las siguientes van con stride 1.* Preserva el comportamiento actual.
+  **Consecuencia:** el submuestreo total es `s`, independiente de `L`, así que **`n_layers` se
+  saca de `stride_range`** — el rango de stride no depende de la profundidad.
 - **Fusión (`merge`):** igual que hoy — `concat` aplana ambas ramas y concatena; `sum` suma
   mapas alineados (el validador exige strides iguales por rama para `sum`).
 - **Cabeza:** sin cambios — `Linear(flat_features, 12)` → `view(-1, 4, 3)` (cabezas de esquina,
   decisión C9). `flat_features` se infiere con el mismo mecanismo de hoy
   ([`_infer_flat_features`](../src/fv/models/builder.py#L74-L80)) tras construir las `L` capas.
-- **Profundidad por rama:** **[DECISIÓN ABIERTA D-S2]** — ¿`n_layers` es único para ambas ramas o
-  uno por rama? Recomendado: **único y simétrico** (más simple); profundidad por rama queda como
-  eje futuro. Confirmar.
+- **Profundidad por rama: [DECIDIDO D-S2]** — `n_layers` **único y simétrico** (ambas ramas igual
+  de profundas). Profundidad por rama queda como eje futuro.
 
 ### 3.2 Canales: regla del vector por defecto
 
 Los canales son el eje que más infla el espacio y su rango `"auto"` continuo pertenece a
-Optuna (instructionsNewNN.md §9) — **[DECISIÓN ABIERTA D-C1: regla de rango auto de canales,
-p. ej. potencias de 2 hasta un tope]**, que **puede aplazarse** porque el usuario dará rangos
+Optuna (instructionsNewNN.md §9) — **[DECIDIDO D-C1: aplazado]**, porque el usuario dará rangos
 explícitos (U5).
 
-Lo que **sí** hay que fijar ahora es el **vector de canales por defecto** para una `L` dada
-(parte de los defaults estáticos de §4, porque cuando se barre otro eje los canales están fijos):
+El **vector de canales por defecto** para una `L` dada (parte de los defaults estáticos de §4,
+porque cuando se barre otro eje los canales están fijos):
 
-- **[DECISIÓN ABIERTA D-C2]** Regla propuesta: `channels[i] = ch_base * 2**i`, con `ch_base = 16`,
-  hasta un tope. Para `L=2` da `[16, 32]` — **idéntico a hoy** (`ch1=16, ch2=32`), preservando los
-  runs existentes. Confirmar `ch_base`, el tope y la progresión antes de codificar.
+- **[DECIDIDO D-C2]** **Constante `16` en todas las capas** (`channels = [16] * L`). ⚠ Esto
+  **cambia** el default de hoy (`[16, 32]`): el modelo derivado por defecto ya no coincide en pesos
+  ni forma con `fov-16`. No rompe nada —los runs de ejemplo se descartan (§13) y `fov-16` migra su
+  `[16, 32]` explícito tal cual—, pero el test de no-regresión se redacta con `channels=[16,32]`
+  **explícito**, no con el default (§12, §13).
 
 ### 3.3 Introspección (V1/V2) tras el cambio
 
@@ -144,17 +145,11 @@ rama), así que `kernels()` y `feature_maps()`
 
 ### 3.4 Config: forma del campo de canales
 
-**[DECISIÓN ABIERTA D-C3]** El config C hoy tiene `ch1`, `ch2` escalares. El builder paramétrico
-necesita un vector. Dos formas posibles, elegir una y documentarla en formatos.md:
-
-- **(a) Lista explícita:** `channels: [16, 32, 64]` (longitud = `n_layers`). Elimina `ch1/ch2`.
-- **(b) Base + regla:** `ch_base: 16` + regla de §3.2, `channels` derivado. `n_layers` fija la
-  longitud.
-
-Recomendado **(a)** por transparencia y por encajar con «barrer la dimensión de la capa i» (§6),
-que necesita direccionar cada capa individualmente. La migración de los configs/runs existentes
-(`ch1=16, ch2=32` → `channels=[16,32]`) debe ser compatible hacia atrás (leer ambos, escribir el
-nuevo).
+**[DECIDIDO D-C3]** El config C pasa de `ch1`, `ch2` escalares a **lista explícita**
+`channels: [16, 32, 64]` (longitud = `n_layers`), documentado en formatos.md. Se eligió sobre
+«base + regla» por transparencia y por encajar con «barrer la dimensión de la capa i» (§6), que
+necesita direccionar cada capa individualmente. **Compatibilidad hacia atrás:** se **lee** el
+`ch1/ch2` viejo (`ch1=16, ch2=32` → `channels=[16,32]`) y se **escribe** siempre `channels`.
 
 ---
 
@@ -180,7 +175,7 @@ Tabla de defaults (valores actuales de `NETWORK_DEFAULTS`, salvo `N`):
 | `n_layers` | 2 | preserva el modelo actual |
 | `k_center`, `k_periph` | 3 | kernels mínimos válidos |
 | `s_center`, `s_periph` | 1 | sin submuestreo por stride |
-| `channels` | `[16, 32]` para `L=2` | según regla §3.2 / forma §3.4 |
+| `channels` | `[16]*L` (constante 16) | D-C2; ⚠ cambia el default de hoy `[16,32]` (§3.2 / §3.4) |
 | `merge` | `concat` | `sum` exige strides iguales |
 | `pool_mode` | `avg` | trazos finos |
 | `pad_mode` | `edge` | decisión C10/C11 |
@@ -202,9 +197,8 @@ de ahí la geometría se calcula.
 
 - `window_size` `W`: del manifest del dataset B seleccionado.
 - Fracciones de forma con default estático (§4): `c_frac`, `pen_frac`, `d`.
-  - **[DECISIÓN ABIERTA D-G1]** ¿Qué expone el derivador y qué fija? Recomendado: exponer `d` y
-    la forma del anillo; `pen_frac` fijo por defecto. Confirmar qué fracciones son visibles en la
-    UI y cuáles quedan ocultas.
+  - **[DECIDIDO D-G1]** El derivador **expone `d` y `c_frac`**; `pen_frac` queda **fijo** (0.1).
+    (OAT igual puede barrer cualquiera como eje de rango explícito — F5.)
 - El **eje a barrer** + su **rango** (`"auto"` o lista explícita, U5).
 - **Ganadores arrastrados** (§7): valores ya fijados de ejes decididos en pasos previos.
 
@@ -215,8 +209,11 @@ de ahí la geometría se calcula.
 2. **Geometría:** con `c_frac` default, `N` es el par tal que
    `round_to_even(N * c_frac) == W` y `(N - W)/2 = periph_out ≥ 1`. Derivar `dims` con
    `derive_dims(N, c_frac, d, pen_frac)`.
-   **[DECISIÓN ABIERTA D-G2]** Si varios `N` cumplen, elegir el que da `c_frac` efectivo más
-   cercano al default (documentar el criterio de desempate).
+   **[DECIDIDO D-G2]** Si varios `N` cumplen, elegir **el `N` más pequeño** (determinista y el más
+   barato en cómputo).
+   **[DECIDIDO D-G3]** Si **ningún `N` par** cumple ①a con el `c_frac` default (y `periph_out ≥ 1`),
+   **aflojar `c_frac`** dentro de una tolerancia hasta que exista `N`, y **registrar el `c_frac`
+   efectivo con su razón** (como el paso 4; nunca a ciegas). `W` no se toca — viene de B.
 3. **Tunables:** rellenar todos los campos NO barridos con los defaults estáticos (§4), aplicando
    sobre ellos los **ganadores arrastrados** (§7).
 4. **Validar `d` y kernels contra la geometría derivada:** un default estático puede ser inválido
@@ -253,13 +250,11 @@ Para procesos largos el usuario define **el orden de barrido**. El ejemplo del u
 
 ### 6.2 Representación propuesta del schedule
 
-**[DECISIÓN ABIERTA D-H1]** ¿El schedule es un **objeto nuevo** (un «estudio» de primera clase,
-comiteable como las recetas) o **metadatos** de una serie de recorridos? Recomendado: un
-**plan comiteable** (JSON/YAML), coherente con «se versiona la descripción» (formatos.md §5), que
-**no ejecuta** (Alt A es manual): describe el orden y las dependencias, y la herramienta guía al
-usuario paso a paso (pre-rellena el siguiente recorrido con la base derivada + ganadores
-arrastrados). Confirmar si vive en `sweeps/` o en un directorio propio, y si extiende H o es
-dominio nuevo (organizacion.md manda).
+**[DECIDIDO D-H1]** El schedule es un **objeto de primera clase comiteable, en un dominio nuevo
+(`studies/`), que NO ejecuta.** Es un plan (JSON/YAML), coherente con «se versiona la descripción»
+(formatos.md §5): describe el orden y las dependencias, y la herramienta guía al usuario paso a
+paso (pre-rellena el siguiente recorrido con la base derivada + ganadores arrastrados). **Hay que
+registrar en organizacion.md el dominio nuevo `studies/`** y su frontera con H.
 
 Esquema propuesto (ilustrativo, nombres a confirmar):
 
@@ -327,11 +322,12 @@ secas». Ingredientes ya disponibles:
 - **Significancia:** exige **N semillas** por punto (§11); sin varias semillas «no supera
   significativamente» no está definido.
 
-**[DECISIÓN ABIERTA D-W1]** La regla exacta. Propuesta (estilo «1-SE / Pareto»): *elegir el valor
-más barato cuya calidad no sea peor que la del mejor por más de un margen `δ`* (en unidades del
-objetivo o en desviaciones estándar entre semillas). Fijar `δ`, la métrica de coste (tiempo vs
-params) y si la regla es automática o solo **sugerida** (Alt A es manual: la herramienta puede
-proponer el ganador y el usuario confirmarlo).
+**[DECIDIDO D-W1]** La regla, **sugerida (el usuario confirma)**: la herramienta propone *el valor
+más barato cuya calidad no sea peor que la del mejor por más de un margen `δ`* (estilo «1-SE /
+Pareto»), con `δ` y la métrica de coste (tiempo vs params) **a la vista**, y el usuario aprieta el
+gatillo antes de arrastrar el ganador (coherente con un schedule que guía, no ejecuta). `δ` y la
+métrica de coste son entradas del estudio; la confirmación exige las N semillas en **ambos**
+candidatos de la frontera (§11.1), no solo el provisional.
 
 ---
 
@@ -350,13 +346,14 @@ strategy, objective, budget{points,epochs}, device, seed, name, points, discarde
 Hoy `create_sweep` **resuelve un nombre**: `net = nstore.get(body["base_network"])`. Para base
 inline (U4) hay que permitir **pasar el config directamente** en vez de un nombre.
 
-**[DECISIÓN ABIERTA D-H2]** Forma exacta de la extensión. Propuesta:
+**[DECIDIDO D-H2]** Forma de la extensión:
 
 - `base_network` (nombre) pasa a **opcional**. Si falta, se usa `base_network_value` tal cual
   (config inline ya resuelto por el derivador).
 - Añadir una **etiqueta sintética** legible para la UI (el filtro por nombre de red muere sin
-  nombre — ver [Sweeps.tsx](../web/src/screens/Sweeps.tsx#L123)): p. ej.
-  `base_label: "ws16·p2·d2·L2"`, derivada de la geometría, para filtrar y leer de un vistazo.
+  nombre — ver [Sweeps.tsx](../web/src/screens/Sweeps.tsx#L123)): `base_label: "ws16-p2-d2-L2"`
+  **con separador guion** (seguro como filtro y nombre de fichero; el middot se descartó), derivada
+  de la geometría, para filtrar y leer de un vistazo.
 - Añadir el bloque de **derivación** (procedencia del generador), para reconstruir la cadena:
 
 ```jsonc
@@ -399,13 +396,13 @@ y el espacio barre un peso de la pérdida, se rechaza. El generador no lo elude:
 | Derivador de base desde `window_size` | **G/C** | nuevo módulo (p. ej. `src/fv/models/derive.py`) | ①a (`center_out==window_size`) |
 | Base inline en el recorrido | **H** | `src/fv/sweeps/spec.py`, `runner.py`, `api/app.py` | ⑧ (B fijo), ⑨ |
 | Generador de receta (P1) | **H** | nuevo (p. ej. `src/fv/sweeps/generate.py` + CLI `fv-oat`) | — |
-| Schedule OAT (plan) | **H** o dominio nuevo | **[D-H1]** | — |
+| Schedule OAT (plan) | **dominio nuevo `studies/`** | plan comiteable, guía al recorrido | — |
 | Arrastre del ganador | **H** | `src/fv/sweeps/runner.py` (lee ganador), generador | — |
 | Etiqueta sintética + filtros | **UI** | `web/src/screens/Sweeps.tsx` | — |
 
 **Antes de codificar hay que escribir en [organizacion.md](organizacion.md):** (a) que H puede
-tener **base inline** (no solo red con nombre) y qué contrato lo cubre; (b) si el **schedule** es
-extensión de H o dominio nuevo. No dejarlo implícito.
+tener **base inline** (no solo red con nombre) y qué contrato lo cubre; (b) el **dominio nuevo
+`studies/`** (D-H1) y su frontera con H. No dejarlo implícito.
 
 **Relación con decisiones abiertas existentes** ([decisiones.md](decisiones.md)):
 - **F5** (¿`c_frac`/`pen_frac` barribles?): OAT los alcanza como ejes con **rango explícito**, un
@@ -444,9 +441,13 @@ CLAUDE.md, «Observaciones de esta máquina»). Política de **dos niveles**:
 
 - **Sondeo rápido:** 1 semilla sobre un dataset B **pequeño** (ya seleccionable — U del enunciado
   original) para **rankear y descartar** dentro de cada eje.
-- **Confirmación:** N semillas solo para **confirmar el ganador** antes de arrastrarlo (§7).
+- **Confirmación:** N semillas (default 3) para **confirmar el ganador** antes de arrastrarlo (§7)
+  — corriéndolas en **ambos candidatos de la frontera** coste-calidad, no solo el provisional.
 
-**[DECISIÓN ABIERTA D-M1]** El `N` de confirmación. Multiplica todo el schedule: fijarlo antes.
+**[DECIDIDO D-M1]** El `N` de confirmación es **configurable por estudio, default 3** (sondeo 1 +
+confirmación 3). Multiplica el schedule, por eso es perilla: pocas en CPU corta, más en GPU larga.
+La confirmación corre las N semillas en **ambos candidatos de la frontera** coste-calidad, no solo
+en el provisional — si no, «no supera significativamente» no está definido.
 
 ### 11.2 Dataset pequeño: válido para rankear, no para concluir
 
@@ -485,23 +486,33 @@ se optimiza la fóvea sin comprobar que la fóvea sirve.
 
 ---
 
-## 13. Decisiones abiertas — resumen para la sesión de código
+## 13. Decisiones cerradas (2026-07-23)
 
-Ninguna debe inventarse; se preguntan antes de codificar la pieza que las toca.
+Resueltas con el usuario. **Estos valores mandan** sobre cualquier recomendación provisional del
+cuerpo. Lo no listado aquí se sigue preguntando; no se inventa.
 
-| ID | Tema | Recomendación provisional |
+| ID | Tema | **Decisión** |
 |---|---|---|
-| D-S1 | Dónde caen los strides con `L` capas | Stride de rama en la 1ª capa, resto stride 1 (preserva hoy) |
-| D-S2 | `n_layers` único o por rama | Único y simétrico |
-| D-C1 | Rango **auto** de canales (Optuna, §9) | Aplazar (U5 da rangos explícitos) |
-| D-C2 | Vector de canales **por defecto** para `L` | `16 * 2**i`, tope a confirmar (da `[16,32]` en `L=2`) |
-| D-C3 | Forma del campo de canales en el config | Lista explícita `channels: [...]`, compatible hacia atrás con `ch1/ch2` |
-| D-G1 | Qué fracciones expone el derivador | Exponer `d` y forma del anillo; `pen_frac` fijo |
-| D-G2 | Desempate si varios `N` cumplen ①a | `c_frac` efectivo más cercano al default |
-| D-H1 | Schedule: objeto nuevo o metadatos; ¿extiende H? | Plan comiteable, no ejecutor; ubicación a decidir |
-| D-H2 | Forma exacta de la base inline en el spec | `base_network` opcional + `base_label` + `derivation` |
-| D-W1 | Regla exacta de «ganador» coste/calidad | «1-SE/Pareto»: más barato dentro de `δ` del mejor |
-| D-M1 | `N` de semillas de confirmación | Fijar antes (multiplica el schedule) |
+| D-S1 | Dónde caen los strides con `L` capas | **Stride de rama en la 1ª capa, resto stride 1.** Consecuencia: **`n_layers` se saca de `stride_range`** (el submuestreo total es `s`, independiente de `L`) |
+| D-S2 | `n_layers` único o por rama | **Único y simétrico** (ambas ramas igual de profundas). Profundidad por rama = eje futuro |
+| D-C1 | Rango **auto** de canales (Optuna, §9) | **Aplazado** (U5 da rangos explícitos) |
+| D-C2 | Vector de canales **por defecto** para `L` | **Constante `16`** en todas las capas (`[16]*L`). ⚠ Cambia el default de hoy (`[16,32]`); ver nota de no-regresión abajo |
+| D-C3 | Forma del campo de canales en el config | **Lista explícita `channels: [...]`**; lee `ch1/ch2` viejo, escribe `channels` |
+| D-G1 | Qué fracciones expone el derivador | **Exponer `d` y `c_frac`; `pen_frac` fijo** (0.1) |
+| D-G2 | Desempate si varios `N` cumplen ①a | **El `N` más pequeño** (determinista, el más barato) |
+| D-G3 | **(nuevo)** Ningún `N` par factible para ese `W` | **Aflojar `c_frac`** dentro de tolerancia hasta que exista `N`, **registrando el `c_frac` efectivo con su razón** (nunca a ciegas). `W` no se toca (viene de B) |
+| D-H1 | Schedule: objeto nuevo o metadatos | **Objeto de primera clase comiteable, dominio nuevo (`studies/`), NO ejecutor** — describe orden y dependencias, guía paso a paso |
+| D-H2 | Forma exacta de la base inline en el spec | **Forma completa, separador guion**: `base_network=null` + `base_label:"ws16-p2-d2-L2"` + bloque `derivation{window_size, fractions, field_origin}` |
+| D-W1 | Regla de «ganador» coste/calidad | **Sugerida, el usuario confirma.** La herramienta propone «el más barato cuya calidad ≥ best−`δ`» (con `δ` y métrica de coste a la vista); el usuario aprieta el gatillo antes de arrastrar |
+| D-M1 | `N` de semillas de confirmación | **Configurable por estudio, default 3** (sondeo 1 + confirmación 3). La confirmación corre las N semillas en **ambos candidatos de la frontera**, no solo el provisional |
+
+**Checkpoints (hueco de la review):** los runs de ejemplo (`fov-run-1/2`, `cli-run-1`) **se
+descartan** — eran pruebas. El builder paramétrico nace sin deuda de migración de `state_dict`;
+no se escribe código de compatibilidad de pesos.
+
+**No-regresión con el nuevo default (D-C2):** como el default pasa a `[16,16]`, el test de §12 se
+redacta «con `channels=[16,32]` **dado explícitamente** se reproduce la forma/param-count de hoy»,
+no «el default reproduce hoy». El `fov-16` existente migra su `[16,32]` explícito tal cual.
 
 ---
 
