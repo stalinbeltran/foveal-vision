@@ -166,6 +166,15 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
   no probada como verificada.
 - `data/`, `runs/` y `sweeps/` son artefactos: **se versiona la descripción (configs, métricas,
   manifests, specs), se ignora la carga (`.npz`, `.pt`, `optuna.db`)** — formatos.md §5.
+- **Enlaces a ficheros en las respuestas**: siempre en formato markdown `[texto](ruta)` con la
+  ruta **relativa a la raíz del workspace** (nunca backticks ni ruta pelada), para que sean
+  clickeables en la extensión de VSCode. **No envuelvas el enlace entre paréntesis** ni pegues
+  puntuación al `)` de cierre: `(... [x](ruta) ...)` rompe la detección del enlace y deja de ser
+  clickeable. Déjalo suelto o sepáralo con `—`, dos puntos, o una coma con espacio.
+  **Los enlaces solo abren ficheros de texto (código fuente), no imágenes** — verificado
+  2026-07-23: un `.png` no abre al clicar aunque esté rastreado por git (no es el git-ignore, es
+  el tipo binario). Para una imagen (capturas de `data/ui-shots/`, etc.) NO ofrezcas un link
+  markdown que no abre: da la ruta para `Ctrl+P`/Go-to-File, o muéstrala inline con la tool Read.
 
 ## Observaciones de esta máquina (medidas en el proyecto hermano — no re-aprenderlas)
 
