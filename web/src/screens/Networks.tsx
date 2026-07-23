@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../api";
+import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 
 // C — the most important screen of this project: editing N and the fractions
@@ -35,7 +36,7 @@ function ZoneDiagram({ dims }: { dims: any }) {
 export default function Networks() {
   const [list, setList] = useState<any[]>([]);
   const [error, setError] = useState<unknown>(null);
-  const [form, setForm] = useState<any>(DEFAULTS);
+  const [form, setForm] = usePersistedState<any>("networks.form", DEFAULTS);
   const [validation, setValidation] = useState<any>(null);
 
   const refresh = () => api.get("/networks").then((d) => setList(d.networks)).catch(setError);

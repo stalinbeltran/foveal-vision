@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api, CORNERS, CORNER_CSS } from "../api";
+import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 import { WindowCanvas } from "../components/WindowCanvas";
 import { MatrixCanvas } from "../components/MatrixCanvas";
@@ -9,9 +10,9 @@ import { MatrixCanvas } from "../components/MatrixCanvas";
 // worst-first; a click opens the probes (input view F0, kernels, feature maps).
 export default function Diagnostics() {
   const [runs, setRuns] = useState<any[]>([]);
-  const [run, setRun] = useState("");
-  const [split, setSplit] = useState("val");
-  const [threshold, setThreshold] = useState(0.5);
+  const [run, setRun] = usePersistedState("diag.run", "");
+  const [split, setSplit] = usePersistedState("diag.split", "val");
+  const [threshold, setThreshold] = usePersistedState("diag.threshold", 0.5);
   const [summary, setSummary] = useState<any>(null);
   const [evidence, setEvidence] = useState<any>(null);
   const [gallery, setGallery] = useState<any>(null);
@@ -24,7 +25,7 @@ export default function Diagnostics() {
     api.get("/runs").then((d) => {
       const done = d.runs.filter((r: any) => ["done", "cancelled"].includes(r.status));
       setRuns(done);
-      if (done[0]) setRun(done[0].name);
+      setRun((cur) => (cur && done.some((r: any) => r.name === cur)) ? cur : (done[0]?.name ?? ""));
     }).catch(setError);
   }, []);
 

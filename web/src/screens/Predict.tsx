@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api, CORNERS, CORNER_CSS } from "../api";
+import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 
 // F — run + full image -> ALL the stages (raw / corners / paragraphs),
@@ -9,26 +10,27 @@ import { ErrorBox, Field, Working } from "../components/ui";
 export default function Predict() {
   const [runs, setRuns] = useState<any[]>([]);
   const [sources, setSources] = useState<any[]>([]);
-  const [run, setRun] = useState("");
-  const [source, setSource] = useState("");
+  const [run, setRun] = usePersistedState("predict.run", "");
+  const [source, setSource] = usePersistedState("predict.source", "");
   const [index, setIndex] = useState(0);
   const [count, setCount] = useState(1);
-  const [knobs, setKnobs] = useState({ threshold: 0.5, stride: 0, nms_radius: 0 });
+  const [knobs, setKnobs] = usePersistedState("predict.knobs", { threshold: 0.5, stride: 0, nms_radius: 0 });
   const [result, setResult] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [show, setShow] = useState({ raw: false, corners: true, paragraphs: true, truth: true });
+  const [show, setShow] = usePersistedState("predict.show", { raw: false, corners: true, paragraphs: true, truth: true });
   const seq = useRef(0);
 
   useEffect(() => {
     api.get("/runs").then((d) => {
       const done = d.runs.filter((r: any) => ["done", "cancelled"].includes(r.status));
       setRuns(done);
-      if (done[0]) setRun(done[0].name);
+      // keep a remembered run only if it still exists, else fall back to first
+      setRun((cur) => (cur && done.some((r: any) => r.name === cur)) ? cur : (done[0]?.name ?? ""));
     }).catch(setError);
     api.get("/sources").then((d) => {
       setSources(d.sources);
-      if (d.sources[0]) setSource(d.sources[0].id);
+      setSource((cur) => (cur && d.sources.some((s: any) => s.id === cur)) ? cur : (d.sources[0]?.id ?? ""));
     }).catch(setError);
   }, []);
 

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
-import { ErrorBox, Field, Working } from "../components/ui";
+import { usePersistedState } from "../uiState";
+import { ErrorBox, Field } from "../components/ui";
 
 // B x C x D + X -> E. Names only (R7); device aside (X). Contract (1) becomes
 // visible here: on picking B and C they either match or they don't — and the
@@ -11,24 +12,25 @@ export default function Train() {
   const [nets, setNets] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
   const [runs, setRuns] = useState<any[]>([]);
-  const [form, setForm] = useState({ name: "", window_dataset: "", network: "",
-                                     recipe: "", device: "cpu" });
+  const [form, setForm] = usePersistedState("train.form", {
+    name: "", window_dataset: "", network: "", recipe: "", device: "cpu" });
   const [error, setError] = useState<unknown>(null);
   const [launched, setLaunched] = useState<string | null>(null);
   const [compat, setCompat] = useState<string | null>(null);
 
   useEffect(() => {
+    // a remembered choice wins over the "first item" default
     api.get("/window-datasets").then((d) => {
       setWds(d.window_datasets);
-      if (d.window_datasets[0]) setForm((f) => ({ ...f, window_dataset: d.window_datasets[0].name }));
+      if (d.window_datasets[0]) setForm((f) => f.window_dataset ? f : { ...f, window_dataset: d.window_datasets[0].name });
     }).catch(setError);
     api.get("/networks").then((d) => {
       setNets(d.networks);
-      if (d.networks[0]) setForm((f) => ({ ...f, network: d.networks[0].name }));
+      if (d.networks[0]) setForm((f) => f.network ? f : { ...f, network: d.networks[0].name });
     }).catch(setError);
     api.get("/recipes").then((d) => {
       setRecipes(d.recipes);
-      if (d.recipes[0]) setForm((f) => ({ ...f, recipe: d.recipes[0].name }));
+      if (d.recipes[0]) setForm((f) => f.recipe ? f : { ...f, recipe: d.recipes[0].name });
     }).catch(setError);
     api.get("/runs").then((d) => setRuns(d.runs)).catch(() => {});
   }, []);
@@ -65,6 +67,7 @@ export default function Train() {
     try {
       await api.post("/runs", form);
       setLaunched(form.name);
+      setForm((f) => ({ ...f, name: "" }));  // a run name is single-use: don't remember it
     } catch (e) { setError(e); }
   };
 

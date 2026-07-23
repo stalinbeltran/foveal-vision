@@ -128,6 +128,25 @@ def test_sweep_over_http(world, client):
     assert client.get("/runs/s1-0000").status_code == 404
 
 
+def test_ui_state_round_trips_and_is_committable(world, client):
+    # empty until something is saved (ausente != cero: {} , not a 404)
+    assert client.get("/ui-state").json() == {}
+    prefs = {"runs.filters": {"network": "fov-16", "status": "done"},
+             "train.form": {"device": "cpu"}}
+    assert client.put("/ui-state", json=prefs).json()["saved"] is True
+    assert client.get("/ui-state").json() == prefs
+    # it lands on disk as a committable file
+    from fv import settings
+    assert settings.ui_state_path().exists()
+
+
+def test_ui_state_rejects_oversized_blob(world, client):
+    big = {"blob": "x" * (300 * 1024)}
+    r = client.put("/ui-state", json=big)
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "ui_state_too_large"
+
+
 def test_network_validate_returns_dims_and_ranges(world, client):
     r = client.post("/networks/validate", json=TINY_NET).json()
     assert r["valid"] and r["trace"]["dims"]["center_out"] == 8

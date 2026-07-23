@@ -64,6 +64,9 @@ a:hover { text-decoration: underline; }
   color: var(--text-dim); margin: 12px 8px 4px; }
 .nav a { display: block; padding: 5px 8px; border-radius: 6px; color: var(--text); }
 .nav a.active { background: var(--surface-2); font-weight: 600; }
+.session { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 8px; }
+.session .linkbtn { display: block; text-align: left; padding: 5px 8px; }
+.sessionmsg { color: var(--text-dim); font-size: 11px; padding: 2px 8px; }
 .main { flex: 1; padding: 18px 24px; max-width: 1200px; }
 
 h2 { font-size: 18px; margin: 0 0 4px; }

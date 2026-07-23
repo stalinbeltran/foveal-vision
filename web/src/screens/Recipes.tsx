@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api";
+import { usePersistedState } from "../uiState";
 import { ErrorBox, Field } from "../components/ui";
 
 // D — every field carries its definition inline; a hyperparameter without a
@@ -23,7 +24,7 @@ const HELP: Record<string, string> = {
 export default function Recipes() {
   const [list, setList] = useState<any[]>([]);
   const [defaults, setDefaults] = useState<any>(null);
-  const [form, setForm] = useState<any>({ name: "" });
+  const [form, setForm] = usePersistedState<any>("recipes.form", { name: "" });
   const [error, setError] = useState<unknown>(null);
 
   const refresh = () => api.get("/recipes").then((d) => {

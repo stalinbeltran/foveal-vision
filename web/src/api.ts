@@ -30,6 +30,8 @@ export const api = {
     req(p, { method: "POST", body: JSON.stringify(body ?? {}) }),
   patch: (p: string, body?: any) =>
     req(p, { method: "PATCH", body: JSON.stringify(body ?? {}) }),
+  put: (p: string, body?: any) =>
+    req(p, { method: "PUT", body: JSON.stringify(body ?? {}) }),
   del: (p: string) => req(p, { method: "DELETE" }),
 };
 

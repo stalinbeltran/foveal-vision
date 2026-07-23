@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from fv import settings
 from fv.api.jobs import JobQueue
+from fv.ioutils import read_json_retrying, write_json_atomic
 from fv.datasets.loader import SourceDataset, SourceError, discover_sources
 from fv.fovea import FoveaError, build_search_space, check_dims, derive_dims
 from fv.inference.checkpoint import MODEL_CACHE
@@ -496,5 +497,30 @@ def create_app() -> FastAPI:
             raise HTTPException(404, {"code": "job_not_found",
                                       "message": f"no existe el job {job_id}", "hint": ""})
         return {"cancelling": job_id}
+
+    # ------------------------------------------- UI state (remembered defaults)
+    # A committable snapshot of the front's filters/forms so a working session
+    # travels to the GPU server. Opaque blob: NOT a domain source of truth, so
+    # no schema is enforced here — only a size bound (R6) to keep it a
+    # convenience, not a data store.
+    UI_STATE_MAX = 256 * 1024
+
+    @app.get("/ui-state")
+    def get_ui_state():
+        p = settings.ui_state_path()
+        return read_json_retrying(p) if p.exists() else {}
+
+    @app.put("/ui-state")
+    def put_ui_state(body: dict):
+        import json
+        if len(json.dumps(body)) > UI_STATE_MAX:
+            raise HTTPException(400, {
+                "code": "ui_state_too_large",
+                "message": f"el estado de UI supera {UI_STATE_MAX // 1024} KB",
+                "hint": "esto guarda filtros y formularios, no datos: revisa qué envías"})
+        p = settings.ui_state_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        write_json_atomic(p, body)
+        return {"saved": True, "path": str(p)}
 
     return app

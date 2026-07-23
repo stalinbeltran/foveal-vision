@@ -48,6 +48,7 @@ los CLI (`fv-extract`, `fv-train`, `fv-sweep`) lo prueban. Regla mecánica: **si
 | **H** Recorrido | `/sweeps` |
 | **F** Inferencia | `/runs/{name}/predict` |
 | **X** Jobs | `/jobs` (+ `POST /jobs/{id}/cancel`, cooperativo) |
+| **UI** Estado recordado | `/ui-state` (`GET`/`PUT`) — blob opaco de filtros/formularios, NO dominio |
 
 ## 3. Lo no evidente, recurso a recurso
 
@@ -147,6 +148,14 @@ Devuelve **todas las etapas** (por-ventana crudo → fusión → resultado por i
 última — sin la cruda, «salió mal» no es diagnosticable. Los knobs van en **unidades de la
 ventana**, el payload los devuelve (las respuestas llegan desordenadas con sliders en vivo), y
 el cliente que no sabe qué mandar manda `null` y adopta el default de F.
+
+### `/ui-state` (conveniencia, no dominio)
+
+`GET` devuelve `{}` cuando no hay nada guardado (ausente ≠ cero: nunca 404). `PUT` escribe un
+`state/ui-state.json` **comiteable** (viaja al server con GPU) tras validar un **tope de tamaño**
+(`ui_state_too_large`, R6): es un blob opaco de filtros/formularios del front, no una segunda
+fuente de verdad para A–H. El front lo usa como snapshot de su `localStorage`; ni el API ni el
+esquema de dominio dependen de su contenido.
 
 ## 4. Dónde el API hace cumplir los contratos
 

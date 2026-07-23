@@ -44,3 +44,10 @@ def sweeps_root() -> Path:
 
 def cache_root() -> Path:
     return project_root() / "data" / "cache"
+
+
+def ui_state_path() -> Path:
+    # Remembered UI defaults (filters + form values). Committable so it travels
+    # with the repo to the GPU server. NOT a domain artifact: an opaque blob of
+    # conveniences, never a source of truth for A-H.
+    return project_root() / "state" / "ui-state.json"

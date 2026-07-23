@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { usePersistedState } from "../uiState";
 import { Badge, ErrorBox, Field, Working } from "../components/ui";
 
 // H — fix B, build a space over C and/or D. Geometry axes offer the
@@ -16,11 +17,11 @@ export default function Sweeps() {
   const [error, setError] = useState<unknown>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [trials, setTrials] = useState<any>(null);
-  const [sf, setSf] = useState({
+  const [sf, setSf] = usePersistedState("sweeps.filters", {
     window_dataset: "", base_network: "", base_recipe: "", objective: "", q: "",
   });
-  const [foldDone, setFoldDone] = useState(false);
-  const [form, setForm] = useState<any>({
+  const [foldDone, setFoldDone] = usePersistedState("sweeps.foldDone", false);
+  const [form, setForm] = usePersistedState<any>("sweeps.form", {
     name: "", window_dataset: "", base_network: "", base_recipe: "",
     objective: "f1", strategy: "grid", points: 0, epochs: 2,
     axes: { d: true, k_center: false, k_periph: false, s_center: false, s_periph: false },
@@ -32,17 +33,21 @@ export default function Sweeps() {
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 3000);
+    // fill a default only when nothing was remembered — a restored value wins
     api.get("/window-datasets").then((d) => {
       setWds(d.window_datasets);
-      if (d.window_datasets[0]) setForm((f: any) => ({ ...f, window_dataset: d.window_datasets[0].name }));
+      if (d.window_datasets[0])
+        setForm((f: any) => f.window_dataset ? f : { ...f, window_dataset: d.window_datasets[0].name });
     }).catch(setError);
     api.get("/networks").then((d) => {
       setNets(d.networks);
-      if (d.networks[0]) setForm((f: any) => ({ ...f, base_network: d.networks[0].name }));
+      if (d.networks[0])
+        setForm((f: any) => f.base_network ? f : { ...f, base_network: d.networks[0].name });
     }).catch(setError);
     api.get("/recipes").then((d) => {
       setRecipes(d.recipes);
-      if (d.recipes[0]) setForm((f: any) => ({ ...f, base_recipe: d.recipes[0].name }));
+      if (d.recipes[0])
+        setForm((f: any) => f.base_recipe ? f : { ...f, base_recipe: d.recipes[0].name });
     }).catch(setError);
     return () => clearInterval(t);
   }, []);
@@ -87,6 +92,7 @@ export default function Sweeps() {
       });
       await refresh();
       setSel(form.name);
+      setForm((f: any) => ({ ...f, name: "" }));  // sweep name is single-use
     } catch (e) { setError(e); }
   };
 

@@ -50,6 +50,14 @@ capa. Si no puedes decir qué fija una vista, la vista no sabe lo que enseña.
 Sin números de paso: en investigación no se recorre un pipeline, se **itera sobre un punto** y
 se vuelve.
 
+**Estado de UI recordado (defaults, no fuente de verdad).** Los filtros y los valores de
+formulario de cada pantalla se recuerdan en `localStorage` (per-browser, listo para multi-usuario
+sin cambios) vía el hook `usePersistedState`. El nav ofrece **Guardar / Cargar sesión**: Guardar
+vuelca todo a un JSON comiteable (`state/ui-state.json`, `PUT /ui-state`) para que una sesión de
+trabajo viaje al server con GPU; Cargar lo trae y recarga. Es solo conveniencia: las pantallas
+siguen leyendo el A–H real del API, y un nombre de run/recorrido **no** se recuerda (es de un solo
+uso). Un valor recordado que ya no existe (un run borrado) cae al primero disponible, no rompe.
+
 ## 2. Pantallas de dominio — lo propio de este proyecto
 
 *(Lo que no se menciona funciona como en el hermano: tablas, galerías paginadas, jobs con

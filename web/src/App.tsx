@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { loadSession, saveSession } from "./uiState";
 import Sources from "./screens/Sources";
 import WindowDatasets from "./screens/WindowDatasets";
 import WindowDatasetDetail from "./screens/WindowDatasetDetail";
@@ -11,6 +12,36 @@ import Runs from "./screens/Runs";
 import RunDetail from "./screens/RunDetail";
 import Diagnostics from "./screens/Diagnostics";
 import Predict from "./screens/Predict";
+
+// The app-wide session control: filters/forms live in localStorage per browser;
+// "Guardar" snapshots them to a committable JSON, "Cargar" pulls it back (and
+// reloads so every screen re-reads). This is what carries a working session to
+// the GPU server.
+function SessionBar() {
+  const [msg, setMsg] = useState<string>("");
+  const save = async () => {
+    setMsg("guardando…");
+    try { await saveSession(); setMsg("sesión guardada"); }
+    catch { setMsg("error al guardar"); }
+  };
+  const load = async () => {
+    setMsg("cargando…");
+    try {
+      const had = await loadSession();
+      if (!had) { setMsg("no hay sesión guardada"); return; }
+      setMsg("cargada — recargando…");
+      setTimeout(() => window.location.reload(), 300);
+    } catch { setMsg("error al cargar"); }
+  };
+  return (
+    <div className="session" data-testid="session-bar">
+      <div className="group">Sesión</div>
+      <button className="linkbtn" onClick={save}>Guardar sesión</button>
+      <button className="linkbtn" onClick={load}>Cargar sesión</button>
+      {msg ? <div className="sessionmsg">{msg}</div> : null}
+    </div>
+  );
+}
 
 // One screen, one domain. Groups follow domain dependency, not steps: in
 // research you iterate on a point and come back — no numbered pipeline.
@@ -32,6 +63,7 @@ export default function App() {
         <div className="group">Analizar</div>
         <NavLink to="/diagnostics">Diagnóstico</NavLink>
         <NavLink to="/predict">Predecir</NavLink>
+        <SessionBar />
       </nav>
       <main className="main">
         <Routes>

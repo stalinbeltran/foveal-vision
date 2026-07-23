@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, waitJob } from "../api";
+import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 
 // B — where the labelled window (the fovea) is decided; contract (1) is born here.
@@ -9,15 +10,15 @@ export default function WindowDatasets() {
   const [sources, setSources] = useState<any[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", source: "", window_size: 16,
-                                     stride: 8, val_frac: 0.15, test_frac: 0.15, seed: 1 });
+  const [form, setForm] = usePersistedState("wds.form", { name: "", source: "",
+    window_size: 16, stride: 8, val_frac: 0.15, test_frac: 0.15, seed: 1 });
 
   const refresh = () => api.get("/window-datasets").then(setData).catch(setError);
   useEffect(() => {
     refresh();
     api.get("/sources").then((d) => {
       setSources(d.sources);
-      if (d.sources[0]) setForm((f) => ({ ...f, source: d.sources[0].id }));
+      if (d.sources[0]) setForm((f) => f.source ? f : { ...f, source: d.sources[0].id });
     }).catch(setError);
   }, []);
 
