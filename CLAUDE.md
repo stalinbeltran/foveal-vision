@@ -23,16 +23,45 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
-> **2026-07-21 — IMPLEMENTACIÓN COMPLETA Y VERIFICADA.** El sistema entero está construido y
+> **2026-07-24 — BARRIDO POR EJES (OAT) IMPLEMENTADO Y VERIFICADO.** Se construyeron las cinco
+> piezas de [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) §14, respetando las decisiones
+> cerradas de su §13:
+> - **Builder paramétrico (C)**: `fv.models.builder` honra `n_layers` y `channels` por capa
+>   (D-C3), stride solo en la 1ª capa (D-S1); no-regresión bit-exacta para `n_layers=2` con
+>   `channels=[16,32]`. Lee `ch1/ch2` viejo, escribe siempre `channels`.
+> - **Derivador de base (G/C)**: `fv.models.derive` — de `window_size` deriva `N`/geometría
+>   (①a), defaults estáticos, ganadores arrastrados, corrección de inválidos con razón, `N` mínimo
+>   (D-G2), afloje de `c_frac` con razón (D-G3).
+> - **Base inline + generador P1 (H)**: `fv.sweeps.generate` + CLI **`fv-oat`** + `POST
+>   /sweeps/generate`. `base_network=null` + `base_label` + `derivation` (D-H2). Barrer `n_layers`
+>   redimensiona `channels` a `[16]*L` (§6.1).
+> - **Arrastre del ganador (I/H)**: `fv.sweeps.winner` — regla coste/calidad con δ (D-W1),
+>   sugiere y el usuario confirma; `GET /sweeps/{name}/winner`.
+> - **Estudio OAT (I, dominio nuevo `studies/`)**: `fv.studies` (plan.json comiteable +
+>   progress.json vivo), CLI **`fv-study`**, endpoints `/studies/*`, pantalla **Estudios**. Guía
+>   y no ejecuta; expande `channels[i]` al fijar `n_layers`.
+>
+> **65 tests en verde** (~25 s) incluyendo el contrato ⑫ (estudio↔recorrido) y **las 12
+> pantallas con Playwright sin un solo error de consola** (`scripts\verify_ui.py`). README con
+> comandos **ejecutados** (`fv-oat`, `fv-study` verificados de punta a punta).
+>
+> ⚠ **Consecuencia de §13 (deuda de pesos = 0):** el builder paramétrico renombró los módulos
+> conv (`center_conv1` → `center_convs.0`), así que **los checkpoints previos ya no cargan**.
+> `load_model` lo rechaza limpio (`checkpoint_incompatible`, 400) en vez de un 500. Los runs de
+> ejemplo antiguos (`fov-run-*`, `cli-*`, `dirty-*`, `rec-d`, `demo-seeds`) quedan **no cargables
+> por diseño**: reentrénalos o descártalos. Fresco y cargable: run **`fov-16-param`** + recorrido
+> inline **`oat-d-demo`** (base `ws16-p2-d2-L2`). Diagnóstico/Predecir usan `fov-16-param`.
+>
+> ---
+>
+> **2026-07-21 — IMPLEMENTACIÓN BASE COMPLETA Y VERIFICADA.** El sistema entero está construido y
 > probado de punta a punta en esta máquina: paquete `fv` (fovea/datasets/windows/models/
-> training/inference/diagnostics/sweeps/validation/metrics/matrixview), API FastAPI, front
-> Vite+React con las **nueve pantallas**, CLIs (`fv-extract`, `fv-train`, `fv-sweep`,
-> `fv-api`) y **31 tests en verde** (~14 s) — un test por contrato más el muestreo foveado
+> training/inference/diagnostics/sweeps/studies/validation/metrics/matrixview), API FastAPI, front
+> Vite+React con las **diez pantallas**, CLIs (`fv-extract`, `fv-train`, `fv-sweep`, `fv-oat`,
+> `fv-study`, `fv-api`) — un test por contrato más el muestreo foveado
 > contra los números de la spec. Verificado además: el flujo completo por HTTP (extract →
 > train → diagnóstico → predict → sweep), los CLIs (bit-idénticos al API con la misma
-> semilla), las negativas con razón+arreglo antes de reservar nombre, y **las 11
-> pantallas/interacciones con Playwright sin un solo error de consola**
-> (`scripts\verify_ui.py`; capturas en `data\ui-shots\`). El README lleva los comandos
+> semilla), las negativas con razón+arreglo antes de reservar nombre. El README lleva los comandos
 > **ejecutados**, no razonados.
 >
 > **Decisiones cerradas en la implementación** (registradas en decisiones.md §4): F1=C9
@@ -43,10 +72,11 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > decisiones.md).
 >
 > **Datos de ejemplo vivos en el repo**: fuente `local/synth-01` (60 img 96×72, regenerable
-> con `scripts\make_synth_source.py`), dataset `synth-b16`, red `fov-16`, recetas
-> `corta`/`media`, runs `fov-run-1/2`, `cli-run-1`, recorridos `rec-d`, `cli-sweep-1`.
-> En `fov-run-2` (12 épocas) ya se ve el fenómeno que la fóvea ataca: err ciega 4,06 px vs
-> visible 2,55 px.
+> con `scripts\make_synth_source.py`), dataset `synth-b16`, red `fov-16` (migrada a `channels:
+> [16,32]`), recetas `corta`/`media`. **Cargables con el builder actual**: run `fov-16-param` y
+> recorrido inline `oat-d-demo`. Los runs/recorridos anteriores (`fov-run-*`, `cli-*`, `dirty-*`,
+> `rec-d`, `demo-seeds`) conservan su metadata comiteada pero **sus checkpoints no cargan** (§13):
+> son historia, no artefactos vivos.
 >
 > **Pendiente, por orden de valor**: (1) el primer experimento real (protocolo.md §6:
 > ¿fóvea+periferia gana a una CNN plana de coste equivalente? — control con `d=1`/`c_frac`→1
@@ -80,12 +110,12 @@ Los demás documentos, en orden de lectura:
 | | |
 |---|---|
 | [instructionsNewNN.md](instructionsNewNN.md) | **La red.** Geometría foveada, parámetros, rangos calculados, código de referencia |
-| [docs/organizacion.md](docs/organizacion.md) | **La raíz.** Dominios (A–H, X, G) y contratos ①–⑪ donde se tocan |
+| [docs/organizacion.md](docs/organizacion.md) | **La raíz.** Dominios (A–I, X, G) y contratos ①–⑫ donde se tocan |
 | [docs/herencia.md](docs/herencia.md) | Qué viene de `image-text-finder`, qué se adapta y qué se descarta |
 | [docs/protocolo.md](docs/protocolo.md) | Cuándo un resultado es creíble. **Léelo antes de sacar conclusiones de un entrenamiento** |
 | [docs/api.md](docs/api.md) · [docs/ui.md](docs/ui.md) | La organización proyectada sobre HTTP y sobre pantallas |
 | [docs/plan.md](docs/plan.md) | El plan de ejecución, por fases verticales |
-| [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) | **DISEÑO, sin implementar.** Barrido OAT (un eje a la vez) con base derivada del problema, defaults estáticos, arrastre del ganador y schedule. El código se genera en otra sesión |
+| [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) | **IMPLEMENTADO (2026-07-24).** Barrido OAT (un eje a la vez) con base derivada del problema, defaults estáticos, arrastre del ganador y estudio (dominio I). Ver `fv.models.derive`, `fv.sweeps.generate/winner`, `fv.studies`, CLIs `fv-oat`/`fv-study` |
 | [docs/formatos.md](docs/formatos.md) · [docs/tests.md](docs/tests.md) | Los artefactos en disco; qué se testea |
 | [docs/decisiones.md](docs/decisiones.md) | Lo que sigue sin decidir, y qué bloquea. **No tomes tú una decisión que esté ahí: pregunta** |
 | [docs/glosario.md](docs/glosario.md) | Las palabras que significan dos cosas |
@@ -114,6 +144,7 @@ Reglas que estos documentos fijan y que se citan aquí porque se incumplen solas
 | **D** | Receta | Hiperparámetros de entrenamiento que definen el resultado | `src/fv/training/`, `configs/recipes/` |
 | **E** | Run | Modelo entrenado: pesos + métricas + procedencia | `runs/<name>/` |
 | **H** | Recorrido | Un espacio sobre **C y/o D** con B fijo → muchos E, sin intervención humana | `src/fv/sweeps/`, `sweeps/` |
+| **I** | Estudio (OAT) | Un plan ordenado de ejes sobre **H** con B fijo → muchos recorridos; guía, **no ejecuta** | `src/fv/studies/`, `studies/` |
 | **F** | Inferencia | Aplicar un E a una imagen completa (ventana foveada deslizante) | `src/fv/inference/` |
 | **G** | Geometría foveada | `derive_dims`, `build_foveated_input`, `build_masks`, rangos calculados. **Un solo módulo, todos lo importan** | `src/fv/fovea/` |
 | **X** | Ejecución | `device`, `num_workers`, concurrencia. **Cuesta tiempo, no cambia el resultado** | `src/fv/api/jobs.py` |

@@ -1,13 +1,16 @@
 # Barrido por ejes (OAT) con base derivada del problema
 
-> **Estado: DISEÑO, decisiones cerradas — sin implementar.** Este documento especifica una
-> funcionalidad cuyo código se generará en otra sesión. **Las decisiones abiertas se resolvieron
-> con el usuario el 2026-07-23; los valores fijados están en §13 y mandan.** Los marcadores
-> `[DECIDIDO D-xx]` del cuerpo llevan el valor elegido; lo no listado en §13 se sigue preguntando,
-> no se inventa.
+> **Estado: IMPLEMENTADO Y VERIFICADO (2026-07-24).** Las cinco piezas de §14 están construidas
+> y probadas: builder paramétrico (`fv.models.builder`), derivador de base (`fv.models.derive`),
+> base inline + generador P1 (`fv.sweeps.generate`, CLI `fv-oat`), arrastre del ganador
+> (`fv.sweeps.winner`) y el estudio OAT (dominio nuevo `fv.studies`, CLI `fv-study`, pantalla
+> **Estudios**). Las decisiones cerradas de §13 se respetaron tal cual. 65 tests en verde y las
+> 12 pantallas sin error de consola. **Nota (§13):** el builder paramétrico renombró los módulos
+> conv, así que los checkpoints previos ya no cargan (por diseño, sin migrar pesos); `load_model`
+> lo rechaza con razón limpia y los runs de ejemplo se descartan/reentrenan.
 >
-> Cuando la funcionalidad se construya y verifique, actualícese el bloque «Estado actual» de
-> [CLAUDE.md](../CLAUDE.md).
+> El cuerpo de abajo es el diseño con el que se construyó; los marcadores `[DECIDIDO D-xx]` y §13
+> siguen mandando sobre la arquitectura.
 
 ## 0. Qué es esto y por qué
 
