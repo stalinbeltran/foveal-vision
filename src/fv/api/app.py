@@ -51,7 +51,7 @@ NOT_FOUND_CODES = {"source_not_found", "sample_not_found", "window_dataset_missi
                    "sweep_not_found", "study_not_found"}
 CONFLICT_CODES = {"window_dataset_exists", "window_dataset_in_use", "network_exists",
                   "recipe_exists", "run_exists", "run_is_running", "sweep_exists",
-                  "run_without_provenance", "run_has_no_checkpoint",
+                  "run_without_provenance", "run_has_no_checkpoint", "run_belongs_to_sweep",
                   "window_dataset_changed", "split_empty", "sweep_is_running",
                   "study_exists", "step_awaiting_confirmation"}
 
@@ -321,10 +321,12 @@ def create_app() -> FastAPI:
         cfg = runs.config(name)
         if cfg.get("provenance", {}).get("sweep"):
             raise _http_error(RunError(
-                "run_is_running",  # 409 family
+                "run_belongs_to_sweep",  # 409 family — NOT "is running": the run
+                # can be done/stopped and still be undeletable on its own
                 f"'{name}' pertenece al recorrido "
                 f"'{cfg['provenance']['sweep']}'",
-                "borra el recorrido entero o deja el run: sus puntos se comparan juntos"))
+                "borra el recorrido entero (arrastra sus runs) o deja el run: "
+                "sus puntos se comparan juntos"))
         runs.delete(name)
         return {"deleted": name}
 
