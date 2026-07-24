@@ -128,6 +128,32 @@ def test_sweep_over_http(world, client):
     assert client.get("/runs/s1-0000").status_code == 404
 
 
+def test_study_guided_flow_over_http(world, client):
+    """Contract ⑫: a study generates a sweep, runs it, the user confirms the
+    winner, the chain advances. The study guides; the winner is the user's."""
+    _make_named(client)
+    plan = {"name": "est-api", "window_dataset": world["dataset"],
+            "base_recipe": "quick", "objective": "f1", "seeds": 3,
+            "budget": {"epochs": 1}, "axes": [{"axis": "n_layers", "range": [1, 2]}]}
+    assert client.post("/studies", json=plan).status_code == 201
+    a = client.post("/studies/est-api/advance", json={})
+    assert a.status_code == 202
+    sweep = a.json()["step"]["sweep"]
+    _wait_job(client, a.json()["job"]["id"], timeout=180)
+    # advancing before confirming the winner is refused (guides, not executes)
+    assert client.post("/studies/est-api/advance", json={}).status_code == 409
+    # suggest the winner, then confirm it
+    w = client.get(f"/sweeps/{sweep}/winner", params={"delta": 1.0}).json()
+    point = w["suggested"]["point"]
+    assert client.post("/studies/est-api/confirm", json={"point": point}).status_code == 200
+    st = client.get("/studies/est-api").json()
+    assert st["done"] is True
+    assert st["winners"]["n_layers"]["from"] == "est-api/step-0"
+    # a done study refuses to advance, with the reason
+    a2 = client.post("/studies/est-api/advance", json={})
+    assert a2.status_code == 400 and a2.json()["detail"]["code"] == "study_done"
+
+
 def test_ui_state_round_trips_and_is_committable(world, client):
     # empty until something is saved (ausente != cero: {} , not a 404)
     assert client.get("/ui-state").json() == {}

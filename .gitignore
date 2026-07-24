@@ -225,6 +225,8 @@ __marimo__/
 /data/ui-shots/
 /data/window-datasets/*/windows.npz
 /runs/*/*.pt
+/studies/*/progress.json
+# studies/*/plan.json SI va a git (la descripcion del estudio; progress.json es estado vivo)
 
 /web/node_modules/
 /web/.vite/

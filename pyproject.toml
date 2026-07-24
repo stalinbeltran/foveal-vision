@@ -28,6 +28,7 @@ fv-extract = "fv.windows.cli:main"
 fv-train = "fv.training.cli:main"
 fv-sweep = "fv.sweeps.cli:main"
 fv-oat = "fv.sweeps.oat_cli:main"
+fv-study = "fv.studies.cli:main"
 fv-api = "fv.api.__main__:main"
 
 [build-system]

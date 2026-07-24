@@ -32,6 +32,9 @@ from fv.sweeps.runner import delete_sweep, prepare_sweep, run_sweep, sweep_trial
 from fv.sweeps.winner import suggest_winner
 from fv.sweeps.spec import SweepError
 from fv.sweeps.store import SweepStore, SweepStoreError
+from fv.studies.driver import StudyError, advance, confirm, create_study
+from fv.studies.driver import status as study_status_fn
+from fv.studies.store import StudyStore, StudyStoreError
 from fv.training.loop import train
 from fv.training.recipe import Recipe, RecipeStore, RecipeStoreError
 from fv.training.registry import RunError, RunStore
@@ -40,15 +43,17 @@ from fv.windows.extract import ExtractConfig, ExtractError, extract_windows
 from fv.windows.store import WindowDatasetStore, WindowStoreError
 
 DOMAIN_ERRORS = (SourceError, ExtractError, WindowStoreError, NetworkStoreError,
-                 RecipeStoreError, RunError, SweepError, SweepStoreError, FoveaError)
+                 RecipeStoreError, RunError, SweepError, SweepStoreError,
+                 StudyError, StudyStoreError, FoveaError)
 
 NOT_FOUND_CODES = {"source_not_found", "sample_not_found", "window_dataset_missing",
                    "network_not_found", "recipe_not_found", "run_not_found",
-                   "sweep_not_found"}
+                   "sweep_not_found", "study_not_found"}
 CONFLICT_CODES = {"window_dataset_exists", "window_dataset_in_use", "network_exists",
                   "recipe_exists", "run_exists", "run_is_running", "sweep_exists",
                   "run_without_provenance", "run_has_no_checkpoint",
-                  "window_dataset_changed", "split_empty", "sweep_is_running"}
+                  "window_dataset_changed", "split_empty", "sweep_is_running",
+                  "study_exists", "step_awaiting_confirmation"}
 
 
 def _http_error(e) -> HTTPException:
@@ -72,6 +77,7 @@ def create_app() -> FastAPI:
     nstore = NetworkStore()
     rstore = RecipeStore()
     sstore = SweepStore()
+    studies_store = StudyStore()
 
     @app.exception_handler(Exception)
     async def _domain_handler(request, exc):
@@ -524,6 +530,59 @@ def create_app() -> FastAPI:
             return run_sweep(name, sstore, runs)
         return {"job": jobs.submit("sweep", work, {"sweep": name},
                                    on_cancel=lambda: sstore.request_stop(name))}
+
+    # --------------------------------------------------------------- studies (I)
+    @app.get("/studies")
+    def list_studies():
+        return {"studies": studies_store.list()}
+
+    @app.post("/studies", status_code=201)
+    def create_study_ep(body: dict):
+        name = body.get("name", "")
+        if not name:
+            raise HTTPException(400, {"code": "name_required",
+                                      "message": "falta el nombre", "hint": ""})
+        plan = {k: body[k] for k in
+                ("window_dataset", "base_recipe", "objective", "seeds", "axes", "budget")
+                if k in body}
+        return create_study(name, plan, studies_store)
+
+    @app.get("/studies/{name}")
+    def study_status(name: str):
+        return study_status_fn(name, studies_store)
+
+    @app.post("/studies/{name}/advance", status_code=202)
+    def advance_study_ep(name: str, body: dict | None = None):
+        """Generate the next step's sweep (inline base + carried winners) and
+        launch it. The WINNER is still the user's to confirm afterwards."""
+        out = advance(name, studies_store, sstore,
+                      budget=(body or {}).get("budget"))
+        sweep_name = out["step"]["sweep"]
+
+        def work(is_cancelled):
+            return run_sweep(sweep_name, sstore, runs)
+        job = jobs.submit("sweep", work, {"sweep": sweep_name},
+                          on_cancel=lambda: sstore.request_stop(sweep_name))
+        return {"step": out["step"], "base_label": out["spec"]["base_label"],
+                "points": len(out["spec"]["points"]),
+                "discarded": len(out["spec"]["discarded"]), "job": job}
+
+    @app.post("/studies/{name}/confirm")
+    def confirm_study_ep(name: str, body: dict):
+        """Record the user-confirmed winner point of the current step and carry
+        it forward (§7). The point is the user's choice — usually the suggestion
+        from GET /sweeps/{sweep}/winner, but the user decides."""
+        point = body.get("point")
+        if point is None:
+            raise HTTPException(400, {"code": "point_required",
+                                      "message": "falta el punto ganador a confirmar",
+                                      "hint": "manda {point: {<eje>: <valor>}}"})
+        return confirm(name, point, studies_store)
+
+    @app.delete("/studies/{name}")
+    def delete_study_ep(name: str):
+        studies_store.delete(name)
+        return {"deleted": name}
 
     # ------------------------------------------------------------------ jobs (X)
     @app.get("/jobs")
