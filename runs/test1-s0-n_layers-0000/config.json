@@ -1,0 +1,91 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "lr": 0.002,
+    "optimizer": "adam",
+    "momentum": 0.9,
+    "weight_decay": 0.0,
+    "batch_size": 64,
+    "epochs": 2,
+    "scheduler": "none",
+    "patience": 0,
+    "lambda_pos": 1.0,
+    "pos_weight": 1.0,
+    "smooth_l1_beta": 0.08,
+    "monitor": "val_loss",
+    "seed": 1
+  },
+  "network": {
+    "N": 20,
+    "c_frac": 0.8,
+    "d": 2,
+    "pen_frac": 0.1,
+    "n_layers": 1,
+    "k_center": 3,
+    "k_periph": 3,
+    "s_center": 1,
+    "s_periph": 1,
+    "channels": [
+      16
+    ],
+    "merge": "concat",
+    "pool_mode": "avg",
+    "pad_mode": "edge"
+  },
+  "execution": {
+    "device": "cpu",
+    "num_workers": 0
+  },
+  "provenance": {
+    "window_dataset": {
+      "name": "dirty-paragraphs-80px-patchs16",
+      "fingerprint": "sha256:3d9fc33eaff80f8e9387aa62a24284b982df274671bb3acc6f0441aa85c7e7bf"
+    },
+    "network": {
+      "name": null,
+      "value": {
+        "N": 20,
+        "c_frac": 0.8,
+        "d": 2,
+        "pen_frac": 0.1,
+        "n_layers": 1,
+        "k_center": 3,
+        "k_periph": 3,
+        "s_center": 1,
+        "s_periph": 1,
+        "channels": [
+          16
+        ],
+        "merge": "concat",
+        "pool_mode": "avg",
+        "pad_mode": "edge"
+      }
+    },
+    "recipe": {
+      "name": "corta",
+      "value": {
+        "lr": 0.002,
+        "optimizer": "adam",
+        "momentum": 0.9,
+        "weight_decay": 0.0,
+        "batch_size": 64,
+        "epochs": 2,
+        "scheduler": "none",
+        "patience": 0,
+        "lambda_pos": 1.0,
+        "pos_weight": 1.0,
+        "smooth_l1_beta": 0.08,
+        "monitor": "val_loss",
+        "seed": 1
+      }
+    },
+    "sweep": "test1-s0-n_layers",
+    "git_commit": "45a0700ab2bd0c4ba8e68c85da955cb2c3a86922",
+    "environment": {
+      "python": "3.12.10",
+      "torch": "2.13.0+cpu",
+      "platform": "win32",
+      "device": "cpu"
+    }
+  }
+}
