@@ -136,6 +136,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .badge.running { color: var(--accent); border-color: var(--accent); }
 .badge.error { color: var(--error); border-color: var(--error); }
 .badge.cancelled, .badge.stopped { color: var(--warn); border-color: var(--warn); }
+.badge.interrupted { color: var(--warn); border-color: var(--warn); }
 .mono { font-family: ui-monospace, monospace; font-size: 12px; }
 .working { color: var(--text-dim); font-style: italic; }
 

@@ -508,7 +508,10 @@ def create_app() -> FastAPI:
 
     @app.get("/sweeps/{name}")
     def sweep_detail(name: str):
-        return {"name": name, "spec": sstore.spec(name), "state": sstore.state(name)}
+        # reconcile-on-read: a sweep whose owner process died is healed to
+        # 'interrupted' here, so a crash never shows 'running' forever
+        return {"name": name, "spec": sstore.spec(name),
+                "state": sstore.reconcile(name)}
 
     @app.post("/sweeps/{name}/stop")
     def stop_sweep(name: str):

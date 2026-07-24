@@ -96,3 +96,62 @@ def test_sweep_stop_between_points(world):
     store.clear_stop("sw2")              # resume clears the request and finishes
     state2 = run_sweep("sw2", store, rstore)
     assert state2["status"] == "done"
+
+
+def test_should_stop_cuts_the_point_in_flight(world):
+    """Feature 1: a stop asked of the sweep cuts the point IN FLIGHT at the next
+    epoch boundary, not only between points."""
+    from fv.training.loop import train
+    from fv.training.recipe import Recipe
+    from fv.training.registry import RunStore
+    rstore = RunStore()
+    recipe = Recipe(epochs=5, batch_size=32, lr=1e-3)
+    summary = train("r-inflight", world["dataset"], "tiny", TINY_NET,
+                    "quick", recipe, store=rstore,
+                    should_stop=lambda: True)  # stop at the first epoch boundary
+    assert summary["cancelled"] is True
+    assert summary["epochs_run"] == 1          # did not run all 5
+    assert rstore.status("r-inflight")["status"] == "cancelled"
+
+
+def test_reconcile_heals_stale_running_when_owner_is_gone(world):
+    """Feature 2: a sweep whose owner process is gone (crash/restart/hibernation)
+    is healed from 'running' to 'interrupted' — never 'running' forever."""
+    import os
+    from fv.sweeps.store import SweepStore
+    store = SweepStore()
+    store.create("crashed", _spec(world, points=2, epochs=1))
+
+    store.set_state("crashed", "running", done=0, total=2, pid=2_000_000_000)
+    healed = store.reconcile("crashed")      # no process owns that PID
+    assert healed["status"] == "interrupted" and healed["reason"]
+
+    store.create("live2", _spec(world, points=2, epochs=1))
+    store.set_state("live2", "running", done=0, total=2, pid=os.getpid())
+    assert store.reconcile("live2")["status"] == "running"   # this process is alive
+
+    store.create("legacy", _spec(world, points=2, epochs=1))
+    store.set_state("legacy", "running", done=0, total=2)    # old sweep, no owner
+    assert store.reconcile("legacy")["status"] == "running"  # never guesses
+
+
+def test_resume_redoes_an_interrupted_point(world):
+    """Feature 2 + runner: only done/cancelled count as finished; an interrupted
+    point (reconciled after a crash) is dropped and redone on resume."""
+    from fv.sweeps.runner import prepare_sweep, run_sweep
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    store, rstore = SweepStore(), RunStore()
+    prepare_sweep("swr", _spec(world, points=2, epochs=1), TINY_NET, store)
+    run_sweep("swr", store, rstore)
+    rstore.set_status("swr-0001", "interrupted", epoch=0)   # simulate a crash
+    run_sweep("swr", store, rstore)                         # resume
+    assert rstore.status("swr-0001")["status"] == "done"    # redone, not jammed
+
+
+def test_pid_alive():
+    import os
+    from fv.proc import pid_alive
+    assert pid_alive(os.getpid()) is True
+    assert pid_alive(2_000_000_000) is False
+    assert pid_alive(None) is False and pid_alive(0) is False

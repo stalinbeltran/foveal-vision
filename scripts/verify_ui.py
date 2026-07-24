@@ -71,9 +71,9 @@ def main() -> int:
             page.wait_for_selector("[data-testid=compat]", timeout=15000)
         check(page, "/train", "text=nombre del run", "06-entrenar", train_extra)
 
-        # Recorridos: table + select rec-d -> trials ranking; (9) block live
+        # Recorridos: table + select oat-d-demo -> trials ranking; (9) block live
         def sweeps_extra(page):
-            page.click("[data-testid=sweeps-table] tbody tr:has-text('rec-d')")
+            page.click("[data-testid=sweeps-table] tbody tr:has-text('oat-d-demo')")
             page.wait_for_selector("[data-testid=trials-table]", timeout=15000)
             page.fill("input[placeholder='0.5, 1.0']", "0.5, 1.0")
             objetivo = page.locator("label.field", has_text="objetivo").locator("select")

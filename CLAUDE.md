@@ -23,6 +23,23 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-24 — PARADA DE RECORRIDOS: CORTE EN VUELO + RECONCILIACIÓN DE ESTADO MUERTO.** Dos
+> arreglos sobre la parada de recorridos (H):
+> - **Corte del punto en vuelo (feat 1):** `train` acepta `should_stop`; el runner le pasa
+>   `lambda: store.stop_requested(name)`, así una parada pedida al recorrido corta el punto **en
+>   marcha** en su siguiente frontera de epoch, no solo entre puntos. La cooperación seguía siendo
+>   entre puntos: un run largo ignoraba la parada hasta acabar.
+> - **Reconciliación de `running` muerto (feat 2):** quien marca un recorrido/run `running` graba
+>   su **PID dueño** (`fv.proc.pid_alive`, portable Win/POSIX sin psutil). `SweepStore.reconcile`
+>   y `RunStore.reconcile` sanan `running`→`interrupted` cuando el proceso dueño ya no existe
+>   (caída/reinicio del API/hibernación) — se llama al leer (`GET /sweeps`, `GET /sweeps/{name}`,
+>   `sweep_trials`). Cierra la trampa heredada "un crash queda running para siempre". Erra seguro:
+>   dueño vivo o sin PID (legacy) → intacto. El runner ahora redó todo lo no-(done|cancelled), así
+>   que un punto `interrupted` se rehace al reanudar. `interrupted` es terminal: borrable y
+>   reanudable; badge ámbar en la UI. **69 tests en verde**, 12 pantallas Playwright sin errores,
+>   reconciliación verificada por HTTP. Causa raíz de `test1-s0-n_layers` pegado en running: su job
+>   murió y nadie leía el `stop.json`.
+>
 > **2026-07-24 — BARRIDO POR EJES (OAT) IMPLEMENTADO Y VERIFICADO.** Se construyeron las cinco
 > piezas de [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) §14, respetando las decisiones
 > cerradas de su §13:

@@ -1,13 +1,15 @@
 """The sweep runner: sequential points (worker limit 1 on CPU), each point a
 first-class run named {sweep}-{i:04d} with provenance.sweep set, validated by
-THE SAME gate as every other way of training. Resume = count what finished and
-run the rest. Cooperative stop between points; the point in flight finishes
-its epoch via the run's own stop file.
+THE SAME gate as every other way of training. Resume = count what finished
+(only done/cancelled) and redo the rest. Cooperative stop cuts twice: between
+points, and — via should_stop — the point IN FLIGHT at its next epoch boundary.
+The owner PID is recorded so a crashed 'running' can be reconciled (store).
 """
 
 from __future__ import annotations
 
 import dataclasses
+import os
 
 from fv.ioutils import read_json_retrying
 from fv.sweeps.spec import OBJECTIVES, SweepError, check_sweep, expand_points
@@ -52,7 +54,8 @@ def run_sweep(name: str, store: SweepStore | None = None,
     objective = spec.get("objective", "f1")
 
     valid, _ = expand_points(spec, base_network)
-    store.set_state(name, "running", total=len(valid))
+    pid = os.getpid()
+    store.set_state(name, "running", total=len(valid), pid=pid)
     done = 0
     for i, point in enumerate(valid):
         run_name = f"{name}-{i:04d}"
@@ -61,15 +64,16 @@ def run_sweep(name: str, store: SweepStore | None = None,
             if st in ("done", "cancelled"):
                 done += 1
                 continue
-            # a run that died mid-flight (crash/hibernation): drop and redo
-            if st in ("error", "unknown", "queued", "running"):
-                try:
-                    run_store.path(run_name).joinpath("status.json").unlink(missing_ok=True)
-                except OSError:
-                    pass
-                for f in sorted(run_store.path(run_name).rglob("*"), reverse=True):
-                    f.unlink() if f.is_file() else f.rmdir()
-                run_store.path(run_name).rmdir()
+            # anything else — error, running, queued, unknown, interrupted — is a
+            # point that never finished (crash/hibernation/reconciled): drop and
+            # redo. Only done/cancelled count as finished; the rest we redo.
+            try:
+                run_store.path(run_name).joinpath("status.json").unlink(missing_ok=True)
+            except OSError:
+                pass
+            for f in sorted(run_store.path(run_name).rglob("*"), reverse=True):
+                f.unlink() if f.is_file() else f.rmdir()
+            run_store.path(run_name).rmdir()
         if store.stop_requested(name):
             store.set_state(name, "stopped", done=done, total=len(valid))
             return store.state(name)
@@ -79,15 +83,18 @@ def run_sweep(name: str, store: SweepStore | None = None,
         try:
             train(run_name, spec["window_dataset"], spec["base_network"],
                   point["network"], spec["base_recipe"], recipe,
-                  device=spec.get("device", "cpu"), sweep=name, store=run_store)
+                  device=spec.get("device", "cpu"), sweep=name, store=run_store,
+                  # a stop asked of the sweep also cuts the point in flight at its
+                  # next epoch boundary — not only between points
+                  should_stop=lambda: store.stop_requested(name))
         except RunError as e:
             # declared, never silent: the point failed with its reason
-            store.set_state(name, "running", done=done, total=len(valid),
+            store.set_state(name, "running", done=done, total=len(valid), pid=pid,
                             last_error={"run": run_name, "code": e.code,
                                         "message": e.message})
             continue
         done += 1
-        store.set_state(name, "running", done=done, total=len(valid))
+        store.set_state(name, "running", done=done, total=len(valid), pid=pid)
         if progress:
             progress(done, len(valid), run_name)
     store.set_state(name, "done", done=done, total=len(valid))
@@ -140,7 +147,7 @@ def sweep_trials(name: str, store: SweepStore | None = None,
         row = {"trial": i, "run": run_name, "point": overrides,
                "status": None, "value": None, "seconds_per_epoch": None}
         if run_store.exists(run_name):
-            row["status"] = run_store.status(run_name).get("status")
+            row["status"] = run_store.reconcile(run_name).get("status")
             sp = run_store.path(run_name) / "summary.json"
             if sp.exists():
                 summary = read_json_retrying(sp)

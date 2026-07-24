@@ -11,6 +11,7 @@ from pathlib import Path
 
 from fv import settings
 from fv.ioutils import read_json_retrying, write_json_atomic
+from fv.proc import pid_alive
 
 
 class SweepStoreError(ValueError):
@@ -57,6 +58,25 @@ class SweepStore:
         p = self.path(name) / "state.json"
         return read_json_retrying(p) if p.exists() else {"status": "unknown"}
 
+    def reconcile(self, name: str) -> dict:
+        """Heal a stale 'running': if the owner process that wrote it is gone
+        (crash / API restart / this machine hibernating), no runner will ever
+        read the stop file, so the state would say 'running' forever (the
+        inherited trap). Mark it 'interrupted' — a terminal state that is
+        resumable and deletable. Errs safe: a live or unknown owner is left be.
+        Returns the (possibly updated) state."""
+        st = self.state(name)
+        if st.get("status") != "running":
+            return st
+        pid = st.get("pid")
+        if pid is None or pid_alive(pid):
+            return st  # legacy sweep without an owner, or genuinely still running
+        self.set_state(name, "interrupted", done=st.get("done", 0),
+                       total=st.get("total"),
+                       reason="el proceso que lo ejecutaba ya no existe "
+                              "(caida/reinicio/hibernacion); reanudalo para seguir")
+        return self.state(name)
+
     def list(self) -> list[dict]:
         if not self.root.exists():
             return []
@@ -64,7 +84,7 @@ class SweepStore:
         for d in sorted(self.root.iterdir()):
             if (d / "spec.json").exists():
                 spec = read_json_retrying(d / "spec.json")
-                st = self.state(d.name)
+                st = self.reconcile(d.name)
                 out.append({"name": d.name, "spec": spec, "state": st})
         return out
 

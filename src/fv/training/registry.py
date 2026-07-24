@@ -16,6 +16,7 @@ from pathlib import Path
 
 from fv import settings
 from fv.ioutils import read_json_retrying, read_text_retrying, write_json_atomic
+from fv.proc import pid_alive
 
 
 class RunError(ValueError):
@@ -77,6 +78,23 @@ class RunStore:
         if not p.exists():
             return {"status": "unknown"}
         return read_json_retrying(p)
+
+    def reconcile(self, name: str) -> dict:
+        """Heal a stale 'running': if the training process that wrote it is gone
+        (crash / API restart / hibernation), the run would read 'running'
+        forever (the inherited trap this store exists to kill). Mark it
+        'interrupted' — the sweep runner redoes any non-(done|cancelled) point
+        on resume. Errs safe: a live or unknown owner is left be."""
+        st = self.status(name)
+        if st.get("status") != "running":
+            return st
+        pid = st.get("pid")
+        if pid is None or pid_alive(pid):
+            return st
+        self.set_status(name, "interrupted", epoch=st.get("epoch", 0),
+                        reason="el proceso que lo entrenaba ya no existe "
+                               "(caida/reinicio/hibernacion)")
+        return self.status(name)
 
     def config(self, name: str) -> dict:
         p = self.path(name) / "config.json"
