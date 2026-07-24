@@ -120,7 +120,7 @@ export default function Diagnostics() {
           ) : null}
         </div>
       ) : null}
-      {gallery ? (
+      {gallery && !busy ? (
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Galería peor-primero ({gallery.total} ventanas) — clic: sondas</h3>
           <div className="thumbgrid" data-testid="gallery">

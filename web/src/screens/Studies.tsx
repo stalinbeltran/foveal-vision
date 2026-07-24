@@ -23,6 +23,7 @@ export default function Studies() {
   const [list, setList] = useState<any[] | null>(null);
   const [wds, setWds] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
+  const [axesMeta, setAxesMeta] = useState<any>(null);
   const [error, setError] = useState<unknown>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
@@ -48,8 +49,18 @@ export default function Studies() {
       if (d.recipes[0])
         setForm((f: any) => f.base_recipe ? f : { ...f, base_recipe: d.recipes[0].name });
     }).catch(setError);
+    api.get("/sweeps/axes").then(setAxesMeta).catch(setError);
     return () => clearInterval(t);
   }, []);
+
+  // the axis vocabulary comes from the backend (single source of truth): C
+  // structure fields + D training fields + the special channels[i] sub-axis.
+  // channels[i] supersedes raw `channels` as the OAT way to sweep width.
+  const geoAuto = new Set<string>(axesMeta?.geometry_auto ?? []);
+  const cAxes = ((axesMeta?.network ?? []) as string[]).filter((a) => a !== "channels");
+  const dAxes = (axesMeta?.recipe ?? []) as string[];
+  const defaultRange = (axis: string) =>
+    geoAuto.has(axis) ? "auto" : axis === "channels[i]" ? "8, 16, 32" : "";
 
   // poll the selected study; when a step awaits confirmation, fetch its winner
   useEffect(() => {
@@ -104,7 +115,12 @@ export default function Studies() {
 
   const setAxis = (i: number, k: string, v: string) =>
     setForm((f: any) => ({ ...f, axes: f.axes.map((a: any, j: number) => j === i ? { ...a, [k]: v } : a) }));
-  const addAxis = () => setForm((f: any) => ({ ...f, axes: [...f.axes, { axis: "", range: "auto" }] }));
+  // picking the axis also seeds a sensible range: 'auto' for calculated-range
+  // geometry, a width list for channels[i], empty (a list is required) otherwise
+  const pickAxis = (i: number, axis: string) =>
+    setForm((f: any) => ({ ...f, axes: f.axes.map((a: any, j: number) =>
+      j === i ? { axis, range: defaultRange(axis) } : a) }));
+  const addAxis = () => setForm((f: any) => ({ ...f, axes: [...f.axes, { axis: "", range: "" }] }));
   const rmAxis = (i: number) => setForm((f: any) => ({ ...f, axes: f.axes.filter((_: any, j: number) => j !== i) }));
 
   return (
@@ -146,10 +162,20 @@ export default function Studies() {
             <div>
               {form.axes.map((a: any, i: number) => (
                 <div className="row" key={i} style={{ marginBottom: 4 }}>
-                  <input style={{ width: 110 }} placeholder="eje (channels[i]…)" value={a.axis}
-                    onChange={(e) => setAxis(i, "axis", e.target.value)} />
-                  <input className="grow" placeholder="auto o 1, 2, 3" value={a.range}
-                    onChange={(e) => setAxis(i, "range", e.target.value)} />
+                  <select style={{ width: 130 }} value={a.axis} data-testid="axis-select"
+                    onChange={(e) => pickAxis(i, e.target.value)}>
+                    <option value="">— eje —</option>
+                    <optgroup label="Estructura (C)">
+                      {cAxes.map((x) => <option key={x} value={x}>{x}</option>)}
+                      <option value="channels[i]">channels[i]</option>
+                    </optgroup>
+                    <optgroup label="Entrenamiento (D)">
+                      {dAxes.map((x) => <option key={x} value={x}>{x}</option>)}
+                    </optgroup>
+                  </select>
+                  <input className="grow"
+                    placeholder={geoAuto.has(a.axis) ? "auto o 1, 2, 3" : "1, 2, 3"}
+                    value={a.range} onChange={(e) => setAxis(i, "range", e.target.value)} />
                   <button className="linkbtn danger" onClick={() => rmAxis(i)}>×</button>
                 </div>
               ))}

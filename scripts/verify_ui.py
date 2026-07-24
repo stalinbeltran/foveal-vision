@@ -84,7 +84,13 @@ def main() -> int:
         check(page, "/sweeps", "[data-testid=sweeps-table]", "07-recorridos", sweeps_extra)
 
         # Estudios (I): the OAT schedule screen renders with its plan form + list
-        check(page, "/studies", "[data-testid=studies-table]", "07c-estudios")
+        def studies_extra(page):
+            # the axis is a SELECT (fed by /sweeps/axes), not free text: it must
+            # exist, offer the OAT axes, and seed a calculated range when picked
+            page.wait_for_selector("[data-testid=axis-select]", timeout=10000)
+            page.select_option("[data-testid=axis-select]", "channels[i]")
+            page.select_option("[data-testid=axis-select]", "k_center")  # geometry
+        check(page, "/studies", "[data-testid=studies-table]", "07c-estudios", studies_extra)
 
         # Runs: list + detail with curves and provenance
         check(page, "/runs", "[data-testid=runs-table]", "08-runs")

@@ -81,6 +81,14 @@ def test_full_flow_train_diagnose_predict(world, client):
     fm = client.post("/runs/api-run/feature-maps",
                      json={"window_dataset": world["dataset"], "index": 0}).json()
     assert set(fm["branches"]) == {"center", "periph"}
+    # a stale gallery thumb (index past the dataset) -> clean 400, not a 500 (R4)
+    oob = client.post("/runs/api-run/feature-maps",
+                      json={"window_dataset": world["dataset"], "index": 10_000_000})
+    assert oob.status_code == 400
+    assert oob.json()["detail"]["code"] == "window_index_out_of_range"
+    assert client.post("/runs/api-run/input-view",
+                       json={"window_dataset": world["dataset"], "index": 10_000_000}
+                       ).status_code == 400
 
     # predict: the three stages + knobs echoed in window units
     p = client.post("/runs/api-run/predict",
@@ -103,6 +111,19 @@ def test_contract_09_http_sweep_refused_before_reserving(world, client):
     assert r.status_code == 400
     assert r.json()["detail"]["code"] == "objective_varies_with_space"
     assert client.get("/sweeps/bad-sweep").status_code == 404  # nothing reserved
+
+
+def test_sweep_axes_match_the_validator(world, client):
+    # the select's vocabulary is the SAME set the study/sweep validator accepts,
+    # so a dropdown can never offer (or hide) an axis the backend disagrees with
+    from fv.sweeps.spec import GEOMETRY_AUTO, NETWORK_PARAMS, RECIPE_PARAMS
+    ax = client.get("/sweeps/axes").json()
+    assert ax["network"] == sorted(NETWORK_PARAMS)
+    assert ax["recipe"] == sorted(RECIPE_PARAMS)
+    assert ax["geometry_auto"] == sorted(GEOMETRY_AUTO)
+    assert ax["channels_indexed"] == "channels[i]"
+    # not shadowed by /sweeps/{name}: 'axes' resolves to this route, not a lookup
+    assert client.get("/sweeps/axes").status_code == 200
 
 
 def test_sweep_over_http(world, client):

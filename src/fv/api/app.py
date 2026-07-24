@@ -377,14 +377,29 @@ def create_app() -> FastAPI:
     def run_kernels(name: str):
         return kernels_payload(_model_for(name))
 
-    @app.post("/runs/{name}/feature-maps")
-    def run_feature_maps(name: str, body: dict):
-        model = _model_for(name)
+    def _probe_window(body: dict):
+        """Resolve (image, window x0, y0) for a probe, validating the index
+        BEFORE indexing (R4): a stale gallery thumb from another dataset must
+        get a clean 400, not a 500 out-of-bounds deep in the handler."""
         arrays = wstore.arrays(body["window_dataset"])
+        n = len(arrays["sample_idx"])
         i = int(body["index"])
+        if not 0 <= i < n:
+            raise _http_error(RunError(
+                "window_index_out_of_range",
+                f"la ventana {i} no existe en '{body['window_dataset']}' "
+                f"(tiene {n})",
+                "elige una ventana del dataset del run: quiza cambiaste de run "
+                "y la galeria anterior quedo en pantalla"))
         lookup = {int(a): r for r, a in enumerate(arrays["images_sample_idx"])}
         img = arrays["images"][lookup[int(arrays["sample_idx"][i])]]
         wx0, wy0 = (int(v) for v in arrays["window_xy"][i])
+        return img, wx0, wy0
+
+    @app.post("/runs/{name}/feature-maps")
+    def run_feature_maps(name: str, body: dict):
+        model = _model_for(name)
+        img, wx0, wy0 = _probe_window(body)
         from fv.fovea import build_view
         view, _cov = build_view(img, wx0, wy0, model.dims,
                                 pool_mode=model.cfg["pool_mode"],
@@ -394,11 +409,7 @@ def create_app() -> FastAPI:
     @app.post("/runs/{name}/input-view")
     def run_input_view(name: str, body: dict):
         model = _model_for(name)
-        arrays = wstore.arrays(body["window_dataset"])
-        i = int(body["index"])
-        lookup = {int(a): r for r, a in enumerate(arrays["images_sample_idx"])}
-        img = arrays["images"][lookup[int(arrays["sample_idx"][i])]]
-        wx0, wy0 = (int(v) for v in arrays["window_xy"][i])
+        img, wx0, wy0 = _probe_window(body)
         return input_view_payload(model, img, wx0, wy0)
 
     # --------------------------------------------------------------- predict (F)
@@ -421,6 +432,17 @@ def create_app() -> FastAPI:
     @app.get("/sweeps")
     def list_sweeps():
         return {"sweeps": sstore.list()}
+
+    @app.get("/sweeps/axes")
+    def sweep_axes():
+        """The axis vocabulary, from the SAME constants the validator uses — so a
+        select can't drift from what check_sweep/study accepts (the 'define it
+        twice' trap). geometry_auto = the axes whose range may be 'auto' (their
+        range is CALCULATED); channels_indexed is the special OAT sub-axis."""
+        from fv.sweeps.spec import GEOMETRY_AUTO, NETWORK_PARAMS, RECIPE_PARAMS
+        return {"network": sorted(NETWORK_PARAMS), "recipe": sorted(RECIPE_PARAMS),
+                "geometry_auto": sorted(GEOMETRY_AUTO),
+                "channels_indexed": "channels[i]"}
 
     @app.post("/sweeps", status_code=202)
     def create_sweep(body: dict):
