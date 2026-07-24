@@ -149,6 +149,23 @@ def test_resume_redoes_an_interrupted_point(world):
     assert rstore.status("swr-0001")["status"] == "done"    # redone, not jammed
 
 
+def test_no_valid_points_error_carries_each_reason(world):
+    # when every axis value is geometrically invalid, the error must say WHICH
+    # value failed and WHY — not just "all invalid" (the user's complaint)
+    from fv.sweeps.runner import prepare_sweep
+    from fv.sweeps.spec import SweepError
+    from fv.sweeps.store import SweepStore
+    store = SweepStore()
+    spec = _spec(world)
+    spec["space"] = {"pen_frac": [0.45, 0.5]}  # both exceed the periphery band
+    with pytest.raises(SweepError) as e:
+        prepare_sweep("bad-axis", spec, TINY_NET, store)
+    assert e.value.code == "no_valid_points"
+    assert "pen_frac=0.45" in e.value.hint and "pen_frac=0.5" in e.value.hint
+    assert "penetration" in e.value.hint          # the concrete geometric reason
+    assert not store.exists("bad-axis")            # nothing reserved on failure
+
+
 def test_pid_alive():
     import os
     from fv.proc import pid_alive

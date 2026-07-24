@@ -30,10 +30,18 @@ def prepare_sweep(name: str, spec: dict, base_network: dict,
         raise SweepError(p["code"], p["message"], p["hint"])
     valid, discarded = expand_points(spec, base_network)
     if not valid:
+        # every value failed — carry WHY (each discard has its reason) so the
+        # user sees which value to fix, not just "all invalid" (formatos §2)
+        def _fmt(pt: dict) -> str:
+            return ", ".join(f"{k}={v}" for k, v in pt.items())
+        reasons = "; ".join(
+            f"{_fmt(d['point'])}: {d['problems'][0]['message']}"
+            for d in discarded[:8])
+        if len(discarded) > 8:
+            reasons += f"; … (+{len(discarded) - 8})"
         raise SweepError("no_valid_points",
-                         "todos los puntos del espacio son geometricamente invalidos",
-                         "revisa los rangos: los asserts de la geometria matan esas "
-                         "combinaciones (los descartes llevan su razon)")
+                         "todos los valores del eje son geometricamente invalidos",
+                         f"cada valor y su razon: {reasons}")
     enriched = dict(spec)
     enriched["name"] = name
     enriched["points"] = [p["overrides"] for p in valid]
