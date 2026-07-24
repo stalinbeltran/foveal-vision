@@ -139,17 +139,21 @@ def test_sweep_over_http(world, client):
     trials = client.get("/sweeps/s1/trials").json()
     assert len(trials["trials"]) == 2
     assert trials["trials"][0]["value"] is not None
+    # child run names carry the axis value, not just an index (point_run_name)
+    names = {t["run"] for t in trials["trials"]}
+    assert names == {"s1-0000-lr0p001", "s1-0001-lr0p003"}
+    one = next(iter(names))
     # a sweep child cannot be deleted alone (would orphan it from its siblings):
     # the reason is "belongs to sweep", NOT "is running" (the run is done/stopped)
-    child = client.delete("/runs/s1-0000")
+    child = client.delete(f"/runs/{one}")
     assert child.status_code == 409
     assert child.json()["detail"]["code"] == "run_belongs_to_sweep"
     # deleting the sweep cascades to its runs — the supported path, no orphan left
     d = client.delete("/sweeps/s1")
     assert d.status_code == 200
-    assert set(d.json()["runs_deleted"]) == {"s1-0000", "s1-0001"}
+    assert set(d.json()["runs_deleted"]) == names
     assert client.get("/sweeps/s1").status_code == 404
-    assert client.get("/runs/s1-0000").status_code == 404
+    assert client.get(f"/runs/{one}").status_code == 404
 
 
 def test_study_guided_flow_over_http(world, client):

@@ -1,5 +1,6 @@
 """The sweep runner: sequential points (worker limit 1 on CPU), each point a
-first-class run named {sweep}-{i:04d} with provenance.sweep set, validated by
+first-class run named {sweep}-{i:04d}-{axis} (point_run_name) with
+provenance.sweep set, validated by
 THE SAME gate as every other way of training. Resume = count what finished
 (only done/cancelled) and redo the rest. Cooperative stop cuts twice: between
 points, and — via should_stop — the point IN FLIGHT at its next epoch boundary.
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import re
 
 from fv.ioutils import read_json_retrying
 from fv.sweeps.spec import OBJECTIVES, SweepError, check_sweep, expand_points
@@ -17,6 +19,32 @@ from fv.sweeps.store import SweepStore, SweepStoreError
 from fv.training.loop import train
 from fv.training.recipe import Recipe
 from fv.training.registry import RunError, RunStore
+
+
+def _axis_token(overrides: dict) -> str:
+    """A compact, filename/route/cp1252-safe tag of the sweep point, so a run's
+    name carries its axis value — not just an opaque index. OAT moves ONE axis
+    at a time, so the first override is normally the only one; if a point moves
+    several fields (a grid, or a study fixing n_layers and expanding channels)
+    we tag the FIRST and let the index disambiguate the rest."""
+    if not overrides:
+        return ""
+    k, v = next(iter(overrides.items()))
+    if isinstance(v, (list, tuple)):
+        vs = "x".join(str(x) for x in v)
+    else:
+        vs = str(v).replace(".", "p").replace("-", "m")
+    return re.sub(r"[^0-9A-Za-z_]+", "", f"{k}{vs}")
+
+
+def point_run_name(sweep_name: str, i: int, overrides: dict) -> str:
+    """The single source of truth for a child run's name — used by BOTH the
+    runner (that creates it) and sweep_trials (that maps a point back to it). If
+    these two ever built the name differently the sweep would show every point as
+    'pending' forever. Index stays for a stable, collision-free identity; the
+    axis token rides along so the name is legible."""
+    tag = _axis_token(overrides)
+    return f"{sweep_name}-{i:04d}-{tag}" if tag else f"{sweep_name}-{i:04d}"
 
 
 def prepare_sweep(name: str, spec: dict, base_network: dict,
@@ -66,7 +94,7 @@ def run_sweep(name: str, store: SweepStore | None = None,
     store.set_state(name, "running", total=len(valid), pid=pid)
     done = 0
     for i, point in enumerate(valid):
-        run_name = f"{name}-{i:04d}"
+        run_name = point_run_name(name, i, point["overrides"])
         if run_store.exists(run_name):
             st = run_store.status(run_name).get("status")
             if st in ("done", "cancelled"):
@@ -154,7 +182,7 @@ def sweep_trials(name: str, store: SweepStore | None = None,
     direction = OBJECTIVES.get(objective, "max")
     rows = []
     for i, overrides in enumerate(spec.get("points", [])):
-        run_name = f"{name}-{i:04d}"
+        run_name = point_run_name(name, i, overrides)
         row = {"trial": i, "run": run_name, "point": overrides,
                "status": None, "value": None, "seconds_per_epoch": None}
         if run_store.exists(run_name):

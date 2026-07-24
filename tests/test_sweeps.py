@@ -35,7 +35,7 @@ def test_auto_ranges_come_from_fovea(world):
 
 
 def test_sweep_runs_ranks_and_resumes(world):
-    from fv.sweeps.runner import prepare_sweep, run_sweep, sweep_trials
+    from fv.sweeps.runner import point_run_name, prepare_sweep, run_sweep, sweep_trials
     from fv.sweeps.store import SweepStore
     from fv.training.registry import RunStore
     store, rstore = SweepStore(), RunStore()
@@ -47,8 +47,11 @@ def test_sweep_runs_ranks_and_resumes(world):
     trials = sweep_trials("sw1", store, rstore)
     assert trials["objective"] == "f1"
     assert all(t["value"] is not None for t in trials["trials"])
-    # every point is a first-class run with provenance.sweep set
-    cfg = rstore.config("sw1-0000")
+    # every point is a first-class run with provenance.sweep set — and the run
+    # name carries its axis value (point_run_name), not just an opaque index
+    r0 = point_run_name("sw1", 0, enriched["points"][0])
+    assert r0.startswith("sw1-0000-") and rstore.exists(r0)
+    cfg = rstore.config(r0)
     assert cfg["provenance"]["sweep"] == "sw1"
     # resume is idempotent: finished points are counted, not redone
     state2 = run_sweep("sw1", store, rstore)
@@ -56,18 +59,19 @@ def test_sweep_runs_ranks_and_resumes(world):
 
 
 def test_delete_sweep_cascades_and_leaves_no_orphan(world):
-    from fv.sweeps.runner import delete_sweep, prepare_sweep, run_sweep
+    from fv.sweeps.runner import delete_sweep, point_run_name, prepare_sweep, run_sweep
     from fv.sweeps.store import SweepStore
     from fv.training.registry import RunStore
     store, rstore = SweepStore(), RunStore()
-    prepare_sweep("swd", _spec(world, points=1, epochs=1), TINY_NET, store)
+    enriched = prepare_sweep("swd", _spec(world, points=1, epochs=1), TINY_NET, store)
     run_sweep("swd", store, rstore)
-    assert rstore.exists("swd-0000")
+    child = point_run_name("swd", 0, enriched["points"][0])
+    assert rstore.exists(child)
     out = delete_sweep("swd", store, rstore)
-    assert out["deleted"] == "swd" and out["runs_deleted"] == ["swd-0000"]
+    assert out["deleted"] == "swd" and out["runs_deleted"] == [child]
     # both gone: the sweep AND its child — nothing points at a missing parent
     assert not store.exists("swd")
-    assert not rstore.exists("swd-0000")
+    assert not rstore.exists(child)
     assert rstore.used_by_sweep("swd") == []
 
 
@@ -138,15 +142,16 @@ def test_reconcile_heals_stale_running_when_owner_is_gone(world):
 def test_resume_redoes_an_interrupted_point(world):
     """Feature 2 + runner: only done/cancelled count as finished; an interrupted
     point (reconciled after a crash) is dropped and redone on resume."""
-    from fv.sweeps.runner import prepare_sweep, run_sweep
+    from fv.sweeps.runner import point_run_name, prepare_sweep, run_sweep
     from fv.sweeps.store import SweepStore
     from fv.training.registry import RunStore
     store, rstore = SweepStore(), RunStore()
-    prepare_sweep("swr", _spec(world, points=2, epochs=1), TINY_NET, store)
+    enriched = prepare_sweep("swr", _spec(world, points=2, epochs=1), TINY_NET, store)
     run_sweep("swr", store, rstore)
-    rstore.set_status("swr-0001", "interrupted", epoch=0)   # simulate a crash
+    child1 = point_run_name("swr", 1, enriched["points"][1])
+    rstore.set_status(child1, "interrupted", epoch=0)       # simulate a crash
     run_sweep("swr", store, rstore)                         # resume
-    assert rstore.status("swr-0001")["status"] == "done"    # redone, not jammed
+    assert rstore.status(child1)["status"] == "done"        # redone, not jammed
 
 
 def test_no_valid_points_error_carries_each_reason(world):
@@ -170,17 +175,18 @@ def test_sweeping_epochs_is_not_collapsed_by_the_budget(world):
     # the budget caps epochs, but a point that SWEEPS epochs must keep its own
     # value — otherwise the axis silently does nothing (every point same epochs)
     from fv.ioutils import read_json_retrying
-    from fv.sweeps.runner import prepare_sweep, run_sweep
+    from fv.sweeps.runner import point_run_name, prepare_sweep, run_sweep
     from fv.sweeps.store import SweepStore
     from fv.training.registry import RunStore
     store, rstore = SweepStore(), RunStore()
     spec = _spec(world)
     spec["space"] = {"epochs": [1, 2]}
     spec["budget"] = {"epochs": 1}          # would have overridden both to 1
-    prepare_sweep("sw-ep", spec, TINY_NET, store)
+    enriched = prepare_sweep("sw-ep", spec, TINY_NET, store)
     run_sweep("sw-ep", store, rstore)
-    got = sorted(read_json_retrying(rstore.path(f"sw-ep-{i:04d}") / "summary.json")
-                 ["epochs_requested"] for i in range(2))
+    got = sorted(read_json_retrying(
+                     rstore.path(point_run_name("sw-ep", i, enriched["points"][i]))
+                     / "summary.json")["epochs_requested"] for i in range(2))
     assert got == [1, 2]                     # the axis varied, not collapsed
 
 

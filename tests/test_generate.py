@@ -27,7 +27,8 @@ def test_generated_inline_sweep_prepares_runs_and_ranks(world):
     trials = sweep_trials("gen1", store, rstore)
     assert all(t["value"] is not None for t in trials["trials"])
     # each point is a first-class run: null network name (inline), sweep set
-    cfg = rstore.config("gen1-0000")
+    from fv.sweeps.runner import point_run_name
+    cfg = rstore.config(point_run_name("gen1", 0, enriched["points"][0]))
     assert cfg["provenance"]["network"]["name"] is None
     assert cfg["provenance"]["network"]["value"]["N"] == enriched["base_network_value"]["N"]
     assert cfg["provenance"]["sweep"] == "gen1"
