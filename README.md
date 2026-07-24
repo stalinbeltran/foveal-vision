@@ -139,15 +139,36 @@ YAML comiteable; `--auto` recorre la cadena confirmando el ganador sugerido (reg
 > completa desatendida. El estudio **guía y no ejecuta** por diseño: desde la web app el ganador
 > lo confirma el usuario (pantalla **Estudios**); `--auto` es para la validación corta en CPU.
 
+### Qué ejes se pueden barrer
+
+Cualquier campo de la **red (C)** o de la **receta (D)** es un eje válido — **excepto `N` y
+`c_frac`**. Esos dos fijan `center_out = round_to_even(N·c_frac)`, que el contrato ①a ata al
+`window_size` del dataset (fijo en todo el recorrido): barrerlos daría una fóvea distinta de la
+ventana etiquetada en cada punto, así que se **rechazan en las dos puertas** (recorrido y estudio)
+con razón y arreglo — para variar el contexto periférico barre `d`, y para cambiar la fóvea usa un
+dataset con esa ventana. Para comprobar que **todos** los ejes corren de punta a punta:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\verify_axes.py --dataset synth-b16
+```
+
+> Verificado (2026-07-24): **26/26 ejes** (11 de red + 13 de receta + `N`/`c_frac` rehusados),
+> 0 fallos. Corre un recorrido real por eje (`generate_sweep` + `run_sweep`), entrena sus puntos
+> en un store temporal y comprueba que se miden. Ejes de red: `d, pen_frac, n_layers, k_center,
+> k_periph, s_center, s_periph, channels, merge, pool_mode, pad_mode`. Ejes de receta: `lr,
+> optimizer, momentum, weight_decay, batch_size, epochs, scheduler, patience, lambda_pos,
+> pos_weight, smooth_l1_beta, monitor, seed`.
+
 ## Tests
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-> Verificado (2026-07-24): **65 passed** en ~25 s — un test por contrato (organizacion.md §2, con
+> Verificado (2026-07-24): **74 passed** en ~26 s — un test por contrato (organizacion.md §2, con
 > el nuevo ⑫ estudio↔recorrido), el builder paramétrico (no-regresión `n_layers=2`), el derivador
-> de base, el generador OAT, el arrastre del ganador y el flujo completo por HTTP.
+> de base, el generador OAT, el arrastre del ganador, el rechazo de `N`/`c_frac` como ejes, que el
+> budget no colapsa el eje `epochs`, y el flujo completo por HTTP.
 
 ## Verificar la UI con navegador
 

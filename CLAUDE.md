@@ -23,6 +23,27 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-24 — EJES DE BARRIDO: `N`/`c_frac` REHUSADOS + BUDGET NO COLAPSA `epochs` +
+> VERIFICADOR DE TODOS LOS EJES.** Un recorrido generado por un estudio (`test2-s0-N`) quedaba en
+> `done 0/3` sin razón visible: barría el eje `N` con `c_frac` fijo, y como `center_out =
+> round_to_even(N·c_frac)` está atado por ①a al `window_size` del dataset, **cada punto** daba una
+> fóvea != la ventana. `expand_points` solo validaba geometría (`check_network`), no la costura con
+> el dataset (`check_run`), así que los 3 puntos pasaban como "válidos" y morían con
+> `window_size_mismatch` dentro del job (`RunError`→`continue`) — la trampa que R4 prohíbe. Arreglos:
+> - **`N` y `c_frac` no son ejes** (`WINDOW_SIZE_FIELDS`): se rechazan en las **dos puertas** —
+>   `check_sweep` (H) y `validate_plan` (I)— con `axis_breaks_window_size` (razón + arreglo: barre
+>   `d`, o usa un dataset con esa ventana), antes de reservar nada. Como ningún otro eje toca
+>   `center_out`, `check_network` por punto sigue bastando.
+> - **Budget no colapsa `epochs`:** el runner solo aplica `budget.epochs` si el punto no barre
+>   `epochs` (antes lo pisaba siempre → el eje no hacía nada, en silencio).
+> - **`scripts\verify_axes.py`:** corre un recorrido real por CADA eje de C y D. Verificado hoy:
+>   **26/26 ejes** (11 red + 13 receta + `N`/`c_frac` rehusados), 0 fallos. Ejes probados listados
+>   en el README (§«Qué ejes se pueden barrer»).
+>
+> **74 tests en verde**. Artefactos muertos del usuario borrados (`studies/test2`,
+> `sweeps/test2-s0-N`, `sweeps/test1-s0-N`). Fresco y cargable sigue siendo `fov-16-param` +
+> `oat-d-demo`.
+>
 > **2026-07-24 — PARADA DE RECORRIDOS: CORTE EN VUELO + RECONCILIACIÓN DE ESTADO MUERTO.** Dos
 > arreglos sobre la parada de recorridos (H):
 > - **Corte del punto en vuelo (feat 1):** `train` acepta `should_stop`; el runner le pasa
