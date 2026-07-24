@@ -13,7 +13,7 @@ from __future__ import annotations
 import itertools
 
 from fv.fovea import build_search_space
-from fv.models.builder import NETWORK_DEFAULTS, full_config
+from fv.models.builder import DEFAULT_CHANNEL, NETWORK_DEFAULTS, full_config
 from fv.training.recipe import Recipe
 from fv.validation import check_network
 
@@ -98,6 +98,11 @@ def expand_points(spec: dict, base_network: dict) -> tuple[list[dict], list[dict
         overrides = dict(zip(names, combo))
         net = dict(base)
         net.update({k: v for k, v in overrides.items() if k in NETWORK_PARAMS})
+        # channels depends on n_layers (§6.1): sweeping depth WITHOUT sweeping
+        # channels resizes the vector to the default rule [16]*L (§3.2), so the
+        # point stays valid instead of carrying the base's stale channel length.
+        if "n_layers" in overrides and "channels" not in overrides:
+            net["channels"] = [DEFAULT_CHANNEL] * int(overrides["n_layers"])
         recipe_over = {k: v for k, v in overrides.items() if k in RECIPE_PARAMS}
         problems = check_network(net)
         if problems:

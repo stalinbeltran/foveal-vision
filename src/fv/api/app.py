@@ -27,6 +27,7 @@ from fv.inference.predict import predict_image
 from fv.metrics import corner_evidence
 from fv.models.builder import full_config, network_trace
 from fv.models.store import NetworkStore, NetworkStoreError
+from fv.sweeps.generate import generate_sweep
 from fv.sweeps.runner import delete_sweep, prepare_sweep, run_sweep, sweep_trials
 from fv.sweeps.spec import SweepError
 from fv.sweeps.store import SweepStore, SweepStoreError
@@ -420,7 +421,16 @@ def create_app() -> FastAPI:
         if not name:
             raise HTTPException(400, {"code": "name_required",
                                       "message": "falta el nombre", "hint": ""})
-        net = nstore.get(body["base_network"])
+        # base by NAME or inline VALUE, never both, never neither (D-H2, formatos §4.4)
+        base_name = body.get("base_network")
+        base_value = body.get("base_network_value")
+        if bool(base_name) == bool(base_value):
+            raise HTTPException(400, {
+                "code": "base_network_xor_value",
+                "message": "el recorrido necesita base_network (nombre) O "
+                           "base_network_value (inline), exactamente uno",
+                "hint": "da el nombre de una red del catalogo, o el config inline"})
+        net = nstore.get(base_name) if base_name else base_value
         recipe = rstore.get(body["base_recipe"])
         manifest = wstore.manifest(body["window_dataset"])
         problems = check_run(manifest, full_config(net))
@@ -428,8 +438,9 @@ def create_app() -> FastAPI:
             raise HTTPException(400, problems[0])
         spec = {
             "window_dataset": body["window_dataset"],
-            "base_network": body["base_network"],
+            "base_network": base_name,
             "base_network_value": net,
+            "base_label": body.get("base_label"),
             "base_recipe": body["base_recipe"],
             "base_recipe_value": recipe.as_dict(),
             "space": body.get("space", {}),
@@ -447,6 +458,34 @@ def create_app() -> FastAPI:
                           on_cancel=lambda: sstore.request_stop(name))
         return {"job": job, "points": len(enriched["points"]),
                 "discarded": len(enriched["discarded"])}
+
+    @app.post("/sweeps/generate", status_code=202)
+    def generate_sweep_ep(body: dict):
+        """P1: derive an inline base from B's window_size and sweep one axis
+        (barrido-por-ejes.md §8). The base is validated with the same check_run
+        as every door, inside generate_sweep, BEFORE reserving the name."""
+        name = body.get("name", "")
+        if not name:
+            raise HTTPException(400, {"code": "name_required",
+                                      "message": "falta el nombre", "hint": ""})
+        enriched = generate_sweep(
+            name, body["window_dataset"], body["axis"], body["range"],
+            base_recipe=body.get("base_recipe", "corta"),
+            objective=body.get("objective", "f1"),
+            strategy=body.get("strategy", "grid"),
+            budget=body.get("budget", {}),
+            device=body.get("device", "cpu"), seed=body.get("seed", 1),
+            winners=body.get("winners"), overrides=body.get("overrides"),
+            c_frac=body.get("c_frac"), study=body.get("study"), sstore=sstore)
+
+        def work(is_cancelled):
+            return run_sweep(name, sstore, runs)
+        job = jobs.submit("sweep", work, {"sweep": name},
+                          on_cancel=lambda: sstore.request_stop(name))
+        return {"job": job, "base_label": enriched["base_label"],
+                "points": len(enriched["points"]),
+                "discarded": len(enriched["discarded"]),
+                "corrections": enriched.get("corrections", [])}
 
     @app.get("/sweeps/{name}/trials")
     def get_sweep_trials(name: str):
