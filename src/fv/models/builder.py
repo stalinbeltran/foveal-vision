@@ -24,17 +24,32 @@ import torch.nn.functional as F
 
 from fv.fovea import build_masks, derive_dims
 
+DEFAULT_CHANNEL = 16  # D-C2: a derived net defaults to [16]*n_layers (constant 16)
+
 NETWORK_DEFAULTS = {
     "N": 20, "c_frac": 0.8, "d": 2, "pen_frac": 0.1, "n_layers": 2,
     "k_center": 3, "k_periph": 3, "s_center": 1, "s_periph": 1,
-    "ch1": 16, "ch2": 32, "merge": "concat", "pool_mode": "avg",
+    "channels": None, "merge": "concat", "pool_mode": "avg",
     "pad_mode": "edge",
 }
+
+
+def resolve_channels(cfg: dict, n_layers: int) -> list[int]:
+    """The per-layer channel vector (D-C3). Precedence: an explicit `channels`
+    list wins; else the legacy scalar `ch1/ch2` maps to `[ch1, ch2]` (read old,
+    write channels); else the default `[16]*n_layers` (D-C2)."""
+    if cfg.get("channels") is not None:
+        return [int(c) for c in cfg["channels"]]
+    if "ch1" in cfg or "ch2" in cfg:
+        return [int(cfg.get("ch1", DEFAULT_CHANNEL)),
+                int(cfg.get("ch2", DEFAULT_CHANNEL))]
+    return [DEFAULT_CHANNEL] * int(n_layers)
 
 
 def full_config(cfg: dict) -> dict:
     out = dict(NETWORK_DEFAULTS)
     out.update({k: v for k, v in cfg.items() if k in NETWORK_DEFAULTS})
+    out["channels"] = resolve_channels(cfg, out["n_layers"])  # always a list
     return out
 
 
@@ -47,12 +62,13 @@ class FoveatedRegionalNN(nn.Module):
         self.dims = dims
         kc, kp = cfg["k_center"], cfg["k_periph"]
         pc, pp = kc // 2, kp // 2
-        ch1, ch2 = cfg["ch1"], cfg["ch2"]
+        channels = cfg["channels"]  # length == n_layers (D-C3)
 
-        self.center_conv1 = nn.Conv2d(1, ch1, kc, stride=cfg["s_center"], padding=pc)
-        self.center_conv2 = nn.Conv2d(ch1, ch2, kc, stride=1, padding=pc)
-        self.periph_conv1 = nn.Conv2d(1, ch1, kp, stride=cfg["s_periph"], padding=pp)
-        self.periph_conv2 = nn.Conv2d(ch1, ch2, kp, stride=1, padding=pp)
+        # L conv layers per branch, same kernel in all of them. The branch stride
+        # goes on the FIRST layer only; the rest are stride 1 (D-S1), so the total
+        # subsampling is `s` regardless of depth -> n_layers stays out of stride_range.
+        self.center_convs = self._make_branch(channels, kc, pc, cfg["s_center"])
+        self.periph_convs = self._make_branch(channels, kp, pp, cfg["s_periph"])
 
         cm, pm = build_masks(dims)
         self.register_buffer("center_mask", torch.from_numpy(cm)[None, None])
@@ -62,13 +78,31 @@ class FoveatedRegionalNN(nn.Module):
         self.flat_features = flat
         self.head = nn.Linear(flat, 12)  # 4 corners x [exists, x, y]
 
+    @staticmethod
+    def _make_branch(channels: list[int], k: int, pad: int, stride: int) -> nn.ModuleList:
+        layers = nn.ModuleList()
+        in_ch = 1  # the masked composite image is one channel per branch
+        for i, out_ch in enumerate(channels):
+            s = stride if i == 0 else 1
+            layers.append(nn.Conv2d(in_ch, out_ch, k, stride=s, padding=pad))
+            in_ch = out_ch
+        return layers
+
+    @staticmethod
+    def _branch_forward(convs: nn.ModuleList, x: torch.Tensor) -> torch.Tensor:
+        # ReLU BETWEEN layers, none after the last (the last map stays
+        # pre-activation, as conv2 did — introspection reads it signed, V2).
+        for i, conv in enumerate(convs):
+            x = conv(x)
+            if i < len(convs) - 1:
+                x = F.relu(x)
+        return x
+
     def _branches(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # option A: mask the input, then convolve — strides act on data already
         # separated by region, and masks stay N x N.
-        xc = x * self.center_mask
-        xp = x * self.periph_mask
-        c = self.center_conv2(F.relu(self.center_conv1(xc)))
-        p = self.periph_conv2(F.relu(self.periph_conv1(xp)))
+        c = self._branch_forward(self.center_convs, x * self.center_mask)
+        p = self._branch_forward(self.periph_convs, x * self.periph_mask)
         return c, p
 
     def _infer_flat_features(self) -> int:
@@ -93,21 +127,30 @@ class FoveatedRegionalNN(nn.Module):
     # first-layer kernels are exact and interpretable in both.
 
     def kernels(self) -> dict:
+        # first-layer kernels: in_channels=1 per branch keeps them exact (V1).
         return {
-            "center": self.center_conv1.weight.detach().cpu().numpy()[:, 0],
-            "periph": self.periph_conv1.weight.detach().cpu().numpy()[:, 0],
+            "center": self.center_convs[0].weight.detach().cpu().numpy()[:, 0],
+            "periph": self.periph_convs[0].weight.detach().cpu().numpy()[:, 0],
         }
+
+    def _branch_maps(self, convs: nn.ModuleList, x: torch.Tensor) -> list:
+        # V1/V2 for the first and last conv (layers >1 are optional this phase,
+        # barrido-por-ejes.md §3.3): [L1 post-ReLU, last pre-activation]. Always
+        # two maps, so the payload never breaks — for n_layers=2 it is bit-identical.
+        first = None
+        for i, conv in enumerate(convs):
+            x = conv(x)
+            if i == 0:
+                first = F.relu(x)[0].cpu().numpy()
+            if i < len(convs) - 1:
+                x = F.relu(x)
+        last = x[0].cpu().numpy()
+        return [first, last]
 
     def feature_maps(self, x: torch.Tensor) -> dict:
         with torch.no_grad():
-            xc = x * self.center_mask
-            xp = x * self.periph_mask
-            c1 = F.relu(self.center_conv1(xc))
-            c2 = self.center_conv2(c1)
-            p1 = F.relu(self.periph_conv1(xp))
-            p2 = self.periph_conv2(p1)
-        return {"center": [c1[0].cpu().numpy(), c2[0].cpu().numpy()],
-                "periph": [p1[0].cpu().numpy(), p2[0].cpu().numpy()]}
+            return {"center": self._branch_maps(self.center_convs, x * self.center_mask),
+                    "periph": self._branch_maps(self.periph_convs, x * self.periph_mask)}
 
 
 def build_model(cfg: dict) -> FoveatedRegionalNN:

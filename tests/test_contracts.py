@@ -71,6 +71,60 @@ def test_contract_03_run_never_overwritten(world):
     assert e.value.code == "run_exists"
 
 
+def test_parametric_builder_no_regression_for_two_layers():
+    """D-C2/D-C3/§12: with channels=[16,32] EXPLICIT (not the new default) the
+    parametric builder reproduces the shape and param count of the old fixed
+    two-layer net (captured before the change: 317612 params, flat 25600)."""
+    from fv.models.builder import network_trace
+    cfg = {"N": 20, "c_frac": 0.8, "d": 2, "pen_frac": 0.1, "n_layers": 2,
+           "k_center": 3, "k_periph": 3, "s_center": 1, "s_periph": 1,
+           "channels": [16, 32], "merge": "concat", "pool_mode": "avg",
+           "pad_mode": "edge"}
+    t = network_trace(cfg)
+    assert t["num_params"] == 317612
+    assert t["flat_features"] == 25600
+    # the legacy ch1/ch2 form maps to the SAME model (read old, write channels)
+    legacy = dict(cfg); del legacy["channels"]; legacy["ch1"] = 16; legacy["ch2"] = 32
+    assert network_trace(legacy)["num_params"] == 317612
+
+
+def test_parametric_builder_default_channels_are_constant_sixteen():
+    """D-C2: a derived net (no channels, no ch1/ch2) defaults to [16]*n_layers."""
+    from fv.models.builder import full_config
+    assert full_config({"n_layers": 3})["channels"] == [16, 16, 16]
+    assert full_config({"n_layers": 2})["channels"] == [16, 16]
+
+
+def test_parametric_builder_three_layers_builds_and_forwards():
+    """§12: n_layers=3 constructs and forwards with the corner-head shape."""
+    import torch
+    from fv.models.builder import build_model
+    cfg = dict(TINY_NET); cfg.pop("ch1"); cfg.pop("ch2")
+    cfg.update(n_layers=3, channels=[4, 8, 8])
+    model = build_model(cfg)
+    assert len(model.center_convs) == 3 and len(model.periph_convs) == 3
+    out = model(torch.zeros(1, 1, cfg["N"], cfg["N"]))
+    assert out.shape == (1, 4, 3)
+
+
+def test_parametric_builder_stride_only_on_first_layer():
+    """D-S1: the branch stride subsamples once (first layer); depth does not
+    change the total subsampling, so branch_out is independent of n_layers."""
+    from fv.models.builder import network_trace
+    base = dict(TINY_NET); base.pop("ch1"); base.pop("ch2")
+    base.update(s_center=2, s_periph=2)
+    two = network_trace(dict(base, n_layers=2, channels=[4, 8]))
+    three = network_trace(dict(base, n_layers=3, channels=[4, 8, 8]))
+    assert two["branch_out"] == three["branch_out"]
+
+
+def test_channels_length_must_match_n_layers():
+    from fv.validation import check_network
+    bad = dict(TINY_NET); bad.pop("ch1"); bad.pop("ch2")
+    bad.update(n_layers=3, channels=[4, 8])  # only 2 for 3 layers
+    assert any(p["code"] == "channels_length_mismatch" for p in check_network(bad))
+
+
 def test_contract_04_checkpoint_rebuilds_the_net_without_yaml(world):
     import torch
     from fv.inference.checkpoint import load_model

@@ -41,6 +41,21 @@ def check_network(net: dict) -> list[dict]:
             "code": "unknown_pool_mode",
             "message": f"pool_mode '{net.get('pool_mode')}' no existe",
             "hint": "usa 'avg' o 'max'"})
+    # channels: a per-layer vector of length n_layers (D-C3). Absent means the
+    # legacy ch1/ch2 form (the builder resolves it); present means it must fit.
+    n_layers = int(net.get("n_layers", 2))
+    channels = net.get("channels")
+    if channels is not None:
+        if not isinstance(channels, (list, tuple)) or len(channels) != n_layers:
+            problems.append({
+                "code": "channels_length_mismatch",
+                "message": f"channels={channels} debe tener longitud n_layers={n_layers}",
+                "hint": "da un canal por capa: una lista de longitud n_layers"})
+        elif any(int(c) < 1 for c in channels):
+            problems.append({
+                "code": "channels_must_be_positive",
+                "message": f"channels={channels} tiene un valor < 1",
+                "hint": "cada capa necesita al menos 1 canal"})
     if not problems:
         dims = derive_dims(net["N"], net["c_frac"], net["d"], net["pen_frac"])
         if int(net.get("k_periph", 3)) > 2 * dims.periph_band + 1:
