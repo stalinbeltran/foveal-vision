@@ -13,6 +13,7 @@ export default function RunDetail() {
   const [detail, setDetail] = useState<any>(null);
   const [error, setError] = useState<unknown>(null);
   const [records, setRecords] = useState<any[]>([]);
+  const [point, setPoint] = useState<Record<string, any> | null>(null);
   const next = useRef(0);
 
   useEffect(() => {
@@ -35,6 +36,22 @@ export default function RunDetail() {
     const t = setInterval(load, 2000);
     return () => clearInterval(t);
   }, [name]);
+
+  // A run born of a sweep IS a point of an axis; its identity is the override
+  // that distinguishes it (e.g. n_layers=2). The run config alone doesn't say
+  // WHICH field is the axis — the sweep does. Fetch its trials and pick this
+  // run's point so the axis value is always shown, never left for the user to
+  // reverse-engineer from the full network config.
+  const sweep = detail?.config?.provenance?.sweep;
+  useEffect(() => {
+    if (!sweep) { setPoint(null); return; }
+    api.get(`/sweeps/${sweep}/trials`)
+      .then((t) => {
+        const row = (t.trials || []).find((r: any) => r.run === name);
+        setPoint(row ? row.point ?? {} : {});
+      })
+      .catch(() => setPoint({}));
+  }, [sweep, name]);
 
   const stop = () => api.post(`/runs/${name}/stop`).catch(setError);
   const del = async () => {
@@ -62,6 +79,16 @@ export default function RunDetail() {
               <dt>receta (D)</dt><dd>{prov.recipe.name} (lr={prov.recipe.value.lr},
                 λ_pos={prov.recipe.value.lambda_pos}, seed={prov.recipe.value.seed})</dd>
               <dt>recorrido</dt><dd>{prov.sweep ?? "—"}</dd>
+              {prov.sweep ? (
+                <>
+                  <dt>eje (punto)</dt>
+                  <dd className="mono">{point == null ? "…" :
+                    Object.keys(point).length === 0 ? "base (sin override)" :
+                    Object.entries(point)
+                      .map(([k, v]) => `${k} = ${JSON.stringify(v)}`)
+                      .join(" · ")}</dd>
+                </>
+              ) : null}
               <dt>commit</dt><dd className="mono">{prov.git_commit?.slice(0, 12)}</dd>
               <dt>entorno (X)</dt><dd>{prov.environment.python} · torch {prov.environment.torch} ·
                 {" "}{prov.environment.device}</dd>
