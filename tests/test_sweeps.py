@@ -166,6 +166,26 @@ def test_no_valid_points_error_carries_each_reason(world):
     assert not store.exists("bad-axis")            # nothing reserved on failure
 
 
+def test_sweeping_N_or_c_frac_is_refused_before_reserving(world):
+    # ①a ties center_out=round_to_even(N*c_frac) to the dataset window_size, so
+    # N/c_frac cannot be axes: check_sweep must refuse WITH the reason, up front,
+    # instead of letting every point fail window_size_mismatch deep in the job
+    # (the bug behind test2-s0-N ending 'done 0/3' with no visible cause).
+    from fv.sweeps.runner import prepare_sweep
+    from fv.sweeps.spec import SweepError, check_sweep
+    from fv.sweeps.store import SweepStore
+    for axis in ("N", "c_frac"):
+        spec = _spec(world)
+        spec["space"] = {axis: [8, 10, 12]}
+        problems = check_sweep(spec)
+        assert any(p["code"] == "axis_breaks_window_size" for p in problems)
+        store = SweepStore()
+        with pytest.raises(SweepError) as e:
+            prepare_sweep(f"bad-{axis}", spec, TINY_NET, store)
+        assert e.value.code == "axis_breaks_window_size"
+        assert not store.exists(f"bad-{axis}")     # nothing reserved on refusal
+
+
 def test_pid_alive():
     import os
     from fv.proc import pid_alive

@@ -14,7 +14,7 @@ import re
 from fv.models.builder import DEFAULT_CHANNEL, NETWORK_DEFAULTS
 from fv.sweeps.generate import generate_sweep
 from fv.sweeps.spec import (GEOMETRY_AUTO, NETWORK_PARAMS, OBJECTIVES,
-                            RECIPE_PARAMS)
+                            RECIPE_PARAMS, WINDOW_SIZE_FIELDS)
 from fv.sweeps.store import SweepStore
 from fv.sweeps.winner import winner_overrides
 
@@ -57,6 +57,13 @@ def validate_plan(plan: dict) -> list[dict]:
         if not is_indexed and axis not in valid_fields:
             _bad(problems, "unknown_axis", f"'{axis}' no es un campo de C/D ni channels[i]",
                  f"ejes válidos: {sorted(valid_fields)} o channels[i]")
+        elif axis in WINDOW_SIZE_FIELDS:
+            _bad(problems, "axis_breaks_window_size",
+                 f"'{axis}' fija center_out (= round_to_even(N*c_frac)), que el "
+                 f"contrato (1)a ata al window_size del dataset: barrerlo daria una "
+                 f"fovea != la ventana etiquetada en cada punto",
+                 "N y c_frac se derivan juntos del window_size (no se barren); barre "
+                 "'d' para el contexto periferico, o usa un dataset con esa ventana")
         if rng == "auto" and not is_indexed and axis not in GEOMETRY_AUTO:
             _bad(problems, "auto_needs_geometry",
                  f"'{axis}' no tiene rango calculado: 'auto' solo vale para {sorted(GEOMETRY_AUTO)}",

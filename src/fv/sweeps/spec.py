@@ -21,6 +21,13 @@ NETWORK_PARAMS = set(NETWORK_DEFAULTS)
 RECIPE_PARAMS = set(Recipe().as_dict())
 LOSS_WEIGHT_PARAMS = {"lambda_pos", "pos_weight", "smooth_l1_beta"}
 GEOMETRY_AUTO = {"k_center", "k_periph", "s_center", "s_periph", "d"}
+# The two fields that set center_out = round_to_even(N·c_frac). Contract ①a ties
+# center_out to B's window_size, which is fixed for the whole sweep — so varying
+# either one INDEPENDENTLY makes every point violate ①a (fovea != window). They
+# are DERIVED together from the problem (fv.models.derive), never swept: a sweep
+# that declares them must be refused HERE, with the reason, before any point is
+# reserved — not silently trained and failed deep in the job (R4, §10).
+WINDOW_SIZE_FIELDS = {"N", "c_frac"}
 OBJECTIVES = {"f1": "max", "pos_err_px": "min", "loss": "min"}
 
 
@@ -43,6 +50,14 @@ def check_sweep(spec: dict) -> list[dict]:
         if param not in NETWORK_PARAMS | RECIPE_PARAMS:
             bad("unknown_space_param", f"'{param}' no es un campo de C ni de D",
                 f"los ejes validos son {sorted(NETWORK_PARAMS | RECIPE_PARAMS)}")
+        elif param in WINDOW_SIZE_FIELDS:
+            bad("axis_breaks_window_size",
+                f"'{param}' fija center_out (= round_to_even(N*c_frac)), que el "
+                f"contrato (1)a ata al window_size del dataset: barrerlo hace que "
+                f"cada punto tenga una fovea != la ventana etiquetada",
+                "N y c_frac se DERIVAN juntos del window_size (no se barren); para "
+                "variar el contexto periferico barre 'd', y para cambiar la fovea "
+                "usa/reconstruye un dataset con ese window_size")
     objective = spec.get("objective", "f1")
     if objective not in OBJECTIVES:
         bad("unknown_objective", f"objetivo '{objective}' no existe",

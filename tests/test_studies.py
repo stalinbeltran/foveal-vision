@@ -28,6 +28,14 @@ def test_validate_plan_rejects_unknown_axis_and_bad_auto(world):
     assert validate_plan(_plan(world, [{"axis": "n_layers", "range": [1, 2]}])) == []
 
 
+def test_validate_plan_refuses_N_and_c_frac_axes(world):
+    # N/c_frac set center_out, which ①a ties to the fixed window_size — they are
+    # derived, not swept; the plan gate must refuse them (root cause of test2).
+    for axis in ("N", "c_frac"):
+        problems = validate_plan(_plan(world, [{"axis": axis, "range": [8, 10, 12]}]))
+        assert any(p["code"] == "axis_breaks_window_size" for p in problems)
+
+
 def test_study_never_overwritten(world):
     _recipe(world)
     store = StudyStore()
