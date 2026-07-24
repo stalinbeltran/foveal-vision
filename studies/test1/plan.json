@@ -1,0 +1,20 @@
+{
+  "window_dataset": "dirty-paragraphs-80px-patchs16",
+  "base_recipe": "corta",
+  "objective": "f1",
+  "seeds": 3,
+  "axes": [
+    {
+      "axis": "n_layers",
+      "range": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "budget": {
+    "epochs": 2
+  },
+  "format_version": 1
+}
