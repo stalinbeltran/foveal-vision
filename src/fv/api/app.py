@@ -29,6 +29,7 @@ from fv.models.builder import full_config, network_trace
 from fv.models.store import NetworkStore, NetworkStoreError
 from fv.sweeps.generate import generate_sweep
 from fv.sweeps.runner import delete_sweep, prepare_sweep, run_sweep, sweep_trials
+from fv.sweeps.winner import suggest_winner
 from fv.sweeps.spec import SweepError
 from fv.sweeps.store import SweepStore, SweepStoreError
 from fv.training.loop import train
@@ -490,6 +491,14 @@ def create_app() -> FastAPI:
     @app.get("/sweeps/{name}/trials")
     def get_sweep_trials(name: str):
         return sweep_trials(name, sstore, runs)
+
+    @app.get("/sweeps/{name}/winner")
+    def get_sweep_winner(name: str, delta: float = 0.0,
+                         cost_metric: str = "seconds_per_epoch"):
+        """D-W1: SUGGEST the cheapest point within δ of the best (the user
+        confirms before carrying it). δ and the cost metric are inputs."""
+        return suggest_winner(name, delta=delta, cost_metric=cost_metric,
+                              store=sstore, run_store=runs)
 
     @app.get("/sweeps/{name}")
     def sweep_detail(name: str):
