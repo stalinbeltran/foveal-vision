@@ -86,7 +86,10 @@ def run_sweep(name: str, store: SweepStore | None = None,
             store.set_state(name, "stopped", done=done, total=len(valid))
             return store.state(name)
         recipe = dataclasses.replace(base_recipe, **point["recipe_overrides"])
-        if epochs:
+        # budget epochs caps the run, but it must NOT silently override a point
+        # that sweeps `epochs` itself — that would collapse the axis to one value
+        # and "the axis does nothing" (exactly what breaks a sweep unnoticed)
+        if epochs and "epochs" not in point["recipe_overrides"]:
             recipe = dataclasses.replace(recipe, epochs=epochs)
         try:
             train(run_name, spec["window_dataset"], spec["base_network"],

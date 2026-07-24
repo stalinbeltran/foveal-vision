@@ -166,6 +166,24 @@ def test_no_valid_points_error_carries_each_reason(world):
     assert not store.exists("bad-axis")            # nothing reserved on failure
 
 
+def test_sweeping_epochs_is_not_collapsed_by_the_budget(world):
+    # the budget caps epochs, but a point that SWEEPS epochs must keep its own
+    # value — otherwise the axis silently does nothing (every point same epochs)
+    from fv.ioutils import read_json_retrying
+    from fv.sweeps.runner import prepare_sweep, run_sweep
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    store, rstore = SweepStore(), RunStore()
+    spec = _spec(world)
+    spec["space"] = {"epochs": [1, 2]}
+    spec["budget"] = {"epochs": 1}          # would have overridden both to 1
+    prepare_sweep("sw-ep", spec, TINY_NET, store)
+    run_sweep("sw-ep", store, rstore)
+    got = sorted(read_json_retrying(rstore.path(f"sw-ep-{i:04d}") / "summary.json")
+                 ["epochs_requested"] for i in range(2))
+    assert got == [1, 2]                     # the axis varied, not collapsed
+
+
 def test_sweeping_N_or_c_frac_is_refused_before_reserving(world):
     # ①a ties center_out=round_to_even(N*c_frac) to the dataset window_size, so
     # N/c_frac cannot be axes: check_sweep must refuse WITH the reason, up front,
