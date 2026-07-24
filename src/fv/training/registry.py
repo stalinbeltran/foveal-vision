@@ -89,7 +89,12 @@ class RunStore:
         if not self.root.exists():
             return []
         out = []
-        for d in sorted(self.root.iterdir()):
+        # newest first: the run you just trained is the one you want to look at,
+        # and it keeps the default selection on a current (loadable) checkpoint
+        # instead of the alphabetically-first, possibly-stale one.
+        dirs = sorted(self.root.iterdir(),
+                      key=lambda d: d.stat().st_mtime, reverse=True)
+        for d in dirs:
             if not (d / "config.json").exists():
                 continue
             cfg = read_json_retrying(d / "config.json")

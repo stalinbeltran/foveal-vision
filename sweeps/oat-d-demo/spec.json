@@ -1,0 +1,113 @@
+{
+  "window_dataset": "synth-b16",
+  "base_network": null,
+  "base_label": "ws16-p2-d2-L2",
+  "base_network_value": {
+    "N": 20,
+    "c_frac": 0.8,
+    "d": 2,
+    "pen_frac": 0.1,
+    "n_layers": 2,
+    "k_center": 3,
+    "k_periph": 3,
+    "s_center": 1,
+    "s_periph": 1,
+    "channels": [
+      16,
+      16
+    ],
+    "merge": "concat",
+    "pool_mode": "avg",
+    "pad_mode": "edge"
+  },
+  "base_recipe": "corta",
+  "base_recipe_value": {
+    "lr": 0.002,
+    "optimizer": "adam",
+    "momentum": 0.9,
+    "weight_decay": 0.0,
+    "batch_size": 64,
+    "epochs": 3,
+    "scheduler": "none",
+    "patience": 0,
+    "lambda_pos": 1.0,
+    "pos_weight": 1.0,
+    "smooth_l1_beta": 0.08,
+    "monitor": "val_loss",
+    "seed": 1
+  },
+  "derivation": {
+    "window_size": 16,
+    "fractions": {
+      "c_frac": 0.8,
+      "pen_frac": 0.1,
+      "d": 2
+    },
+    "field_origin": {
+      "N": {
+        "origin": "default"
+      },
+      "c_frac": {
+        "origin": "default"
+      },
+      "d": {
+        "origin": "default"
+      },
+      "pen_frac": {
+        "origin": "default"
+      },
+      "n_layers": {
+        "origin": "default"
+      },
+      "k_center": {
+        "origin": "default"
+      },
+      "k_periph": {
+        "origin": "default"
+      },
+      "s_center": {
+        "origin": "default"
+      },
+      "s_periph": {
+        "origin": "default"
+      },
+      "channels": {
+        "origin": "default"
+      },
+      "merge": {
+        "origin": "default"
+      },
+      "pool_mode": {
+        "origin": "default"
+      },
+      "pad_mode": {
+        "origin": "default"
+      }
+    }
+  },
+  "corrections": [],
+  "space": {
+    "d": [
+      1,
+      2
+    ]
+  },
+  "strategy": "grid",
+  "objective": "f1",
+  "budget": {
+    "points": 2,
+    "epochs": 2
+  },
+  "device": "cpu",
+  "seed": 1,
+  "name": "oat-d-demo",
+  "points": [
+    {
+      "d": 1
+    },
+    {
+      "d": 2
+    }
+  ],
+  "discarded": []
+}

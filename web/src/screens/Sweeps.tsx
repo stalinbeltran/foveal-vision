@@ -67,6 +67,8 @@ export default function Sweeps() {
   const selSweep = (sweeps ?? []).find((s) => s.name === sel);
   const baseNet = selSweep?.spec?.base_network_value ?? null;
   const baseNetName = selSweep?.spec?.base_network ?? null;
+  // inline base (D-H2): no name — the synthetic base_label is the grouping key
+  const baseLabel = selSweep?.spec?.base_label ?? null;
   const baseRecipeName = selSweep?.spec?.base_recipe ?? null;
   const spaceKeys = Object.keys(selSweep?.spec?.space ?? {});
   const baseKey = baseNet ? JSON.stringify(baseNet) : "";
@@ -118,16 +120,18 @@ export default function Sweeps() {
   const allSweeps = sweeps ?? [];
   const sdistinct = (path: (s: any) => any) =>
     [...new Set(allSweeps.map(path).filter((v) => v != null))].sort() as string[];
+  // group by the base's identity: its name, or the synthetic label when inline
+  const baseKeyOf = (s: any) => s.spec.base_network ?? s.spec.base_label ?? null;
   const sopts = {
     window_dataset: sdistinct((s) => s.spec.window_dataset),
-    base_network: sdistinct((s) => s.spec.base_network),
+    base_network: sdistinct(baseKeyOf),
     base_recipe: sdistinct((s) => s.spec.base_recipe),
     objective: sdistinct((s) => s.spec.objective),
   };
   const ACTIVE = ["running", "queued"];
   const sfiltered = allSweeps.filter((s) => {
     if (sf.window_dataset && s.spec.window_dataset !== sf.window_dataset) return false;
-    if (sf.base_network && s.spec.base_network !== sf.base_network) return false;
+    if (sf.base_network && baseKeyOf(s) !== sf.base_network) return false;
     if (sf.base_recipe && s.spec.base_recipe !== sf.base_recipe) return false;
     if (sf.objective && s.spec.objective !== sf.objective) return false;
     if (sf.q && !s.name.toLowerCase().includes(sf.q.toLowerCase())) return false;
@@ -300,7 +304,7 @@ export default function Sweeps() {
                 borderRadius: 8,
               }}>
                 <div>
-                  <strong>red base (C): {baseNetName ?? "—"}</strong>
+                  <strong>red base (C): {baseNetName ?? (baseLabel ? `${baseLabel} (inline)` : "—")}</strong>
                   {baseRecipeName ? <span className="sub" style={{ margin: 0 }}>
                     {"  ·  receta base (D): "}{baseRecipeName}</span> : null}
                 </div>

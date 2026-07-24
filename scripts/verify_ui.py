@@ -83,16 +83,22 @@ def main() -> int:
             objetivo.select_option("f1")
         check(page, "/sweeps", "[data-testid=sweeps-table]", "07-recorridos", sweeps_extra)
 
+        # Estudios (I): the OAT schedule screen renders with its plan form + list
+        check(page, "/studies", "[data-testid=studies-table]", "07c-estudios")
+
         # Runs: list + detail with curves and provenance
         check(page, "/runs", "[data-testid=runs-table]", "08-runs")
 
         def run_extra(page):
             page.wait_for_selector("text=Procedencia", timeout=15000)
             page.wait_for_selector("svg[aria-label='loss']", timeout=15000)
-        check(page, "/runs/fov-run-2", "text=fov-run-2", "09-run-detalle", run_extra)
+        check(page, "/runs/fov-16-param", "text=fov-16-param", "09-run-detalle", run_extra)
 
         # Diagnostico: summary + gallery -> click opens the probes (F0, V1, V2)
         def diag_extra(page):
+            # pick a run trained with the CURRENT builder — old checkpoints are
+            # intentionally incompatible (barrido §13); load fails cleanly on them
+            page.locator("select").first.select_option("fov-16-param")
             page.wait_for_selector("[data-testid=diag-summary]", timeout=30000)
             page.wait_for_selector("[data-testid=gallery] canvas", timeout=30000)
             page.click("[data-testid=gallery] .thumb")
@@ -102,6 +108,7 @@ def main() -> int:
 
         # Predecir: stage with overlays + move the threshold slider live
         def predict_extra(page):
+            page.locator("select").first.select_option("fov-16-param")
             page.wait_for_selector("[data-testid=predict-stage]", timeout=30000)
             page.wait_for_selector("[data-testid=predict-numbers]", timeout=15000)
             sliders = page.locator("input[type=range]")
@@ -117,7 +124,7 @@ def main() -> int:
         for e in real:
             print(" ", e)
         return 1
-    print(f"\nTODO OK: 11 pantallas/interacciones sin errores. Capturas en {SHOTS}")
+    print(f"\nTODO OK: 12 pantallas/interacciones sin errores. Capturas en {SHOTS}")
     return 0
 
 

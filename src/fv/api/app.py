@@ -20,7 +20,7 @@ from fv.api.jobs import JobQueue
 from fv.ioutils import read_json_retrying, write_json_atomic
 from fv.datasets.loader import SourceDataset, SourceError, discover_sources
 from fv.fovea import FoveaError, build_search_space, check_dims, derive_dims
-from fv.inference.checkpoint import MODEL_CACHE
+from fv.inference.checkpoint import MODEL_CACHE, CheckpointError
 from fv.inference.introspect import (feature_maps_payload, input_view_payload,
                                      kernels_payload)
 from fv.inference.predict import predict_image
@@ -44,7 +44,7 @@ from fv.windows.store import WindowDatasetStore, WindowStoreError
 
 DOMAIN_ERRORS = (SourceError, ExtractError, WindowStoreError, NetworkStoreError,
                  RecipeStoreError, RunError, SweepError, SweepStoreError,
-                 StudyError, StudyStoreError, FoveaError)
+                 StudyError, StudyStoreError, CheckpointError, FoveaError)
 
 NOT_FOUND_CODES = {"source_not_found", "sample_not_found", "window_dataset_missing",
                    "network_not_found", "recipe_not_found", "run_not_found",

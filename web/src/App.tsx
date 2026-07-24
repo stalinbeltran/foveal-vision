@@ -8,6 +8,7 @@ import Networks from "./screens/Networks";
 import Recipes from "./screens/Recipes";
 import Train from "./screens/Train";
 import Sweeps from "./screens/Sweeps";
+import Studies from "./screens/Studies";
 import Runs from "./screens/Runs";
 import RunDetail from "./screens/RunDetail";
 import Diagnostics from "./screens/Diagnostics";
@@ -59,6 +60,7 @@ export default function App() {
         <div className="group">Entrenar</div>
         <NavLink to="/train">Entrenar</NavLink>
         <NavLink to="/sweeps">Recorridos</NavLink>
+        <NavLink to="/studies">Estudios</NavLink>
         <NavLink to="/runs">Runs</NavLink>
         <div className="group">Analizar</div>
         <NavLink to="/diagnostics">Diagnóstico</NavLink>
@@ -75,6 +77,7 @@ export default function App() {
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/train" element={<Train />} />
           <Route path="/sweeps" element={<Sweeps />} />
+          <Route path="/studies" element={<Studies />} />
           <Route path="/runs" element={<Runs />} />
           <Route path="/runs/:name" element={<RunDetail />} />
           <Route path="/diagnostics" element={<Diagnostics />} />

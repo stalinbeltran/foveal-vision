@@ -8,8 +8,8 @@ import { ErrorBox, Field, Working } from "../components/ui";
 // (FG1), via POST /networks/validate. Broken asserts show with their reason.
 
 const DEFAULTS = { name: "", N: 20, c_frac: 0.8, d: 2, pen_frac: 0.1,
-  k_center: 3, k_periph: 3, s_center: 1, s_periph: 1, ch1: 16, ch2: 32,
-  merge: "concat", pool_mode: "avg", pad_mode: "edge" };
+  n_layers: 2, k_center: 3, k_periph: 3, s_center: 1, s_periph: 1,
+  channels: [16, 16], merge: "concat", pool_mode: "avg", pad_mode: "edge" };
 
 function ZoneDiagram({ dims }: { dims: any }) {
   const N = dims.N, s = Math.min(12, Math.floor(240 / N));
@@ -63,6 +63,19 @@ export default function Networks() {
     </Field>
   );
 
+  // n_layers drives the channel vector's length (D-C3): grow -> pad with 16
+  // (the default channel, D-C2), shrink -> truncate, so it always fits.
+  const setLayers = (L: number) => {
+    L = Math.max(1, L | 0);
+    const ch = (form.channels ?? []).slice(0, L);
+    while (ch.length < L) ch.push(16);
+    setForm({ ...form, n_layers: L, channels: ch });
+  };
+  const setChannels = (text: string) => {
+    const ch = text.split(",").map((s) => parseInt(s.trim(), 10)).filter((v) => !isNaN(v));
+    setForm({ ...form, channels: ch, n_layers: ch.length || form.n_layers });
+  };
+
   return (
     <div>
       <h2>Redes foveadas (C)</h2>
@@ -89,8 +102,18 @@ export default function Networks() {
             <div className="grow">{num("s_periph")}</div>
           </div>
           <div className="row">
-            <div className="grow">{num("ch1")}</div>
-            <div className="grow">{num("ch2")}</div>
+            <div className="grow">
+              <Field label="n_layers" help="capas conv por rama (D-S2: simétrico)">
+                <input type="number" step={1} min={1} value={form.n_layers}
+                  onChange={(e) => setLayers(+e.target.value)} />
+              </Field>
+            </div>
+            <div className="grow">
+              <Field label="channels (por capa)" help="lista de longitud n_layers (D-C3)">
+                <input value={(form.channels ?? []).join(", ")} placeholder="16, 32"
+                  onChange={(e) => setChannels(e.target.value)} />
+              </Field>
+            </div>
           </div>
           <Field label="merge" help="concat tolera strides distintos; sum exige iguales">
             <select value={form.merge} onChange={(e) => setForm({ ...form, merge: e.target.value })}>
