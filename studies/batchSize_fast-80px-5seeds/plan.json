@@ -1,0 +1,22 @@
+{
+  "window_dataset": "dirty-paragraphs-fast-80px",
+  "base_recipe": "corta",
+  "objective": "f1",
+  "seeds": 5,
+  "axes": [
+    {
+      "axis": "batch_size",
+      "range": [
+        10,
+        50,
+        80,
+        100,
+        120
+      ]
+    }
+  ],
+  "budget": {
+    "epochs": 20
+  },
+  "format_version": 1
+}
