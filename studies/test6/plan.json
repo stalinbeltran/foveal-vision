@@ -2,14 +2,14 @@
   "window_dataset": "dirty-paragraphs-fast-80px",
   "base_recipe": "corta",
   "objective": "f1",
-  "seeds": 2,
+  "seeds": 4,
   "axes": [
     {
-      "axis": "n_layers",
+      "axis": "batch_size",
       "range": [
-        1,
-        2,
-        3
+        100,
+        200,
+        300
       ]
     }
   ],
