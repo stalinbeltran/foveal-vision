@@ -21,6 +21,18 @@
   /* diverging ramp endpoints (signed data, neutral 0) */
   --div-neg: #2166ac;
   --div-pos: #b2182b;
+  /* categorical series ramp for multi-run overlays (Recorridos). 8 hues in a
+     FIXED, CVD-validated order (dataviz: worst adjacent ΔE 9.1 light). Assigned
+     by run/group identity, never by rank; past 8 they cycle, so identity always
+     rides the legend label + emphasis, never colour alone. */
+  --series-1: #2a78d6;
+  --series-2: #008300;
+  --series-3: #e87ba4;
+  --series-4: #eda100;
+  --series-5: #1baf7a;
+  --series-6: #eb6834;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -41,6 +53,16 @@
     --corner-bl: #c79ae0;
     --div-neg: #6ba3d6;
     --div-pos: #e2766f;
+    /* same eight hues, re-stepped for the dark surface (#232220): worst
+       adjacent ΔE 8.4 dark, all ≥3:1 contrast — validated as a set. */
+    --series-1: #3987e5;
+    --series-2: #008300;
+    --series-3: #d55181;
+    --series-4: #c98500;
+    --series-5: #199e70;
+    --series-6: #d95926;
+    --series-7: #9085e9;
+    --series-8: #e66767;
   }
 }
 
@@ -162,3 +184,15 @@ button:disabled { opacity: 0.5; cursor: default; }
 .kv dt { color: var(--text-dim); }
 .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
 .zonebox { display: grid; place-items: center; }
+
+/* Recorridos: multi-run curve overlay — mode switch + togglable legend */
+.curvemode { display: inline-flex; gap: 0; }
+.curvemode button { border-radius: 0; padding: 4px 10px; font-size: 12px; }
+.curvemode button:first-child { border-radius: 6px 0 0 6px; }
+.curvemode button:last-child { border-radius: 0 6px 6px 0; }
+.curvelegend { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.legenditem { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+  margin: 0; cursor: pointer; }
+.legenditem.off { opacity: 0.5; }
+.legenditem .swatch { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
+.legenditem input[type="checkbox"] { margin: 0; }

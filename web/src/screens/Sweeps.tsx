@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { usePersistedState } from "../uiState";
 import { Badge, ErrorBox, Field, Working } from "../components/ui";
+import { SweepCurves } from "../components/SweepCurves";
 
 // H — fix B, build a space over C and/or D. Geometry axes offer the
 // CALCULATED ranges ("auto"); the (9) block is active in the form; the budget
@@ -17,6 +18,8 @@ export default function Sweeps() {
   const [error, setError] = useState<unknown>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [trials, setTrials] = useState<any>(null);
+  const [curves, setCurves] = useState<Record<string, any[]>>({});
+  const curvesRef = useRef<Record<string, any[]>>({});
   const [baseDims, setBaseDims] = useState<any>(null);
   const [sf, setSf] = usePersistedState("sweeps.filters", {
     window_dataset: "", base_network: "", base_recipe: "", objective: "", q: "",
@@ -53,12 +56,34 @@ export default function Sweeps() {
     return () => clearInterval(t);
   }, []);
 
+  // Poll the trials AND fan out per-run metrics on the same 3s cadence, so a
+  // running sweep animates its curve overlay. A terminal run's curve is fetched
+  // once (its file won't grow); live runs re-fetch every tick. Curves live in a
+  // ref so the tick sees the previous fill without re-subscribing the effect.
   useEffect(() => {
     if (!sel) return;
-    const load = () => api.get(`/sweeps/${sel}/trials`).then(setTrials).catch(setError);
+    let alive = true;
+    curvesRef.current = {}; setCurves({});
+    const TERMINAL = new Set(["done", "cancelled", "failed"]);
+    const load = async () => {
+      let t: any;
+      try { t = await api.get(`/sweeps/${sel}/trials`); }
+      catch (e) { if (alive) setError(e); return; }
+      if (!alive) return;
+      setTrials(t);
+      const runs = (t.trials || []).filter((r: any) => r.status);
+      await Promise.all(runs.map(async (r: any) => {
+        if (TERMINAL.has(r.status) && curvesRef.current[r.run]?.length) return;
+        try {
+          const m = await api.get(`/runs/${r.run}/metrics?since=0`);
+          curvesRef.current[r.run] = m.records;
+        } catch { /* a run mid-write or just gone: keep what we had */ }
+      }));
+      if (alive) setCurves({ ...curvesRef.current });
+    };
     load();
-    const t = setInterval(load, 3000);
-    return () => clearInterval(t);
+    const iv = setInterval(load, 3000);
+    return () => { alive = false; clearInterval(iv); };
   }, [sel]);
 
   // The NN of each point = base network + the "punto". The base is the part FIXED
@@ -347,6 +372,7 @@ export default function Sweeps() {
                 <p className="sub">{trials.discarded.length} puntos descartados por geometría
                   (con su razón en el spec) — los asserts matan esas combinaciones.</p>
               ) : null}
+              <SweepCurves key={sel} trials={trials} curves={curves} />
             </div>
           ) : null}
         </div>

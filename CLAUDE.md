@@ -23,6 +23,23 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-25 — CURVAS DEL RECORRIDO: OVERLAY MULTI-RUN EN RECORRIDOS.** Al elegir un recorrido,
+> la pantalla **Recorridos** superpone las curvas de val (loss / f1 / pos_err_px) de **todos sus
+> runs** en tres small-multiples (la misma vista V14 de RunDetail, pero N líneas). Dos modos, por
+> decisión del usuario: **líneas por run** (una por run, leyenda de casillas para ocultar/mostrar
+> cada uno o todos, énfasis al pasar el ratón) y **media ± banda** (agrupa runs que comparten
+> config salvo `seed`: línea media + sombra min–max; con 1 semilla la banda es degenerada, a
+> propósito y anunciado en el subtítulo). El color **sigue a la entidad** (índice de trial / orden
+> de grupo), nunca al rank, así ocultar/ordenar no repinta a los demás. La paleta de 8 hues vive en
+> `tokens.css` (`--series-1..8`, claro/oscuro), validada CVD para las dos superficies; identidad
+> siempre por leyenda+etiqueta, nunca por color solo. Los datos ya existían: `/sweeps/{n}/trials` +
+> `/runs/{r}/metrics` (fan-out en el poll de 3 s; runs terminales se traen una vez). **Cero rutas
+> nuevas de backend.** Verificado: `web` typecheck+build limpio; Playwright sobre el recorrido vivo
+> `batchSize_fast-80px-s0-batch_size` (5 runs) — ambos modos, toggle y ocultar/mostrar todo, **sin
+> errores de consola**. `LineChart` extendido (banda + serie atenuada + leyenda opcional) sin
+> romper RunDetail. `SweepCurves.tsx` es nuevo. ⚠ `scripts\verify_ui.py` sigue apuntando a
+> `test4-s0-n_layers` (borrado): su interacción de Recorridos hay que reapuntarla al recorrido vivo.
+>
 > **2026-07-25 — AUDITORÍA CRUD CROSS-PÁGINA + REFRESCO DE LISTAS EN VIVO.** Se revisó el CRUD de
 > las 12 pantallas buscando «borrar aquí rompe allá». Arreglos:
 > - **Diagnóstico/Predecir** ya no piden un run recordado en `localStorage` que fue borrado o

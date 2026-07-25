@@ -78,6 +78,12 @@ valida en vivo: dimensiones derivadas, rangos calculados y el diagrama de zonas;
 edita por `n_layers` + `channels` por capa). **Estudios** encadena barridos por ejes (OAT):
 deriva la base del problema, arrastra el ganador y guía paso a paso.
 
+Al seleccionar un **Recorrido** se superponen las curvas de val (loss / f1 / pos_err_px) de
+**todos sus runs** en tres small-multiples: una línea de color por run, con leyenda de casillas
+para ocultar/mostrar cada uno (o todos), y un conmutador **líneas por run ↔ media ± banda**
+(la banda agrupa los runs que comparten config salvo la semilla; con una sola semilla queda
+degenerada, a propósito). Útil para ver el espacio entrenar y cazar el punto que diverge.
+
 ## Entrenar sin la UI
 
 Hacen falta tres cosas **con nombre**: un dataset (B), una red (C) y una receta (D). Se crean
