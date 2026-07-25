@@ -337,14 +337,18 @@ def create_app() -> FastAPI:
     @app.delete("/runs/{name}")
     def delete_run(name: str):
         cfg = runs.config(name)
-        if cfg.get("provenance", {}).get("sweep"):
+        sweep = cfg.get("provenance", {}).get("sweep")
+        if sweep and sstore.exists(sweep):
             raise _http_error(RunError(
                 "run_belongs_to_sweep",  # 409 family — NOT "is running": the run
                 # can be done/stopped and still be undeletable on its own
-                f"'{name}' pertenece al recorrido "
-                f"'{cfg['provenance']['sweep']}'",
+                f"'{name}' pertenece al recorrido '{sweep}'",
                 "borra el recorrido entero (arrastra sus runs) o deja el run: "
                 "sus puntos se comparan juntos"))
+        # sweep GONE (deleted out-of-band: manual/filesystem/git checkout) -> the
+        # run is an ORPHAN and "borra el recorrido entero" is impossible; deleting
+        # it alone is the only way out, so allow it instead of a permanent
+        # deadlock. Mirror of the reconcile idiom: heal a dangling ref, never trap.
         runs.delete(name)
         return {"deleted": name}
 

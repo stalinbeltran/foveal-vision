@@ -9,6 +9,7 @@ a stack trace inside a job later). This pins the reference graph:
     REFUSED with the list of referrers.
 """
 
+import json
 import time
 
 import pytest
@@ -123,3 +124,34 @@ def test_delete_generated_sweep_leaves_study_readable(world, client):
     st = client.get("/studies/est")
     assert st.status_code == 200
     assert st.json()["steps"][0]["sweep"] == sweep  # dangling name, but readable
+
+
+# --------- an ORPHAN run (its sweep was deleted out-of-band) is deletable ------
+def test_orphan_run_of_a_deleted_sweep_is_deletable(world, client):
+    """A child run guards against being deleted alone WHILE its sweep exists. But
+    if the sweep is gone (removed by hand / a git checkout / a partial delete),
+    'borra el recorrido entero' is impossible — the run must be deletable alone,
+    or it deadlocks forever. delete_run gates on the sweep STILL EXISTING."""
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+
+    def _fab_run(name: str, sweep: str):
+        d = RunStore().path(name)
+        d.mkdir(parents=True)
+        (d / "config.json").write_text(json.dumps({"provenance": {"sweep": sweep}}),
+                                       encoding="utf-8")
+        (d / "status.json").write_text(json.dumps({"status": "done"}), encoding="utf-8")
+
+    # sweep alive -> child still guarded (the existing contract holds)
+    SweepStore().create("live-sw", {"window_dataset": world["dataset"],
+                                    "base_network_value": {}, "base_recipe": "x",
+                                    "base_recipe_value": {}, "points": []})
+    _fab_run("child-live", "live-sw")
+    assert client.delete("/runs/child-live").status_code == 409
+
+    # sweep gone -> orphan -> deletable alone (no deadlock)
+    _fab_run("child-orphan", "ghost-sw")
+    assert "ghost-sw" not in {s["name"] for s in client.get("/sweeps").json()["sweeps"]}
+    r = client.delete("/runs/child-orphan")
+    assert r.status_code == 200, r.text
+    assert client.get("/runs/child-orphan").status_code == 404
