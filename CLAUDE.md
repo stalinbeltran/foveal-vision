@@ -23,6 +23,27 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-25 — AUDITORÍA CRUD CROSS-PÁGINA + REFRESCO DE LISTAS EN VIVO.** Se revisó el CRUD de
+> las 12 pantallas buscando «borrar aquí rompe allá». Arreglos:
+> - **Diagnóstico/Predecir** ya no piden un run recordado en `localStorage` que fue borrado o
+>   renombrado (la migración de sufijo de eje dejó nombres huérfanos): **gatean por pertenencia a la
+>   lista, no por verdad**, y la doomed-request ya no revienta ni pisa la carga válida. Además
+>   **refrescan la lista de runs en vivo** (sondeo 3 s, como Runs/Recorridos/Estudios), gateando la
+>   carga pesada con un booleano `runReady`/`sourceReady` estable para no re-computar en cada pasada.
+> - **Borrado cruzado por-nombre (R4):** borrar un **dataset B** que fija un **recorrido**
+>   (`spec.window_dataset`) o un **estudio** (`plan.window_dataset`), o una **receta D** que fija un
+>   estudio (`plan.base_recipe`), devolvía 200 y rompía la otra pantalla *dentro del job* al
+>   reanudar/avanzar. Ahora se rechaza en la puerta con **409 + razón+arreglo** nombrando al referente
+>   (`SweepStore/StudyStore.used_by_dataset`, `StudyStore.used_by_recipe`; código `recipe_in_use`). La
+>   asimetría es deliberada: las referencias **instantánea** (run/recorrido copian los VALORES de C/D
+>   inline) SÍ permiten borrar C/D sin romper el run ni su diagnóstico.
+> - **Verificado:** `tests/test_crud_integration.py` fija el grafo (instantánea no obliga, por-nombre
+>   sí; borrar el recorrido de un estudio lo deja legible). **80 tests en verde**; guards probados en
+>   vivo por HTTP; ciclo crear→borrar y refusal-en-UI por Playwright, 12 rutas sin errores de consola.
+> - **Artefactos:** por decisión del usuario **no se borró nada**. Todos los runs/recorridos/estudios
+>   actuales **cargan** — la nota de §13 sobre checkpoints incompatibles (`fov-run-*`, `cli-run-1`)
+>   quedó **OBSOLETA**: hoy cargan y se diagnostican/predicen sin error.
+>
 > **2026-07-24 — EJES DE BARRIDO: `N`/`c_frac` REHUSADOS + BUDGET NO COLAPSA `epochs` +
 > VERIFICADOR DE TODOS LOS EJES.** Un recorrido generado por un estudio (`test2-s0-N`) quedaba en
 > `done 0/3` sin razón visible: barría el eje `N` con `c_frac` fijo, y como `center_out =
