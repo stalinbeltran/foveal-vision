@@ -224,6 +224,44 @@ def advance(name: str, store: StudyStore | None = None,
     return {"step": step, "spec": enriched}
 
 
+def delete_study(name: str, store: StudyStore | None = None,
+                 sstore: SweepStore | None = None, run_store=None) -> dict:
+    """Delete a study AND every sweep it generated (which each cascade to their
+    runs), as one unit. A study names each step's sweep deterministically, so
+    leaving its sweeps behind orphans them: recreating the study with the same
+    name would collide on the next advance (sweep_exists) — the reported bug.
+    Refuses BEFORE deleting anything if any of its sweeps (or their runs) is
+    live, so a study is never half-cascaded. Mirrors runner.delete_sweep."""
+    from fv.studies.store import StudyStore as _SS
+    from fv.sweeps.runner import delete_sweep
+    from fv.training.registry import RunStore
+    store = store or _SS()
+    sstore = sstore or SweepStore()
+    run_store = run_store or RunStore()
+    if not store.exists(name):
+        raise StudyError("study_not_found",
+                         f"no existe el estudio '{name}'", "nada que borrar")
+    sweeps = sstore.used_by_study(name)
+    # pre-scan: refuse the WHOLE delete if any sweep or child run is live, so we
+    # never delete some sweeps and then choke on a running one (R4: fail early)
+    live = []
+    for s in sweeps:
+        if sstore.reconcile(s).get("status") in ("running", "queued"):
+            live.append(s)
+            continue
+        live += [c for c in run_store.used_by_sweep(s)
+                 if run_store.status(c).get("status") in ("running", "queued")]
+    if live:
+        raise StudyError(
+            "study_has_live_sweeps",
+            f"el estudio '{name}' tiene trabajo en marcha: {', '.join(sorted(set(live)))}",
+            "paralo antes de borrar el estudio (para el recorrido/run activo)")
+    for s in sweeps:                      # cascade: sweeps (y sus runs) primero
+        delete_sweep(s, sstore, run_store)
+    store.delete(name)                    # ... luego el estudio
+    return {"deleted": name, "sweeps_deleted": sweeps}
+
+
 def confirm(name: str, chosen_point: dict, store: StudyStore | None = None) -> dict:
     """Record the user-confirmed winner of the current step, carry it forward as
     a winner for the next step's derived base (§7), and advance the chain. A

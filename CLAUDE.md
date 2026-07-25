@@ -23,6 +23,17 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-25 — BORRAR UN ESTUDIO ARRASTRA SUS RECORRIDOS (antes los dejaba huérfanos).**
+> `StudyStore.delete` borraba solo el estudio (plan+progress), no los recorridos que generó
+> (`{estudio}-s{i}-{eje}`). Al borrar y **recrear un estudio con el mismo nombre**, el recorrido de
+> la versión anterior quedaba huérfano y el siguiente `advance` chocaba con `sweep_exists` (nunca
+> sobrescribe — correcto) sin salida. Ahora `fv.studies.driver.delete_study` **arrastra** a los
+> recorridos del estudio (por `spec.study`, vía `SweepStore.used_by_study`) y estos a sus runs
+> (reusa `delete_sweep`); rechaza ANTES de borrar nada si algún recorrido/run está `queued`/`running`
+> (`study_has_live_sweeps`, 409 — R4). El endpoint `DELETE /studies/{name}` usa el arrastre. **87
+> tests en verde** (+2 de contrato: ciclo borrar→recrear→avanzar sin colisión; guarda de vivo).
+> ⚠ Espejo del arrastre recorrido→runs; simétrico con la auditoría CRUD del 2026-07-25.
+>
 > **2026-07-25 — SEMILLAS DEL ESTUDIO: N SEMILLAS EN CADA PUNTO (antes se ignoraban).** El `seeds`
 > del plan de un estudio se **validaba y guardaba pero nunca generaba runs**: cada punto del eje se
 > entrenaba con una sola semilla (la del recipe base), pidieras 1, 3 o 5. Por decisión del usuario

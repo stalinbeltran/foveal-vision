@@ -32,7 +32,8 @@ from fv.sweeps.runner import delete_sweep, prepare_sweep, run_sweep, sweep_trial
 from fv.sweeps.winner import suggest_winner
 from fv.sweeps.spec import SweepError
 from fv.sweeps.store import SweepStore, SweepStoreError
-from fv.studies.driver import StudyError, advance, confirm, create_study
+from fv.studies.driver import (StudyError, advance, confirm, create_study,
+                               delete_study)
 from fv.studies.driver import status as study_status_fn
 from fv.studies.store import StudyStore, StudyStoreError
 from fv.training.loop import train
@@ -53,7 +54,7 @@ CONFLICT_CODES = {"window_dataset_exists", "window_dataset_in_use", "network_exi
                   "recipe_exists", "recipe_in_use", "run_exists", "run_is_running", "sweep_exists",
                   "run_without_provenance", "run_has_no_checkpoint", "run_belongs_to_sweep",
                   "window_dataset_changed", "split_empty", "sweep_is_running",
-                  "study_exists", "step_awaiting_confirmation"}
+                  "study_exists", "step_awaiting_confirmation", "study_has_live_sweeps"}
 
 
 def _http_error(e) -> HTTPException:
@@ -626,8 +627,9 @@ def create_app() -> FastAPI:
 
     @app.delete("/studies/{name}")
     def delete_study_ep(name: str):
-        studies_store.delete(name)
-        return {"deleted": name}
+        # cascade to the sweeps the study generated (and their runs): leaving
+        # them orphaned collides on the next same-name advance (sweep_exists)
+        return delete_study(name, studies_store, sstore, runs)
 
     # ------------------------------------------------------------------ jobs (X)
     @app.get("/jobs")

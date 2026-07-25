@@ -4,7 +4,7 @@ expansion, carry-forward (barrido-por-ejes.md §6, §7; contract ⑫)."""
 import pytest
 
 from fv.studies.driver import (StudyError, advance, confirm, create_study,
-                               status, validate_plan)
+                               delete_study, status, validate_plan)
 from fv.studies.store import StudyStore
 
 
@@ -113,6 +113,48 @@ def test_study_seeds_are_wired_into_every_axis_point(world):
     assert out["step"]["points"] == 2 * 3
     space = SweepStore().spec(out["step"]["sweep"])["space"]
     assert space["d"] == [1, 2] and space["seed"] == [1, 2, 3]
+
+
+def test_delete_study_cascades_its_sweeps_so_same_name_can_be_recreated(world):
+    """Deleting a study removes the sweeps it generated (and their runs): leaving
+    them orphaned makes recreating the study with the same name collide on the
+    next advance (sweep_exists) — the reported bug. After a cascading delete, the
+    same name is free to advance again."""
+    _recipe(world)
+    from fv.sweeps.runner import run_sweep
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    store, sstore, rstore = StudyStore(), SweepStore(), RunStore()
+    create_study("est-recycle", _plan(world, [{"axis": "d", "range": [1, 2]}]), store)
+    out = advance("est-recycle", store, sstore)
+    sweep = out["step"]["sweep"]
+    assert sstore.exists(sweep)                       # the study generated it
+    run_sweep(sweep, sstore, rstore)                  # -> terminal (done), deletable
+    res = delete_study("est-recycle", store, sstore, rstore)
+    assert res["sweeps_deleted"] == [sweep]
+    assert not sstore.exists(sweep)                   # cascaded away, not orphaned
+    assert not store.exists("est-recycle")
+    # the name is reusable: recreate + advance regenerates the SAME sweep name
+    # with no collision (before the fix this raised sweep_exists)
+    create_study("est-recycle", _plan(world, [{"axis": "d", "range": [1, 2]}]), store)
+    out2 = advance("est-recycle", store, sstore)
+    assert out2["step"]["sweep"] == sweep and sstore.exists(sweep)
+
+
+def test_delete_study_refuses_while_a_generated_sweep_is_live(world):
+    """R4: a study whose sweep is queued/running is not deleted out from under
+    it — refuse BEFORE removing anything, naming the live sweep. (advance
+    generates the sweep as 'queued'; the study owns it but must not orphan a
+    scheduled run.)"""
+    _recipe(world)
+    from fv.sweeps.store import SweepStore
+    store, sstore = StudyStore(), SweepStore()
+    create_study("est-live", _plan(world, [{"axis": "d", "range": [1, 2]}]), store)
+    sweep = advance("est-live", store, sstore)["step"]["sweep"]   # -> queued
+    with pytest.raises(StudyError) as e:
+        delete_study("est-live", store, sstore)
+    assert e.value.code == "study_has_live_sweeps" and sweep in e.value.message
+    assert store.exists("est-live") and sstore.exists(sweep)      # nothing removed
 
 
 def test_missing_progress_is_reconstructed_from_plan(world):
