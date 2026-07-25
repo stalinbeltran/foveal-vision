@@ -99,6 +99,27 @@ def test_n_layers_winner_expands_channels_placeholder(world):
     assert space2["channels"] == [[8, 8, 16], [8, 16, 16]]
 
 
+def test_missing_progress_is_reconstructed_from_plan(world):
+    """progress.json is regenerable live state (gitignored); plan.json is
+    committed. A fresh clone has plan.json and no progress.json — reading or
+    listing the study must self-heal (step-0 progress from the plan), never
+    500. Root cause of the /studies HTTP 500 (studies/test5)."""
+    _recipe(world)
+    store = StudyStore()
+    create_study("est-fresh", _plan(world, [{"axis": "n_layers", "range": [1, 2, 3]}]), store)
+    # simulate the fresh-clone / cleaned-tree state: only the committed plan.json
+    (store.path("est-fresh") / "progress.json").unlink()
+    # list() over all studies must not raise on the one missing progress.json
+    names = [s["name"] for s in store.list()]
+    assert "est-fresh" in names
+    # progress is reconstructed: queue from the axis, no steps, no winners
+    st = status("est-fresh", store)
+    assert st["progress"]["steps"] == [] and st["progress"]["winners"] == {}
+    assert st["progress"]["queue"][0]["axis"] == "n_layers"
+    # and it was persisted (self-healed on disk)
+    assert (store.path("est-fresh") / "progress.json").exists()
+
+
 def test_full_chain_runs_and_suggests(world):
     """Integration: generate a step, run it, suggest+confirm the winner, advance."""
     _recipe(world)

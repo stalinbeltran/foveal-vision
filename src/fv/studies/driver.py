@@ -87,6 +87,15 @@ def _queue_from_plan(plan: dict) -> list[dict]:
     return q
 
 
+def initial_progress(plan: dict) -> dict:
+    """The step-0 progress for a plan: no steps run, no winners, queue derived
+    from the axes. `progress.json` is regenerable live state (gitignored) whose
+    committed source is `plan.json`; this reconstructs it when it is absent (a
+    fresh clone, or a cleaned working tree)."""
+    return {"format_version": 1, "steps": [], "winners": {},
+            "queue": _queue_from_plan(plan)}
+
+
 def create_study(name: str, plan: dict, store: StudyStore | None = None) -> dict:
     from fv.studies.store import StudyStore as _SS
     store = store or _SS()
@@ -99,8 +108,7 @@ def create_study(name: str, plan: dict, store: StudyStore | None = None) -> dict
     plan.setdefault("objective", "f1")
     plan.setdefault("seeds", 3)
     plan.setdefault("base_recipe", "corta")
-    progress = {"format_version": 1, "steps": [], "winners": {},
-                "queue": _queue_from_plan(plan)}
+    progress = initial_progress(plan)
     store.create(name, plan, progress)
     return {"name": name, "plan": plan, "progress": progress}
 

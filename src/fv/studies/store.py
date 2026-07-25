@@ -48,10 +48,20 @@ class StudyStore:
 
     def progress(self, name: str) -> dict:
         p = self.path(name) / "progress.json"
-        if not p.exists():
+        if p.exists():
+            return read_json_retrying(p)
+        # progress.json is regenerable live state (gitignored); a committed
+        # plan.json with no progress is a fresh clone / cleaned tree, not a
+        # missing study. Reconstruct the step-0 progress from the plan and
+        # persist it (self-healing, like SweepStore/RunStore.reconcile).
+        if not self.exists(name):
             raise StudyStoreError("study_not_found",
-                                  f"no existe el estudio '{name}'", "")
-        return read_json_retrying(p)
+                                  f"no existe el estudio '{name}'",
+                                  "mira la lista en /studies")
+        from fv.studies.driver import initial_progress
+        progress = initial_progress(read_json_retrying(self.path(name) / "plan.json"))
+        self.set_progress(name, progress)
+        return progress
 
     def set_progress(self, name: str, progress: dict) -> None:
         write_json_atomic(self.path(name) / "progress.json", progress)
@@ -64,7 +74,7 @@ class StudyStore:
             if (d / "plan.json").exists():
                 out.append({"name": d.name,
                             "plan": read_json_retrying(d / "plan.json"),
-                            "progress": read_json_retrying(d / "progress.json")})
+                            "progress": self.progress(d.name)})
         return out
 
     def delete(self, name: str) -> None:
