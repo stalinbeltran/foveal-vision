@@ -58,13 +58,64 @@ def suggest_winner(name: str, delta: float = 0.0,
     if cost_metric == "num_params":
         for t in scored:
             t["num_params"] = _num_params_of(t["run"], run_store)
-    best, suggested, frontier = select_winner(scored, direction, delta, cost_metric)
+    # seed is the replica axis, not one to optimise (recipe.py): rank the
+    # per-value MEAN across seeds, never a single lucky replica (§11.1, D-M1).
+    # With one seed per value each group is a singleton -> identical to before.
+    groups = aggregate_seeds(scored, direction, cost_metric)
+    best, suggested, frontier = select_winner(groups, direction, delta, cost_metric)
     return {
         "objective": trials["objective"], "direction": direction,
         "delta": delta, "cost_metric": cost_metric,
         "best": best, "suggested": suggested,
-        "frontier": frontier, "trials": scored,
+        "frontier": frontier, "trials": groups,
     }
+
+
+def _hashable(v):
+    return tuple(v) if isinstance(v, list) else v
+
+
+def aggregate_seeds(scored: list[dict], direction: str,
+                    cost_metric: str) -> list[dict]:
+    """Collapse per-run trials into one entry per axis value, averaging the
+    objective (and the cost) across the seed replicas that share it. Grouping key
+    is the point WITHOUT `seed`; the group's `point` drops `seed` too, so the
+    carried winner is the axis value, not a replica. Each group keeps `n_seeds`
+    and the min/max band (protocolo: a value is a distribution, not a point).
+    Returned sorted best-first, the order select_winner expects."""
+    groups: dict = {}
+    order: list = []
+    for t in scored:
+        point = {k: v for k, v in t["point"].items() if k != "seed"}
+        key = tuple(sorted((k, _hashable(v)) for k, v in point.items()))
+        if key not in groups:
+            groups[key] = {"point": point, "values": [], "costs": [],
+                           "num_params": t.get("num_params"), "runs": [], "seeds": []}
+            order.append(key)
+        g = groups[key]
+        g["values"].append(t["value"])
+        g["runs"].append(t["run"])
+        if "seed" in t["point"]:
+            g["seeds"].append(t["point"]["seed"])
+        c = t.get(cost_metric)
+        if c is not None and cost_metric != "num_params":
+            g["costs"].append(c)
+    out = []
+    for key in order:
+        g = groups[key]
+        n = len(g["values"])
+        entry = {"point": g["point"], "value": sum(g["values"]) / n,
+                 "n_seeds": n, "seeds": sorted(g["seeds"]),
+                 "value_min": min(g["values"]), "value_max": max(g["values"]),
+                 "runs": g["runs"]}
+        if cost_metric == "num_params":
+            entry["num_params"] = g["num_params"]
+        else:
+            entry[cost_metric] = (sum(g["costs"]) / len(g["costs"])
+                                  if g["costs"] else None)
+        out.append(entry)
+    out.sort(key=lambda e: e["value"], reverse=(direction == "max"))
+    return out
 
 
 def select_winner(scored: list[dict], direction: str, delta: float,

@@ -99,6 +99,22 @@ def test_n_layers_winner_expands_channels_placeholder(world):
     assert space2["channels"] == [[8, 8, 16], [8, 16, 16]]
 
 
+def test_study_seeds_are_wired_into_every_axis_point(world):
+    """The plan's `seeds` (D-M1) reaches the generated sweep: seeds=3 over a
+    2-value axis yields 2*3 points with a seed axis — root cause of the reported
+    bug (seeds validated + stored but never turned into runs)."""
+    _recipe(world)
+    store = StudyStore()
+    from fv.sweeps.store import SweepStore
+    create_study("est-seeds", {**_plan(world, [{"axis": "d", "range": [1, 2]}]),
+                               "seeds": 3}, store)
+    out = advance("est-seeds", store)
+    assert out["step"]["seeds"] == 3
+    assert out["step"]["points"] == 2 * 3
+    space = SweepStore().spec(out["step"]["sweep"])["space"]
+    assert space["d"] == [1, 2] and space["seed"] == [1, 2, 3]
+
+
 def test_missing_progress_is_reconstructed_from_plan(world):
     """progress.json is regenerable live state (gitignored); plan.json is
     committed. A fresh clone has plan.json and no progress.json — reading or

@@ -206,17 +206,18 @@ def advance(name: str, store: StudyStore | None = None,
     safe = re.sub(r"[^0-9a-zA-Z]+", "_", desc["axis"])
     sweep_name = f"{name}-s{step_i}-{safe}"
 
+    seeds = int(plan.get("seeds", 3))
     enriched = generate_sweep(
         sweep_name, plan["window_dataset"], axis, axis_range,
         base_recipe=plan["base_recipe"], objective=plan["objective"],
         budget=budget or plan.get("budget", {}), winners=winners,
-        study=name, sstore=sstore)
+        seeds=seeds, study=name, sstore=sstore)
 
     step = {"step": step_i, "axis": desc["axis"], "kind": desc["kind"],
             "index": desc.get("index"), "sweep": sweep_name,
             "space_field": axis, "base_label": enriched["base_label"],
             "points": len(enriched["points"]), "discarded": len(enriched["discarded"]),
-            "confirmed": False, "winner": None}
+            "seeds": seeds, "confirmed": False, "winner": None}
     progress["steps"].append(step)
     progress["queue"] = queue[1:]
     store.set_progress(name, progress)

@@ -41,6 +41,8 @@ def main() -> int:
     ap.add_argument("--objective", default="f1")
     ap.add_argument("--strategy", default="grid")
     ap.add_argument("--points", type=int, default=0, help="0 = all")
+    ap.add_argument("--seeds", type=int, default=1,
+                    help="replica seeds per axis value (>1 adds a seed axis; §11.1)")
     ap.add_argument("--epochs", type=int, default=0, help="0 = recipe default")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--c-frac", type=float, default=None)
@@ -56,7 +58,7 @@ def main() -> int:
             args.name, args.window_dataset, args.axis, _parse_range(args.range),
             base_recipe=args.recipe, objective=args.objective, strategy=args.strategy,
             budget={"points": args.points, "epochs": args.epochs},
-            device=args.device, c_frac=args.c_frac,
+            device=args.device, seeds=args.seeds, c_frac=args.c_frac,
             winners=json.loads(args.winners) if args.winners else None,
             overrides=json.loads(args.overrides) if args.overrides else None,
             study=args.study, sstore=store)

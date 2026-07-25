@@ -103,3 +103,35 @@ def test_generated_spec_is_deterministic(world):
     a, _ = build_generated_spec(world["dataset"], "d", [1, 2], base_recipe_value=RECIPE)
     b, _ = build_generated_spec(world["dataset"], "d", [1, 2], base_recipe_value=RECIPE)
     assert a == b
+
+
+def test_seeds_add_a_replica_axis_one_run_per_value_and_seed(world):
+    """§11.1/D-M1: seeds>1 trains EVERY axis value on N seeds — the generator
+    adds a second `seed` axis, so points = len(range) * seeds, one run per
+    (value, seed), each carrying its own recipe seed. seed<=1 is unchanged."""
+    from fv.sweeps.generate import generate_sweep
+    from fv.sweeps.runner import point_run_name
+    from fv.sweeps.spec import expand_points
+    from fv.sweeps.store import SweepStore
+    store = SweepStore()
+    enriched = generate_sweep(
+        "gen-seeds", world["dataset"], "d", [1, 2], base_recipe_value=RECIPE,
+        seeds=3, sstore=store)
+    assert enriched["space"]["seed"] == [1, 2, 3]      # base recipe seed = 1 -> [1,2,3]
+    assert len(enriched["points"]) == 2 * 3            # each value x each seed
+    valid, _ = expand_points(enriched, enriched["base_network_value"])
+    # every point pairs an axis value with a distinct seed, and the seed flows
+    # into the recipe overrides (so training actually uses it)
+    pairs = {(v["overrides"]["d"], v["recipe_overrides"]["seed"]) for v in valid}
+    assert pairs == {(1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (2, 3)}
+    # and the run name carries the seed so N replicas are legible, not opaque
+    name0 = point_run_name("gen-seeds", 0, valid[0]["overrides"])
+    assert name0.endswith("_seed1") and "d1" in name0
+
+
+def test_seed_one_keeps_single_seed_probe_unchanged(world):
+    """seeds=1 (the fast probe) adds NO seed axis: one run per value, as before."""
+    from fv.sweeps.generate import build_generated_spec
+    spec, _ = build_generated_spec(world["dataset"], "d", [1, 2],
+                                   base_recipe_value=RECIPE, seeds=1)
+    assert "seed" not in spec["space"]

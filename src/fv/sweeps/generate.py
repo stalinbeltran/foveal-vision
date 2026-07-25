@@ -27,6 +27,7 @@ def build_generated_spec(window_dataset: str, axis: str, axis_range,
                          *, base_recipe: str = "corta", base_recipe_value: dict | None = None,
                          objective: str = "f1", budget: dict | None = None,
                          strategy: str = "grid", device: str = "cpu", seed: int = 1,
+                         seeds: int = 1,
                          winners: dict | None = None, overrides: dict | None = None,
                          c_frac: float | None = None, study: str | None = None,
                          wstore: WindowDatasetStore | None = None,
@@ -34,7 +35,14 @@ def build_generated_spec(window_dataset: str, axis: str, axis_range,
     """Derive the inline base from B's window_size, validate it with check_run,
     and build the sweep spec (D-H2: base_network=null + base_label + derivation +
     a single-axis space). Returns (spec, derived). Raises SweepError on a base
-    that would not train — the reason travels, nothing is written."""
+    that would not train — the reason travels, nothing is written.
+
+    `seeds` is the REPLICA count (recipe.py: seed is "the REPLICA axis, not a
+    hyperparameter to optimise"). With seeds>1 the generator adds a SECOND axis
+    `seed=[s0..s0+seeds-1]` so EVERY axis value is trained on N seeds (§11.1,
+    D-M1) — one run per (value, seed) — instead of the lucky single seed. The
+    winner is chosen over the per-value MEAN across seeds (fv.sweeps.winner),
+    never a single replica. seeds<=1 keeps the single-seed probe unchanged."""
     wstore = wstore or WindowDatasetStore()
     manifest = wstore.manifest(window_dataset)
     window_size = int(manifest["config"]["window_size"])
@@ -50,6 +58,12 @@ def build_generated_spec(window_dataset: str, axis: str, axis_range,
     if base_recipe_value is None:
         base_recipe_value = (rstore or RecipeStore()).get(base_recipe).as_dict()
 
+    space = {axis: axis_range}                       # the ONE axis (U5) ...
+    n_seeds = max(1, int(seeds))
+    if n_seeds > 1 and axis != "seed":               # ... plus the replica axis (§11.1)
+        s0 = int(base_recipe_value.get("seed", 1))
+        space["seed"] = [s0 + k for k in range(n_seeds)]
+
     spec = {
         "window_dataset": window_dataset,
         "base_network": None,                       # inline (U4/D-H2): no name
@@ -59,12 +73,13 @@ def build_generated_spec(window_dataset: str, axis: str, axis_range,
         "base_recipe_value": base_recipe_value,
         "derivation": derived["derivation"],        # §5, §7.2 — how the base was reached
         "corrections": derived["corrections"],      # invalid defaults fixed, with reason
-        "space": {axis: axis_range},                # the ONE axis (U5)
+        "space": space,
         "strategy": strategy,
         "objective": objective,
         "budget": budget or {},
         "device": device,
         "seed": seed,
+        "seeds": n_seeds,
     }
     if study:
         spec["study"] = study

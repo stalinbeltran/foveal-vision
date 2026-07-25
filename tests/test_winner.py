@@ -1,6 +1,6 @@
 """Piece 4 — winner carry-forward and the cost/quality rule (§7, D-W1)."""
 
-from fv.sweeps.winner import select_winner, winner_overrides
+from fv.sweeps.winner import aggregate_seeds, select_winner, winner_overrides
 
 
 def _t(point, value, cost):
@@ -34,6 +34,46 @@ def test_min_direction_respects_delta():
                                               cost_metric="seconds_per_epoch")
     assert best["point"]["n_layers"] == 3
     assert suggested["point"]["n_layers"] == 2   # within 0.5 and cheaper
+
+
+def _seeded(point_val, seed, value, cost):
+    return {"run": f"r-{point_val}-s{seed}", "point": {"n_layers": point_val, "seed": seed},
+            "value": value, "seconds_per_epoch": cost}
+
+
+def test_aggregate_seeds_ranks_by_mean_not_the_lucky_replica():
+    """§11.1: seed is the replica axis, not one to optimise. A value whose seeds
+    AVERAGE higher must win, even if a single lucky replica of another value
+    scored the single best run. Aggregation collapses to one entry per value with
+    the mean, the band, and n_seeds."""
+    scored = [
+        _seeded(2, 1, 0.95, 12.0),   # one lucky replica of n_layers=2
+        _seeded(2, 2, 0.70, 12.0),
+        _seeded(2, 3, 0.72, 12.0),   # mean(2) = 0.79
+        _seeded(3, 1, 0.86, 30.0),
+        _seeded(3, 2, 0.88, 30.0),
+        _seeded(3, 3, 0.90, 30.0),   # mean(3) = 0.88 -> wins on the mean
+    ]
+    groups = aggregate_seeds(scored, "max", "seconds_per_epoch")
+    assert len(groups) == 2
+    top = groups[0]
+    assert top["point"] == {"n_layers": 3}          # seed stripped from the carried point
+    assert abs(top["value"] - 0.88) < 1e-9          # ranked by the MEAN
+    assert top["n_seeds"] == 3 and top["seeds"] == [1, 2, 3]
+    assert top["value_min"] == 0.86 and top["value_max"] == 0.90  # the band travels
+    # the cost/quality rule then runs on the aggregated groups
+    best, suggested, frontier = select_winner(groups, "max", delta=0.0,
+                                              cost_metric="seconds_per_epoch")
+    assert best["point"] == {"n_layers": 3}
+
+
+def test_aggregate_seeds_singleton_is_a_noop():
+    """One seed per value (the probe) -> each group is a singleton: mean = value,
+    point unchanged. Same ranking as no aggregation at all (backward compatible)."""
+    scored = [_t(3, 0.90, 30.0), _t(2, 0.88, 12.0)]
+    groups = aggregate_seeds(scored, "max", "seconds_per_epoch")
+    assert [g["point"]["n_layers"] for g in groups] == [3, 2]
+    assert all(g["n_seeds"] == 1 for g in groups)
 
 
 def test_winner_overrides_only_network_fields_with_from():

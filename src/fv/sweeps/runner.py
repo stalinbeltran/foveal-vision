@@ -42,8 +42,17 @@ def point_run_name(sweep_name: str, i: int, overrides: dict) -> str:
     runner (that creates it) and sweep_trials (that maps a point back to it). If
     these two ever built the name differently the sweep would show every point as
     'pending' forever. Index stays for a stable, collision-free identity; the
-    axis token rides along so the name is legible."""
-    tag = _axis_token(overrides)
+    axis token rides along so the name is legible.
+
+    `seed` is the replica axis, not the real one (§11.1): tag from the real axis
+    and append the seed as a suffix, so N replicas of one value read as
+    `...-batch_size10_seed1 .. _seed5` instead of five opaque indices — and the
+    'group by config-minus-seed' view has a legible name to lean on."""
+    seed = overrides.get("seed")
+    primary = {k: v for k, v in overrides.items() if k != "seed"}
+    tag = _axis_token(primary)
+    if seed is not None:
+        tag = f"{tag}_seed{seed}" if tag else f"seed{seed}"
     return f"{sweep_name}-{i:04d}-{tag}" if tag else f"{sweep_name}-{i:04d}"
 
 

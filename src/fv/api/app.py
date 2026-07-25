@@ -523,6 +523,7 @@ def create_app() -> FastAPI:
             strategy=body.get("strategy", "grid"),
             budget=body.get("budget", {}),
             device=body.get("device", "cpu"), seed=body.get("seed", 1),
+            seeds=body.get("seeds", 1),
             winners=body.get("winners"), overrides=body.get("overrides"),
             c_frac=body.get("c_frac"), study=body.get("study"), sstore=sstore)
 

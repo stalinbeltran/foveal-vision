@@ -23,6 +23,24 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-25 — SEMILLAS DEL ESTUDIO: N SEMILLAS EN CADA PUNTO (antes se ignoraban).** El `seeds`
+> del plan de un estudio se **validaba y guardaba pero nunca generaba runs**: cada punto del eje se
+> entrenaba con una sola semilla (la del recipe base), pidieras 1, 3 o 5. Por decisión del usuario
+> se implementó **N semillas en cada punto**: el generador (`fv.sweeps.generate.build_generated_spec`)
+> añade un **segundo eje `seed=[s0..s0+N-1]`** junto al eje real cuando `seeds>1`, así el barrido
+> produce `len(rango)·N` runs (uno por `(valor, seed)`) y la banda existe en todo el eje. Cableado:
+> `studies.advance` pasa `plan["seeds"]`; también `fv-oat --seeds` y `POST /sweeps/generate {seeds}`.
+> El nombre del run lleva la semilla (`…-d2_seed1 .. _seed3`, `point_run_name` seed-aware). El
+> **ganador agrega por valor de eje** (`fv.sweeps.winner.aggregate_seeds`): rankea la **media** de
+> las semillas + banda min–max + `n_seeds`, nunca la réplica con suerte (recipe.py: seed es el eje
+> RÉPLICA). `seeds=1` = sondeo rápido de antes (sin eje de semilla). Divergencia registrada en
+> [barrido-por-ejes.md](docs/barrido-por-ejes.md) §11.1: el esquema D-M1 «confirmación N-en-frontera»
+> queda como modo alternativo NO construido. **85 tests en verde** (+5 de contrato); verificado en
+> vivo con `fv-oat --seeds 2` sobre `synth-b16` (2 runs, seeds 1/2 distintas en disco, ganador
+> agregado). ⚠ **El estudio `batchSize_fast-80px-5seeds` que ya corría se generó ANTES del arreglo:
+> su recorrido no tiene eje de semilla (sigue en 5 runs, seed=1). Para obtener las 5 semillas hay
+> que borrarlo y recrearlo.**
+>
 > **2026-07-25 — CURVAS DEL RECORRIDO: OVERLAY MULTI-RUN EN RECORRIDOS.** Al elegir un recorrido,
 > la pantalla **Recorridos** superpone las curvas de val (loss / f1 / pos_err_px) de **todos sus
 > runs** en tres small-multiples (la misma vista V14 de RunDetail, pero N líneas). Dos modos, por

@@ -453,6 +453,21 @@ confirmación 3). Multiplica el schedule, por eso es perilla: pocas en CPU corta
 La confirmación corre las N semillas en **ambos candidatos de la frontera** coste-calidad, no solo
 en el provisional — si no, «no supera significativamente» no está definido.
 
+> **[REVISADO 2026-07-25 — el `seeds` del plan corre N semillas EN CADA PUNTO, no solo en la
+> frontera.]** El esquema de dos niveles (sondeo 1 + confirmación N-en-frontera) quedó a medio
+> construir: hasta hoy el `seeds` del plan se **validaba y guardaba pero nunca generaba runs** —
+> cada punto se entrenaba con una sola semilla (la del recipe base). Por decisión del usuario
+> (2026-07-25) se implementó el modo **N semillas en cada punto**: el generador añade un
+> **segundo eje `seed=[s0..s0+N-1]`** junto al eje real, así el barrido produce `len(rango)·N`
+> runs (uno por `(valor, seed)`) y **la banda existe en todo el eje**, no solo en el ganador.
+> Cuesta N× (asumido, con la máquina que hiberna/throttlea en vista). El ganador se elige sobre
+> la **media por valor de eje** (`fv.sweeps.winner.aggregate_seeds`), nunca sobre una réplica con
+> suerte — coherente con recipe.py («seed es el eje RÉPLICA, no un hiperparámetro a optimizar»).
+> `seeds=1` = el sondeo rápido de antes (sin eje de semilla). La confirmación-en-frontera del
+> esquema original **no se construyó**; si se retoma, es un modo alternativo, no un reemplazo.
+> Mecanismo: `fv.sweeps.generate.build_generated_spec(seeds=…)`, cableado por `studies.advance`,
+> `fv-oat --seeds`, `POST /sweeps/generate {seeds}`.
+
 ### 11.2 Dataset pequeño: válido para rankear, no para concluir
 
 Cualquier `window_size`/tamaño de B es seleccionable (ya disponible). Pero el tamaño de muestra

@@ -132,6 +132,16 @@ eje**. El único ingreso manual es dataset + eje + rango (diseño en
 > secuencial e imprime el ranking. `--axis n_layers --range "[1,2,3]"` redimensiona `channels`
 > a `[16]*L` en cada punto (§6.1); un eje inválido para la geometría cae al válido con su razón.
 
+`--seeds N` entrena **cada valor del eje con N semillas** (añade un eje `seed` réplica): el
+barrido pasa a `len(rango)·N` runs (`…-d2_seed1 .. _seedN`) y el ganador se rankea sobre la
+**media** por valor, no sobre la réplica con suerte (recipe.py: seed es el eje réplica). Sin la
+bandera, `seeds=1` = sondeo de una semilla. En un **estudio**, el campo `seeds:` del plan hace lo
+mismo en cada paso.
+
+> Verificado (2026-07-25): `fv-oat --seeds 2` sobre `synth-b16` → 2 runs con semillas 1 y 2
+> distintas en disco; `GET /sweeps/{n}/winner` agrega los dos en una entrada por valor de eje
+> (media + banda + `n_seeds`).
+
 Un **estudio** encadena varios ejes (descenso por coordenadas): fija el ganador de cada paso
 como base del siguiente y **expande sub-ejes** (`channels[i]` al fijar `n_layers`). El plan es un
 YAML comiteable; `--auto` recorre la cadena confirmando el ganador sugerido (regla coste/calidad):
