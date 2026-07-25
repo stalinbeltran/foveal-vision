@@ -35,12 +35,19 @@ export default function Predict() {
   }, []);
 
   useEffect(() => {
-    if (!source) return;
+    // Same reason as the run gate below: a remembered source may be gone.
+    if (!source || !sources.some((s) => s.id === source)) return;
     api.get(`/sources/${source}`).then((m) => setCount(m.count)).catch(setError);
-  }, [source]);
+  }, [source, sources]);
 
   useEffect(() => {
+    // Gate on membership, not just truthiness: remembered run/source
+    // (localStorage predict.run / predict.source) may name an object that was
+    // deleted or renamed. Firing against it races the /runs and /sources fetches
+    // above and surfaces run_not_found. Wait until the lists confirm both exist;
+    // `runs`/`sources` are deps so we re-run once they load.
     if (!run || !source) return;
+    if (!runs.some((r) => r.name === run) || !sources.some((s) => s.id === source)) return;
     const mySeq = ++seq.current;
     setBusy(true);
     const body: any = { source, index, threshold: knobs.threshold };
@@ -54,7 +61,7 @@ export default function Predict() {
       });
     }, 250);
     return () => clearTimeout(t);
-  }, [run, source, index, knobs]);
+  }, [run, source, index, knobs, runs, sources]);
 
   const W = result?.image_size?.[0] ?? 96, H = result?.image_size?.[1] ?? 72;
   const cs = (c: string) => CORNER_CSS[c as keyof typeof CORNER_CSS];

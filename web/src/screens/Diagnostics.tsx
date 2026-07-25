@@ -30,7 +30,13 @@ export default function Diagnostics() {
   }, []);
 
   useEffect(() => {
-    if (!run) return;
+    // Gate on membership, not just truthiness: a remembered run (localStorage
+    // diag.run) may name a run that was deleted or renamed (e.g. the axis-suffix
+    // migration turned `x-0000` into `x-0000-n_layers1`). Firing against it races
+    // the /runs fetch above and surfaces run_not_found — and its late-arriving
+    // rejection can even clobber the corrected, valid load. Wait until the list
+    // confirms the run exists; `runs` is a dep so we re-run once it loads.
+    if (!run || !runs.some((r) => r.name === run)) return;
     setError(null); setSummary(null); setGallery(null); setProbe(null); setBusy(true);
     Promise.all([
       api.get(`/runs/${run}/diagnostics/summary?split=${split}&threshold=${threshold}`),
@@ -48,7 +54,7 @@ export default function Diagnostics() {
         setWindowsPix(pix);
       }
     }).catch(setError).finally(() => setBusy(false));
-  }, [run, split, threshold]);
+  }, [run, split, threshold, runs]);
 
   const openProbes = async (it: any) => {
     const r = runs.find((x) => x.name === run);
