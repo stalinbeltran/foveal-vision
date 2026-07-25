@@ -21,22 +21,34 @@ export default function Diagnostics() {
   const [probe, setProbe] = useState<any>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  // The run list is LIVE: a run that finishes (e.g. a sweep point) while this
+  // screen is open must appear without a reload — so poll like Runs/Sweeps/
+  // Studies (3s). Each pass also reconciles the selection, so a run deleted
+  // elsewhere is dropped from the picker instead of 404-ing on the next load.
+  const refreshRuns = () =>
     api.get("/runs").then((d) => {
       const done = d.runs.filter((r: any) => ["done", "cancelled"].includes(r.status));
       setRuns(done);
       setRun((cur) => (cur && done.some((r: any) => r.name === cur)) ? cur : (done[0]?.name ?? ""));
     }).catch(setError);
+  useEffect(() => {
+    refreshRuns();
+    const t = setInterval(refreshRuns, 3000);
+    return () => clearInterval(t);
   }, []);
 
+  // Gate the (heavy) per-run load on membership, not truthiness: a remembered
+  // run (localStorage diag.run) may name a run that was deleted or renamed (e.g.
+  // the axis-suffix migration turned `x-0000` into `x-0000-n_layers1`). Firing
+  // against it races the list fetch and surfaces run_not_found — and its late
+  // rejection can even clobber the corrected, valid load. This boolean (NOT
+  // `runs`) is the effect's dep, so the 3s list refresh above doesn't re-run the
+  // whole diagnostics computation on every poll — only a real membership change
+  // (the run appears, or the selection moves) re-fires it.
+  const runReady = !!run && runs.some((r) => r.name === run);
+
   useEffect(() => {
-    // Gate on membership, not just truthiness: a remembered run (localStorage
-    // diag.run) may name a run that was deleted or renamed (e.g. the axis-suffix
-    // migration turned `x-0000` into `x-0000-n_layers1`). Firing against it races
-    // the /runs fetch above and surfaces run_not_found — and its late-arriving
-    // rejection can even clobber the corrected, valid load. Wait until the list
-    // confirms the run exists; `runs` is a dep so we re-run once it loads.
-    if (!run || !runs.some((r) => r.name === run)) return;
+    if (!runReady) return;
     setError(null); setSummary(null); setGallery(null); setProbe(null); setBusy(true);
     Promise.all([
       api.get(`/runs/${run}/diagnostics/summary?split=${split}&threshold=${threshold}`),
@@ -54,7 +66,7 @@ export default function Diagnostics() {
         setWindowsPix(pix);
       }
     }).catch(setError).finally(() => setBusy(false));
-  }, [run, split, threshold, runs]);
+  }, [run, split, threshold, runReady]);
 
   const openProbes = async (it: any) => {
     const r = runs.find((x) => x.name === run);
