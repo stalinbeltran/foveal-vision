@@ -50,7 +50,7 @@ NOT_FOUND_CODES = {"source_not_found", "sample_not_found", "window_dataset_missi
                    "network_not_found", "recipe_not_found", "run_not_found",
                    "sweep_not_found", "study_not_found"}
 CONFLICT_CODES = {"window_dataset_exists", "window_dataset_in_use", "network_exists",
-                  "recipe_exists", "run_exists", "run_is_running", "sweep_exists",
+                  "recipe_exists", "recipe_in_use", "run_exists", "run_is_running", "sweep_exists",
                   "run_without_provenance", "run_has_no_checkpoint", "run_belongs_to_sweep",
                   "window_dataset_changed", "split_empty", "sweep_is_running",
                   "study_exists", "step_awaiting_confirmation"}
@@ -150,15 +150,23 @@ def create_app() -> FastAPI:
                                    should_stop=is_cancelled)
         return {"job": jobs.submit("extract", work, {"name": name})}
 
+    def _dataset_referrers(name: str) -> list[str]:
+        """Everything that would RETRAIN on this B by name: runs (have), sweeps
+        (resume), studies (advance). All three break if B vanishes — so all three
+        gate its deletion (R4), not just runs."""
+        return (runs.used_by_dataset(name)
+                + sstore.used_by_dataset(name)
+                + studies_store.used_by_dataset(name))
+
     @app.get("/window-datasets/{name}")
     def window_dataset_detail(name: str):
         m = wstore.manifest(name)
-        m["used_by"] = runs.used_by_dataset(name)
+        m["used_by"] = _dataset_referrers(name)
         return m
 
     @app.delete("/window-datasets/{name}")
     def delete_window_dataset(name: str):
-        wstore.delete(name, runs.used_by_dataset(name))
+        wstore.delete(name, _dataset_referrers(name))
         return {"deleted": name}
 
     @app.get("/window-datasets/{name}/windows/{index}")
@@ -256,6 +264,15 @@ def create_app() -> FastAPI:
 
     @app.delete("/recipes/{name}")
     def delete_recipe(name: str):
+        # a run/sweep snapshots the recipe VALUES, so they don't pin it; a STUDY
+        # carries base_recipe by NAME and re-resolves it at advance (generate),
+        # so deleting it would break the study later -> refuse at the gate (R4).
+        used = studies_store.used_by_recipe(name)
+        if used:
+            raise _http_error(RecipeStoreError(
+                "recipe_in_use",
+                f"la receta '{name}' la fijan los estudios: {', '.join(used)}",
+                "borra esos estudios primero, o deja la receta"))
         rstore.delete(name)
         return {"deleted": name}
 

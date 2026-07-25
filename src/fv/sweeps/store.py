@@ -88,6 +88,19 @@ class SweepStore:
                 out.append({"name": d.name, "spec": spec, "state": st})
         return out
 
+    def used_by_dataset(self, dataset_name: str) -> list[str]:
+        """Sweeps that FIX this B (spec.window_dataset). A sweep retrains on it by
+        name on resume, so deleting B would break the sweep later — even with no
+        surviving child runs to catch it. Reads spec.json only (no reconcile)."""
+        if not self.root.exists():
+            return []
+        out = []
+        for d in sorted(self.root.iterdir()):
+            p = d / "spec.json"
+            if p.exists() and read_json_retrying(p).get("window_dataset") == dataset_name:
+                out.append(d.name)
+        return out
+
     def request_stop(self, name: str) -> None:
         if not self.exists(name):
             raise SweepStoreError("sweep_not_found",

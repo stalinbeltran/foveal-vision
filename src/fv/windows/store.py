@@ -62,8 +62,8 @@ class WindowDatasetStore:
         if used_by:
             raise WindowStoreError(
                 "window_dataset_in_use",
-                f"'{name}' lo referencian los runs: {', '.join(used_by)}",
-                "borra esos runs primero, o deja el dataset")
+                f"'{name}' lo referencian (runs/recorridos/estudios): {', '.join(used_by)}",
+                "borra esos primero, o deja el dataset")
         d = self.path(name)
         if not d.exists():
             raise WindowStoreError("window_dataset_missing",

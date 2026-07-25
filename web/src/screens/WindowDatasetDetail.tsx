@@ -55,7 +55,7 @@ export default function WindowDatasetDetail() {
             <dt>usado por</dt><dd>{manifest.used_by?.join(", ") || "—"}</dd>
           </dl>
           <button className="secondary" onClick={del} style={{ marginTop: 8 }}>
-            Borrar (409 si algún run lo usa)</button>
+            Borrar (409 si lo usa un run, recorrido o estudio)</button>
         </div>
       ) : <Working on />}
       <div className="card">

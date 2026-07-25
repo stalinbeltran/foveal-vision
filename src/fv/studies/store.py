@@ -77,6 +77,28 @@ class StudyStore:
                             "progress": self.progress(d.name)})
         return out
 
+    def _plans(self):
+        """(name, plan) for every study, reading plan.json only — no progress
+        self-heal side effect (this is called from delete-guards, a read)."""
+        if not self.root.exists():
+            return
+        for d in sorted(self.root.iterdir()):
+            p = d / "plan.json"
+            if p.exists():
+                yield d.name, read_json_retrying(p)
+
+    def used_by_dataset(self, dataset_name: str) -> list[str]:
+        """Studies that FIX this B (plan.window_dataset). A study retrains on it
+        by name at every advance, so deleting B would break the study later."""
+        return [n for n, plan in self._plans()
+                if plan.get("window_dataset") == dataset_name]
+
+    def used_by_recipe(self, recipe_name: str) -> list[str]:
+        """Studies that carry this D as base_recipe. advance re-resolves it by
+        name (generate_sweep), so deleting D would break the study later."""
+        return [n for n, plan in self._plans()
+                if plan.get("base_recipe") == recipe_name]
+
     def delete(self, name: str) -> None:
         d = self.path(name)
         if not self.exists(name):
