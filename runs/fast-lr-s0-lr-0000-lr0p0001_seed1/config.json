@@ -1,11 +1,11 @@
 {
   "format_version": 1,
   "recipe": {
-    "lr": 0.002,
+    "lr": 0.0001,
     "optimizer": "adam",
     "momentum": 0.9,
     "weight_decay": 0.0,
-    "batch_size": 80,
+    "batch_size": 64,
     "epochs": 20,
     "scheduler": "none",
     "patience": 0,
@@ -66,11 +66,11 @@
     "recipe": {
       "name": "corta",
       "value": {
-        "lr": 0.002,
+        "lr": 0.0001,
         "optimizer": "adam",
         "momentum": 0.9,
         "weight_decay": 0.0,
-        "batch_size": 80,
+        "batch_size": 64,
         "epochs": 20,
         "scheduler": "none",
         "patience": 0,
@@ -81,8 +81,8 @@
         "seed": 1
       }
     },
-    "sweep": "fast-batchSize-s0-batch_size",
-    "git_commit": "7c87ac5b981945c3220d2755614fbe97e18b191c",
+    "sweep": "fast-lr-s0-lr",
+    "git_commit": "f01592dfc6ae3627e39334622ae230fe4a18be53",
     "environment": {
       "python": "3.12.10",
       "torch": "2.13.0+cpu",
