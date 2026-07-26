@@ -23,6 +23,65 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-26 — EL PROXY DE VENTANA VALE TAMBIÉN PARA C, Y LA PERIFERIA NO ESTÁ APORTANDO.**
+> Cerradas las **Fases 3b y 4-código** de metrica-de-tarea.md; la **3 queda aplazada por decisión
+> del usuario**. Lo que hay que saber, por orden de importancia:
+>
+> 1. **Fase 3b ✅ (§2 bis del doc).** Recorrido `proxy-c-d` (eje **`d`**, dominio C: 6 valores × 5
+>    semillas, 20 épocas, **68 min** de CPU). **Spearman agregado +1,000**, mismo ganador (`d=2`)
+>    por ventana y por tarea, dentro de la frontera δ. **`OBJECTIVES` NO cambia y §5.5 no se
+>    ejecuta**: el ranking barato se queda. El criterio estaba escrito antes de mirar y es
+>    **comprobable** — las constantes viven en `scripts/proxy_vs_task.py`, commiteado en `7dd34ad`,
+>    antes de que el recorrido terminara. Reservas: el eje separa poco (amplitud 0,028; δ se come
+>    3 de los 6 puntos), n=6, y es **un solo** eje de C.
+> 2. ⚠ **LA PERIFERIA NO ESTÁ APORTANDO DE FORMA MEDIBLE** (§2 bis.1) — es media respuesta a *la*
+>    pregunta del proyecto (protocolo.md §6) **sin construir el control que F12 bloquea**. El
+>    máximo está en `d=2` (**4 px** de periferia); `d=1` —casi sin contexto— queda **segundo**; y
+>    `d=6` (12 px) de los últimos. El coste no lo explica: 7,0–8,8 s/época en todos. Honestidad:
+>    mejor−peor son **1,43 SE** y `d=5` rompe la tendencia, así que se afirma «no ayuda de forma
+>    medible», **no** «estorba».
+> 3. **El cuello de botella es la red, y es de DETECCIÓN.** §9.1: con esquinas perfectas la
+>    reconstrucción actual da **0,97** (19/20 imágenes perfectas; el NMS no suprime nada), contra
+>    0,6448 del mejor modelo real → los 0,33 que faltan son **todos** de detectar esquinas, no de
+>    `_reconstruct`. §9.3: ni aflojando el IoU a 0,3 se pasa de **0,66** — un tercio de los párrafos
+>    no se detecta en absoluto. **Ahí está el trabajo.**
+> 4. **Ocho de las diez pruebas de §9, hechas — y dos corrigen al documento.** §9.4: la sd por
+>    imagen **sube a 0,4148** (se suponía que bajaría de 0,372: es máxima con modelos
+>    *intermedios*, y el 0,372 promediaba modelos de F1 0,10) → hoy **±0,093** por run, tabla de
+>    §4.1 rehecha. §9.2: **los tres defaults de F están mal** y el óptimo es **el mismo** en tres
+>    runs muy distintos (`threshold≈0,3`, `stride n/4`, `nms 3n/4`), acotados por dentro; deja
+>    +0,065/+0,187/+0,261 sobre la mesa. §9.5: macro≈micro, pero **7 de 20 imágenes cargan casi
+>    todo el fallo** y la 60 falla en 20/20 réplicas (con techo 1,000 → es la red). §9.7: `f1` es el
+>    mejor proxy con diferencia (`loss` +0,780, `pos_err_px` +0,544, **y eligen otro ganador**).
+>    §9.6: el `sem` aguanta el bootstrap (0,973×) → **el bloqueo es la `n`, no la fórmula**.
+> 5. **Cuatro decisiones cerradas por el usuario** (decisiones.md): **F11 — no se regenera el dato
+>    por ahora** (la métrica de tarea es *informe del ganador*, nunca criterio entre puntos; se
+>    conserva la comparabilidad); **F13** aparcada con ella; **F15 — los knobs de F no se tocan**
+>    pese a §9.2; **F14 — sí se registra que el holdout se tocó**, y está construido.
+> 6. **Fase 4: todo el código, hecho y probado; falta la fuente** (depende de F11). Selectores de
+>    dataset/split en el detalle de un run con el aviso de «se toca una vez»; y **F14**: cada
+>    medición contra un holdout anexa una línea a `runs/<run>/holdout.jsonl` **también cuando el
+>    número sale de caché** —ese era el vistazo invisible—, con `holdout_touches` en el payload y
+>    en ámbar en la UI. Append-only: **registra miradas, nunca bloquea una**. Qué cuenta como
+>    holdout lo dice **una sola función** (`is_holdout_source`): el campo `"holdout"` del
+>    `dataset.json` manda **en los dos sentidos** y el nombre `-holdout` es el respaldo.
+> 7. **Piezas nuevas reutilizables**: `fv.metrics.spearman` (empates a rango medio, **None** —nunca
+>    0— si una serie es constante); `scripts/proxy_vs_task.py` (no calcula ninguna métrica por su
+>    cuenta y **descuenta diciéndolo** los runs sin checkpoint); `sweep_trials`/`suggest_winner`
+>    aceptan `objective=` para **re-leer** un recorrido con otro proxy sin tocar el spec, y lo
+>    **declaran** (`objective_overridden`); `loader.source_meta` unifica los dos lectores que había
+>    de `dataset.json`.
+>
+> ⚠ **Verificado, no razonado**: **122 tests en verde** (+15), 12 pantallas Playwright con el
+> backend **reiniciado** (estaba stale de ayer), el camino de holdout probado **por HTTP en los dos
+> sentidos** (200 con otra fuente / 400 `holdout_shares_source` con la misma), y el flujo del README
+> **ejecutado de punta a punta con un holdout real** — dos miradas, dos líneas, la segunda marcada
+> `from_cache`. Esas dos líneas se dejan en el repo a propósito.
+> **Lo que sigue teniendo más valor**: (a) por qué la red no detecta un tercio de las esquinas
+> (punto 3); (b) las 7 imágenes que fallan siempre, con Diagnóstico/Predecir; (c) si «la periferia
+> no aporta» se sostiene con otra fóvea o con otro dataset. Ninguna necesita regenerar nada.
+> **Queda sin hacer de §9**: 9.8 (vectorizar `build_view` — *no hasta que duela*) y 9.9 (F12).
+>
 > **2026-07-26 — LA MÉTRICA DE TAREA, CABLEADA (Fase 2 de metrica-de-tarea.md).** `paragraph_f1`
 > ya no es una función que no llama nadie: hay **módulo nuevo `fv.task`** (contrato **⑬ E×A vía
 > F**, escrito en organizacion.md §2) que puntúa un run **por imagen** contra los párrafos de la
@@ -337,7 +396,7 @@ Los demás documentos, en orden de lectura:
 | [docs/api.md](docs/api.md) · [docs/ui.md](docs/ui.md) | La organización proyectada sobre HTTP y sobre pantallas |
 | [docs/plan.md](docs/plan.md) | El plan de ejecución, por fases verticales |
 | [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) | **IMPLEMENTADO (2026-07-24).** Barrido OAT (un eje a la vez) con base derivada del problema, defaults estáticos, arrastre del ganador y estudio (dominio I). Ver `fv.models.derive`, `fv.sweeps.generate/winner`, `fv.studies`, CLIs `fv-oat`/`fv-study` |
-| [docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) | **FASES 1 y 2 HECHAS (2026-07-26); 3b/3/4 pendientes.** La métrica que manda (párrafo por imagen): el proxy de ventana correlaciona 0,956 en ejes de D, y `task_score` ya está cableada (`fv.task`, contrato ⑬). Pendiente: validar el proxy en un eje de **C**, dimensionar el dato (F11), el holdout. **Léelo antes de tocar métricas de ranking** |
+| [docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) | **FASES 1, 2 y 3b HECHAS (2026-07-26); la 3 aplazada (F11), la 4 con el código hecho.** La métrica que manda (párrafo por imagen): el proxy de ventana ordena igual en ejes de **D** (+0,956) **y de C** (+1,000, §2 bis) → `OBJECTIVES` no cambia. `task_score` cableada (`fv.task`, contrato ⑬) con registro de holdout. 8 de las 10 pruebas de §9, medidas. **Léelo antes de tocar métricas de ranking** |
 | [docs/formatos.md](docs/formatos.md) · [docs/tests.md](docs/tests.md) | Los artefactos en disco; qué se testea |
 | [docs/decisiones.md](docs/decisiones.md) | Lo que sigue sin decidir, y qué bloquea. **No tomes tú una decisión que esté ahí: pregunta** |
 | [docs/glosario.md](docs/glosario.md) | Las palabras que significan dos cosas |
