@@ -148,6 +148,21 @@ def main() -> int:
             page.click("button:has-text('Medir la métrica de tarea')")
             page.wait_for_selector("[data-testid=task-row]", timeout=60000)
             page.wait_for_selector("[data-testid=task-small-sample]", timeout=10000)
+            # the holdout path (§6.4.1): choosing ANOTHER dataset must raise the
+            # "se toca una sola vez" caveat BEFORE anything is measured — the
+            # warning is the point, a silent second look is what it prevents
+            page.wait_for_selector("[data-testid=task-dataset]", timeout=10000)
+            page.select_option("[data-testid=task-split]", "test")
+            options = page.locator("[data-testid=task-dataset] option")
+            other = next((options.nth(i).get_attribute("value")
+                          for i in range(options.count())
+                          if options.nth(i).get_attribute("value")), None)
+            assert other, "el selector de dataset no ofrece ningun dataset"
+            page.select_option("[data-testid=task-dataset]", other)
+            page.wait_for_selector("[data-testid=task-holdout-warn]", timeout=10000)
+            page.screenshot(path=str(SHOTS / "09b-run-holdout.png"), full_page=True)
+            page.select_option("[data-testid=task-dataset]", "")
+            assert page.locator("[data-testid=task-holdout-warn]").count() == 0
         check(page, "/runs/fov-16-param", "text=fov-16-param", "09-run-detalle", run_extra)
 
         # Diagnostico: summary + gallery -> click opens the probes (F0, V1, V2)

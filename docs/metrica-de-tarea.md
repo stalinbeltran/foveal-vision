@@ -674,12 +674,16 @@ Invoke-RestMethod ("http://localhost:8010/runs/<ganador>/task-score" +
 - Se reporta `macro.f1 ± macro.sem` **con el n de imágenes**, y `micro` al lado. Nada de
   redondear a un solo número sin banda.
 
-### 6.4 Las tres piezas que faltan (pequeñas, pero hay que decidirlas)
+### 6.4 Las tres piezas que faltaban (la 1 HECHA; 2 y 3 son decisiones)
 
-1. **UI**: hoy el bloque de Runs pide siempre `split=val` contra el B del run. Para el holdout
-   hace falta **elegir dataset y split** en ese bloque (dos `<select>`, alimentados por
-   `GET /window-datasets`), con un aviso claro: *«el holdout se toca una vez»*. Sin esto, el
-   holdout solo se puede pedir por HTTP o CLI.
+1. **UI — HECHA (2026-07-26).** El bloque de tarea del **detalle de un run** trae dos `<select>`
+   (**dataset**, alimentado por `GET /window-datasets`, con «el del propio run» como opción por
+   defecto; y **split**), y al elegir un dataset distinto del propio aparece el aviso de que **el
+   holdout se toca una sola vez, al final y solo con el ganador**, explicando *por qué* (el val
+   hace dos trabajos, así que su número está sesgado al alza). El selector solo se ofrece donde
+   tiene sentido: `TaskScore` lo recibe por prop `chooser`, y el **veredicto de Recorridos no lo
+   lleva** — allí se mide el val del ganador, y ofrecer apuntar al holdout mientras aún se está
+   eligiendo sería justo lo que el protocolo prohíbe.
 2. **Registro de que se tocó.** El protocolo dice «una sola vez», y hoy nada lo recuerda: la caché
    hace que la segunda llamada sea gratis e invisible. Propuesta concreta: al puntuar contra un B
    cuyo `source_id` acaba en `-holdout` (o marcado como tal en su `dataset.json`), **anexar una
@@ -691,14 +695,22 @@ Invoke-RestMethod ("http://localhost:8010/runs/<ganador>/task-score" +
    un campo `"holdout": true` en el `dataset.json` de la fuente, y que la guarda lo lea. Mientras
    no exista, el convenio de nombre `-holdout` es lo único que hay — **escribirlo en el README**.
 
-### 6.5 Tests que hay que escribir para esta fase
+### 6.5 Tests de esta fase — **los tres primeros ESCRITOS y en verde (2026-07-26)**
 
-| Test | Afirma |
-|---|---|
-| `test_task_score_scores_another_dataset` | Con `window_dataset=<otro B>` (otra fuente) puntúa y el payload dice **ese** dataset y **esa** fuente |
-| `test_holdout_dataset_can_be_100_percent_test` | `val_frac=0, test_frac=1` → `split.json` mete todas las imágenes en `test`, y `check_run` lo rechaza para entrenar (`no_validation_split`) |
-| `test_task_score_on_holdout_ignores_the_run_fingerprint` | Reconstruido el B **del run**, puntuar contra el holdout **sigue funcionando** (esa huella no protege este número) |
-| `test_holdout_touch_is_recorded` | Solo si se implementa 6.4.2: dos llamadas dejan dos líneas, aunque la segunda salga de caché |
+| Test | Afirma | |
+|---|---|---|
+| `test_task_score_scores_another_dataset` | Con `window_dataset=<otro B>` (otra fuente) puntúa y el payload dice **ese** dataset y **esa** fuente | ✅ |
+| `test_holdout_dataset_can_be_100_percent_test` | `val_frac=0, test_frac=1` → `split.json` mete todas las imágenes en `test`, y `check_run` lo rechaza para entrenar (`no_validation_split`) | ✅ |
+| `test_task_score_on_holdout_ignores_the_run_fingerprint` | Reconstruido el B **del run**, puntuar contra el holdout **sigue funcionando** (esa huella no protege este número) | ✅ |
+| `test_holdout_touch_is_recorded` | Solo si se implementa 6.4.2: dos llamadas dejan dos líneas, aunque la segunda salga de caché | ⛔ F14 |
+
+Los tres verdes viven en `tests/test_task.py` con una fixture `holdout` que construye **una segunda
+fuente y un B 100 % test** sobre ella — así el camino del holdout queda fijado **antes** de que
+exista el dato real, y el día que la fuente exista no hay que re-deducir nada. El cuarto depende de
+F14 y no se escribe hasta que se decida.
+
+**Lo que queda de la Fase 4 es, literalmente, la fuente**: una corrida del generador hermano con la
+misma receta y otra semilla, más el resize (§4.3, F13). Todo lo demás está construido y probado.
 
 ---
 

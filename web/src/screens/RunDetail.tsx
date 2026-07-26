@@ -123,12 +123,14 @@ export default function RunDetail() {
         <h3 style={{ marginTop: 0 }}>Métrica de tarea (párrafo por imagen)</h3>
         <p className="sub" style={{ marginTop: 0 }}>
           La métrica que manda (protocolo.md §2): reconstruye los párrafos de cada
-          imagen de val con <span className="mono">best.pt</span> y los empareja con
-          los de la fuente (IoU ≥ 0,5). Las curvas de arriba son la métrica de{" "}
-          <strong>ventana</strong>, que es el proxy con el que se rankea — barato y,
-          en ejes de D, ordena igual (Spearman +0,956).
+          imagen del split elegido con <span className="mono">best.pt</span> y los
+          empareja con los de la fuente (IoU ≥ 0,5). Las curvas de arriba son la
+          métrica de <strong>ventana</strong>, que es el proxy con el que se rankea
+          — barato y, en ejes de D, ordena igual (Spearman +0,956). Eligiendo{" "}
+          <strong>otro dataset</strong> se puntúa contra un <strong>holdout</strong>
+          {" "}(metrica-de-tarea.md §6): otro B, de una fuente que este run jamás vio.
         </p>
-        <TaskScore runs={name ? [name] : []} />
+        <TaskScore runs={name ? [name] : []} chooser />
       </div>
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Épocas</h3>

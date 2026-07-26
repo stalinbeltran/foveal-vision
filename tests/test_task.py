@@ -204,3 +204,81 @@ def test_task_score_refuses_a_holdout_that_shares_the_source(trained):
         task_score(trained["run"], "test", window_dataset="fake-holdout",
                    store=trained["store"])
     assert e.value.code == "holdout_shares_source"
+
+
+# ---------------------------------------------------------------------------
+# Fase 4 (§6): the holdout path. The DATA is not here yet — generating a proper
+# holdout source is a decision (F11/F13) — but the code path is, and these fix
+# it so the day the source exists nothing has to be re-derived.
+
+@pytest.fixture()
+def holdout(world):
+    """A second source the run never saw, and a 100%-test B over it (§6.2)."""
+    from fv import settings
+    from fv.windows.extract import ExtractConfig, extract_windows
+    from tests.conftest import make_source
+    make_source(settings.local_sources_root(), "mini-holdout", count=6, seed=99)
+    cfg = ExtractConfig(source="local/mini-holdout", window_size=8, stride=6,
+                        val_frac=0.0, test_frac=1.0, seed=1)
+    manifest = extract_windows(cfg,
+                               settings.window_datasets_root() / "mini-holdout-b8")
+    return {"source": "local/mini-holdout", "dataset": "mini-holdout-b8",
+            "manifest": manifest}
+
+
+def test_task_score_scores_another_dataset(trained, holdout):
+    """§6.3: with `window_dataset=<other B>` the payload names THAT dataset and
+    THAT source — the number must say what it measured, or it is unreadable."""
+    from fv.task import task_score
+    out = task_score(trained["run"], "test", window_dataset=holdout["dataset"],
+                     store=trained["store"])
+    assert out["window_dataset"] == holdout["dataset"]
+    assert out["source"] == holdout["source"]
+    assert out["images"] == 6              # the whole holdout, not a slice
+    assert len(out["per_image"]) == 6
+    # and it is a different measurement from the run's own val, not the same
+    # cache entry wearing another label
+    own = task_score(trained["run"], "val", store=trained["store"])
+    assert own["window_dataset"] == trained["dataset"]
+    assert own["source"] == trained["source"]
+
+
+def test_holdout_dataset_can_be_100_percent_test(holdout):
+    """§6.2: val_frac 0 + test_frac 1 puts EVERY image in test, and that dataset
+    then refuses to train — here a virtue, not an obstacle: the fuga is made
+    physically impossible instead of trusted to a flag."""
+    from fv.validation import check_run
+    from fv.windows.store import WindowDatasetStore
+    m = holdout["manifest"]
+    assert m["windows_per_split"]["train"] == 0
+    assert m["windows_per_split"]["val"] == 0
+    assert m["windows_per_split"]["test"] > 0
+    smap = WindowDatasetStore().split_map(holdout["dataset"])
+    assert len(smap["test"]) == 6 and not smap["train"] and not smap["val"]
+
+    problems = check_run(WindowDatasetStore().manifest(holdout["dataset"]), TINY_NET)
+    assert "no_validation_split" in {p["code"] for p in problems}
+
+
+def test_task_score_on_holdout_ignores_the_run_fingerprint(trained, holdout):
+    """That fingerprint protects the RUN's split (the images its best.pt never
+    saw). It says nothing about another B, so rebuilding the run's own dataset
+    must not block the holdout number."""
+    from fv import settings
+    from fv.ioutils import read_json_retrying, write_json_atomic
+    from fv.task import task_score
+    from fv.training.registry import RunError
+
+    p = settings.window_datasets_root() / trained["dataset"] / "manifest.json"
+    m = read_json_retrying(p)
+    m["fingerprint"] = "sha256:" + "ab" * 32
+    write_json_atomic(p, m)
+
+    # its own val is refused ...
+    with pytest.raises(RunError) as e:
+        task_score(trained["run"], "val", store=trained["store"])
+    assert e.value.code == "window_dataset_changed"
+    # ... and the holdout still answers
+    out = task_score(trained["run"], "test", window_dataset=holdout["dataset"],
+                     store=trained["store"])
+    assert out["images"] == 6 and out["source"] == holdout["source"]

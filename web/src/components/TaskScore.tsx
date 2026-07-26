@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../api";
 import { ErrorBox, Working } from "./ui";
+
+const SPLITS = ["val", "test", "train"];
 
 // The metric that MATTERS (protocolo.md §2): paragraph per IMAGE, scored against
 // the source (A) — not the per-window proxy the ranking uses. ONE renderer, two
@@ -41,19 +43,35 @@ function One({ p }: { p: any }) {
   );
 }
 
-export function TaskScore(props: { runs: string[]; split?: string; title?: string }) {
+export function TaskScore(props: {
+  runs: string[]; split?: string; title?: string;
+  // `chooser` opens the holdout path (metrica-de-tarea.md §6.4.1): scoring
+  // against ANOTHER B, which is what a holdout is. Off where it makes no sense
+  // — the sweep verdict measures its winner's own val, and offering to point it
+  // at a holdout there would invite touching the holdout while still choosing.
+  chooser?: boolean;
+}) {
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
-  const split = props.split ?? "val";
+  const [wds, setWds] = useState<any[]>([]);
+  const [dataset, setDataset] = useState("");     // "" = el del propio run
+  const [split, setSplit] = useState(props.split ?? "val");
   const runs = props.runs ?? [];
+
+  useEffect(() => {
+    if (!props.chooser) return;
+    api.get("/window-datasets").then((d) => setWds(d.window_datasets ?? []))
+      .catch(() => { /* the block still works against the run's own B */ });
+  }, [props.chooser]);
 
   const measure = async () => {
     setError(null); setBusy(true); setRows(null);
     try {
+      const q = `split=${split}` + (dataset ? `&window_dataset=${dataset}` : "");
       const out: any[] = [];
       for (const r of runs)   // sequential: each one is full-image inference
-        out.push(await api.get(`/runs/${r}/task-score?split=${split}`));
+        out.push(await api.get(`/runs/${r}/task-score?${q}`));
       setRows(out);
     } catch (e) { setError(e); } finally { setBusy(false); }
   };
@@ -65,6 +83,37 @@ export function TaskScore(props: { runs: string[]; split?: string; title?: strin
 
   return (
     <div data-testid="task-score">
+      {props.chooser ? (
+        <div className="row" style={{ alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <label className="sub" style={{ margin: 0 }}>dataset</label>
+          <select data-testid="task-dataset" value={dataset}
+                  onChange={(e) => setDataset(e.target.value)}>
+            <option value="">el del propio run</option>
+            {wds.map((w: any) => (
+              <option key={w.name} value={w.name}>{w.name}</option>
+            ))}
+          </select>
+          <label className="sub" style={{ margin: 0 }}>split</label>
+          <select data-testid="task-split" value={split}
+                  onChange={(e) => setSplit(e.target.value)}>
+            {SPLITS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      ) : null}
+      {props.chooser && dataset ? (
+        <div className="warn" data-testid="task-holdout-warn" style={{
+          marginBottom: 8, padding: "8px 12px", borderRadius: 8,
+          background: "var(--surface-2)", border: "1px solid var(--warn)",
+        }}>
+          <strong>Vas a puntuar contra otro dataset.</strong> Si es un holdout,
+          <strong> se toca una sola vez, al final y solo con el ganador</strong>
+          {" "}(protocolo.md §3). El val ya hace dos trabajos —elegir{" "}
+          <span className="mono">best.pt</span> y rankear—, así que su número está
+          sesgado al alza; el del holdout no, y por eso solo vale mirándolo una vez.
+          Un dataset que salga de <em>la misma fuente</em> que el de entrenamiento
+          se rechaza: no sería un holdout.
+        </div>
+      ) : null}
       <div className="row" style={{ alignItems: "center", gap: 8 }}>
         <button className="secondary" onClick={measure} disabled={busy || !runs.length}>
           {props.title ?? "Medir la métrica de tarea"}

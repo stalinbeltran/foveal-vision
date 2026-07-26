@@ -226,6 +226,38 @@ eso está esperando decisión (F11 en [docs/decisiones.md](docs/decisiones.md)).
 > documento suponía, **sube** — la sd es máxima con modelos intermedios (F1 por imagen casi bimodal),
 > y el 0,372 se había promediado incluyendo modelos de F1 0,10. Hacen falta *más* imágenes, no menos.
 
+#### Puntuar contra un holdout
+
+El val hace **dos trabajos** —elegir `best.pt` y rankear—, así que el número del val del ganador
+está **sesgado al alza** y no se reporta como resultado. Para eso está el holdout: otro dataset de
+ventanas (B) extraído de una **fuente propia de la que jamás se entrena**. El camino está cableado
+de punta a punta; **lo que falta es la fuente**, que depende de F11/F13.
+
+```powershell
+# el holdout es "todo test": asi no se puede usar para entrenar, ni por accidente
+.\.venv\Scripts\fv-extract.exe --source local/<fuente>-holdout --name <fuente>-holdout-b16 `
+  --window-size 16 --stride 8 --val-frac 0 --test-frac 1 --seed 1
+
+Invoke-RestMethod ("http://localhost:8010/runs/<ganador>/task-score" +
+  "?window_dataset=<fuente>-holdout-b16&split=test") | ConvertTo-Json -Depth 3
+```
+
+En la web app, el bloque de tarea del **detalle de un run** trae dos selectores (**dataset** y
+**split**); al elegir un dataset distinto del propio aparece el aviso de que **el holdout se toca
+una sola vez, al final y solo con el ganador**.
+
+> **Convenio, mientras no exista una marca en disco**: la única señal de que una fuente es holdout
+> es que su nombre acabe en **`-holdout`**. Un campo `"holdout": true` en su `dataset.json` sería
+> más robusto y está propuesto; hoy no existe (F14 en [docs/decisiones.md](docs/decisiones.md)
+> cubre además si se **registra** que el holdout se miró — hoy nada lo recuerda, y la caché hace
+> que la segunda mirada sea gratis e invisible).
+>
+> Lo que el código **sí** garantiza hoy, con test: un B que salga de **la misma fuente** que el de
+> entrenamiento se rechaza con `holdout_shares_source` (no sería un holdout, sería entrenamiento con
+> otro nombre); un B 100 % test **no puede entrenar** (`no_validation_split`); y la huella del
+> dataset del run **no bloquea** el número del holdout, porque esa huella protege el split del run,
+> no el del holdout.
+
 ### ¿El proxy de ventana ordena igual que la tarea?
 
 La pregunta que decide si el ranking barato vale. Se contesta sobre un recorrido **ya
