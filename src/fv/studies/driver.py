@@ -160,11 +160,11 @@ def _awaiting(progress: dict) -> dict | None:
     return None
 
 
-def status(name: str, store: StudyStore | None = None) -> dict:
-    from fv.studies.store import StudyStore as _SS
-    store = store or _SS()
-    plan = store.plan(name)
-    progress = store.progress(name)
+def summarize(progress: dict) -> dict:
+    """What a study is waiting for, derived from its progress. ONE definition,
+    two readers: the detail (`status`) and the list. The list used to have no
+    `next_axis` at all — the screen's «siguiente» column showed the dataset
+    instead, a header and a cell disagreeing about what they meant."""
     awaiting = _awaiting(progress)
     queue = progress["queue"]
     next_axis = None
@@ -172,10 +172,18 @@ def status(name: str, store: StudyStore | None = None) -> dict:
         head = queue[0]
         next_axis = (head["axis"] if head["kind"] != "channels_indexed"
                      else f"channels[i] (se expande a {_current_n_layers(progress['winners'])} sub-pasos)")
+    return {"awaiting_confirmation": awaiting, "next_axis": next_axis,
+            "done": awaiting is None and not queue}
+
+
+def status(name: str, store: StudyStore | None = None) -> dict:
+    from fv.studies.store import StudyStore as _SS
+    store = store or _SS()
+    plan = store.plan(name)
+    progress = store.progress(name)
     return {"name": name, "plan": plan, "progress": progress,
             "steps": progress["steps"], "winners": progress["winners"],
-            "awaiting_confirmation": awaiting, "next_axis": next_axis,
-            "done": awaiting is None and not queue}
+            **summarize(progress)}
 
 
 def advance(name: str, store: StudyStore | None = None,

@@ -20,6 +20,29 @@ def _plan(world, axes):
             "axes": axes}
 
 
+def test_list_and_detail_agree_on_what_the_study_awaits(world):
+    """La lista y el detalle describen lo mismo con los MISMOS campos.
+
+    La lista no traía `next_axis`, así que la pantalla rellenó su columna
+    «siguiente» con lo que tenía a mano (el dataset): una cabecera y una celda
+    diciendo cosas distintas. Ahora ambas salen de `summarize`, y este test
+    afirma la COSTURA, no la función."""
+    from fastapi.testclient import TestClient
+    from fv.api.app import create_app
+    _recipe(world)
+    client = TestClient(create_app())
+    body = {"name": "seam", **_plan(world, [{"axis": "n_layers", "range": [1, 2]}])}
+    assert client.post("/studies", json=body).status_code == 201
+    KEYS = ("next_axis", "awaiting_confirmation", "done")
+    row = next(s for s in client.get("/studies").json()["studies"]
+               if s["name"] == "seam")
+    detail = client.get("/studies/seam").json()
+    assert all(k in row for k in KEYS), "la lista no trae lo que la pantalla pinta"
+    assert {k: row[k] for k in KEYS} == {k: detail[k] for k in KEYS}
+    assert row["next_axis"] == "n_layers"       # el EJE, no el dataset
+    assert row["next_axis"] != row["plan"]["window_dataset"]
+
+
 def test_validate_plan_rejects_unknown_axis_and_bad_auto(world):
     problems = validate_plan(_plan(world, [{"axis": "not_a_field", "range": [1]}]))
     assert any(p["code"] == "unknown_axis" for p in problems)

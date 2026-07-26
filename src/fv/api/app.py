@@ -586,7 +586,12 @@ def create_app() -> FastAPI:
     # --------------------------------------------------------------- studies (I)
     @app.get("/studies")
     def list_studies():
-        return {"studies": studies_store.list()}
+        # each row carries the SAME derived fields the detail computes
+        # (fv.studies.driver.summarize) — a list that lacks them forces the
+        # screen to re-derive "what is this waiting for", and the two drift
+        from fv.studies.driver import summarize
+        return {"studies": [{**s, **summarize(s["progress"])}
+                            for s in studies_store.list()]}
 
     @app.post("/studies", status_code=201)
     def create_study_ep(body: dict):

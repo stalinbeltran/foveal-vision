@@ -197,15 +197,23 @@ export default function Studies() {
           <Working on={!list} />
           {list ? (
             <table className="data" data-testid="studies-table">
-              <thead><tr><th>nombre</th><th>ejes</th><th>pasos</th><th>siguiente</th><th></th></tr></thead>
+              <thead><tr><th>nombre</th><th>dataset (B)</th><th>ejes</th><th>pasos</th>
+                <th>siguiente</th><th></th></tr></thead>
               <tbody>
                 {list.map((s) => (
                   <tr key={s.name} className={sel === s.name ? "sel" : ""}
                       onClick={() => setSel(s.name)}>
                     <td>{s.name}</td>
+                    <td className="mono">{s.plan.window_dataset}</td>
                     <td>{s.plan.axes?.length ?? 0}</td>
                     <td>{s.progress.steps?.length ?? 0}</td>
-                    <td className="mono">{s.plan.window_dataset}</td>
+                    {/* «siguiente» = lo que el estudio espera, del MISMO campo que
+                        usa el detalle (summarize): eje pendiente, confirmación, o
+                        completo. Antes esta celda pintaba el dataset. */}
+                    <td className="mono">
+                      {s.awaiting_confirmation ? "confirmar ganador"
+                        : s.next_axis ? s.next_axis
+                        : s.done ? "completo" : "—"}</td>
                     <td><button className="linkbtn danger" onClick={(ev) => {
                       ev.stopPropagation(); remove(s.name);
                     }}>borrar</button></td>
