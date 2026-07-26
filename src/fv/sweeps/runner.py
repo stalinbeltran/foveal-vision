@@ -14,6 +14,7 @@ import os
 import re
 
 from fv.ioutils import read_json_retrying
+from fv.metrics import checkpoint_record
 from fv.sweeps.spec import OBJECTIVES, SweepError, check_sweep, expand_points
 from fv.sweeps.store import SweepStore, SweepStoreError
 from fv.training.loop import train
@@ -182,32 +183,77 @@ def delete_sweep(name: str, store: SweepStore | None = None,
 
 def sweep_trials(name: str, store: SweepStore | None = None,
                  run_store: RunStore | None = None) -> dict:
-    """The points table ordered by the objective (read from run summaries +
-    last metrics line)."""
+    """The points table ordered by the objective.
+
+    A point is scored by the objective AT THE EPOCH THAT `best.pt` KEPT, not at
+    the last one. `best.pt` is what survives the run — what diagnostics load,
+    what inference uses, what the winner carries forward — so the number that
+    picks a winner must describe THAT file. Ranking by the last epoch scored
+    weights nobody keeps: measured on the user's own sweeps, `best.pt` was not
+    the last epoch in 63% of the runs of `fast-lr-2-s0-lr`, and ranking by the
+    last epoch elected a different lr than ranking by the checkpoint.
+
+    `value_last` keeps the old number in view (auditing a ranking means seeing
+    both), and `epoch`/`epochs` say which epoch the value came from and how many
+    ran, so a point still training is never mistaken for a finished one.
+    """
     store = store or SweepStore()
     run_store = run_store or RunStore()
     spec = store.spec(name)
     objective = spec.get("objective", "f1")
     direction = OBJECTIVES.get(objective, "max")
+    base_monitor = (spec.get("base_recipe_value") or {}).get("monitor", "val_loss")
     rows = []
     for i, overrides in enumerate(spec.get("points", [])):
         run_name = point_run_name(name, i, overrides)
         row = {"trial": i, "run": run_name, "point": overrides,
-               "status": None, "value": None, "seconds_per_epoch": None}
+               "status": None, "value": None, "value_last": None,
+               "epoch": None, "epochs": None, "monitor": None,
+               "seconds_per_epoch": None}
         if run_store.exists(run_name):
             row["status"] = run_store.reconcile(run_name).get("status")
             sp = run_store.path(run_name) / "summary.json"
             if sp.exists():
                 summary = read_json_retrying(sp)
                 row["seconds_per_epoch"] = summary.get("seconds_per_epoch")
+            # the run's OWN monitor: `monitor` is a recipe field, so a sweep may
+            # move it point to point — asking the base recipe would be wrong there
+            monitor = base_monitor
+            try:
+                monitor = run_store.config(run_name).get("recipe", {}).get(
+                    "monitor", base_monitor)
+            except RunError:
+                pass
+            row["monitor"] = monitor
             m = run_store.metrics_since(run_name, 0)["records"]
             if m:
-                last_val = m[-1].get("val", {})
-                row["value"] = last_val.get(objective)
+                row["epochs"] = len(m)
+                row["value_last"] = (m[-1].get("val") or {}).get(objective)
+                rec = checkpoint_record(m, monitor)
+                if rec is not None:
+                    row["value"] = (rec.get("val") or {}).get(objective)
+                    row["epoch"] = rec.get("epoch")
+                else:
+                    # the monitor never measured -> the loop never wrote best.pt.
+                    # No checkpoint, no value: the reason travels (formatos §2)
+                    row["value_reason"] = {
+                        "code": "no_checkpoint",
+                        "message": f"'{monitor}' no midio en ninguna epoca, asi que "
+                                   f"este run no tiene best.pt que rankear",
+                        "hint": "usa un monitor que este definido en val "
+                                "(val_loss / val_f1) y reentrena el punto"}
         rows.append(row)
     scored = [r for r in rows if r["value"] is not None]
     scored.sort(key=lambda r: r["value"], reverse=(direction == "max"))
     pending = [r for r in rows if r["value"] is None]
+    monitors = sorted({r["monitor"] for r in rows if r["monitor"]})
     return {"objective": objective, "direction": direction,
+            # declared, so a reader never has to guess which epoch it is looking at
+            "value_from": "checkpoint",
+            "monitors": monitors,
+            # best.pt is chosen by `monitor` and the ranking reports `objective`:
+            # when they disagree the ranking measures a checkpoint selected by a
+            # DIFFERENT criterion. Legal, but the reader has to know.
+            "monitor_matches_objective": monitors == [f"val_{objective}"],
             "trials": scored + pending,
             "discarded": spec.get("discarded", [])}

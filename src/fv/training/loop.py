@@ -21,7 +21,8 @@ from torch.utils.data import DataLoader
 from fv import settings
 from fv.fovea import derive_dims
 from fv.ioutils import write_json_atomic
-from fv.metrics import corner_scores, detection_counts, pos_err_px
+from fv.metrics import (corner_scores, detection_counts, monitor_improved,
+                        monitor_key, pos_err_px)
 from fv.models.builder import build_model, full_config
 from fv.training.losses import corner_loss
 from fv.training.recipe import Recipe
@@ -171,14 +172,12 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
         with metrics_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec) + "\n")
 
-        monitor_value = val["loss"] if recipe.monitor == "val_loss" else val.get(
-            recipe.monitor.removeprefix("val_"))
+        # the selection rule lives in fv.metrics, so the sweep ranking can ask
+        # WHICH epoch this kept without reimplementing it (and drifting)
+        monitor_value = val.get(monitor_key(recipe.monitor))
         ckpt = {"model": model.state_dict(), "config": {"model": net}, "epoch": epoch}
         torch.save(ckpt, run_dir / "last.pt")
-        improved = monitor_value is not None and (
-            best_value is None or
-            (monitor_value > best_value if recipe.monitor in ("val_f1",)
-             else monitor_value < best_value))
+        improved = monitor_improved(monitor_value, best_value, recipe.monitor)
         if improved:
             best_value, best_epoch = monitor_value, epoch
             torch.save(ckpt, run_dir / "best.pt")

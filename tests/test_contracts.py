@@ -249,6 +249,88 @@ def test_contract_11_same_seed_same_weights_with_control(world):
     assert any(not torch.equal(wa[k], wc[k]) for k in wa)
 
 
+def test_ranking_seam_the_value_describes_the_checkpoint_that_survives(world):
+    """E↔H: the number that ranks a point must come from the epoch `best.pt`
+    kept, not from the last epoch — best.pt is what diagnostics load and what a
+    study carries forward. Asserts the SEAM (the loop's own best_epoch vs what
+    the ranking picks), not the function: those two drifting apart is exactly
+    how a ranking starts describing weights nobody has."""
+    from fv.metrics import checkpoint_record
+    from fv.training.loop import train
+    from fv.training.recipe import Recipe
+    from fv.training.registry import RunStore
+    store = RunStore()
+    r = Recipe(epochs=3, batch_size=32, seed=2, monitor="val_loss")
+    summary = train("seam", world["dataset"], "n", TINY_NET, "r", r, store=store)
+    records = store.metrics_since("seam", 0)["records"]
+    rec = checkpoint_record(records, "val_loss")
+    assert rec is not None
+    assert rec["epoch"] == summary["best_epoch"]        # the seam
+    assert rec["val"]["loss"] == summary["best"]
+
+
+def test_ranking_uses_the_checkpoint_epoch_not_the_last(world):
+    """The regression the user hit: with a monitor that peaks BEFORE the end, the
+    ranking must report the objective of the kept checkpoint. The last epoch's
+    value stays visible as `value_last`, but it does not rank."""
+    import json
+    from fv.sweeps.runner import point_run_name, prepare_sweep, sweep_trials
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    store, rstore = SweepStore(), RunStore()
+    spec = {"window_dataset": world["dataset"], "base_network": "tiny",
+            "base_network_value": TINY_NET, "base_recipe": "quick",
+            "base_recipe_value": {"epochs": 3, "batch_size": 32, "monitor": "val_loss"},
+            "space": {"lr": [0.001]}, "strategy": "grid", "objective": "f1"}
+    enriched = prepare_sweep("rank1", spec, TINY_NET, store)
+    run = point_run_name("rank1", 0, enriched["points"][0])
+    # a run whose val_loss bottoms at epoch 2 while f1 keeps wobbling
+    d = rstore.create(run, {"recipe": {"monitor": "val_loss"}, "network": TINY_NET})
+    rows = [{"epoch": 1, "val": {"loss": 0.9, "f1": 0.10}},
+            {"epoch": 2, "val": {"loss": 0.3, "f1": 0.80}},   # best.pt lives here
+            {"epoch": 3, "val": {"loss": 0.7, "f1": 0.55}}]   # the last epoch
+    (d / "metrics.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    rstore.set_status(run, "done", epoch=3)
+    t = sweep_trials("rank1", store, rstore)
+    row = t["trials"][0]
+    assert row["value"] == 0.80 and row["epoch"] == 2      # the checkpoint's f1
+    assert row["value_last"] == 0.55                       # the old rule, kept in view
+    assert row["epochs"] == 3
+    assert t["value_from"] == "checkpoint"
+    # monitor (val_loss) != objective (f1): the reader must be told
+    assert t["monitors"] == ["val_loss"]
+    assert t["monitor_matches_objective"] is False
+
+
+def test_ranking_refuses_to_invent_a_value_without_a_checkpoint(world):
+    """A monitor that never measured means the loop never wrote best.pt: there is
+    no checkpoint to describe, so the point has NO value and carries the reason —
+    it does not silently fall back to the last epoch (formatos §2)."""
+    from fv.sweeps.runner import point_run_name, prepare_sweep, sweep_trials
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    import json
+    store, rstore = SweepStore(), RunStore()
+    spec = {"window_dataset": world["dataset"], "base_network": "tiny",
+            "base_network_value": TINY_NET, "base_recipe": "quick",
+            "base_recipe_value": {"epochs": 2, "batch_size": 32,
+                                  "monitor": "val_pos_err_px"},
+            "space": {"lr": [0.001]}, "strategy": "grid", "objective": "f1"}
+    enriched = prepare_sweep("rank2", spec, TINY_NET, store)
+    run = point_run_name("rank2", 0, enriched["points"][0])
+    d = rstore.create(run, {"recipe": {"monitor": "val_pos_err_px"}, "network": TINY_NET})
+    rows = [{"epoch": 1, "val": {"loss": 0.9, "f1": 0.10, "pos_err_px": None}},
+            {"epoch": 2, "val": {"loss": 0.3, "f1": 0.80, "pos_err_px": None}}]
+    (d / "metrics.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    rstore.set_status(run, "done", epoch=2)
+    row = sweep_trials("rank2", store, rstore)["trials"][0]
+    assert row["value"] is None                      # never 0, never the last epoch
+    assert row["value_reason"]["code"] == "no_checkpoint"
+    assert row["value_last"] == 0.80                 # visible, but it does not rank
+
+
 def test_no_validation_split_refuses_to_train(world):
     from fv import settings
     from fv.training.loop import train

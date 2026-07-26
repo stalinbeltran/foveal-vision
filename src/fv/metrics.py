@@ -16,6 +16,43 @@ import numpy as np
 CORNER_NAMES = ("TL", "TR", "BR", "BL")
 NUM_CORNERS = 4
 
+# ---------------------------------------------------------------------------
+# Which epoch the monitor keeps. ONE definition, two readers: the training loop
+# asks `monitor_improved` when to overwrite best.pt, and the sweep ranking asks
+# `checkpoint_record` WHICH epoch that file came from. Written twice they drift,
+# and the ranking starts describing weights that are not on disk.
+
+MONITOR_HIGHER_IS_BETTER = frozenset({"val_f1"})
+
+
+def monitor_key(monitor: str) -> str:
+    """The key inside a metrics record's `val` dict: 'val_loss' -> 'loss'."""
+    return monitor[4:] if monitor.startswith("val_") else monitor
+
+
+def monitor_improved(value, best, monitor: str) -> bool:
+    """Strictly better, so the FIRST epoch of a tie keeps the checkpoint."""
+    if value is None:
+        return False
+    if best is None:
+        return True
+    return value > best if monitor in MONITOR_HIGHER_IS_BETTER else value < best
+
+
+def checkpoint_record(records: list, monitor: str) -> dict | None:
+    """The metrics record of the epoch whose weights `best.pt` holds.
+
+    None when the monitor never measured — that run has NO best.pt (the loop
+    never wrote one), so there is nothing to describe. None, never the last
+    epoch as a consolation: absent is not a fallback (formatos.md §2).
+    """
+    best, best_rec = None, None
+    for r in records:
+        v = (r.get("val") or {}).get(monitor_key(monitor))
+        if monitor_improved(v, best, monitor):
+            best, best_rec = v, r
+    return best_rec
+
 
 def corner_scores(logits: np.ndarray) -> np.ndarray:
     """sigmoid(exists) — logits (N, 4, 3) -> scores (N, 4)."""

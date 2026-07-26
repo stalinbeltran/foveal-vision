@@ -364,16 +364,42 @@ export default function Sweeps() {
                   <span className="mono">{spaceKeys.length ? spaceKeys.join(", ") : "—"}</span>
                 </div>
               </div>
+              <p className="sub" style={{ margin: "0 0 8px" }}>
+                El valor es el del <strong>checkpoint que sobrevive</strong> (`best.pt`,
+                elegido por <span className="mono">{(trials.monitors || []).join(", ") || "—"}</span>),
+                no el de la última época — es el fichero que cargan Diagnóstico y
+                Predecir, y el que arrastra un estudio. La columna «época» dice de
+                dónde sale cada número.
+              </p>
+              {trials.monitor_matches_objective === false ? (
+                <div className="warn" data-testid="monitor-mismatch" style={{
+                  margin: "0 0 10px", padding: "8px 12px", borderRadius: 8,
+                  background: "var(--surface-2)", border: "1px solid var(--warn)",
+                }}>
+                  <strong>El monitor y el objetivo no coinciden.</strong>{" "}
+                  <span className="mono">{(trials.monitors || []).join(", ")}</span> elige
+                  qué época se guarda; el ranking la mide con{" "}
+                  <span className="mono">{trials.objective}</span>. Es legal, pero el
+                  ganador se elige entre checkpoints seleccionados por otro criterio:
+                  si lo que te importa es <span className="mono">{trials.objective}</span>,
+                  entrena con <span className="mono">monitor: val_{trials.objective}</span>.
+                </div>
+              ) : null}
               <table className="data" data-testid="trials-table">
                 <thead><tr><th>#</th><th>run</th><th>punto</th><th>{trials.objective}</th>
-                  <th>estado</th><th>s/época</th></tr></thead>
+                  <th>época</th><th>última</th><th>estado</th><th>s/época</th></tr></thead>
                 <tbody>
                   {trials.trials.map((t: any, i: number) => (
                     <tr key={t.trial}>
                       <td>{i + 1}</td>
                       <td><Link to={`/runs/${t.run}`}>{t.run}</Link></td>
                       <td className="mono">{JSON.stringify(t.point)}</td>
-                      <td>{t.value?.toFixed ? t.value.toFixed(4) : t.value ?? "—"}</td>
+                      <td title={t.value_reason?.message ?? ""}>
+                        {t.value?.toFixed ? t.value.toFixed(4) : t.value ?? "—"}</td>
+                      <td className="sub" style={{ margin: 0 }}>
+                        {t.epoch != null ? `${t.epoch}/${t.epochs}` : "—"}</td>
+                      <td className="sub" style={{ margin: 0 }}>
+                        {t.value_last?.toFixed ? t.value_last.toFixed(4) : "—"}</td>
                       <td><Badge status={t.status} /></td>
                       <td>{t.seconds_per_epoch ?? "—"}</td>
                     </tr>
