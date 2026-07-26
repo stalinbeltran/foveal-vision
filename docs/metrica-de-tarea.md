@@ -307,32 +307,123 @@ Nota honesta para quien lo implemente: 0,372 se midió con modelos mediocres (F1
 Con modelos mejores la sd por imagen puede bajar, así que 0,372 es la elección **conservadora**.
 Al regenerar, **volver a medir la sd** y rehacer esta tabla.
 
-### 4.2 Cómo se genera
+### 4.2 ⚠ CORRECCIÓN (2026-07-26): de dónde sale el dato de verdad
 
-`scripts\make_synth_source.py` **ya está parametrizado** (verificado 2026-07-26): acepta
-`--name --count --width --height --seed --root`, y escribe `count` en el `dataset.json`. No hay
-que tocarlo.
+**La versión anterior de este §4.2 estaba equivocada en un punto que manda sobre toda la fase**, y
+se corrige aquí con lo comprobado en disco. Decía que bastaba `scripts\make_synth_source.py`.
+**No basta: ese script genera OTRO problema.**
 
-**La resolución no se cambia de paso.** El dataset con el que se ha medido todo
-(`dirty-paragraphs-fast-80px`) es de **80×60**, mientras el default del generador es 96×72:
-pasarlas por alto cambiaría el problema a la vez que el tamaño de muestra, y ningún número sería
-comparable. El comando, con la resolución explícita:
+Lo que hay en `data/sources/`, leído de sus `dataset.json`:
+
+| Fuente | Imágenes | Origen | ¿La generó `make_synth_source.py`? |
+|---|---|---|---|
+| `local/synth-01` | 60, 96×72 | `{"synthetic": true, "seed": 7}` | **Sí** — barras sintéticas de juguete |
+| `local/dirty-paragraphs-fast-80px` | 100, 80×60 | receta `clean-paragraphs` (`recipe_id: clean-paragraphs-copy-627fdbdc`), `spec_version: 1`, **`derived: {from: "dirty-paragraphs-fast-a86efebe", op: "resize", request: {width: 80}, scale: [0.125, 0.125], resample: "lanczos"}`** | **No** |
+| `local/dirty-paragraphs-80ancho` | 20000, 80×60 | la misma receta, mismo camino | **No** |
+
+Es decir: **todo lo medido en §2 (y los 130 runs) vive sobre texto renderizado por el proyecto
+hermano `image-text-sample-generator`** (canvas 640×480, receta `clean-paragraphs`: 1–4 párrafos
+por imagen, ancho 200–320 px, 18–45 palabras, fuentes 11–17 px, fondos solid/gradient/noise/
+paper/lines/grid…), **reducido después a 80 px de ancho por un `resize` lanczos**. El generador
+local hace rectángulos de barras: otro problema, otra dificultad, otras esquinas.
+
+**Consecuencia:** «regenerar el dato» con `make_synth_source.py` cambiaría **el problema** a la vez
+que el tamaño de muestra — exactamente el error que este mismo §4.2 advertía sobre la resolución.
+Ningún número nuevo sería comparable con ninguno viejo, y encima no se sabría por cuál de las dos
+razones.
+
+**Las tres rutas posibles, con lo que cuesta cada una:**
+
+| Ruta | Qué se hace | Comparabilidad | Coste real |
+|---|---|---|---|
+| **A — más de lo mismo** (recomendada si se regenera) | 2000 imágenes con la **misma receta** en `image-text-sample-generator` + **resize a 80 px** | El problema es el mismo; solo cambian las imágenes y el n | La corrida del generador (navegador headless, ~horas para 2000) **+ el resize, que NO está portado** (§4.3) |
+| **B — juguete** | `make_synth_source.py --count 2000` | **Otro problema.** Sirve para probar el instrumento, **no** para concluir nada sobre la tarea | Minutos |
+| **C — no regenerar** | Seguir con 20 imágenes de val | Se conserva todo | Cero, pero la métrica de tarea **no puede decidir entre puntos**, solo informar del ganador |
+
+**La ruta A, paso a paso** (nada de esto está automatizado hoy):
+
+1. En `c:\Desarrollo\image-text-sample-generator`: `\.venv\Scripts\python -m app.serve --port 8001`,
+   y por su API `POST /datasets {recipe_id: "clean-paragraphs-copy-627fdbdc", count: 2000}` →
+   `POST /datasets/{id}/build` (job; se sondea con `GET /datasets/{id}/build`). La receta exacta
+   está **copiada dentro** de `data/sources/dirty-paragraphs-fast-80px/dataset.json` (campo
+   `recipe`), así que se puede reproducir aunque el `recipe_id` ya no exista allí.
+   **Otra semilla que la de las fuentes actuales** (`4652026051386056742` y
+   `1640648715688333905`) — y anotarla.
+2. Reducir a 80 px de ancho (§4.3).
+3. Copiar la fuente reducida a `data/sources/<nombre>/` (fv lee `labels.jsonl` + `images/` +
+   `dataset.json`; el lector es [loader.py](../src/fv/datasets/loader.py) y **exige `labels.jsonl`**).
+4. Extraer el dataset de ventanas (§4.4).
+
+### 4.3 El eslabón que falta: el `resize` no está portado
+
+Comprobado (2026-07-26): en `fv` **no existe** el resize de fuentes. `docs/api.md` lo lista como
+`POST /sources/{id}/resize` **previsto**, `docs/plan.md` lo dice explícitamente («resize de fuentes
+no portado aún»), y `grep -rn resize src/` solo encuentra el `img.resize` del *thumbnail* de la
+pantalla de Fuentes. Las fuentes de 80×60 que hay en disco se redujeron **fuera de este repo**.
+
+De dónde se porta, si se decide la ruta A:
+
+- `image-text-finder/src/itf/datasets/resize.py` (336 líneas) — «A' — a derived source: the same A,
+  at another resolution (D19)». Es la **composición**: mueve píxeles con `itf.imageops.resize` y
+  coordenadas con `itf.geometry.scale_quad`, y **reescribe solo los campos que consume, copiando
+  el resto tal cual** (es un segundo productor del formato de otro proyecto).
+- Dos detalles suyos que no son detalles y que hay que conservar al portar:
+  **la escala se mide de la salida, no del factor pedido** (y son dos escalas, x e y — por eso el
+  `dataset.json` de la fuente actual guarda `scale: [0.125, 0.125]`), y **las máscaras se
+  remuestrean con NEAREST**, nunca interpolando (interpolar una máscara de etiquetas fabrica
+  clases que no existen: la forma continua de *ausente ≠ cero*).
+
+**Alternativa sin portar nada** (más barata y honesta si solo se quiere el dato): hacer el resize
+**una vez, con un script de un solo uso** en el scratchpad, que reescriba `labels.jsonl`
+multiplicando cada `quad` por la escala medida y guarde las imágenes reducidas — y **declararlo en
+el `dataset.json` derivado** con el mismo bloque `derived` que ya usan las fuentes actuales, para
+que la procedencia no se pierda. Si el resize se va a hacer más de una vez, se porta.
+
+> **Decisión implícita que conviene tomar explícita:** ¿se porta el resize a `fv` (dominio A,
+> `POST /sources/{id}/resize` + pantalla) o se hace fuera y solo entra el resultado? Hoy **no está
+> registrada en decisiones.md**; anotarla al abrir la Fase 3.
+
+### 4.4 Extraer el B nuevo (comandos reales, banderas verificadas)
+
+`fv-extract --help` (ejecutado 2026-07-26) acepta **exactamente**: `--source --name --window-size
+--stride --val-frac --test-frac --seed`. **No hay `--target-kinds`**: se queda en el default
+`("paragraph",)` de `ExtractConfig`, que es justo lo que la métrica de tarea filtra (§3.2 paso 7).
 
 ```powershell
-.\.venv\Scripts\python scripts\make_synth_source.py --name paragraphs-2k --count 2000 `
-  --width 80 --height 60 --seed 11
+.\.venv\Scripts\fv-extract.exe --source local/<fuente-2k> --name paragraphs-2k-b16 `
+  --window-size 16 --stride 8 --val-frac 0.1 --test-frac 0.1 --seed 1
 ```
 
-Después `fv-extract` con el mismo `window_size` que el B actual (**16**; ①a atará `N` a él) y
-`val_frac`/`test_frac` que den los n de §4.1 — con 2000 imágenes, `--val-frac 0.1 --test-frac 0.1`
-da 200 de val (SE ±0,026). Comprobar los nombres reales de las banderas con
-`.\.venv\Scripts\fv-extract.exe --help` antes de escribirlo en el README.
+- **`--window-size 16`**: el mismo del B actual. El contrato ①a atará `N` a él (`derive_base(16)`
+  → `N=20, c_frac=0.8, d=2` → fóvea 16, comprobado), así que las redes derivadas siguen siendo las
+  mismas y **la comparación red-a-red se conserva**; lo que cambia es el dato.
+- **`--val-frac 0.1 --test-frac 0.1`** sobre 2000 imágenes → **200 de val** (SE ±0,026) y 200 de
+  test. El split es **por imagen** (`_assign_splits`), que es lo que hace que el n efectivo sea el
+  de imágenes.
+- **`--stride 8`**: el del B actual. Sube el número de ventanas (coste de entrenamiento), no la
+  resolución de la métrica de tarea.
+- Presupuesto: `IMAGES_BUDGET_BYTES` = 1 GB; 2000 × 80 × 60 = **9,6 MB**. No estorba, y si alguna
+  vez lo hiciera el error lo dice con su razón.
 
-`IMAGES_BUDGET_BYTES` (1 GB) en [extract.py](../src/fv/windows/extract.py) no estorba: 2000
-imágenes de 80×60 son **9,6 MB**. A resoluciones mayores sí lo haría, y el error ya lo dice con
-su razón.
+### 4.5 Qué hay que RE-medir después de regenerar (no se hereda nada)
 
-### 4.3 La consecuencia, que es lo que hace esto una DECISIÓN DEL USUARIO
+1. **La sd por imagen.** Los ±0,083 de hoy salen de sd = 0,372 medida con modelos mediocres
+   (F1 de tarea 0,3–0,54). Con más dato y modelos mejores puede bajar. Se re-mide con
+   `task_score` sobre unos pocos runs del dato nuevo y **se rehace la tabla de §4.1**.
+2. **La correlación proxy↔tarea (§2)**, que se midió sobre el B viejo: con otro n de val el ruido
+   por run cambia y el Spearman *por run* se moverá aunque el agregado no.
+3. **La Fase 3b** (§5), si ya se hubiera hecho sobre el B viejo: su conclusión es sobre ese dato.
+
+### 4.6 Lo que NO se rompe (para que nadie borre nada por las prisas)
+
+- Los 130 runs, 4 recorridos y 4 estudios actuales **siguen cargando y diagnosticándose** contra su
+  B viejo: el fingerprint los protege, no los invalida.
+- `task_score` sobre ellos sigue funcionando: apunta a su propia fuente por `source_id`.
+- Lo único que se pierde es **poder comparar un número nuevo con uno viejo**. Eso no lo arregla
+  ningún código: son dos datos distintos.
+- **No borrar nada al regenerar.** El B viejo es la referencia de todo lo medido hasta hoy.
+
+### 4.7 La consecuencia, que es lo que hace esto una DECISIÓN DEL USUARIO
 
 **Un dataset nuevo tiene otro fingerprint, así que TODO lo entrenado hasta hoy deja de ser
 comparable con lo nuevo.** Los 130 runs, los 4 recorridos y los 4 estudios actuales quedan como
@@ -342,6 +433,11 @@ lo viejo siguen funcionando contra su B viejo), es una decisión de investigaci�
 > **DECISIÓN DEL USUARIO (pendiente):** ¿se regenera el dato ahora —perdiendo la comparabilidad
 > con lo medido hasta hoy— o se sigue con 20 imágenes de val sabiendo que la métrica de tarea
 > solo puede usarse como *informe del ganador*, nunca para decidir entre puntos?
+>
+> **Y, si se regenera, ¿por qué ruta?** (§4.2): A (misma receta del generador hermano + resize, el
+> único camino que conserva el problema), o B (generador local de juguete, que sirve para probar el
+> instrumento y no para concluir). La ruta A **cuesta más de lo que decía la versión anterior de
+> este documento**: una corrida larga del generador **más** el resize, que no está portado.
 
 Registrada como **F11** en [decisiones.md](decisiones.md) §2 (2026-07-26). **Claude no la toma
 solo.** Junto a ella quedó **F12**: qué es exactamente «la CNN plana de coste equivalente» del
@@ -358,61 +454,251 @@ la regla de mirar. protocolo.md §2 es explícito: *aquí se barre C, así que n
 ranking puede depender de la vista*. Si el proxy de ventana se degrada al barrer geometría, todo
 el arrastre de ganadores de un estudio OAT está eligiendo por el número equivocado.
 
-**Receta exacta:**
+### 5.1 El recorrido: qué se lanza exactamente, y qué cuesta
 
-1. Recorrido de **un eje de C** con semillas, sobre el dataset actual: el candidato natural es
-   **`d`** (el submuestreo de la periferia), porque cambia cuánto contexto real ve la red sin
-   tocar la fóvea (①a se mantiene). Rango: `"auto"` (lo calcula `downsample_range`).
-   `fv-oat --name proxy-c-d --window-dataset <B> --axis d --range auto --seeds 5 --epochs 20`.
-2. Cuando termine, calcular por cada run la métrica de tarea (`fv.task.task_score`, ya
-   construida) y el Spearman contra la de ventana, **por run y agregado por valor del eje**,
-   igual que en §2.
-3. Decisión, escrita **antes** de mirar (protocolo.md §1):
-   - **Spearman agregado ≥ 0,9 y el ganador coincide** → el proxy también vale para C. Se anota
-     y no se cambia nada.
-   - **Spearman < 0,9 o el ganador NO coincide** → el proxy **no** vale para barrer C. Entonces
-     sí: añadir `paragraph_f1` a `fv.sweeps.spec.OBJECTIVES` (dirección `max`), con el coste
-     asumido de 0,6 s por punto **y con la Fase 3 hecha antes** (si no, se estaría rankeando con
-     ±0,083 de ruido, que es peor que el proxy).
+El eje es **`d`** (el submuestreo de la periferia): cambia **cuánto contexto real ve la red** sin
+tocar la fóvea, así que ①a se mantiene en todos los puntos y el dataset no cambia. Es el eje de C
+más limpio para esta pregunta.
 
-**Guardar el resultado** en este documento como §2 bis, con la tabla y la fecha. Un número de
-correlación sin fecha ni dataset no vale nada.
+```powershell
+.\.venv\Scripts\fv-oat.exe --name proxy-c-d --window-dataset dirty-paragraphs-fast-80px `
+  --axis d --range auto --recipe corta --epochs 20 --seeds 5 --objective f1 --task-score
+```
+
+Verificado **hoy**, sin entrenar (probes en el scratchpad):
+
+- `build_search_space(N=20, c_frac=0.8, pen_frac=0.1)` → **`d ∈ [1, 2, 3, 4, 5, 6]`**: 6 puntos.
+- Los **6 pasan `check_run`** contra `dirty-paragraphs-fast-80px` (ninguno se descarta). Lo que
+  varía: `periph_real` 2→12 px y `original_size` 20→40 px (la fóvea sigue en 16 y el recorte cabe
+  en la imagen de 80×60 — por eso ninguno cae con `original_size_exceeds_image`).
+- Coste medido en ese dataset: **7,0 s/época de mediana** (min 6,1 / max 9,0, sobre los 65 runs de
+  `fast-lr-s0-lr`). Con 20 épocas → **~140 s/run**; 6 valores × 5 semillas = **30 runs ≈ 70 min**
+  de CPU limpia.
+- ⚠ Esta máquina **hiberna** y **estrangula por temperatura hasta ~5×** en carga sostenida
+  (CLAUDE.md). Para dejarlo desatendido: desactivar la suspensión (`powercfg`) y contar con que el
+  reloj de pared puede ser mucho mayor que 70 min. Variante barata si hay prisa: `--seeds 3`
+  (18 runs, ~42 min) — pero con 3 semillas la banda de ruido está peor estimada y la regla de
+  empate se vuelve más laxa.
+- `--task-score` al final imprime la métrica de tarea del ganador sugerido; **no sustituye** al
+  análisis de §5.3, que necesita los 30 runs, no uno.
+
+### 5.2 La pieza de código que falta: `spearman`
+
+**No hay scipy en el venv** (comprobado: `scipy`, `pandas` y `matplotlib` no están instalados;
+sí `numpy 2.5.1`, `torch 2.13.0+cpu`, `yaml`). Así que la correlación de rangos hay que
+escribirla. **Dónde: `fv/metrics.py`** — es puro numpy, no importa nada de `fv`, y es *el* sitio
+donde vive «qué significa cada número» (un Spearman calculado dentro de un script es un número que
+nadie puede testear, y este proyecto ya se quemó con definir un número dos veces).
+
+```python
+def spearman(a, b) -> float | None:
+    """Correlación de rangos. Empates -> rango MEDIO. None (nunca 0) si alguna
+    de las dos series es constante: ahí la correlación no está definida, y 0
+    se leería como «no correlacionan», que es otra cosa (formatos.md §2)."""
+```
+
+Implementación mínima (rango medio + Pearson sobre los rangos) y **números dorados ya calculados**
+para el test, porque sin scipy no hay contra quién comparar:
+
+| caso | x | y | `spearman` |
+|---|---|---|---|
+| monótona perfecta | `[1,2,3,4,5]` | `[10,20,30,40,50]` | **1,0** |
+| inversa perfecta | `[1,2,3,4,5]` | `[50,40,30,20,10]` | **−1,0** |
+| con empates en y | `[1,2,3,4,5]` | `[5,6,7,8,7]` | **0,8207826816681233** |
+| ruidosa | `[0.10,0.20,0.30,0.40,0.50,0.60]` | `[0.11,0.30,0.25,0.55,0.44,0.70]` | **0,8857142857142857** |
+| serie constante | `[1,2,3]` | `[7,7,7]` | **None** (no 0, no NaN hacia fuera) |
+
+Test: `tests/test_metrics.py::test_spearman_matches_hand_computed_cases` con esa tabla, más
+`test_spearman_is_none_for_a_constant_series`.
+
+### 5.3 El script de análisis: `scripts/proxy_vs_task.py`
+
+Precedente exacto de forma y tono: `scripts\verify_axes.py` (corre algo real e imprime un
+veredicto). **CLI propuesto**, todo explícito:
+
+```powershell
+.\.venv\Scripts\python scripts\proxy_vs_task.py --sweep proxy-c-d --split val [--json out.json]
+```
+
+Qué hace, en orden (todas las piezas ya existen; el script **no** calcula ninguna métrica por su
+cuenta):
+
+1. `trials = sweep_trials(sweep)` → por run: `value` (la métrica de **ventana**, medida en la
+   época que guardó `best.pt`), `point`, `status`. Descartar los `value is None` **contando
+   cuántos** y diciéndolo (un run sin checkpoint no es un cero).
+2. `task = task_score(run, split)` por cada run → `macro["f1"]` y `macro["sem"]`. Coste: ~0,4 s
+   por run con 20 imágenes de val (medido); 30 runs ≈ **12 s**. Con caché, la segunda pasada es
+   instantánea.
+3. **Spearman por run** sobre las dos listas emparejadas (n = 30).
+4. **Spearman agregado por valor del eje**: `suggest_winner(sweep)["trials"]` ya devuelve los
+   grupos por valor del eje con `value` (media de ventana entre semillas) y `runs`; el valor de
+   tarea del grupo es la media de `macro["f1"]` de esos `runs`. n = 6 puntos.
+5. Imprimir la tabla igual que §2 (punto, ventana, tarea, n_seeds) **ordenada por ventana**, los
+   dos Spearman, y el veredicto de §5.4. ASCII (cp1252).
+6. `--json` guarda todo el detalle (por run y por punto) para poder rehacer la tabla sin
+   reentrenar ni re-inferir.
+
+**Lo que el script NO debe hacer**: recalcular `paragraph_f1` por su cuenta, leer `metrics.jsonl` a
+mano, ni «rellenar» un run sin checkpoint. Cada número sale de su única definición.
+
+### 5.4 El criterio, escrito ANTES de mirar (protocolo.md §1)
+
+Se compara **el agregado**, porque es lo que decide un ganador; el por-run se reporta para ver
+cuánto ruido hay, no para decidir.
+
+- **✅ El proxy vale también para C** si: `spearman_agregado ≥ 0,90` **y** el punto ganador por
+  tarea **cae dentro de la frontera δ** del ganador por ventana (`suggest_winner(...)["frontier"]`).
+  La frontera, y no el top-1, porque el propio proyecto ya decidió que un ganador dentro de la
+  banda de ruido es un empate (protocolo.md §1.5): exigir que coincida el top-1 exacto sería más
+  duro que la regla con la que se elige de verdad. → Se anota en §2 bis y **no se cambia nada**.
+- **❌ El proxy NO vale para C** si: `spearman_agregado < 0,90` **o** el ganador por tarea queda
+  **fuera** de la frontera δ. → Ver §5.5.
+- **⚠ Resultado no concluyente** si: menos de 4 puntos con valor, o la serie de ventana es
+  prácticamente constante (todos los `d` empatan). Entonces el recorrido no distingue nada y el
+  Spearman no significa nada: **repetir con más épocas** (el efecto de `d` puede necesitar más
+  entrenamiento para aparecer) antes de concluir.
+
+**Guardar el resultado en este documento como §2 bis**, con: fecha, dataset, nombre del recorrido,
+la tabla, los dos Spearman, el veredicto y el nº de semillas. Un número de correlación sin fecha ni
+dataset no vale nada.
+
+### 5.5 Si el proxy NO vale: todo lo que hay que tocar para que la tarea sea el objetivo
+
+Esto es lo que más fácilmente se subestima, así que va enumerado. **No es «añadir una línea a
+`OBJECTIVES`».** Comprobado leyendo el código (2026-07-26):
+
+1. **`fv/sweeps/spec.py`**: `OBJECTIVES = {"f1": "max", "pos_err_px": "min", "loss": "min"}` →
+   añadir `"paragraph_f1": "max"`.
+2. **`fv/sweeps/runner.py::sweep_trials`** — *el detalle que rompe en silencio*: hoy el valor de un
+   punto sale de `(rec.get("val") or {}).get(objective)`, donde `rec` es el **registro de época**
+   que guardó `best.pt` (`checkpoint_record`). El `val` de una época contiene **solo**
+   `{loss, f1, precision, recall, pos_err_px}` (lo escribe `fv/training/loop.py::evaluate`). Con
+   `objective = "paragraph_f1"` **todos los puntos saldrían con `value: None`** y el recorrido
+   diría «no tiene puntos con valor aún» — sin error, sin pista. Hace falta una rama explícita:
+   si el objetivo es de tarea, el valor se obtiene con `task_score(run, split)["macro"]["f1"]`
+   (que ya puntúa `best.pt`, que es justo la semántica que `sweep_trials` documenta), y
+   `value_from` pasa a decir `"task"` en vez de `"checkpoint"`.
+3. **El aviso `monitor_matches_objective`**: hoy compara `monitors == [f"val_{objective}"]`. Con un
+   objetivo de tarea **nunca** puede coincidir (no hay `val_paragraph_f1` por época), así que el
+   aviso se dispararía siempre y dejaría de significar algo. Hay que darle un texto propio: «el
+   checkpoint lo elige el monitor de ventana; el ranking mide la tarea» — que es cierto y es
+   información, no una alarma repetida.
+4. **La banda de ruido**: `task_score` devuelve `macro["sem"]` **por run** (dispersión entre
+   imágenes). `aggregate_seeds` calcula su propia `value_sem` (dispersión entre semillas). Son dos
+   ruidos distintos y **no se suman a la ligera**; decidir explícitamente cuál alimenta
+   `tie_delta` (propuesta: seguir usando el de semillas, y **mostrar** el de imágenes al lado —
+   pero es una decisión, no un detalle).
+5. **El coste del ranking deja de ser cero**: cada lectura del ranking dispara inferencia de imagen
+   completa por punto. Con la caché es 0,4 s/run la primera vez y ~0 después, **pero la UI sondea
+   `/sweeps/{n}/trials` cada 3 s**: hay que asegurarse de que el valor sale de caché o el sondeo
+   se vuelve carísimo. Alternativa: calcularlo al terminar cada punto (en el runner) y guardarlo
+   en el `summary.json` del run.
+6. **Las puertas y los vocabularios** que ya sirven `OBJECTIVES` y que heredarían el valor nuevo
+   sin tocarlos (verificado por grep): `check_sweep` (H), `fv/studies/driver.py::validate_plan`
+   (I), y `GET /sweeps/axes` → los `<select>` de **Recorridos** y **Estudios**. Este último es el
+   que hace que no haya que tocar el front: sirve la lista desde la definición única.
+7. **El contrato ⑨** hay que releerlo con esto puesto: la métrica de tarea está definida en
+   píxeles de la imagen original, así que **sí** puede rankear un espacio que barre C — es la
+   razón de que exista. Anotarlo en organizacion.md §2 ⑨ como el caso que lo cumple.
+8. **La Fase 3 tiene que estar hecha antes.** Rankear con ±0,083 de ruido por run es peor que
+   rankear con el proxy: se estaría eligiendo por el ruido con más ceremonia.
+9. Tests: uno que afirme que un recorrido con objetivo de tarea **rankea** (no devuelve todo
+   `None`) — la costura del punto 2, que es la que se rompe sola.
 
 ---
 
 ## 6. Fase 4 — PENDIENTE: el holdout
 
-Heredado de protocolo.md §3 (paso 0a), sin cambios de diseño; se repite aquí lo operativo:
+Heredado de protocolo.md §3 (paso 0a). El **cableado ya está** (§3.11); lo que falta es el dato y
+tres piezas pequeñas. Todo lo operativo, sin dar nada por supuesto:
+
+### 6.1 Las reglas que no se negocian
 
 - **Fuente propia**, nombre `<fuente>-holdout`, **de la que jamás se extrae entrenamiento** — la
-  fuga se hace físicamente imposible, no se confía en un flag.
-- Misma configuración del generador que la fuente de entrenamiento, **otra semilla**.
-- Tamaño: **~500 imágenes** (protocolo.md §3). Con sd 0,372 → SE ±0,017.
-- **Se toca una sola vez, al final, y solo con el ganador.** El val ya hace dos trabajos (elegir
-  `best.pt` y rankear), así que el val del ganador está sesgado al alza y **no se reporta**.
-- Implementación: la métrica de tarea de §3 ya sirve tal cual — el holdout es *otro dataset de
-  ventanas* extraído de la fuente holdout, y se pide `task_score(run, split="test")` sobre él…
-  **y el detalle que esto exigía ya está resuelto** (§3.11): `task_score` resuelve la fuente
-  desde el manifest del B **del run**, así que puntuar contra otro B se pide con el parámetro
-  `window_dataset` — `GET /runs/{name}/task-score?window_dataset=<holdout-B>&split=test` — y hay
-  guarda: **si el B del holdout comparte `source_id` con el B de entrenamiento, se rechaza** con
-  `holdout_shares_source`, porque entonces no es un holdout. Lo que falta es **la fuente
-  holdout**: generarla (`scripts\make_synth_source.py` con otra semilla, ~500 imágenes),
-  extraerla y tocarla una sola vez, al final, con el ganador.
+  fuga se hace físicamente imposible en vez de confiarla a un flag.
+- **Misma configuración del generador** que la fuente de entrenamiento, **otra semilla**. Con la
+  corrección de §4.2 esto significa: la misma receta `clean-paragraphs` del proyecto hermano +
+  el mismo resize a 80 px, **no** `make_synth_source.py` (que haría otro problema, y entonces el
+  holdout mediría la generalización a otro dataset, que es otra pregunta).
+- **Tamaño ~500 imágenes** (protocolo.md §3). Con sd 0,372 → **SE ±0,017**. Coste de medirlo:
+  ~19 ms por imagen (medido) → **~9,5 s por run**. Es barato: lo caro es generarlo.
+- **Se toca una sola vez, al final, y solo con el ganador.** El val hace dos trabajos (elegir
+  `best.pt` y rankear), así que el val del ganador está **sesgado al alza** y no se reporta.
+
+### 6.2 Extraer el B del holdout: 100% test, verificado
+
+El holdout es *otro dataset de ventanas*. Para la métrica de tarea **solo se usan `manifest`
+(`source_id`, `config.target_kinds`) y `split.json`** — ni `windows.npz` ni el `window_size`
+entran en el número. Aun así se extrae con el mismo `window_size` (16) para poder mirarlo también
+por ventana si hiciera falta.
+
+```powershell
+.\.venv\Scripts\fv-extract.exe --source local/<fuente>-holdout --name <fuente>-holdout-b16 `
+  --window-size 16 --stride 8 --val-frac 0 --test-frac 1 --seed 1
+```
+
+**Verificado hoy** (extracción real sobre `local/synth-01`, 60 imágenes): `--val-frac 0
+--test-frac 1` deja `windows_per_split = {train: 0, val: 0, test: 5280}` y `split.json` con las
+**60 imágenes en `test`**. Es lo que se quiere: **todo el holdout es holdout**, y de paso ese
+dataset **no se puede usar para entrenar** — `check_measurable` lo rechaza con
+`no_validation_split`, que aquí es una virtud, no un estorbo.
+
+### 6.3 Cómo se pide el número
+
+```powershell
+Invoke-RestMethod ("http://localhost:8010/runs/<ganador>/task-score" +
+  "?window_dataset=<fuente>-holdout-b16&split=test") | ConvertTo-Json -Depth 3
+```
+
+- La guarda `holdout_shares_source` salta si ese B sale de la misma fuente que el B de
+  entrenamiento (400 con razón). **Comprobado en vivo** que el camino legítimo (fuente distinta)
+  devuelve 200.
+- Cuando el B es otro, **la comprobación de huella no aplica** (esa huella protege el split del
+  run, no el del holdout) — está así a propósito y escrito en el código.
+- Se reporta `macro.f1 ± macro.sem` **con el n de imágenes**, y `micro` al lado. Nada de
+  redondear a un solo número sin banda.
+
+### 6.4 Las tres piezas que faltan (pequeñas, pero hay que decidirlas)
+
+1. **UI**: hoy el bloque de Runs pide siempre `split=val` contra el B del run. Para el holdout
+   hace falta **elegir dataset y split** en ese bloque (dos `<select>`, alimentados por
+   `GET /window-datasets`), con un aviso claro: *«el holdout se toca una vez»*. Sin esto, el
+   holdout solo se puede pedir por HTTP o CLI.
+2. **Registro de que se tocó.** El protocolo dice «una sola vez», y hoy nada lo recuerda: la caché
+   hace que la segunda llamada sea gratis e invisible. Propuesta concreta: al puntuar contra un B
+   cuyo `source_id` acaba en `-holdout` (o marcado como tal en su `dataset.json`), **anexar una
+   línea a `runs/<run>/holdout.jsonl`** con `{when, window_dataset, split, macro.f1, sem, knobs}`.
+   Así «cuántas veces se ha mirado el holdout» es un hecho comprobable, no una promesa.
+   ⚠ **Es una decisión de diseño, no un detalle**: convierte una caché pura en algo que escribe
+   en el artefacto del run. Decidirla explícitamente antes de escribirla.
+3. **Marcar la fuente como holdout.** Hoy la única señal es el nombre. Alternativa robusta:
+   un campo `"holdout": true` en el `dataset.json` de la fuente, y que la guarda lo lea. Mientras
+   no exista, el convenio de nombre `-holdout` es lo único que hay — **escribirlo en el README**.
+
+### 6.5 Tests que hay que escribir para esta fase
+
+| Test | Afirma |
+|---|---|
+| `test_task_score_scores_another_dataset` | Con `window_dataset=<otro B>` (otra fuente) puntúa y el payload dice **ese** dataset y **esa** fuente |
+| `test_holdout_dataset_can_be_100_percent_test` | `val_frac=0, test_frac=1` → `split.json` mete todas las imágenes en `test`, y `check_run` lo rechaza para entrenar (`no_validation_split`) |
+| `test_task_score_on_holdout_ignores_the_run_fingerprint` | Reconstruido el B **del run**, puntuar contra el holdout **sigue funcionando** (esa huella no protege este número) |
+| `test_holdout_touch_is_recorded` | Solo si se implementa 6.4.2: dos llamadas dejan dos líneas, aunque la segunda salga de caché |
 
 ---
 
 ## 7. Orden recomendado y coste
 
-| Fase | Qué | Coste | Bloquea a |
-|---|---|---|---|
-| ~~2~~ | ~~Cablear `task_score` (§3)~~ — **HECHA 2026-07-26** | — | — |
-| 3b | Validar el proxy sobre el eje `d` (§5) | 1 recorrido + 40 s de medición | la decisión de cambiar el objetivo |
-| 3 | Regenerar el dato (§4) | corrida del generador + reentrenar lo que importe | que la métrica de tarea decida algo |
-| 4 | Holdout (§6) | una corrida del generador | el número que se reporta |
+| Fase | Qué | Coste (medido donde se pudo) | Bloquea a | ¿Decisión del usuario? |
+|---|---|---|---|---|
+| ~~2~~ | ~~Cablear `task_score` (§3)~~ — **HECHA 2026-07-26** | — | — | — |
+| **3b** | Validar el proxy sobre el eje `d` (§5) | **~70 min** de CPU (30 runs × 140 s medidos) + `spearman` (~30 líneas + test) + el script (~120 líneas) + **12 s** de medición | la decisión de cambiar el objetivo de ranking | No: el criterio ya está escrito (§5.4) |
+| **3** | Regenerar el dato (§4) | Ruta A: corrida larga del generador hermano **+ el resize, que no está portado** (§4.3) + reentrenar lo que importe | que la métrica de tarea pueda **decidir** entre puntos | **Sí (F11)**, y además **por qué ruta** |
+| **4** | Holdout (§6) | Otra corrida del generador (~500 imágenes) + 3 piezas pequeñas de código (§6.4) | el número que se **reporta** | Sí: el registro de «se tocó» (§6.4.2) |
 
-**La 2 y la 3b se pueden hacer con el dato de hoy**; la 3 es la que cuesta comparabilidad y por
-eso es decisión del usuario.
+**La 3b se puede hacer con el dato de hoy y es la que más puede cambiar el plan** — por eso va
+primera. La 3 es la que cuesta comparabilidad. La 4 depende de la 3: el holdout debe salir de la
+**misma** receta que la fuente de entrenamiento que se acabe usando; generarlo antes de decidir la
+3 es tirar una corrida del generador.
 
 ---
 
@@ -420,9 +706,147 @@ eso es decisión del usuario.
 
 1. La Fase 2 ya existe: `src/fv/task/__init__.py` (es `fv/diagnostics/table.py` con «por imagen»
    en vez de «por ventana» y con la verdad viniendo de A). Léelo antes de tocar métricas.
-2. No añadas `paragraph_f1` a `OBJECTIVES` todavía. §2 dice por qué, con números.
-3. No regeneres el dataset sin preguntar. §4.3.
+2. No añadas `paragraph_f1` a `OBJECTIVES` todavía. §2 dice por qué, con números — y §5.5 dice
+   todo lo que habría que tocar además de esa línea (el ranking se quedaría en `None` sin avisar).
+3. No regeneres el dataset sin preguntar (§4.7), y si se regenera, **lee §4.2 antes**: el dato de
+   verdad no lo hace el generador local.
 4. Los knobs de F entran en la clave de caché; el `threshold` de diagnostics **no** entra en la
    suya. No es una incoherencia: allí re-umbralizar lee scores guardados, aquí hay que re-inferir.
 5. Todo número que salga de aquí viaja con su `sem` y su n de imágenes. Un F1 de tarea sin banda
    es exactamente el error que este proyecto acaba de arreglar en el ranking.
+6. Casi todo lo de §9 **no necesita entrenar nada**: son preguntas que los 130 runs de disco ya
+   pueden contestar. Empieza por ahí antes de gastar CPU.
+
+---
+
+## 9. Pruebas que valdría la pena hacer (ninguna está hecha)
+
+Ordenadas por **valor / coste**. Las cuatro primeras **no entrenan nada**: usan runs que ya
+existen, así que cuestan segundos o minutos. Cada una dice qué pregunta contesta y qué se hace con
+la respuesta — una medición sin decisión asociada no se hace.
+
+### 9.1 El techo de la reconstrucción: ¿el eslabón débil es la red o es F? ⭐ la primera
+
+**Pregunta:** si las esquinas fueran perfectas, ¿qué F1 de párrafo daría la reconstrucción TL→BR
+actual? Ese número es **el techo** de todo lo que se puede ganar mejorando la red.
+
+**Cómo:** alimentar `fv.inference.predict._nms` + `_reconstruct` con las esquinas **verdaderas**
+(las de la fuente, `_corners_of(bbox)` de `extract.py`, con `score=1.0`), sin modelo, y puntuar con
+`paragraph_f1` sobre las mismas imágenes de val. Un script de scratchpad de ~40 líneas. **Coste:
+segundos, cero entrenamiento.**
+
+**Qué se hace con la respuesta:** si el techo es ~1,0, la red es el cuello de botella y todo el
+esfuerzo va ahí. Si el techo es 0,7, **el 30% que falta no lo arregla ninguna arquitectura** y hay
+que tocar la reconstrucción (que hoy es una heurística heredada: `_reconstruct` empareja el TL de
+mayor score con el BR de mayor producto, e ignora TR y BL por completo). protocolo.md §2 ya avisa
+de que esta es la pregunta que decide dónde invertir.
+
+### 9.2 Barrer los knobs de F (gratis, no reentrena) ⭐
+
+**Pregunta:** ¿cuánto F1 de tarea se está dejando en la mesa por usar `threshold=0.5`,
+`stride=n//2`, `nms_radius=n/2`, `min_size=4` **por defecto, sin haberlos mirado nunca**?
+
+**Cómo:** `task_score` ya acepta los cuatro y ya cachea por ellos. Un barrido pequeño sobre un run
+bueno: `threshold ∈ {0.3,0.4,0.5,0.6,0.7}` × `stride ∈ {4,8}` × `nms_radius ∈ {4,8,12}` = 30
+llamadas × 0,4 s ≈ **12 s por run**. Hacerlo sobre 3 runs de calidad distinta para ver si el óptimo
+es el mismo (si no lo es, los knobs son parte de la comparación y no un ajuste global).
+
+**Qué se hace con la respuesta:** si el óptimo es estable y mejor que el default, se cambian los
+defaults **declarándolo** (son F: se ajustan sin reentrenar, contrato del dominio). Si el óptimo
+depende del run, entonces **comparar runs con knobs fijos está sesgado** y hay que decir cómo se
+elige. Es también la funcionalidad que §3.7 aplazó a propósito.
+
+### 9.3 La curva F1-vs-IoU: ¿falla detectar o falla localizar?
+
+**Pregunta:** con `iou_threshold ∈ {0.3, 0.4, 0.5, 0.6, 0.7, 0.8}`, ¿cómo cae el F1?
+
+**Cómo:** seis llamadas a `task_score` por run (ya parametrizado, ya cacheado). **Coste: 2,4 s por
+run.** Se puede hacer sobre los 5 seeds del ganador actual.
+
+**Qué se hace con la respuesta:** una caída suave = las cajas están **casi** bien (problema de
+localización → mirar `pos_err_px` y la cabeza de posición). Una caída brusca ya en 0,4 = las cajas
+que se emparejan lo hacen por poco (problema de detección/emparejamiento). Hoy el 0,5 es un valor
+heredado que nadie ha justificado con datos de este proyecto.
+
+### 9.4 Re-medir la sd por imagen con los mejores modelos que hay
+
+**Pregunta:** la aritmética de §4.1 usa **sd = 0,372**, medida con modelos de F1 0,3–0,54. ¿Cuánto
+vale con los mejores runs de hoy (`batch_size-*`, `fast-lr-*`)?
+
+**Cómo:** `task_score` sobre los ganadores de los 4 recorridos y leer `macro["sd"]`. **Coste:
+~10 s.** Rehacer la tabla de §4.1 con el valor nuevo.
+
+**Qué se hace con la respuesta:** cambia **cuántas imágenes hacen falta** (el número que sostiene
+F11). Si la sd baja a 0,30, 200 imágenes dan ±0,021 y el argumento se refuerza; si sube, hacen
+falta más. Es literalmente el input de la decisión pendiente del usuario.
+
+### 9.5 macro vs micro: ¿mandan unas pocas imágenes difíciles?
+
+**Pregunta:** `task_score` ya devuelve las dos y `per_image` entero. ¿La diferencia macro−micro es
+sistemática, y son siempre **las mismas** imágenes las que fallan?
+
+**Cómo:** con los `per_image` de los 5 seeds del ganador (ya cacheados), contar cuántas imágenes
+tienen F1 = 0 en las 5 réplicas. **Coste: segundos.**
+
+**Qué se hace con la respuesta:** si son siempre las mismas 4-5 imágenes, hay un **modo de fallo
+concreto** que mirar con Diagnóstico/Predecir (¿párrafos pegados al borde? ¿fondo `lines`/`grid`?
+¿4 párrafos en una imagen?), y eso vale más que cualquier décima de F1 promedio. Si el fallo rota
+entre imágenes, es ruido y no hay nada que mirar.
+
+### 9.6 Bootstrap de la banda, en vez de sd/√n
+
+**Pregunta:** el `sem` que se reporta asume normalidad; con F1 por imagen acotado en [0,1] y muchos
+ceros exactos, la distribución **no** es normal. ¿Da lo mismo un intervalo por bootstrap sobre las
+imágenes?
+
+**Cómo:** 2000 remuestreos de las 20 imágenes (numpy, sin dependencias nuevas), percentiles 2,5 y
+97,5. **Coste: milisegundos** sobre datos ya cacheados.
+
+**Qué se hace con la respuesta:** si el intervalo bootstrap es parecido, el `sem` se queda y se
+gana confianza. Si es mucho más ancho, **el ±0,083 de hoy está subestimando el ruido** y la Fase 3
+es aún más necesaria de lo que dice §4.1.
+
+### 9.7 ¿Qué proxy de ventana correlaciona mejor con la tarea?
+
+**Pregunta:** §2 midió `f1` de ventana. ¿Y `pos_err_px`? ¿Y una combinación?
+
+**Cómo:** los datos ya están: `sweep_trials` con `objective="pos_err_px"` sobre el mismo recorrido
+`fast-lr-s0-lr`, y el mismo Spearman de §5.2. **Coste: segundos** (con la caché de tarea llena).
+
+**Qué se hace con la respuesta:** si `pos_err_px` correlaciona mejor, el `objective` por defecto de
+los recorridos debería ser ese — es un cambio de una línea en la receta de recorrido, con evidencia
+detrás en vez de por costumbre.
+
+### 9.8 El coste: vectorizar `build_view` (si alguna vez molesta)
+
+**Pregunta:** el coste de la métrica lo domina construir **63 vistas por imagen** en Python, no el
+modelo (§3.8; el reparto exacto no está perfilado). ¿Cuánto se gana vectorizando?
+
+**Cómo:** medir primero con `cProfile` sobre una imagen (¿es de verdad `build_view`?), y solo
+entonces tocar. **Coste: una tarde**, y **no hacerlo hasta que el n de imágenes lo haga doler** —
+con 20 imágenes no duele; con 500 y un barrido de knobs (9.2), empieza a doler.
+
+**Qué se hace con la respuesta:** si el holdout de 500 imágenes × 30 runs se va a minutos, se
+vectoriza; si no, se deja. **Nunca** «arreglarlo» bajando el número de imágenes: eso es cambiar la
+medida para que quepa en el instrumento.
+
+### 9.9 El primer experimento de verdad (bloqueado por F12)
+
+protocolo.md §6: **¿fóvea + periferia gana a una CNN plana de coste equivalente?** Es *la* pregunta
+del proyecto y sigue sin poderse montar, porque «la CNN plana equivalente» no se puede construir
+hoy (`no_periphery` rechaza la geometría sin periferia, y `d=1` sigue siendo dos ramas
+enmascaradas). **F12 en decisiones.md.** Lo que sí se puede preparar sin decidir nada:
+
+- el eje `d` de §5 **ya es media respuesta**: `d=1` es «casi sin contexto» y `d=6` es «mucho
+  contexto reducido». Si el F1 de tarea no se mueve con `d`, la periferia no está aportando y eso
+  se sabe **antes** de construir el control.
+- escribir el criterio (qué diferencia, medida cómo, con cuántas semillas) **antes** de medir,
+  como manda protocolo.md §1.
+
+### 9.10 Higiene: que la caché no mienta
+
+**Prueba barata que hoy no existe:** entrenar un run, medir tarea, **reentrenar el mismo run**
+(otro `best.pt`, otro mtime) y comprobar que el número cambia. La clave ya incluye
+`ckpt.stat().st_mtime_ns`, pero *que la clave lo incluya* y *que el número cambie* son dos cosas
+distintas, y la segunda es la que le importa a quien mira la pantalla. Es un test de integración
+de ~20 líneas.

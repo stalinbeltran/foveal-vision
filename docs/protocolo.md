@@ -99,6 +99,14 @@ barriendo la geometría.
 
 ### Paso 0b — dimensionar el dato como variable, no como default
 
+> ⚠ **Matiz medido el 2026-07-26, antes de que nadie cuente con «el generador está al lado»:** el
+> dato real de este proyecto (`dirty-paragraphs-*`, 80×60) sale del **proyecto hermano**
+> `image-text-sample-generator` (receta `clean-paragraphs`, canvas 640×480) **y de un `resize` que
+> este repo no tiene portado**. `scripts\make_synth_source.py` genera **otro problema** (barras
+> sintéticas, `local/synth-01`), útil para probar el instrumento y no para concluir sobre la tarea.
+> Las rutas, sus costes y lo que hay que portar: [metrica-de-tarea.md](metrica-de-tarea.md) §4.2 y
+> §4.3, y las decisiones F11/F13 en [decisiones.md](decisiones.md).
+
 El dato es sintético y el generador está al lado: **el tamaño del dataset es una variable de
 investigación** (D6 del hermano), no una restricción. La lección medida: **train manda en el
 coste; val manda en la resolución de la medida** — son knobs independientes, y un split

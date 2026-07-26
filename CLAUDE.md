@@ -43,7 +43,19 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > `holdout_shares_source` (puntuar contra otro B); **falta el holdout en sí**.
 > **Pendiente de este doc, por orden**: 3b (validar el proxy en un eje de **C** — el más barato y
 > el que más puede cambiar el plan), 3 (regenerar el dato: **F11, decisión del usuario**), 4 (el
-> holdout).
+> holdout). **Las tres están especificadas al detalle** en metrica-de-tarea.md §§4-6 para que otra
+> sesión las ejecute en frío: comandos reales con banderas verificadas, costes **medidos** (el
+> recorrido de 3b son 30 runs × 140 s ≈ 70 min; los 6 valores de `d` pasan `check_run`), la pieza
+> que falta (`spearman` en `fv.metrics` — **no hay scipy**, con números dorados para su test), y
+> **todo lo que habría que tocar** si el proxy no valiera para C (§5.5: meter `paragraph_f1` en
+> `OBJECTIVES` **no basta** — `sweep_trials` lee el `val` por época, que no tiene esa clave, y el
+> ranking se quedaría en `None` sin avisar). Además, §9 lista **10 pruebas que valdría la pena
+> hacer**, cuatro de ellas **sin entrenar nada** (el techo de la reconstrucción con esquinas
+> perfectas; barrer los knobs de F, que nadie ha mirado nunca; la curva F1-vs-IoU; re-medir la sd).
+> ⚠ **Y una corrección que manda sobre la Fase 3**: el dato real sale del **generador hermano +
+> un resize que este repo NO tiene portado** — `make_synth_source.py` hace otro problema (barras de
+> juguete). Nuevas decisiones registradas: **F13** (¿portar el resize?) y **F14** (¿registrar que
+> el holdout se tocó?).
 >
 > **2026-07-26 — CÓMO SE ELIGE UN GANADOR: CUATRO ARREGLOS ENCADENADOS.** El usuario reportó que
 > «el gráfico se detiene antes de terminar las épocas». No era el entrenamiento (en disco no
