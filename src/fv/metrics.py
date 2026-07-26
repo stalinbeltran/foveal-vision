@@ -11,6 +11,8 @@ of the foveated geometry (contract (9) extension).
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 CORNER_NAMES = ("TL", "TR", "BR", "BL")
@@ -132,6 +134,52 @@ def _iou(a: tuple, b: tuple) -> float:
     inter = iw * ih
     union = (ax1 - ax0) * (ay1 - ay0) + (bx1 - bx0) * (by1 - by0) - inter
     return inter / union if union > 0 else 0.0
+
+
+def _mean_ranks(v: np.ndarray) -> np.ndarray:
+    """Ranks 1..n with TIES SHARING THE MEAN rank — the standard convention, and
+    the one that keeps the two series comparable when only one of them has ties."""
+    order = np.argsort(v, kind="mergesort")
+    ranks = np.empty(len(v), dtype=np.float64)
+    ranks[order] = np.arange(1, len(v) + 1, dtype=np.float64)
+    s = v[order]
+    i = 0
+    while i < len(s):
+        j = i
+        while j + 1 < len(s) and s[j + 1] == s[i]:
+            j += 1
+        if j > i:
+            ranks[order[i:j + 1]] = (i + j + 2) / 2.0   # mean of ranks i+1..j+1
+        i = j + 1
+    return ranks
+
+
+def spearman(a, b) -> float | None:
+    """Rank correlation between two series (metrica-de-tarea.md §5.2).
+
+    Lives here and not in a script because this is THE site where "what each
+    number means" is defined: a Spearman computed inside a one-off script is a
+    number nobody can test, and this project has already been burnt by defining
+    a number twice.
+
+    Ties take the MEAN rank. Returns None — never 0 — when either series is
+    constant or has fewer than two points: there the correlation is undefined,
+    and 0 would read as «they do not correlate», which is a different claim
+    (formatos.md §2: absent is not zero).
+    """
+    x = np.asarray(a, dtype=np.float64)
+    y = np.asarray(b, dtype=np.float64)
+    if x.shape != y.shape or x.ndim != 1:
+        raise ValueError(f"spearman necesita dos series 1-D del mismo largo, "
+                         f"llegaron {x.shape} y {y.shape}")
+    if len(x) < 2:
+        return None
+    rx, ry = _mean_ranks(x), _mean_ranks(y)
+    dx, dy = rx - rx.mean(), ry - ry.mean()
+    den = math.sqrt(float((dx ** 2).sum()) * float((dy ** 2).sum()))
+    if den == 0.0:                       # a constant series has no ranking
+        return None
+    return float((dx * dy).sum() / den)
 
 
 def paragraph_f1(pred_boxes: list, true_boxes: list, iou_threshold: float = 0.5) -> dict:

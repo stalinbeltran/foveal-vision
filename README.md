@@ -220,6 +220,34 @@ decidir entre puntos. La UI y los CLIs lo dicen en pantalla siempre que n < 100.
 regenerar el dato (§4 del doc), que **cuesta la comparabilidad con lo entrenado hasta hoy** y por
 eso está esperando decisión (F11 en [docs/decisiones.md](docs/decisiones.md)).
 
+### ¿El proxy de ventana ordena igual que la tarea?
+
+La pregunta que decide si el ranking barato vale. Se contesta sobre un recorrido **ya
+entrenado**, sin reentrenar nada:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\proxy_vs_task.py --sweep fast-lr-s0-lr --split val
+```
+
+> Verificado (2026-07-26): reproduce **exactamente** la tabla de la Fase 1 sobre los 65 runs de
+> `fast-lr-s0-lr` — Spearman **+0,737** por run (0,7368) y **+0,956** agregado por valor del eje,
+> ganador `lr=0,00215443` con las dos métricas, en 40,6 s la primera vez y 0,6 s con la caché
+> llena. Imprime también la frontera δ y dice si el ganador por tarea cae dentro; `--json` guarda
+> el detalle por run y por punto.
+>
+> El veredicto **nombra el eje y su dominio** (`eje(s): lr — dominio: D (la receta: no cambia la
+> vista)`): la pregunta de la Fase 3b es precisamente C-contra-D, así que un «vale para C» tras
+> medir `lr` sería una mentira con forma de resultado.
+>
+> El script **no calcula ninguna métrica por su cuenta**: la de ventana sale de `sweep_trials` (la
+> época que guardó `best.pt`), la de tarea de `fv.task.task_score`, la correlación de
+> `fv.metrics.spearman` y la frontera de `suggest_winner`. Un run sin checkpoint se **descuenta
+> diciéndolo**, nunca se rellena con un cero. Códigos de salida: `0` el proxy vale, `1` no vale,
+> `2` no concluyente (el recorrido no distingue nada).
+
+El criterio de aceptación está escrito **antes** de mirar (protocolo.md §1), como constantes del
+script: Spearman agregado ≥ 0,90 **y** el ganador por tarea dentro de la frontera δ.
+
 ### Qué ejes se pueden barrer
 
 Cualquier campo de la **red (C)** o de la **receta (D)** es un eje válido — **excepto `N` y
