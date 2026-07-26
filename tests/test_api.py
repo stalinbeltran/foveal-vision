@@ -96,6 +96,20 @@ def test_full_flow_train_diagnose_predict(world, client):
     assert set(p) >= {"raw", "corners", "paragraphs", "knobs", "truth"}
     assert p["knobs"]["window_size"] == 8
 
+    # the task metric (⑬): on demand, per image, with its band and its knobs
+    ts = client.get("/runs/api-run/task-score?split=val").json()
+    assert ts["images"] > 0 and ts["source"] == world["source"]
+    assert ts["macro"]["sem"] is not None and ts["checkpoint"] == "best.pt"
+    assert ts["knobs"]["window_size"] == 8 and ts["knobs"]["iou_threshold"] == 0.5
+    assert ts["cached"] is False
+    assert client.get("/runs/api-run/task-score?split=val").json()["cached"] is True
+    # a knob changes the reconstruction -> another key, another pass
+    assert client.get("/runs/api-run/task-score?split=val&threshold=0.9"
+                      ).json()["cached"] is False
+    bad = client.get("/runs/api-run/task-score?split=nope")
+    assert bad.status_code == 400
+    assert bad.json()["detail"]["code"] == "unknown_split"
+
     # dataset in use -> 409 with the list
     del409 = client.delete(f"/window-datasets/{world['dataset']}")
     assert del409.status_code == 409

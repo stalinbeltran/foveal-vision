@@ -177,6 +177,49 @@ YAML comiteable; `--auto` recorre la cadena confirmando el ganador sugerido (reg
 > completa desatendida. El estudio **guía y no ejecuta** por diseño: desde la web app el ganador
 > lo confirma el usuario (pantalla **Estudios**); `--auto` es para la validación corta en CPU.
 
+### La métrica de tarea (párrafo por imagen)
+
+El ranking de un recorrido se mide **por ventana** (`f1`, `pos_err_px`): es barata, se calcula
+por época y —medido— **ordena igual** que la cara en ejes de receta (Spearman +0,956 agregado,
+[docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) §2). La métrica que **manda** es otra: si el
+párrafo se reconoce bien **en la imagen completa**. Se pide a parte, cuando hace falta, porque
+cuesta inferencia de imagen completa (~0,6 s por run con 20 imágenes de val):
+
+```powershell
+Invoke-RestMethod "http://localhost:8010/runs/fov-16-param/task-score?split=val" | ConvertTo-Json -Depth 3
+```
+
+> Verificado (2026-07-26): devuelve `macro` (**la primaria**: media por imagen, con `sd` y
+> **`sem`**), `micro` (tp/fp/fn sumados), `mean_iou` (`null` si no hubo emparejamientos, nunca 0),
+> `per_image`, los knobs de F resueltos y `cached`. Se puntúa `best.pt` contra los párrafos de la
+> **fuente** (contrato ⑬): sin la fuente falla con `task_needs_source` en vez de puntuar contra
+> las etiquetas de ventana, que miden otra cosa. La segunda llamada sale de caché; cambiar
+> cualquier knob (`threshold`, `stride`, `nms_radius`, `min_size`, `iou_threshold`) re-infiere.
+>
+> Reproducido el número de la Fase 1 con el código nuevo: las 5 semillas del ganador de
+> `fast-lr-s0-lr` (`lr=0,00215443`) dan **0,5353** de media — el mismo valor de la tabla de
+> metrica-de-tarea.md §2, en 1,9 s.
+
+En la web app: bloque **«Métrica de tarea (párrafo por imagen)»** en el detalle de un run, y
+botón **«Medir la tarea del ganador sugerido»** en el veredicto de Recorridos (solo el sugerido y
+el mejor, nunca los 35 puntos). En los CLIs, detrás de una bandera **apagada por defecto** para
+que un recorrido nocturno no pague inferencia que nadie pidió:
+
+```powershell
+.\.venv\Scripts\fv-oat.exe --name tarea-demo --window-dataset synth-b16 --axis lr --range "[0.001,0.002]" --recipe corta --epochs 1 --task-score
+.\.venv\Scripts\fv-study.exe --name tarea-estudio --plan estudio-example.yaml --auto --task-score
+```
+
+> Verificado (2026-07-26) de punta a punta, también con `PYTHONIOENCODING=cp1252`: los dos
+> imprimen la métrica del **ganador sugerido** (una línea por semilla + la media), con el aviso
+> explícito de tamaño de muestra. Los artefactos de la demo se borraron después.
+
+**Con 20 imágenes de val el error estándar es ±0,083**, y las diferencias entre puntos vecinos de
+un recorrido son de 0,01 a 0,05: hoy este número sirve para **informar del ganador**, no para
+decidir entre puntos. La UI y los CLIs lo dicen en pantalla siempre que n < 100. Subirlo es
+regenerar el dato (§4 del doc), que **cuesta la comparabilidad con lo entrenado hasta hoy** y por
+eso está esperando decisión (F11 en [docs/decisiones.md](docs/decisiones.md)).
+
 ### Qué ejes se pueden barrer
 
 Cualquier campo de la **red (C)** o de la **receta (D)** es un eje válido — **excepto `N` y
@@ -203,10 +246,12 @@ dataset con esa ventana. Para comprobar que **todos** los ejes corren de punta a
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-> Verificado (2026-07-24): **74 passed** en ~26 s — un test por contrato (organizacion.md §2, con
-> el nuevo ⑫ estudio↔recorrido), el builder paramétrico (no-regresión `n_layers=2`), el derivador
-> de base, el generador OAT, el arrastre del ganador, el rechazo de `N`/`c_frac` como ejes, que el
-> budget no colapsa el eje `epochs`, y el flujo completo por HTTP.
+> Verificado (2026-07-26): **107 passed** en ~43 s — un test por contrato (organizacion.md §2,
+> con el ⑫ estudio↔recorrido y el nuevo **⑬ métrica de tarea**), el builder paramétrico
+> (no-regresión `n_layers=2`), el derivador de base, el generador OAT, el arrastre del ganador, el
+> rechazo de `N`/`c_frac` como ejes, que el budget no colapsa el eje `epochs`, las costuras de
+> `task_score` (`tests/test_task.py`: caché por knobs, `best.pt` y no `last.pt`, `mean_iou` null,
+> holdout que comparte fuente) y el flujo completo por HTTP.
 
 ## Verificar la UI con navegador
 
@@ -216,9 +261,11 @@ Con backend y front corriendo (y los datos de arriba creados):
 .\.venv\Scripts\python.exe scripts\verify_ui.py
 ```
 
-> Verificado (2026-07-24): recorre las **12 pantallas/interacciones** con Chromium (incluye la
+> Verificado (2026-07-26): recorre las **12 pantallas/interacciones** con Chromium (incluye la
 > pantalla Estudios, el clic en la galería de Diagnóstico → sondas, el bloqueo del contrato ⑨ en
-> Recorridos y los sliders de Predecir), falla ante cualquier error de consola, y deja capturas
+> Recorridos, los sliders de Predecir y **el botón de la métrica de tarea** en el detalle de un run
+> y en el veredicto de un recorrido, con su aviso de tamaño de muestra), falla ante cualquier error
+> de consola, y deja capturas
 > en `data\ui-shots\`. Diagnóstico/Predecir usan `fov-16-param` (entrenado con el builder
 > paramétrico): los checkpoints anteriores son incompatibles a propósito (barrido §13).
 

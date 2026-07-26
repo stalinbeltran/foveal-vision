@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Badge, ErrorBox } from "../components/ui";
 import { LineChart } from "../components/LineChart";
+import { TaskScore } from "../components/TaskScore";
 
 // E detail: full provenance, execution (X) apart, live curves as SMALL
 // MULTIPLES (loss / f1 / px are three scales: never one chart, never a double
@@ -117,6 +118,17 @@ export default function RunDetail() {
           <LineChart title="val pos_err_px (px de la ventana)" series={[
             { label: "val", points: pts((r) => r.val?.pos_err_px) }]} />
         </div>
+      </div>
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Métrica de tarea (párrafo por imagen)</h3>
+        <p className="sub" style={{ marginTop: 0 }}>
+          La métrica que manda (protocolo.md §2): reconstruye los párrafos de cada
+          imagen de val con <span className="mono">best.pt</span> y los empareja con
+          los de la fuente (IoU ≥ 0,5). Las curvas de arriba son la métrica de{" "}
+          <strong>ventana</strong>, que es el proxy con el que se rankea — barato y,
+          en ejes de D, ordena igual (Spearman +0,956).
+        </p>
+        <TaskScore runs={name ? [name] : []} />
       </div>
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Épocas</h3>

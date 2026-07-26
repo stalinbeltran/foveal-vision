@@ -51,6 +51,11 @@ def main() -> int:
                     help="JSON {field: {value, from}} carried from previous steps")
     ap.add_argument("--overrides", default=None, help="JSON {field: value} user tunables")
     ap.add_argument("--study", default=None)
+    # OFF by default: an unattended sweep must not pay full-image inference that
+    # nobody asked for (metrica-de-tarea.md §3.6)
+    ap.add_argument("--task-score", action="store_true",
+                    help="al cerrar, mide la metrica de tarea (parrafo por "
+                         "imagen) del ganador sugerido")
     args = ap.parse_args()
 
     store = SweepStore()
@@ -95,6 +100,11 @@ def main() -> int:
         print(f"  {sug['tie_reason']}")
         print(f"  sugerido: {json.dumps(sug['suggested']['point'])} "
               f"({sug['suggested']['value']:.4f})")
+        if args.task_score:
+            from fv.task.report import print_task_score
+            print_task_score(
+                "metrica de tarea del sugerido (parrafo por imagen, val):",
+                sug["suggested"].get("runs", []))
     except SweepError as e:
         print(f"\nsin veredicto: {e.message}")
     return 0

@@ -396,6 +396,21 @@ def create_app() -> FastAPI:
                 if (m & np.isfinite(err)).any() else None})
         return {"blind_threshold": blind, "bands": bands}
 
+    # ------------------------------------------- task metric (E x A via F, (13))
+    from fv.task import task_score
+
+    @app.get("/runs/{name}/task-score")
+    def run_task_score(name: str, split: str = "val", threshold: float = 0.5,
+                       stride: int | None = None, nms_radius: float | None = None,
+                       min_size: float | None = None, iou_threshold: float = 0.5,
+                       window_dataset: str | None = None):
+        """The metric that MATTERS (paragraph per image), on demand — never on a
+        poll: it re-infers whole images (0.6 s for 20, seconds for a holdout)."""
+        return task_score(name, split, threshold=threshold, stride=stride,
+                          nms_radius=nms_radius, min_size=min_size,
+                          iou_threshold=iou_threshold,
+                          window_dataset=window_dataset, store=runs)
+
     # ------------------------------------------------------- introspection (V1/V2/F0)
     def _model_for(name: str):
         ckpt = runs.path(name) / "best.pt"

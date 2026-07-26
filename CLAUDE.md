@@ -23,6 +23,28 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-26 — LA MÉTRICA DE TAREA, CABLEADA (Fase 2 de metrica-de-tarea.md).** `paragraph_f1`
+> ya no es una función que no llama nadie: hay **módulo nuevo `fv.task`** (contrato **⑬ E×A vía
+> F**, escrito en organizacion.md §2) que puntúa un run **por imagen** contra los párrafos de la
+> **fuente** — B guarda las imágenes pero no los párrafos verdaderos, así que la costura es
+> `manifest["source_id"]` y sin fuente se falla (`task_needs_source`), nunca se puntúa contra las
+> etiquetas de ventana. Es **caché, no entidad** (como el diagnóstico E×B), con los **knobs de F
+> dentro de la clave** (cambiarlos obliga a re-inferir; el `threshold` del diagnóstico no entra en
+> la suya porque allí solo se re-leen scores). Se puntúa **`best.pt`**, el fichero que sobrevive.
+> Superficies: `GET /runs/{name}/task-score`, bloque en el detalle de un run, botón «medir la
+> tarea del ganador» en el veredicto de Recorridos (solo sugerido + mejor), y `fv-oat/fv-study
+> --task-score` (**apagado por defecto**: un recorrido nocturno no paga inferencia que nadie
+> pidió). Todo número sale con `sem` y n de imágenes, y **con el aviso cuando n < 100**.
+> **NO entra en `OBJECTIVES` y no se calcula por época** — §2 del doc lo desaconseja con datos.
+> ⚠ **La comprobación que vale**: el código nuevo reproduce **exactamente** el número de la Fase 1
+> (0,5353 de media en las 5 semillas del ganador de `fast-lr-s0-lr`, 1,9 s). **107 tests en verde**
+> (+8: los 7 de §3.9 y el ⑬), 12 pantallas Playwright con los botones nuevos pulsados, los dos
+> CLIs de punta a punta bajo cp1252. Se adelantó de la Fase 4 el parámetro `window_dataset` +
+> `holdout_shares_source` (puntuar contra otro B); **falta el holdout en sí**.
+> **Pendiente de este doc, por orden**: 3b (validar el proxy en un eje de **C** — el más barato y
+> el que más puede cambiar el plan), 3 (regenerar el dato: **F11, decisión del usuario**), 4 (el
+> holdout).
+>
 > **2026-07-26 — CÓMO SE ELIGE UN GANADOR: CUATRO ARREGLOS ENCADENADOS.** El usuario reportó que
 > «el gráfico se detiene antes de terminar las épocas». No era el entrenamiento (en disco no
 > faltaba ni una época: `patience: 0`, `stopped_early: false` en los 134 runs) sino la UI — y al
@@ -303,7 +325,7 @@ Los demás documentos, en orden de lectura:
 | [docs/api.md](docs/api.md) · [docs/ui.md](docs/ui.md) | La organización proyectada sobre HTTP y sobre pantallas |
 | [docs/plan.md](docs/plan.md) | El plan de ejecución, por fases verticales |
 | [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) | **IMPLEMENTADO (2026-07-24).** Barrido OAT (un eje a la vez) con base derivada del problema, defaults estáticos, arrastre del ganador y estudio (dominio I). Ver `fv.models.derive`, `fv.sweeps.generate/winner`, `fv.studies`, CLIs `fv-oat`/`fv-study` |
-| [docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) | **DISEÑADO, NO CONSTRUIDO (2026-07-26).** La métrica que manda (párrafo por imagen): qué está medido ya (el proxy de ventana correlaciona 0,956 en ejes de D), y la especificación detallada de lo pendiente — cablear `task_score`, validar el proxy en un eje de C, dimensionar el dato, el holdout. **Léelo antes de tocar métricas de ranking** |
+| [docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) | **FASES 1 y 2 HECHAS (2026-07-26); 3b/3/4 pendientes.** La métrica que manda (párrafo por imagen): el proxy de ventana correlaciona 0,956 en ejes de D, y `task_score` ya está cableada (`fv.task`, contrato ⑬). Pendiente: validar el proxy en un eje de **C**, dimensionar el dato (F11), el holdout. **Léelo antes de tocar métricas de ranking** |
 | [docs/formatos.md](docs/formatos.md) · [docs/tests.md](docs/tests.md) | Los artefactos en disco; qué se testea |
 | [docs/decisiones.md](docs/decisiones.md) | Lo que sigue sin decidir, y qué bloquea. **No tomes tú una decisión que esté ahí: pregunta** |
 | [docs/glosario.md](docs/glosario.md) | Las palabras que significan dos cosas |

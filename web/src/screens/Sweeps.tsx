@@ -5,6 +5,7 @@ import { usePersistedState } from "../uiState";
 import { Badge, ErrorBox, Field, Working } from "../components/ui";
 import { SweepCurves } from "../components/SweepCurves";
 import { WinnerVerdict } from "../components/WinnerVerdict";
+import { TaskScore } from "../components/TaskScore";
 
 // H — fix B, build a space over C and/or D. Geometry axes offer the
 // CALCULATED ranges ("auto"); the (9) block is active in the form; the budget
@@ -431,6 +432,22 @@ export default function Sweeps() {
                   <h4 style={{ margin: "0 0 8px" }}>Veredicto — agregado por valor de eje
                     (media de las semillas)</h4>
                   <WinnerVerdict winner={winner} />
+                  {/* the task metric ONLY for the suggested point (and the best
+                      one when it is another point): measuring the 35 points of a
+                      sweep is the difference between 0,6 s and half a minute,
+                      and the ranking does not use this number anyway */}
+                  <div style={{ marginTop: 12, borderTop: "1px solid var(--border)",
+                                paddingTop: 10 }}>
+                    <TaskScore runs={winner.suggested?.runs ?? []}
+                               title="Medir la tarea del ganador sugerido" />
+                    {JSON.stringify(winner.best?.point) !==
+                      JSON.stringify(winner.suggested?.point) ? (
+                      <div style={{ marginTop: 10 }}>
+                        <TaskScore runs={winner.best?.runs ?? []}
+                                   title="…y la del mejor por objetivo" />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
               {trials.discarded?.length ? (

@@ -38,7 +38,7 @@ por ventana que el bucle calcula por época. Del hermano se hereda la estructura
 |---|---|
 | **Entrenar** (la pérdida) | La de D — tiene que ser diferenciable |
 | **Elegir `best.pt`** dentro de un run | val de ventana (barato, por época), `monitor` explícito |
-| **Rankear el recorrido** | **métrica de tarea por imagen, en val** ← el objetivo |
+| **Rankear el recorrido** | **métrica de tarea por imagen, en val** ← el objetivo. **Hoy se rankea con el proxy de ventana, medido y validado para ejes de D** (recuadro de abajo); la de tarea existe cableada (`fv.task.task_score`, `GET /runs/{name}/task-score`) y se usa para **informar del ganador**, no para elegir |
 | **Reportar** | métrica de tarea en **holdout**, una vez, del ganador |
 
 Con las cabezas de esquina (C9), la métrica de tarea se hereda tal cual del hermano: **F1 de
@@ -69,6 +69,14 @@ su coste.
 > 0,372 sobre **20 imágenes de val** → **±0,083** por run. La métrica de tarea, hoy, es más
 > ruidosa que las diferencias que se quieren distinguir; el arreglo es el §3 de aquí abajo
 > (dimensionar el dato), no más código.
+>
+> **✅ CABLEADA (2026-07-26).** La métrica de tarea ya no es una función que no llama nadie:
+> `fv.task.task_score(run, split)` la calcula por imagen contra la fuente (contrato ⑬), con
+> caché por knobs, y se pide desde `GET /runs/{name}/task-score`, desde el detalle de un run y
+> desde el veredicto de un recorrido (botón: cuesta inferencia de imagen completa), y desde
+> `fv-oat --task-score` / `fv-study --task-score`. **No entra en `OBJECTIVES`**: el proxy ordena
+> igual en ejes de D y cuesta cero. Todo número que sale de ahí viaja con su `sem` y su n de
+> imágenes, y con el aviso explícito cuando n < 100.
 
 ## 3. El instrumento antes que el experimento
 

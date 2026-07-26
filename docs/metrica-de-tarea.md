@@ -1,10 +1,13 @@
 # La métrica de tarea: cablearla, dimensionarla y usarla
 
-> **Estado: DISEÑADO, NO CONSTRUIDO (2026-07-26).** La Fase 1 (validar el proxy) **sí está
-> hecha y medida** — sus números están en §2 y son la razón de que el resto tenga esta forma.
-> Las fases 2, 3 y 4 están **pendientes**: este documento las especifica para que otra sesión
-> las implemente sin volver a decidir nada. Lo que aquí queda abierto está marcado como
-> **DECISIÓN DEL USUARIO** y no se toma solo (decisiones.md).
+> **Estado: FASES 1 y 2 HECHAS (2026-07-26). 3b, 3 y 4 pendientes.** La Fase 1 (validar el
+> proxy) está medida — sus números están en §2 y son la razón de que el resto tenga esta forma.
+> La **Fase 2 está construida y verificada**: `fv.task.task_score`, `GET /runs/{name}/task-score`,
+> bloque en el detalle de un run, botón en el veredicto de Recorridos, `fv-oat --task-score` /
+> `fv-study --task-score`, 8 tests (7 de §3.9 + el contrato ⑬). Detalle de lo construido y de las
+> desviaciones, al final de §3. Las fases **3b, 3 y 4** siguen pendientes: este documento las
+> especifica para que otra sesión las implemente sin volver a decidir nada. Lo que queda abierto
+> está marcado como **DECISIÓN DEL USUARIO** y no se toma solo (decisiones.md).
 
 Documento hermano de [protocolo.md](protocolo.md) §2, que fija *qué* métrica manda. Este fija
 **cómo se construye, cuánto cuesta y qué hace falta para que sirva**.
@@ -71,7 +74,7 @@ convierte en código de primera clase y §5 lo repite sobre un eje de C.
 
 ---
 
-## 3. Fase 2 — PENDIENTE: cablear la métrica de tarea como medida de primera clase
+## 3. Fase 2 — HECHA (2026-07-26): la métrica de tarea, cableada
 
 **Objetivo:** poder pedir el número de tarea de cualquier run, con caché, y verlo en el veredicto
 de un recorrido. **No** convertirlo en el objetivo del ranking (§2 lo desaconseja con datos), y
@@ -257,6 +260,28 @@ la construcción de vistas, no bajar el n de imágenes.
 - [README.md](../README.md): cómo pedir el número de tarea, con el comando **ejecutado**.
 - El bloque de estado de [CLAUDE.md](../CLAUDE.md).
 
+### 3.11 Lo construido, y en qué se desvía de lo escrito arriba
+
+Todo §3 está implementado tal cual, salvo tres cosas que se anotan para que el próximo lector no
+crea que se le escapó algo:
+
+1. **`window_dataset` como parámetro llegó ya** (era §6, Fase 4). Es una línea de código y una
+   guarda, y sin ella la firma habría que cambiarla después: `task_score(..., window_dataset=…)`
+   puntúa contra otro B, y **rechaza** con `holdout_shares_source` si ese B sale de la misma
+   fuente que el de entrenamiento. Lo que sigue pendiente de la Fase 4 es **el holdout en sí**
+   (generar la fuente), no su cableado. Cuando el B es otro, la comprobación de huella **no
+   aplica** (esa huella protege el split del run, no el del holdout).
+2. **`fv.task.report`**: un formateador ASCII compartido por `fv-oat` y `fv-study`, en vez de dos
+   copias del mismo bloque de `print`. Los CLIs solo aportan la bandera.
+3. **El aviso de muestra pequeña viaja en las tres superficies** (UI, los dos CLIs) desde una
+   sola regla (`n < 100`), no solo en la pantalla de Runs como decía §3.6.
+
+**Verificado, no razonado:** el número de §2 sale **idéntico** del código nuevo — las 5 semillas
+del ganador de `fast-lr-s0-lr` dan 0,5353 de media (1,9 s los 5 runs), que es la fila de la tabla
+de §2. Los 7 tests de §3.9 más el ⑬ están en `tests/test_task.py` y `tests/test_contracts.py`
+(**107 en verde**); las 12 pantallas Playwright pasan con los dos botones nuevos pulsados; los dos
+CLIs corrieron de punta a punta bajo `PYTHONIOENCODING=cp1252`.
+
 ---
 
 ## 4. Fase 3 — PENDIENTE: dimensionar el dato (el bloqueo real)
@@ -339,8 +364,9 @@ el arrastre de ganadores de un estudio OAT está eligiendo por el número equivo
    **`d`** (el submuestreo de la periferia), porque cambia cuánto contexto real ve la red sin
    tocar la fóvea (①a se mantiene). Rango: `"auto"` (lo calcula `downsample_range`).
    `fv-oat --name proxy-c-d --window-dataset <B> --axis d --range auto --seeds 5 --epochs 20`.
-2. Cuando termine, calcular por cada run la métrica de tarea (§3) y el Spearman contra la de
-   ventana, **por run y agregado por valor del eje**, igual que en §2.
+2. Cuando termine, calcular por cada run la métrica de tarea (`fv.task.task_score`, ya
+   construida) y el Spearman contra la de ventana, **por run y agregado por valor del eje**,
+   igual que en §2.
 3. Decisión, escrita **antes** de mirar (protocolo.md §1):
    - **Spearman agregado ≥ 0,9 y el ganador coincide** → el proxy también vale para C. Se anota
      y no se cambia nada.
@@ -366,12 +392,13 @@ Heredado de protocolo.md §3 (paso 0a), sin cambios de diseño; se repite aquí 
   `best.pt` y rankear), así que el val del ganador está sesgado al alza y **no se reporta**.
 - Implementación: la métrica de tarea de §3 ya sirve tal cual — el holdout es *otro dataset de
   ventanas* extraído de la fuente holdout, y se pide `task_score(run, split="test")` sobre él…
-  **salvo por un detalle que hay que resolver al implementarlo**: hoy `task_score` resuelve la
-  fuente desde el manifest del B **del run**, así que puntuar contra otro B exige un parámetro
-  `window_dataset` explícito. Especificar entonces:
-  `GET /runs/{name}/task-score?window_dataset=<holdout-B>&split=test`, con una guarda nueva:
-  **si el B del holdout comparte `source_id` con el B de entrenamiento, se rechaza** con
-  `holdout_shares_source` — porque entonces no es un holdout.
+  **y el detalle que esto exigía ya está resuelto** (§3.11): `task_score` resuelve la fuente
+  desde el manifest del B **del run**, así que puntuar contra otro B se pide con el parámetro
+  `window_dataset` — `GET /runs/{name}/task-score?window_dataset=<holdout-B>&split=test` — y hay
+  guarda: **si el B del holdout comparte `source_id` con el B de entrenamiento, se rechaza** con
+  `holdout_shares_source`, porque entonces no es un holdout. Lo que falta es **la fuente
+  holdout**: generarla (`scripts\make_synth_source.py` con otra semilla, ~500 imágenes),
+  extraerla y tocarla una sola vez, al final, con el ganador.
 
 ---
 
@@ -379,7 +406,7 @@ Heredado de protocolo.md §3 (paso 0a), sin cambios de diseño; se repite aquí 
 
 | Fase | Qué | Coste | Bloquea a |
 |---|---|---|---|
-| 2 | Cablear `task_score` (§3) | ~medio día | 3b, 4 |
+| ~~2~~ | ~~Cablear `task_score` (§3)~~ — **HECHA 2026-07-26** | — | — |
 | 3b | Validar el proxy sobre el eje `d` (§5) | 1 recorrido + 40 s de medición | la decisión de cambiar el objetivo |
 | 3 | Regenerar el dato (§4) | corrida del generador + reentrenar lo que importe | que la métrica de tarea decida algo |
 | 4 | Holdout (§6) | una corrida del generador | el número que se reporta |
@@ -391,8 +418,8 @@ eso es decisión del usuario.
 
 ## 8. Resumen para quien implemente esto en frío
 
-1. Lee §3 entero y `fv/diagnostics/table.py`: la Fase 2 es ese fichero con «por imagen» en vez de
-   «por ventana» y con la verdad viniendo de A.
+1. La Fase 2 ya existe: `src/fv/task/__init__.py` (es `fv/diagnostics/table.py` con «por imagen»
+   en vez de «por ventana» y con la verdad viniendo de A). Léelo antes de tocar métricas.
 2. No añadas `paragraph_f1` a `OBJECTIVES` todavía. §2 dice por qué, con números.
 3. No regeneres el dataset sin preguntar. §4.3.
 4. Los knobs de F entran en la clave de caché; el `threshold` de diagnostics **no** entra en la

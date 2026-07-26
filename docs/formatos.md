@@ -51,6 +51,13 @@ Cachés previstos (todos en `data/cache/`, gitignoreados): índice de offsets de
 memmapeadas de B si hace falta, tabla de diagnóstico por ventana (clave con **mtime del
 checkpoint**: un run vivo reescribe `best.pt`).
 
+**`data/cache/task/<key>.json`** (implementado): la métrica de tarea por run (contrato ⑬). Misma
+regla, clave con un trozo más: run + huella de B + split + mtime del checkpoint + **los knobs de
+F** (`threshold`, `stride`, `nms_radius`, `min_size`, `iou_threshold`). Los knobs entran porque
+cambiar uno cambia la reconstrucción entera y obliga a re-inferir — no es una incoherencia con el
+`threshold` del diagnóstico, que solo re-lee scores guardados. Es carga: se ignora
+(`/data/cache/` ya está en `.gitignore`) y borrarlo solo cuesta tiempo.
+
 ## 4. Los artefactos
 
 ### 4.1 `data/window-datasets/<name>/` — el dataset de ventanas (B)

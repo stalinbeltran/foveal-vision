@@ -50,6 +50,11 @@ def main() -> int:
     ap.add_argument("--delta", type=float, default=None,
                     help="margen de calidad; por defecto se mide de las semillas (1-SE)")
     ap.add_argument("--cost-metric", default="seconds_per_epoch")
+    # OFF by default: a nightly chain must not pay full-image inference per step
+    # unless it was asked for (metrica-de-tarea.md §3.6)
+    ap.add_argument("--task-score", action="store_true",
+                    help="en cada paso, mide la metrica de tarea (parrafo por "
+                         "imagen) del ganador sugerido")
     args = ap.parse_args()
 
     store, sstore, rstore = StudyStore(), SweepStore(), RunStore()
@@ -97,6 +102,10 @@ def _run_chain(args, store, sstore, rstore) -> None:
         print(f"  delta={sug['delta']:.4f} ({sug['delta_source']})")
         print(f"  {sug['tie_reason']}")
         print(f"  ganador sugerido ({args.cost_metric}): {point} -> se confirma auto")
+        if args.task_score:
+            from fv.task.report import print_task_score
+            print_task_score("  metrica de tarea del sugerido (parrafo por imagen, val):",
+                             sug["suggested"].get("runs", []), store=rstore)
         confirm(args.name, point, store)
 
 

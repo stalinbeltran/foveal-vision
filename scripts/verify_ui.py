@@ -106,6 +106,12 @@ def main() -> int:
             page.wait_for_selector("[data-testid=nine-block]", timeout=10000)
             page.screenshot(path=str(SHOTS / "07b-recorridos-contrato9.png"), full_page=True)
             objetivo.select_option("f1")
+            # the task metric of the winner: a BUTTON (it re-infers whole
+            # images), only for the suggested point — never for the 35 rows
+            page.click("button:has-text('Medir la tarea del ganador sugerido')")
+            page.wait_for_selector("[data-testid=task-row]", timeout=60000)
+            page.wait_for_selector("[data-testid=task-small-sample]", timeout=10000)
+            page.screenshot(path=str(SHOTS / "07f-recorridos-tarea.png"), full_page=True)
         check(page, "/sweeps", "[data-testid=sweeps-table]", "07-recorridos", sweeps_extra)
 
         # Estudios (I): the OAT schedule screen renders with its plan form + list
@@ -137,6 +143,11 @@ def main() -> int:
         def run_extra(page):
             page.wait_for_selector("text=Procedencia", timeout=15000)
             page.wait_for_selector("svg[aria-label='loss']", timeout=15000)
+            # the task metric block (⑬): fired by the button, with its band and
+            # the small-sample caveat visible
+            page.click("button:has-text('Medir la métrica de tarea')")
+            page.wait_for_selector("[data-testid=task-row]", timeout=60000)
+            page.wait_for_selector("[data-testid=task-small-sample]", timeout=10000)
         check(page, "/runs/fov-16-param", "text=fov-16-param", "09-run-detalle", run_extra)
 
         # Diagnostico: summary + gallery -> click opens the probes (F0, V1, V2)

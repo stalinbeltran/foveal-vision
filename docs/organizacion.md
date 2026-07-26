@@ -385,6 +385,32 @@ confirma el usuario** antes de arrastrarlo — coherente con «no ejecuta, guía
 estudio es **dinámica** (un ganador desbloquea sub-ejes), así que el presupuesto se cuenta al
 correr la cadena, no antes.
 
+### ⑬ E × A vía F — la métrica de tarea se puntúa contra la fuente
+
+**IMPLEMENTADO 2026-07-26** (`fv.task`, `GET /runs/{name}/task-score`).
+
+Puntuar un run sobre imágenes completas exige la **fuente** (A) de la que salió su dataset (B),
+no solo B: B guarda las imágenes pero **no los párrafos verdaderos** — guarda etiquetas de
+esquina por ventana, que son otra cosa. El fingerprint de B protege el split; la fuente se
+resuelve por `manifest["source_id"]`. Si la fuente no existe, se falla con razón
+(`task_needs_source`) — **nunca se puntúa contra las etiquetas de ventana**.
+
+Consecuencias que el módulo hace explícitas:
+
+- La verdad se filtra por `manifest["config"]["target_kinds"]`: un dataset extraído de párrafos
+  no se puntúa contra líneas.
+- Se puntúa **`best.pt`**, el fichero que sobrevive y el que cargan Diagnóstico/Predecir — el
+  mismo criterio que el ranking (`sweep_trials`).
+- Es una **caché, no una entidad** (como el diagnóstico E×B): función pura de (run, huella de B,
+  split, mtime del checkpoint, **knobs de F**). Los knobs entran en la clave porque cambiarlos
+  obliga a re-inferir; el `threshold` del diagnóstico no entra en la suya porque allí solo se
+  re-lee un score guardado.
+- **Holdout** (protocolo.md §3): se puede puntuar contra **otro** B (`window_dataset=…`), y si
+  ese B comparte `source_id` con el de entrenamiento se rechaza (`holdout_shares_source`) —
+  porque entonces no es un holdout.
+- **No es el objetivo del ranking** (`OBJECTIVES` no la incluye) y **no se calcula por época**:
+  medido, el proxy de ventana ordena igual en ejes de D (metrica-de-tarea.md §2).
+
 ---
 
 ## 3. Trampas conocidas

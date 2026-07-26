@@ -49,6 +49,7 @@ los CLI (`fv-extract`, `fv-train`, `fv-sweep`) lo prueban. Regla mecánica: **si
 | **D** Receta | `/recipes` |
 | **E** Run | `/runs` |
 | **E×B** Diagnóstico | `/runs/{name}/diagnostics/*` — caché, todo GET idempotente |
+| **E×A** Métrica de tarea | `/runs/{name}/task-score` — caché, GET idempotente (contrato ⑬) |
 | **H** Recorrido | `/sweeps` |
 | **I** Estudio (schedule OAT) | `/studies` (plan comiteable; genera recorridos, no ejecuta) |
 | **F** Inferencia | `/runs/{name}/predict` |
@@ -108,6 +109,25 @@ cuadra: contrato ⑧ cobrándose), `split_empty` → 409; parámetros imposibles
 
 Los endpoints concretos (PR, mapas de error, galería peor-primero…) se fijan con F1; el patrón
 es el del hermano.
+
+### `GET /runs/{name}/task-score` (E×A vía F, contrato ⑬) — la métrica que manda
+
+Párrafo por imagen: reconstruye con `best.pt` cada imagen del split y la empareja con los
+párrafos de **la fuente** (A), no con las etiquetas de ventana. Query: `split` (val por defecto),
+`threshold`, `stride`, `nms_radius`, `min_size` (los knobs de F), `iou_threshold`, y
+`window_dataset` para puntuar contra **otro** B (el holdout).
+
+Devuelve `macro` (**la primaria**: media por imagen, con `sd` y **`sem`**), `micro` (tp/fp/fn
+sumados), `mean_iou` (**`null`** si no hubo emparejamientos, nunca 0), `per_image`, los `knobs`
+resueltos y `cached`. **Los knobs SÍ están en la clave de caché** — a diferencia del `threshold`
+del diagnóstico, aquí cambiar uno obliga a re-inferir la imagen entera.
+
+Negativas con razón: `run_without_provenance`, `window_dataset_changed`, `run_has_no_checkpoint`,
+`split_empty` → 409; `unknown_split`, `task_needs_source` (la fuente no está: se falla, no se
+puntúa contra otra cosa) y `holdout_shares_source` → 400.
+
+**No la llama ningún sondeo**: cuesta inferencia de imagen completa (0,6 s por run con 20
+imágenes). La UI la dispara con un botón.
 
 ### Introspección (`/runs/{name}/…`)
 

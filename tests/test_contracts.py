@@ -170,6 +170,10 @@ def test_contract_07_import_directions():
         "models": {"fovea"},
         "windows": {"datasets", "fovea", "metrics", "ioutils"},
         "inference": {"models", "fovea", "matrixview", "metrics"},
+        # ⑬ fv.task cruza E×A vía F: consume los dominios de abajo y NADA de
+        # arriba (ni api, ni sweeps, ni studies) — es una métrica, no una puerta
+        "task": {"datasets", "diagnostics", "inference", "ioutils", "metrics",
+                 "training", "windows"},
     }
     for mod, allowed in rules.items():
         p = src / mod
@@ -400,6 +404,39 @@ def test_contract_09_the_study_gate_is_not_laxer_than_the_sweep_gate(world):
     # control: con un objetivo de tarea, el mismo plan pasa
     ok = dict(plan, objective="f1")
     assert "objective_varies_with_space" not in [p["code"] for p in validate_plan(ok)]
+
+
+def test_contract_13_task_metric_needs_the_source(world):
+    """⑬ E×A vía F — la métrica de tarea se puntúa contra los párrafos de la
+    FUENTE, no contra las etiquetas de ventana.
+
+    B guarda las imágenes pero no los párrafos verdaderos: son cosas distintas
+    (una esquina dentro de una ventana ≠ un párrafo de la imagen). Así que la
+    costura es `manifest["source_id"]` — y si la fuente no está, se falla con la
+    razón, nunca se puntúa contra lo que sí hay a mano."""
+    from fv import settings
+    from fv.task import task_score
+    from fv.training.loop import train
+    from fv.training.recipe import Recipe
+    from fv.training.registry import RunError, RunStore
+    from fv.windows.store import WindowDatasetStore
+    store = RunStore()
+    train("t13", world["dataset"], "n", TINY_NET, "r",
+          Recipe(epochs=1, batch_size=32), store=store)
+
+    manifest = WindowDatasetStore().manifest(world["dataset"])
+    out = task_score("t13", "val", store=store)
+    assert out["source"] == manifest["source_id"]        # la verdad viene de A
+    # una imagen del split = una unidad de muestra; el n viaja con el número
+    assert out["images"] == len(WindowDatasetStore().split_map(
+        world["dataset"])["val"])
+    assert out["macro"]["sem"] is not None
+
+    # sin la fuente no hay métrica de tarea (y el dataset de ventanas sigue ahí)
+    (settings.local_sources_root() / "mini" / "labels.jsonl").unlink()
+    with pytest.raises(RunError) as e:
+        task_score("t13", "test", store=store)
+    assert e.value.code == "task_needs_source"
 
 
 def test_no_validation_split_refuses_to_train(world):
