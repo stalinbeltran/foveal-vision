@@ -5,8 +5,12 @@ an unattended study dies on the last line if a Greek letter reaches it.
 
 Every line carries the band and the n of images, because a task F1 without them
 is exactly the error this project just fixed in the ranking: with 20 images the
-standard error is +-0.083 and the differences between neighbouring points are
-0.01-0.05 (metrica-de-tarea.md §2).
+standard error is +-0.093 and the differences between neighbouring points are
+0.01-0.05 (metrica-de-tarea.md §4.1, sd re-measured 2026-07-26 in §9.4 — it went
+UP from 0.372 to 0.4148, so this band is wider than the doc first claimed).
+
+The band printed at runtime is ALWAYS computed from the payload's own `sem`, not
+from that number: the docstring is context, never a second definition of it.
 """
 
 from __future__ import annotations

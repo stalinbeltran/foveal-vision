@@ -63,7 +63,13 @@ por época y ordena igual que la cara.
 
 **El hallazgo colateral, que manda sobre las fases siguientes:** la desviación típica del F1 de
 párrafo **entre imágenes** es **0,372** y el val tiene **20 imágenes** → error estándar por run
-**±0,083**. Las diferencias entre puntos vecinos del recorrido son de 0,01 a 0,05. Es decir: hoy
+**±0,083**.
+> ⚠ **Esa sd quedó re-medida el 2026-07-26 en §9.4: es 0,4148 (±0,093), y sube.** El 0,372 de aquí
+> se promedió sobre el recorrido `lr` **entero**, modelos de F1 0,10 incluidos, que varían poco entre
+> imágenes. **Para cualquier cuenta usa la tabla de §4.1**, que ya está rehecha; este número se
+> conserva porque es lo que se midió en la Fase 1 y borrarlo haría irreproducible su tabla.
+
+Las diferencias entre puntos vecinos del recorrido son de 0,01 a 0,05. Es decir: hoy
 la métrica de tarea es **más ruidosa que las diferencias que se quieren medir**, y por eso el
 Spearman salta de 0,736 (por run) a 0,956 (agregando 5 semillas): el ruido está en la estimación
 por run, no en el proxy. Esto es exactamente lo que protocolo.md §3 avisaba — *el tamaño de
@@ -290,22 +296,30 @@ CLIs corrieron de punta a punta bajo `PYTHONIOENCODING=cp1252`.
 
 ### 4.1 La aritmética, para que se pueda rehacer
 
-`SE = sd / √n_imágenes`, con **sd = 0,372 medido** (§2):
+`SE = sd / √n_imágenes`, con **sd = 0,4148 medido** — el valor **re-medido el 2026-07-26 sobre los
+20 runs ganadores de los 4 recorridos** (§9.4), que sustituye al 0,372 de §2:
 
 | imágenes de val | SE de la métrica de tarea |
 |---|---|
-| 20 (hoy) | **±0,083** |
-| 55 | ±0,050 |
-| 154 | ±0,030 |
-| **200** | **±0,026** |
-| 346 | ±0,020 |
+| 20 (hoy) | **±0,093** |
+| 55 | ±0,056 |
+| 154 | ±0,033 |
+| **200** | **±0,029** |
+| 346 | ±0,022 |
+| 500 (el holdout de §6) | ±0,019 |
 
-protocolo.md §3 ya pedía **~2000 imágenes 80/10/10** → 200 de val → **±0,026**, que es del orden
+protocolo.md §3 ya pedía **~2000 imágenes 80/10/10** → 200 de val → **±0,029**, que es del orden
 de las diferencias que se quieren distinguir. Es la cifra coherente: **no inventar otra**.
 
-Nota honesta para quien lo implemente: 0,372 se midió con modelos mediocres (F1 de tarea 0,3–0,54).
-Con modelos mejores la sd por imagen puede bajar, así que 0,372 es la elección **conservadora**.
-Al regenerar, **volver a medir la sd** y rehacer esta tabla.
+⚠ **La versión anterior de esta tabla usaba sd = 0,372 y la llamaba «la elección conservadora»,
+razonando que con modelos mejores la sd bajaría. Se midió, y sube** (§9.4): la sd es **máxima con
+modelos intermedios**, porque el F1 por imagen es casi bimodal y un modelo de F1≈0,5 reparte mitad
+y mitad, mientras que uno uniformemente malo falla en todas y varía poco. El 0,372 se había
+promediado sobre el recorrido `lr` entero, modelos de F1 0,10 incluidos. **La consecuencia es que
+hacen falta más imágenes, no menos: el argumento de F11 se refuerza.**
+
+Sigue en pie la regla: al regenerar, **volver a medir la sd** y rehacer esta tabla — con dato nuevo
+y modelos mejores puede volver a moverse en cualquier dirección.
 
 ### 4.2 ⚠ CORRECCIÓN (2026-07-26): de dónde sale el dato de verdad
 
@@ -397,7 +411,7 @@ que la procedencia no se pierda. Si el resize se va a hacer más de una vez, se 
 - **`--window-size 16`**: el mismo del B actual. El contrato ①a atará `N` a él (`derive_base(16)`
   → `N=20, c_frac=0.8, d=2` → fóvea 16, comprobado), así que las redes derivadas siguen siendo las
   mismas y **la comparación red-a-red se conserva**; lo que cambia es el dato.
-- **`--val-frac 0.1 --test-frac 0.1`** sobre 2000 imágenes → **200 de val** (SE ±0,026) y 200 de
+- **`--val-frac 0.1 --test-frac 0.1`** sobre 2000 imágenes → **200 de val** (SE ±0,029) y 200 de
   test. El split es **por imagen** (`_assign_splits`), que es lo que hace que el n efectivo sea el
   de imágenes.
 - **`--stride 8`**: el del B actual. Sube el número de ventanas (coste de entrenamiento), no la
@@ -407,9 +421,11 @@ que la procedencia no se pierda. Si el resize se va a hacer más de una vez, se 
 
 ### 4.5 Qué hay que RE-medir después de regenerar (no se hereda nada)
 
-1. **La sd por imagen.** Los ±0,083 de hoy salen de sd = 0,372 medida con modelos mediocres
-   (F1 de tarea 0,3–0,54). Con más dato y modelos mejores puede bajar. Se re-mide con
-   `task_score` sobre unos pocos runs del dato nuevo y **se rehace la tabla de §4.1**.
+1. **La sd por imagen.** Los ±0,093 de hoy salen de **sd = 0,4148**, ya re-medida sobre los 20 runs
+   ganadores (§9.4). **No se dé por hecho que con más dato baja: la primera vez que se razonó eso,
+   la medición dijo lo contrario.** Se re-mide con `task_score` sobre unos pocos runs del dato nuevo
+   y **se rehace la tabla de §4.1** — y si sube otra vez, hacen falta más imágenes de las
+   presupuestadas.
 2. **La correlación proxy↔tarea (§2)**, que se midió sobre el B viejo: con otro n de val el ruido
    por run cambia y el Spearman *por run* se moverá aunque el agregado no.
 3. **La Fase 3b** (§5), si ya se hubiera hecho sobre el B viejo: su conclusión es sobre ese dato.
@@ -600,7 +616,7 @@ Esto es lo que más fácilmente se subestima, así que va enumerado. **No es «a
 7. **El contrato ⑨** hay que releerlo con esto puesto: la métrica de tarea está definida en
    píxeles de la imagen original, así que **sí** puede rankear un espacio que barre C — es la
    razón de que exista. Anotarlo en organizacion.md §2 ⑨ como el caso que lo cumple.
-8. **La Fase 3 tiene que estar hecha antes.** Rankear con ±0,083 de ruido por run es peor que
+8. **La Fase 3 tiene que estar hecha antes.** Rankear con ±0,093 de ruido por run es peor que
    rankear con el proxy: se estaría eligiendo por el ruido con más ceremonia.
 9. Tests: uno que afirme que un recorrido con objetivo de tarea **rankea** (no devuelve todo
    `None`) — la costura del punto 2, que es la que se rompe sola.
@@ -620,7 +636,7 @@ tres piezas pequeñas. Todo lo operativo, sin dar nada por supuesto:
   corrección de §4.2 esto significa: la misma receta `clean-paragraphs` del proyecto hermano +
   el mismo resize a 80 px, **no** `make_synth_source.py` (que haría otro problema, y entonces el
   holdout mediría la generalización a otro dataset, que es otra pregunta).
-- **Tamaño ~500 imágenes** (protocolo.md §3). Con sd 0,372 → **SE ±0,017**. Coste de medirlo:
+- **Tamaño ~500 imágenes** (protocolo.md §3). Con **sd 0,4148** (§9.4) → **SE ±0,019**. Coste de medirlo:
   ~19 ms por imagen (medido) → **~9,5 s por run**. Es barato: lo caro es generarlo.
 - **Se toca una sola vez, al final, y solo con el ganador.** El val hace dos trabajos (elegir
   `best.pt` y rankear), así que el val del ganador está **sesgado al alza** y no se reporta.
@@ -719,13 +735,13 @@ primera. La 3 es la que cuesta comparabilidad. La 4 depende de la 3: el holdout 
 
 ---
 
-## 9. Pruebas que valdría la pena hacer (ninguna está hecha)
+## 9. Pruebas que valdría la pena hacer (9.1, 9.4 y 9.5 HECHAS el 2026-07-26)
 
 Ordenadas por **valor / coste**. Las cuatro primeras **no entrenan nada**: usan runs que ya
 existen, así que cuestan segundos o minutos. Cada una dice qué pregunta contesta y qué se hace con
 la respuesta — una medición sin decisión asociada no se hace.
 
-### 9.1 El techo de la reconstrucción: ¿el eslabón débil es la red o es F? ⭐ la primera
+### 9.1 El techo de la reconstrucción — HECHA: **0,97. El cuello de botella es la red**
 
 **Pregunta:** si las esquinas fueran perfectas, ¿qué F1 de párrafo daría la reconstrucción TL→BR
 actual? Ese número es **el techo** de todo lo que se puede ganar mejorando la red.
@@ -735,13 +751,35 @@ actual? Ese número es **el techo** de todo lo que se puede ganar mejorando la r
 `paragraph_f1` sobre las mismas imágenes de val. Un script de scratchpad de ~40 líneas. **Coste:
 segundos, cero entrenamiento.**
 
-**Qué se hace con la respuesta:** si el techo es ~1,0, la red es el cuello de botella y todo el
-esfuerzo va ahí. Si el techo es 0,7, **el 30% que falta no lo arregla ninguna arquitectura** y hay
-que tocar la reconstrucción (que hoy es una heurística heredada: `_reconstruct` empareja el TL de
-mayor score con el BR de mayor producto, e ignora TR y BL por completo). protocolo.md §2 ya avisa
-de que esta es la pregunta que decide dónde invertir.
+**Medido** (2026-07-26, `dirty-paragraphs-fast-80px`, 20 imágenes de val, 49 párrafos, IoU ≥ 0,5):
 
-### 9.2 Barrer los knobs de F (gratis, no reentrena) ⭐
+| | macro F1 | micro F1 | imágenes perfectas |
+|---|---|---|---|
+| reconstrucción sola | **0,9700** (sd 0,134, sem 0,030) | 0,9691 (tp 47, fp 1, fn 2) | **19/20** |
+| NMS + reconstrucción | **0,9700** | 0,9691 | 19/20 |
+| *el mejor run real de hoy* | *0,6448* | *0,6512* | — |
+
+**La respuesta, y lo que se hace con ella:** el techo es **0,97**, así que **la red es el cuello de
+botella** y el esfuerzo va ahí — no a `_reconstruct`. Los ~0,33 que separan al mejor modelo del
+techo son **todos** de detección de esquinas. Dos hallazgos colaterales:
+
+- **El NMS no cuesta nada**: con las esquinas verdaderas no suprime ni una (`nms_radius=8` con
+  ventana 16). La sospecha de que dos párrafos vecinos se comieran entre sí **no se cumple** en
+  este dataset.
+- **El único fallo del techo es real y diagnosticable.** En la imagen 67 (3 párrafos) `_reconstruct`
+  emparejó el **TL del párrafo 3** `(6,2, 0,4)` con el **BR del párrafo 2** `(73,6, 8,7)` y produjo
+  una caja que cruza dos párrafos, perdiendo los dos (F1 0,4). Es la heurística heredada
+  enseñando su costura: **ignora TR y BL por completo** y no comprueba ninguna consistencia
+  geométrica.
+  ⚠ **Matiz honesto:** con esquinas perfectas todos los scores valen 1,0, así que el desempate de
+  `_reconstruct` (`score > best`, estricto) se resuelve por **orden de lista**, que es arbitrario.
+  Con scores reales ese emparejamiento concreto puede salir distinto. El 0,97 es el techo *de esta
+  heurística con scores uniformes*; el orden de magnitud —«el techo está cerca de 1, no de 0,7»—
+  es el que manda para decidir dónde invertir, y ese no depende del desempate.
+- **Cruce con 9.5:** la imagen 60 falla en **20/20** réplicas de los mejores modelos y su techo es
+  **1,000**. No es un problema de reconstrucción ni de dato: es la red.
+
+### 9.2 Barrer los knobs de F — HECHA: **los tres defaults están mal, y el óptimo es el mismo**
 
 **Pregunta:** ¿cuánto F1 de tarea se está dejando en la mesa por usar `threshold=0.5`,
 `stride=n//2`, `nms_radius=n/2`, `min_size=4` **por defecto, sin haberlos mirado nunca**?
@@ -751,24 +789,73 @@ bueno: `threshold ∈ {0.3,0.4,0.5,0.6,0.7}` × `stride ∈ {4,8}` × `nms_radiu
 llamadas × 0,4 s ≈ **12 s por run**. Hacerlo sobre 3 runs de calidad distinta para ver si el óptimo
 es el mismo (si no lo es, los knobs son parte de la comparación y no un ajuste global).
 
-**Qué se hace con la respuesta:** si el óptimo es estable y mejor que el default, se cambian los
-defaults **declarándolo** (son F: se ajustan sin reentrenar, contrato del dominio). Si el óptimo
-depende del run, entonces **comparar runs con knobs fijos está sesgado** y hay que decir cómo se
-elige. Es también la funcionalidad que §3.7 aplazó a propósito.
+**Medido** (2026-07-26, 30 combinaciones × 3 runs de calidad deliberadamente distinta, 143 s):
 
-### 9.3 La curva F1-vs-IoU: ¿falla detectar o falla localizar?
+| run | F1 con el default | F1 con el óptimo | ganancia | puesto del default |
+|---|---|---|---|---|
+| bueno (`fast-lr-2-…-0018`) | 0,6448 | **0,7095** | **+0,065** | 16/30 |
+| medio (`batch_size-1-…-0001`) | 0,4800 | **0,6667** | **+0,187** | 24/30 |
+| malo (`fast-lr-s0-lr-0000`, lr 1e-4) | 0,3017 | **0,5626** | **+0,261** | 19/30 |
+
+**El óptimo es EL MISMO en los tres**: `threshold≈0,3`, `stride=4`, `nms_radius=12`. Es decir, es un
+ajuste **global**, no parte de la identidad de cada run — comparar runs con knobs fijos **no está
+sesgado en el orden**, pero el número absoluto está infravalorado entre 0,06 y 0,26.
+
+⚠ **La primera rejilla no acotaba su óptimo**: los tres knobs ganaban en el **borde** ofrecido
+(0,3 / 4 / 12), y una rejilla que no acota su óptimo no ha encontrado ninguno. Se extendió
+(2026-07-26, 46 s) y ahora **los tres son óptimos interiores**:
+
+- `threshold`: 0,05 → 0,49 · 0,1 → 0,59 · **0,2–0,3 → 0,67–0,71** · 0,4 → 0,67. Pico plano en
+  ~0,25. Por debajo se dispara la precisión a la baja (0,40 con th 0,05) sin ganar recall.
+- `nms_radius`: **12** · 16 → 0,69 · 20 → 0,66 · 24 → 0,65, y 4/8 ya eran peores. Interior.
+- `stride`: 2 → 0,68 · **4 → 0,71** · 8 → 0,68. Interior. Bajar más **empeora**, no solo cuesta.
+
+En unidades de la ventana (n=16) el óptimo es `stride = n/4` y `nms_radius = 3n/4`, contra los
+`n/2` y `n/2` de hoy.
+
+**Qué se hace con la respuesta — y qué NO hago solo:** §3.7 aplazó esto diciendo que «necesita su
+propia decisión de diseño», y la necesita: cambiar los defaults **mueve todos los números que el
+proyecto ha reportado** (la tabla de §2 incluida) y **la caché no avisa**, porque los knobs entran
+en su clave y simplemente se recalcularía otra cosa. Registrado como **F15** en
+[decisiones.md](decisiones.md). **No se tocan mientras la Fase 3b está midiendo**: usa los mismos
+defaults que §2 a propósito, para que las dos correlaciones sean comparables.
+
+**Y un hallazgo que importa a F11 más que el propio óptimo:** las ganancias son **desiguales** —el
+run malo gana +0,26 y el bueno +0,065—, así que los knobs buenos **comprimen las diferencias entre
+runs**: la separación bueno↔malo pasa de **0,343** (defaults) a **0,147** (óptimo), mientras el
+`sem` se queda en ~0,08. Dicho de otro modo: **con los knobs bien puestos, la métrica de tarea
+distingue PEOR entre modelos en relación con su ruido**, y buena parte de lo que hoy parece
+«diferencia de calidad de modelo» es handicap de los knobs. Refuerza que el bloqueo es el tamaño
+del val.
+
+### 9.3 La curva F1-vs-IoU — HECHA: **falla detectar Y falla localizar, sin meseta**
 
 **Pregunta:** con `iou_threshold ∈ {0.3, 0.4, 0.5, 0.6, 0.7, 0.8}`, ¿cómo cae el F1?
 
 **Cómo:** seis llamadas a `task_score` por run (ya parametrizado, ya cacheado). **Coste: 2,4 s por
 run.** Se puede hacer sobre los 5 seeds del ganador actual.
 
-**Qué se hace con la respuesta:** una caída suave = las cajas están **casi** bien (problema de
-localización → mirar `pos_err_px` y la cabeza de posición). Una caída brusca ya en 0,4 = las cajas
-que se emparejan lo hacen por poco (problema de detección/emparejamiento). Hoy el 0,5 es un valor
-heredado que nadie ha justificado con datos de este proyecto.
+**Medido** (2026-07-26, las 5 semillas del ganador de `fast-lr-s0-lr`, knobs por defecto):
 
-### 9.4 Re-medir la sd por imagen con los mejores modelos que hay
+| IoU | 0,3 | 0,4 | 0,5 | 0,6 | 0,7 | 0,8 |
+|---|---|---|---|---|---|---|
+| media de las 5 semillas | 0,6584 | 0,5722 | **0,5353** | 0,4631 | 0,3438 | 0,1800 |
+| caída respecto al anterior | — | −0,086 | −0,037 | −0,072 | −0,119 | −0,164 |
+
+**La respuesta es «las dos cosas», y eso separa el trabajo en dos:**
+
+1. **Techo de detección ≈ 0,66.** Ni aflojando el IoU a 0,3 se pasa de 0,658: **un tercio de los
+   párrafos no se detecta en absoluto**, con criterio de solape casi regalado. Eso no lo arregla
+   afinar la posición.
+2. **No hay meseta, y la caída se acelera** (−0,04 en 0,4→0,5, pero −0,16 en 0,7→0,8): de los que
+   sí se emparejan, muy pocos se emparejan **bien**. Es localización, y apunta a `pos_err_px` y a la
+   cabeza de posición.
+
+**Y una consecuencia sobre el propio 0,5:** el umbral heredado cae justo en el tramo **más plano**
+de la curva (−0,037), que es el mejor sitio posible para un umbral —el número es poco sensible a
+elegirlo mal— pero es una **casualidad afortunada**, no una justificación. Ahora sí está medido.
+
+### 9.4 Re-medir la sd por imagen — HECHA: **sube a 0,4148, no baja**
 
 **Pregunta:** la aritmética de §4.1 usa **sd = 0,372**, medida con modelos de F1 0,3–0,54. ¿Cuánto
 vale con los mejores runs de hoy (`batch_size-*`, `fast-lr-*`)?
@@ -776,11 +863,29 @@ vale con los mejores runs de hoy (`batch_size-*`, `fast-lr-*`)?
 **Cómo:** `task_score` sobre los ganadores de los 4 recorridos y leer `macro["sd"]`. **Coste:
 ~10 s.** Rehacer la tabla de §4.1 con el valor nuevo.
 
-**Qué se hace con la respuesta:** cambia **cuántas imágenes hacen falta** (el número que sostiene
-F11). Si la sd baja a 0,30, 200 imágenes dan ±0,021 y el argumento se refuerza; si sube, hacen
-falta más. Es literalmente el input de la decisión pendiente del usuario.
+**Medido** (2026-07-26, los **20 runs** de los puntos ganadores de los 4 recorridos —
+`fast-lr-s0-lr`, `fast-lr-2-s0-lr`, `batch_size-1`, `batch_size-2`— × 5 semillas):
 
-### 9.5 macro vs micro: ¿mandan unas pocas imágenes difíciles?
+| | valor |
+|---|---|
+| sd por imagen, media de las 20 réplicas | **0,4148** |
+| rango (min / max) | 0,3468 / 0,4507 |
+| sd del **mejor** run (`fast-lr-2-…-0018`, F1 0,6448) | 0,3468 |
+| lo que decía §4.1 | 0,3720 |
+
+⚠ **La respuesta contradice el supuesto del documento.** §4.1 escribió que 0,372 era la elección
+*conservadora* porque «con modelos mejores la sd puede bajar». **Sube a 0,4148.** La razón, una vez
+vista, es obvia y merece quedar escrita: **la sd es máxima con modelos intermedios**, porque el F1
+por imagen es casi bimodal (0 o 1) y un modelo de F1≈0,5 reparte mitad y mitad; un modelo
+**uniformemente malo** acierta poco en todas y su varianza **entre imágenes es pequeña**. El 0,372
+original se promedió sobre el recorrido `lr` **entero**, que incluía modelos de F1 0,10 — y esos
+bajaron la media. La relación calidad↔sd sí existe (el mejor run es el de menor sd, 0,3468), pero
+**por debajo de 0,372 solo llega el mejor de 20**.
+
+**Qué se hace con la respuesta:** el argumento de F11 **se refuerza**, no se debilita — hacen falta
+*más* imágenes de las que decía la tabla. §4.1 queda rehecha con 0,4148.
+
+### 9.5 macro vs micro — HECHA: **empatan; pero el fallo se concentra en las mismas imágenes**
 
 **Pregunta:** `task_score` ya devuelve las dos y `per_image` entero. ¿La diferencia macro−micro es
 sistemática, y son siempre **las mismas** imágenes las que fallan?
@@ -788,10 +893,26 @@ sistemática, y son siempre **las mismas** imágenes las que fallan?
 **Cómo:** con los `per_image` de los 5 seeds del ganador (ya cacheados), contar cuántas imágenes
 tienen F1 = 0 en las 5 réplicas. **Coste: segundos.**
 
-**Qué se hace con la respuesta:** si son siempre las mismas 4-5 imágenes, hay un **modo de fallo
-concreto** que mirar con Diagnóstico/Predecir (¿párrafos pegados al borde? ¿fondo `lines`/`grid`?
-¿4 párrafos en una imagen?), y eso vale más que cualquier décima de F1 promedio. Si el fallo rota
-entre imágenes, es ruido y no hay nada que mirar.
+**Medido** (2026-07-26, las mismas 20 réplicas de 9.4):
+
+- **macro − micro = −0,0036 de media** (rango −0,038 a +0,039). **No mandan** las imágenes con
+  muchos párrafos: las dos agregaciones dicen lo mismo, y eso es tranquilizador — el `macro` puede
+  seguir siendo el primario sin estar contando otra cosa.
+- **El fallo NO rota: se concentra.** Imágenes con F1 = 0, contadas sobre las 20 réplicas:
+
+  | imagen | 60 | 48 | 20 | 34 | 87 | 8 | 16 | 5 | resto (10 imgs) |
+  |---|---|---|---|---|---|---|---|---|---|
+  | réplicas donde falla | **20/20** | 18/20 | 16/20 | 14/20 | 12/20 | 10/20 | 8/20 | 5/20 | ≤ 3/20 |
+
+  **7 de 20 imágenes cargan casi todo el fallo**, y la 60 falla **siempre**, con los 20 modelos.
+
+**Qué se hace con la respuesta:** hay **modo de fallo concreto** que mirar con Diagnóstico/Predecir,
+y no es de reconstrucción — 9.1 mide el techo de la imagen 60 en **1,000**. La red no ve esas
+esquinas. Mirar qué tienen en común (¿párrafos pegados al borde? ¿fondo `lines`/`grid`? ¿4 párrafos?)
+vale más que cualquier décima de F1 promedio.
+⚠ **Y un aviso sobre el tamaño de muestra que refuerza a 9.4:** si 7 imágenes de 20 deciden el
+número, cambiar **una sola imagen** del val mueve el F1 en 0,05. Es la misma conclusión que la sd,
+vista desde el otro lado.
 
 ### 9.6 Bootstrap de la banda, en vez de sd/√n
 
@@ -803,8 +924,10 @@ imágenes?
 97,5. **Coste: milisegundos** sobre datos ya cacheados.
 
 **Qué se hace con la respuesta:** si el intervalo bootstrap es parecido, el `sem` se queda y se
-gana confianza. Si es mucho más ancho, **el ±0,083 de hoy está subestimando el ruido** y la Fase 3
-es aún más necesaria de lo que dice §4.1.
+gana confianza. Si es mucho más ancho, **el ±0,093 de hoy está subestimando el ruido** y la Fase 3
+es aún más necesaria de lo que dice §4.1. **Hay motivo concreto para sospecharlo:** §9.5 midió que
+7 de 20 imágenes cargan casi todo el fallo y que una falla en 20/20 réplicas — una distribución
+así de bimodal y desbalanceada es justo donde `sd/√n` peor aproxima.
 
 ### 9.7 ¿Qué proxy de ventana correlaciona mejor con la tarea?
 

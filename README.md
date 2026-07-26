@@ -214,11 +214,17 @@ que un recorrido nocturno no pague inferencia que nadie pidió:
 > imprimen la métrica del **ganador sugerido** (una línea por semilla + la media), con el aviso
 > explícito de tamaño de muestra. Los artefactos de la demo se borraron después.
 
-**Con 20 imágenes de val el error estándar es ±0,083**, y las diferencias entre puntos vecinos de
+**Con 20 imágenes de val el error estándar es ±0,093**, y las diferencias entre puntos vecinos de
 un recorrido son de 0,01 a 0,05: hoy este número sirve para **informar del ganador**, no para
-decidir entre puntos. La UI y los CLIs lo dicen en pantalla siempre que n < 100. Subirlo es
+decidir entre puntos. La UI y los CLIs lo dicen en pantalla siempre que n < 100 — y **el número
+que imprimen sale siempre del `sem` del propio payload**, nunca de esa cifra escrita. Subirlo es
 regenerar el dato (§4 del doc), que **cuesta la comparabilidad con lo entrenado hasta hoy** y por
 eso está esperando decisión (F11 en [docs/decisiones.md](docs/decisiones.md)).
+
+> La sd por imagen se **re-midió el 2026-07-26** sobre los 20 runs ganadores de los 4 recorridos
+> (§9.4 del doc): **0,4148**, no el 0,372 con el que se hizo la primera aritmética. Contra lo que el
+> documento suponía, **sube** — la sd es máxima con modelos intermedios (F1 por imagen casi bimodal),
+> y el 0,372 se había promediado incluyendo modelos de F1 0,10. Hacen falta *más* imágenes, no menos.
 
 ### ¿El proxy de ventana ordena igual que la tarea?
 

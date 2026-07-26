@@ -66,9 +66,14 @@ su coste.
 > metrica-de-tarea.md §5.
 >
 > El mismo trabajo destapó el límite que manda ahora: sd del F1 de párrafo **entre imágenes** =
-> 0,372 sobre **20 imágenes de val** → **±0,083** por run. La métrica de tarea, hoy, es más
+> **0,4148** sobre **20 imágenes de val** → **±0,093** por run. La métrica de tarea, hoy, es más
 > ruidosa que las diferencias que se quieren distinguir; el arreglo es el §3 de aquí abajo
 > (dimensionar el dato), no más código.
+> **⚠ Re-medido el 2026-07-26** (metrica-de-tarea.md §9.4) sobre los 20 runs ganadores de los 4
+> recorridos: la primera estimación era 0,372 y se dio por «conservadora» razonando que con modelos
+> mejores bajaría. **Sube.** La sd es máxima con modelos intermedios (el F1 por imagen es casi
+> bimodal), y aquel 0,372 se promedió sobre el recorrido `lr` entero, modelos de F1 0,10 incluidos.
+> Es un recordatorio de esta misma sección: **una estimación razonada no es una medición.**
 >
 > **✅ CABLEADA (2026-07-26).** La métrica de tarea ya no es una función que no llama nadie:
 > `fv.task.task_score(run, split)` la calcula por imagen contra la fuente (contrato ⑬), con
