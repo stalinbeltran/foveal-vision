@@ -914,20 +914,31 @@ vale más que cualquier décima de F1 promedio.
 número, cambiar **una sola imagen** del val mueve el F1 en 0,05. Es la misma conclusión que la sd,
 vista desde el otro lado.
 
-### 9.6 Bootstrap de la banda, en vez de sd/√n
+### 9.6 Bootstrap de la banda — HECHA: **el `sem` aguanta (0,973× el ancho bootstrap)**
 
 **Pregunta:** el `sem` que se reporta asume normalidad; con F1 por imagen acotado en [0,1] y muchos
 ceros exactos, la distribución **no** es normal. ¿Da lo mismo un intervalo por bootstrap sobre las
 imágenes?
 
-**Cómo:** 2000 remuestreos de las 20 imágenes (numpy, sin dependencias nuevas), percentiles 2,5 y
+**Cómo:** 20 000 remuestreos de las 20 imágenes (numpy, sin dependencias nuevas), percentiles 2,5 y
 97,5. **Coste: milisegundos** sobre datos ya cacheados.
 
-**Qué se hace con la respuesta:** si el intervalo bootstrap es parecido, el `sem` se queda y se
-gana confianza. Si es mucho más ancho, **el ±0,093 de hoy está subestimando el ruido** y la Fase 3
-es aún más necesaria de lo que dice §4.1. **Hay motivo concreto para sospecharlo:** §9.5 midió que
-7 de 20 imágenes cargan casi todo el fallo y que una falla en 20/20 réplicas — una distribución
-así de bimodal y desbalanceada es justo donde `sd/√n` peor aproxima.
+**Medido** (2026-07-26, las mismas 20 réplicas ganadoras de 9.4, semilla 7):
+
+| | valor |
+|---|---|
+| ancho del IC95 bootstrap ÷ ancho del IC95 normal (`±1,96·sem`) | **0,973** de media |
+| rango sobre las 20 réplicas | 0,960 – 0,986 |
+
+**La distribución sí es bimodal**, como se sospechaba — un run típico reparte sus 20 imágenes en
+**6 ceros exactos, 7 unos exactos y 7 intermedios**. Y aun así el `sem` vale: la media de 20
+sorteos ya es prácticamente normal, y el intervalo simétrico sale **un 2,7% más ancho** que el
+bootstrap, es decir **ligeramente conservador**, nunca optimista.
+
+**Qué se hace con la respuesta:** el `sem` se queda tal cual en `task_score`, en la UI y en los
+CLIs, y se gana confianza en él. **Y confirma dónde está el bloqueo:** no en la fórmula de la
+banda, sino en la `n`. El ±0,093 no es un artefacto de suponer normalidad — es el ruido de verdad
+que hay con 20 imágenes.
 
 ### 9.7 ¿Qué proxy de ventana correlaciona mejor? — HECHA: **`f1`, y no de poco**
 
@@ -986,10 +997,22 @@ enmascaradas). **F12 en decisiones.md.** Lo que sí se puede preparar sin decidi
 - escribir el criterio (qué diferencia, medida cómo, con cuántas semillas) **antes** de medir,
   como manda protocolo.md §1.
 
-### 9.10 Higiene: que la caché no mienta
+### 9.10 Higiene: que la caché no mienta — HECHA: **escrita y en verde**
 
 **Prueba barata que hoy no existe:** entrenar un run, medir tarea, **reentrenar el mismo run**
 (otro `best.pt`, otro mtime) y comprobar que el número cambia. La clave ya incluye
 `ckpt.stat().st_mtime_ns`, pero *que la clave lo incluya* y *que el número cambie* son dos cosas
 distintas, y la segunda es la que le importa a quien mira la pantalla. Es un test de integración
 de ~20 líneas.
+
+**Hecha** (2026-07-26): `tests/test_task.py::test_task_score_does_not_serve_a_stale_number_after_retraining`.
+Mide, comprueba que la segunda llamada **sí** sale de caché, reescribe `best.pt` con otros pesos y
+vuelve a medir: `cached: false`, la entrada vieja sobrevive sin usarse (2 ficheros de caché) y **las
+predicciones cambian**.
+
+> ⚠ **Detalle que costó un intento y que conviene saber**: la afirmación natural
+> («el `macro.f1` cambia») **no se puede hacer en el mundo mínimo de los tests** — un modelo de 1
+> época sobre 10 imágenes de juguete puntúa `f1 = 0,0` prediga lo que prediga, así que 0,0 ≠ 0,0
+> falla y el test parecería estar detectando un bug que no existe. La afirmación se apoya en el
+> **número de predicciones** (`micro.fp`), que es lo que los pesos nuevos sí mueven. Es un ejemplo
+> de la regla de tests.md: *afirmar la costura, no un valor bonito*.

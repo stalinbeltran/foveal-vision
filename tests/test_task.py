@@ -156,6 +156,39 @@ def test_task_score_mean_iou_is_null_without_matches(trained):
     assert out["micro"]["tp"] == 0 and out["macro"]["f1"] == 0.0
 
 
+def test_task_score_does_not_serve_a_stale_number_after_retraining(trained):
+    """§9.10 — the cache must not lie.
+
+    That the key CONTAINS `ckpt.st_mtime_ns` and that the NUMBER changes when the
+    weights change are two different claims, and only the second one is what the
+    person looking at the screen cares about. Retrain in place (a new best.pt) and
+    the answer must be recomputed, not served from the previous run's file.
+    """
+    import torch
+    from fv.task import task_score
+    before = task_score(trained["run"], "val", store=trained["store"])
+    assert before["cached"] is False
+    assert task_score(trained["run"], "val", store=trained["store"])["cached"] is True
+
+    # the same run, trained again: same name, same dataset, other weights
+    ckpt_path = trained["store"].path(trained["run"]) / "best.pt"
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    with torch.no_grad():
+        for i in (0, 3, 6, 9):       # exists-bias up: every window fires now
+            ckpt["model"]["head.bias"][i] += 10.0
+    torch.save(ckpt, ckpt_path)
+
+    after = task_score(trained["run"], "val", store=trained["store"])
+    assert after["cached"] is False, "sirvio el numero viejo de un best.pt que ya no existe"
+    assert len(_cache_files()) == 2   # the old entry survives, it just is not used
+    # the NUMBER moved, not only the key. A 1-epoch model on a tiny world scores
+    # F1 0.0 whatever it predicts, so the assertion rides on the count of
+    # predictions, which is what the new weights actually changed: firing on
+    # every window cannot leave the false positives where they were.
+    assert after["micro"]["fp"] > before["micro"]["fp"]
+    assert sum(r["fp"] for r in after["per_image"]) == after["micro"]["fp"]
+
+
 def test_task_score_refuses_a_holdout_that_shares_the_source(trained):
     """§6: another B extracted from the SAME source is training data wearing
     another name — the guard is the whole point of a holdout."""
