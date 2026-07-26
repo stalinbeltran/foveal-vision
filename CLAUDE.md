@@ -23,6 +23,41 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-26 — CÓMO SE ELIGE UN GANADOR: CUATRO ARREGLOS ENCADENADOS.** El usuario reportó que
+> «el gráfico se detiene antes de terminar las épocas». No era el entrenamiento (en disco no
+> faltaba ni una época: `patience: 0`, `stopped_early: false` en los 134 runs) sino la UI — y al
+> tirar del hilo aparecieron tres cosas que sí decidían el ganador:
+> 1. **La curva de un run terminal se congelaba** (`Sweeps.tsx`): se cacheaba en cuanto el estado
+>    leía `done` Y había algo cacheado, pero ese algo venía del sondeo ANTERIOR, tomado mientras
+>    el run entrenaba. Se perdían las épocas entrenadas en esa ventana (3 s normalmente; hasta un
+>    minuto con la pestaña de fondo, que el navegador estrangula; más tras hibernar). Ahora un run
+>    solo se «settle» al traerlo CON el estado ya terminal. **Verificado en vivo con control**:
+>    4 runs × 6 épocas mirados sin recargar → 6/6 con el arreglo, **5/6 con el guard viejo**.
+> 2. **El ranking medía la última época, no el checkpoint.** `best.pt` se elige por `monitor` y es
+>    lo que cargan Diagnóstico/Predecir y lo que arrastra un estudio; el ranking usaba `m[-1]`.
+>    Eran épocas distintas en el **63%** de los runs de `fast-lr-2-s0-lr`. Ahora `sweep_trials`
+>    puntúa la época que guardó `best.pt` (`fv.metrics.checkpoint_record`, **la misma regla que usa
+>    el bucle** — verificada contra el `best_epoch` de los 134 runs, 134/134). Sin checkpoint (el
+>    monitor nunca midió) → `value: null` + razón, nunca la última época de consuelo. **Cambia el
+>    ganador** de `fast-lr-2-s0-lr` (lr 0.0014 → 0.00168).
+> 3. **No había regla de empate.** `select_winner` cogía `scored[0]` aunque `aggregate_seeds` ya
+>    calculara la banda. protocolo.md §1.5 dice lo contrario. Ahora `δ` por defecto = 1-SE de las
+>    semillas del mejor punto (`tie_delta`), con `tie`/`tie_reason` en palabras. Veredicto sobre
+>    los recorridos reales: `batch_size` gana de verdad; `fast-lr-s0-lr` empata sus dos primeros;
+>    **`fast-lr-2-s0-lr` empata los SEIS** — 30 runs que no distinguen nada. ⚠ `fv-study --delta`
+>    tenía default `0.0`, que habría pisado la regla justo en el camino desatendido: ahora es None.
+> 4. **La banda del gráfico se estrechaba sola**: promediaba las réplicas presentes en cada época,
+>    así que un grupo con réplicas a distinta altura fingía converger al final. Se corta donde
+>    faltan réplicas y se dice dónde.
+>
+> UI nueva: columnas «época»/«última» en el ranking, aviso cuando `monitor != objective` (el caso
+> de los tres recorridos vivos), y componente `WinnerVerdict` — **Recorridos estrena veredicto**,
+> antes esa pantalla no mostraba ganador ninguno. Los CLIs (`fv-oat`, `fv-sweep`, `fv-study`) lo
+> imprimen también; `tie_reason` es ASCII a propósito (llevaba una δ griega, **que no existe en
+> cp1252** y habría matado un estudio nocturno en la última línea — reproducido y arreglado).
+> **95 tests en verde** (+7), 12 pantallas Playwright sin errores, `fv-oat` y `fv-study --auto`
+> ejecutados de punta a punta (también bajo `PYTHONIOENCODING=cp1252`).
+>
 > **2026-07-25 — BORRAR UN ESTUDIO ARRASTRA SUS RECORRIDOS (antes los dejaba huérfanos).**
 > `StudyStore.delete` borraba solo el estudio (plan+progress), no los recorridos que generó
 > (`{estudio}-s{i}-{eje}`). Al borrar y **recrear un estudio con el mismo nombre**, el recorrido de
@@ -66,8 +101,10 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > nuevas de backend.** Verificado: `web` typecheck+build limpio; Playwright sobre el recorrido vivo
 > `batchSize_fast-80px-s0-batch_size` (5 runs) — ambos modos, toggle y ocultar/mostrar todo, **sin
 > errores de consola**. `LineChart` extendido (banda + serie atenuada + leyenda opcional) sin
-> romper RunDetail. `SweepCurves.tsx` es nuevo. ⚠ `scripts\verify_ui.py` sigue apuntando a
-> `test4-s0-n_layers` (borrado): su interacción de Recorridos hay que reapuntarla al recorrido vivo.
+> romper RunDetail. `SweepCurves.tsx` es nuevo. ~~⚠ `scripts\verify_ui.py` sigue apuntando a
+> `test4-s0-n_layers` (borrado)~~ — **RESUELTO 2026-07-26**: reapuntado a `fast-lr-2-s0-lr` y
+> ampliado (época, aviso de monitor, veredicto, los dos modos de curva). El «runs terminales se
+> traen una vez» de arriba era el bug del gráfico congelado: ver la nota del 2026-07-26.
 >
 > **2026-07-25 — AUDITORÍA CRUD CROSS-PÁGINA + REFRESCO DE LISTAS EN VIVO.** Se revisó el CRUD de
 > las 12 pantallas buscando «borrar aquí rompe allá». Arreglos:

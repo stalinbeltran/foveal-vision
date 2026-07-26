@@ -332,6 +332,24 @@ gatillo antes de arrastrar el ganador (coherente con un schedule que guía, no e
 métrica de coste son entradas del estudio; la confirmación exige las N semillas en **ambos**
 candidatos de la frontera (§11.1), no solo el provisional.
 
+**[REFINADO 2026-07-26 — `δ` por defecto se MIDE, no se teclea]** `δ` como entrada obligatoria es
+una constante que nadie recuerda ajustar: con `δ=0` (el default que tenían el API y `fv-study`)
+la regla degenera en «gana el de arriba», que es lo que protocolo.md §1.5 prohíbe. Ahora, **si no
+se da `δ`, sale de la dispersión que el propio recorrido midió**: el error estándar de la media
+del mejor punto entre sus semillas (1-SE clásico, `fv.sweeps.winner.tie_delta`). Consecuencias:
+
+- Un `δ` explícito lo sigue pisando, y la respuesta declara cuál fue (`delta_source`).
+- Con **una sola semilla no hay banda medida**: `δ=0` **y la razón lo dice**. Nunca se finge que
+  el ruido sea cero (formatos.md §2 aplicado a un margen).
+- La frontera con más de un punto es un **empate técnico declarado** (`tie`, `tie_reason`), no un
+  ganador con cara de resultado. Medido en los recorridos del repo: `fast-lr-2-s0-lr` empata sus
+  seis puntos.
+
+**[REFINADO 2026-07-26 — qué número entra en la regla]** El valor de un punto es el del objetivo
+**en la época que guardó `best.pt`** (elegida por `monitor`), no el de la última época: `best.pt`
+es el artefacto que sobrevive y el que se arrastra. Rankear la última época puntúa unos pesos que
+nadie conserva — eran épocas distintas en el 63% de los runs de `fast-lr-2-s0-lr`.
+
 ---
 
 ## 8. La receta de recorrido generada y la extensión de H (base inline)

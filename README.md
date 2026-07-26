@@ -142,13 +142,35 @@ mismo en cada paso.
 > distintas en disco; `GET /sweeps/{n}/winner` agrega los dos en una entrada por valor de eje
 > (media + banda + `n_seeds`).
 
+### Cómo se lee un ranking (y cuándo NO hay ganador)
+
+Dos reglas que cambian lo que significa la tabla:
+
+- **El valor de un punto es el de su checkpoint**, no el de la última época. `best.pt` se elige
+  por `monitor` y es lo que cargan Diagnóstico, Predecir y el arrastre de un estudio; el ranking
+  mide **ese** fichero. La columna «época» dice de dónde sale cada número, y la UI avisa cuando
+  `monitor` y `objective` no son el mismo (entonces el ranking mide checkpoints seleccionados por
+  otro criterio — legal, pero hay que saberlo).
+- **Un ganador dentro del ruido es un empate.** `δ` por defecto = el error estándar de la media
+  del mejor punto entre sus semillas (regla 1-SE); todo lo que caiga dentro es indistinguible y
+  se declara **empate técnico**, nombrando la frontera. `--delta` (CLI) o la caja δ (UI) lo fijan
+  a mano; vacío = medido. Con una sola semilla no hay banda: `δ=0` **y se dice por qué**.
+
+> Verificado (2026-07-26) sobre los recorridos reales del repo: `batch_size` gana de verdad
+> (batch 100 despega de δ=0.0133); `fast-lr-s0-lr` empata sus dos primeros; `fast-lr-2-s0-lr`
+> empata **los seis** puntos — 30 runs que no distinguen nada. Y rankear por checkpoint en vez de
+> por última época **cambia el ganador** de ese recorrido (lr 0.0014 → 0.00168).
+
 Un **estudio** encadena varios ejes (descenso por coordenadas): fija el ganador de cada paso
 como base del siguiente y **expande sub-ejes** (`channels[i]` al fijar `n_layers`). El plan es un
 YAML comiteable; `--auto` recorre la cadena confirmando el ganador sugerido (regla coste/calidad):
 
 ```powershell
-.\.venv\Scripts\fv-study.exe --name mi-estudio --plan estudio-example.yaml --auto --delta 0.02
+.\.venv\Scripts\fv-study.exe --name mi-estudio --plan estudio-example.yaml --auto
 ```
+
+> `--delta` es opcional: sin él, el margen se **mide** de la dispersión entre semillas de cada
+> paso (1-SE). Pasarlo (`--delta 0.02`) lo fija a mano en toda la cadena.
 
 > Verificado (2026-07-24): con un plan `n_layers → channels[i]`, el ganador `n_layers=1` encogió
 > la base a `ws16-p2-d2-L1` y expandió `channels[i]` a un solo paso `channels[0]` — cadena
