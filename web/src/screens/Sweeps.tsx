@@ -4,6 +4,7 @@ import { api } from "../api";
 import { usePersistedState } from "../uiState";
 import { Badge, ErrorBox, Field, Working } from "../components/ui";
 import { SweepCurves } from "../components/SweepCurves";
+import { WinnerVerdict } from "../components/WinnerVerdict";
 
 // H — fix B, build a space over C and/or D. Geometry axes offer the
 // CALCULATED ranges ("auto"); the (9) block is active in the form; the budget
@@ -18,6 +19,7 @@ export default function Sweeps() {
   const [error, setError] = useState<unknown>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [trials, setTrials] = useState<any>(null);
+  const [winner, setWinner] = useState<any>(null);
   const [curves, setCurves] = useState<Record<string, any[]>>({});
   const curvesRef = useRef<Record<string, any[]>>({});
   // runs whose curve is final: fetched WITH a terminal status, never re-fetched
@@ -75,6 +77,7 @@ export default function Sweeps() {
     if (!sel) return;
     let alive = true;
     curvesRef.current = {}; setCurves({}); settledRef.current = new Set();
+    setWinner(null);
     const TERMINAL = new Set(["done", "cancelled", "failed"]);
     const load = async () => {
       let t: any;
@@ -92,6 +95,12 @@ export default function Sweeps() {
         } catch { /* a run mid-write or just gone: keep what we had, retry next tick */ }
       }));
       if (alive) setCurves({ ...curvesRef.current });
+      // the verdict rides the same tick: δ omitted so the backend measures it
+      // from the seeds (1-SE). 404/no-scored-trials just means "not yet".
+      try {
+        const w = await api.get(`/sweeps/${sel}/winner?cost_metric=seconds_per_epoch`);
+        if (alive) setWinner(w);
+      } catch { if (alive) setWinner(null); }
     };
     load();
     const iv = setInterval(load, 3000);
@@ -406,6 +415,13 @@ export default function Sweeps() {
                   ))}
                 </tbody>
               </table>
+              {winner ? (
+                <div className="card" style={{ marginTop: 12 }} data-testid="sweep-winner">
+                  <h4 style={{ margin: "0 0 8px" }}>Veredicto — agregado por valor de eje
+                    (media de las semillas)</h4>
+                  <WinnerVerdict winner={winner} />
+                </div>
+              ) : null}
               {trials.discarded?.length ? (
                 <p className="sub">{trials.discarded.length} puntos descartados por geometría
                   (con su razón en el spec) — los asserts matan esas combinaciones.</p>

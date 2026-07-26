@@ -14,6 +14,9 @@ the winner is carried. This module suggests; it never decides.
 
 from __future__ import annotations
 
+import math
+import statistics
+
 from fv.models.builder import network_trace
 from fv.sweeps.runner import sweep_trials
 from fv.sweeps.spec import NETWORK_PARAMS, SweepError
@@ -30,17 +33,19 @@ def _num_params_of(run_name: str, run_store: RunStore) -> int | None:
     return network_trace(net)["num_params"] if net else None
 
 
-def suggest_winner(name: str, delta: float = 0.0,
+def suggest_winner(name: str, delta: float | None = None,
                    cost_metric: str = "seconds_per_epoch",
                    store: SweepStore | None = None,
                    run_store: RunStore | None = None) -> dict:
     """Suggest the winner of a finished sweep by the cost/quality rule (D-W1).
 
-    Returns {objective, direction, delta, cost_metric, best, suggested,
-    frontier, trials}: `best` is the provisional best objective, `suggested` is
-    the cheapest within δ of it, `frontier` are the candidates within δ (the
-    ones a confirmation must re-run with N seeds, §11.1). Nothing is decided —
-    the caller confirms.
+    Returns {objective, direction, delta, delta_source, tie, tie_reason,
+    cost_metric, best, suggested, frontier, trials}: `best` is the provisional
+    best objective, `suggested` is the cheapest within δ of it, `frontier` are
+    the candidates within δ. Nothing is decided — the caller confirms.
+
+    δ defaults to the noise the sweep MEASURED ITSELF (`tie_delta`): pass a
+    number to override it.
     """
     store = store or SweepStore()
     run_store = run_store or RunStore()
@@ -62,17 +67,64 @@ def suggest_winner(name: str, delta: float = 0.0,
     # per-value MEAN across seeds, never a single lucky replica (§11.1, D-M1).
     # With one seed per value each group is a singleton -> identical to before.
     groups = aggregate_seeds(scored, direction, cost_metric)
+    if delta is None:
+        delta, delta_source = tie_delta(groups)
+    else:
+        delta, delta_source = float(delta), "fijada a mano"
     best, suggested, frontier = select_winner(groups, direction, delta, cost_metric)
     return {
         "objective": trials["objective"], "direction": direction,
-        "delta": delta, "cost_metric": cost_metric,
+        "delta": delta, "delta_source": delta_source, "cost_metric": cost_metric,
         "best": best, "suggested": suggested,
         "frontier": frontier, "trials": groups,
+        "tie": len(frontier) > 1, "tie_reason": tie_reason(frontier, delta),
+        # the ranking's own provenance travels with the suggestion
+        "value_from": trials.get("value_from"),
+        "monitor_matches_objective": trials.get("monitor_matches_objective"),
     }
 
 
 def _hashable(v):
     return tuple(v) if isinstance(v, list) else v
+
+
+def tie_delta(groups: list[dict]) -> tuple[float, str]:
+    """δ by default = the noise THIS sweep measured (the 1-SE rule).
+
+    protocolo.md §1.5: «la diferencia supera la banda de ruido; si no, es un
+    empate — y no se rompe con "pero es que este subió"». The seeds are run
+    precisely to measure that band, and until now `select_winner` took
+    `scored[0]` without looking at it: on the user's own `fast-lr-2-s0-lr` the
+    gap between 1st and 2nd was 0.0035 while the winner's own seeds spread
+    0.0771 — a coin flip crowned with the face of a result.
+
+    So δ = the standard error of the mean of the best point across its seeds.
+    Anything within that is, by the project's own protocol, a tie. With a single
+    seed there is no measured band: δ=0 and the reason says so — it does NOT
+    pretend the noise is zero.
+    """
+    best = groups[0]
+    sem = best.get("value_sem")
+    if sem is None:
+        return 0.0, ("una sola semilla en el mejor punto: no hay dispersión medida, "
+                     "así que no hay banda de ruido que descontar (sube `seeds` para "
+                     "poder declarar un empate)")
+    return float(sem), (f"1-SE: error estándar de las {best['n_seeds']} semillas del "
+                        f"mejor punto")
+
+
+def tie_reason(frontier: list[dict], delta: float) -> str:
+    """What the frontier means, in words — a number the reader has to interpret
+    alone is a number that gets over-read."""
+    if len(frontier) <= 1:
+        return (f"el mejor punto despega del resto por más de δ={delta:.4f}: "
+                f"la diferencia supera la banda de ruido medida")
+    pts = ", ".join(str(t["point"]) for t in frontier[:6])
+    more = f" (+{len(frontier) - 6})" if len(frontier) > 6 else ""
+    return (f"EMPATE TÉCNICO: {len(frontier)} puntos caen dentro de δ={delta:.4f} "
+            f"({pts}{more}). Sus diferencias no superan el ruido entre semillas, "
+            f"así que este recorrido no los distingue: el sugerido es el más barato "
+            f"de la frontera, no «el mejor»")
 
 
 def aggregate_seeds(scored: list[dict], direction: str,
@@ -82,7 +134,10 @@ def aggregate_seeds(scored: list[dict], direction: str,
     is the point WITHOUT `seed`; the group's `point` drops `seed` too, so the
     carried winner is the axis value, not a replica. Each group keeps `n_seeds`
     and the min/max band (protocolo: a value is a distribution, not a point).
-    Returned sorted best-first, the order select_winner expects."""
+    Returned sorted best-first, the order select_winner expects. Each group also
+    carries the dispersion of its replicas (`value_std`, `value_sem`) — that is
+    the noise band the tie rule spends (tie_delta); None with one seed, never 0
+    (an unmeasured band is not a zero band)."""
     groups: dict = {}
     order: list = []
     for t in scored:
@@ -104,9 +159,12 @@ def aggregate_seeds(scored: list[dict], direction: str,
     for key in order:
         g = groups[key]
         n = len(g["values"])
+        std = statistics.stdev(g["values"]) if n >= 2 else None
         entry = {"point": g["point"], "value": sum(g["values"]) / n,
                  "n_seeds": n, "seeds": sorted(g["seeds"]),
                  "value_min": min(g["values"]), "value_max": max(g["values"]),
+                 "value_std": std,
+                 "value_sem": (std / math.sqrt(n)) if std is not None else None,
                  "runs": g["runs"]}
         if cost_metric == "num_params":
             entry["num_params"] = g["num_params"]

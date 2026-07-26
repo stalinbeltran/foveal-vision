@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { usePersistedState } from "../uiState";
 import { Badge, ErrorBox, Field, Working } from "../components/ui";
+import { WinnerVerdict } from "../components/WinnerVerdict";
 
 // I — the OAT study: an ordered plan of axes over H with B fixed. It GUIDES,
 // it does NOT execute (D-H1): per step it derives the base from the problem,
@@ -28,7 +29,9 @@ export default function Studies() {
   const [sel, setSel] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
   const [winner, setWinner] = useState<any>(null);
-  const [delta, setDelta] = usePersistedState("studies.delta", 0);
+  // "" = auto: the backend derives δ from the seed dispersion it measured
+  // (1-SE, protocolo §1.5). A number overrides it.
+  const [delta, setDelta] = usePersistedState<string>("studies.delta", "");
   const [costMetric, setCostMetric] = usePersistedState("studies.cost", "seconds_per_epoch");
   const [form, setForm] = usePersistedState<any>("studies.form", {
     name: "", window_dataset: "", base_recipe: "", objective: "f1", seeds: 3, epochs: 2,
@@ -76,7 +79,10 @@ export default function Studies() {
   useEffect(() => {
     setWinner(null);
     if (!awaitingSweep) return;
-    api.get(`/sweeps/${awaitingSweep}/winner?delta=${delta}&cost_metric=${costMetric}`)
+    // δ omitted on purpose when the box is empty: the backend then measures it
+    // from the seeds instead of trusting a constant nobody remembers to set
+    const d = delta.trim() === "" ? "" : `delta=${Number(delta)}&`;
+    api.get(`/sweeps/${awaitingSweep}/winner?${d}cost_metric=${costMetric}`)
       .then(setWinner).catch(() => setWinner(null));
   }, [awaitingSweep, delta, costMetric]);
 
@@ -242,9 +248,10 @@ export default function Studies() {
                 <div className="card" style={{ marginTop: 12 }} data-testid="confirm-box">
                   <strong>Confirmar ganador del paso {awaiting.step} ({awaiting.axis})</strong>
                   <div className="row" style={{ marginTop: 6 }}>
-                    <div className="grow"><Field label="δ (margen calidad)">
-                      <input type="number" step={0.01} value={delta}
-                        onChange={(e) => setDelta(+e.target.value)} /></Field></div>
+                    <div className="grow"><Field label="δ (margen calidad)"
+                      help="vacío = medido de las semillas (1-SE); un número lo fija">
+                      <input type="number" step={0.01} value={delta} placeholder="auto"
+                        onChange={(e) => setDelta(e.target.value)} /></Field></div>
                     <div className="grow"><Field label="coste">
                       <select value={costMetric} onChange={(e) => setCostMetric(e.target.value)}>
                         <option value="seconds_per_epoch">s/época</option>
@@ -253,11 +260,7 @@ export default function Studies() {
                   </div>
                   {winner ? (
                     <div>
-                      <div className="sub">mejor objetivo:{" "}
-                        <span className="mono">{JSON.stringify(winner.best.point)}</span>
-                        {" "}({winner.best.value?.toFixed ? winner.best.value.toFixed(4) : winner.best.value})</div>
-                      <div className="sub">sugerido (el más barato dentro de δ):{" "}
-                        <span className="mono">{JSON.stringify(winner.suggested.point)}</span></div>
+                      <WinnerVerdict winner={winner} />
                       <button style={{ marginTop: 8 }} onClick={() => confirm(winner.suggested.point)}>
                         Confirmar sugerido y arrastrar</button>
                     </div>

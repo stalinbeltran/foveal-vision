@@ -76,6 +76,81 @@ def test_aggregate_seeds_singleton_is_a_noop():
     assert all(g["n_seeds"] == 1 for g in groups)
 
 
+def test_tie_delta_is_the_noise_the_sweep_measured(world):
+    """protocolo §1.5: a difference that does not clear the seed band is a TIE.
+    δ defaults to the 1-SE of the best point across its replicas — the sweep's
+    own measurement, not a constant someone has to remember to set."""
+    from fv.sweeps.winner import tie_delta
+    scored = [
+        _seeded(2, 1, 0.80, 12.0), _seeded(2, 2, 0.60, 12.0), _seeded(2, 3, 0.70, 12.0),
+        _seeded(3, 1, 0.69, 30.0), _seeded(3, 2, 0.70, 30.0), _seeded(3, 3, 0.71, 30.0),
+    ]
+    groups = aggregate_seeds(scored, "max", "seconds_per_epoch")
+    assert abs(groups[0]["value"] - 0.70) < 1e-9        # both mean 0.70; ties broken by order
+    delta, source = tie_delta(groups)
+    # stdev([0.80,0.60,0.70]) = 0.1 -> sem = 0.1/sqrt(3) = 0.0577
+    assert abs(delta - 0.1 / (3 ** 0.5)) < 1e-9
+    assert "1-SE" in source and "3 semillas" in source
+
+
+def test_tie_delta_refuses_to_invent_a_band_with_one_seed():
+    """One replica has no dispersion. δ=0 AND the reason says why — pretending
+    the noise is 0 is what crowned the lucky replica in the first place."""
+    from fv.sweeps.winner import tie_delta
+    groups = aggregate_seeds([_t(3, 0.90, 30.0), _t(2, 0.88, 12.0)], "max",
+                             "seconds_per_epoch")
+    delta, source = tie_delta(groups)
+    assert delta == 0.0
+    assert "una sola semilla" in source and "seeds" in source
+    assert groups[0]["value_sem"] is None and groups[0]["value_std"] is None
+
+
+def test_technical_tie_is_declared_not_hidden(world):
+    """The user's real case: 1st beats 2nd by less than the winner's own seed
+    spread. The suggestion must SAY it is a tie and name the frontier, instead of
+    presenting a coin flip as a result."""
+    from fv.sweeps.winner import select_winner, tie_delta, tie_reason
+    scored = [
+        _seeded(2, 1, 0.62, 12.0), _seeded(2, 2, 0.55, 12.0), _seeded(2, 3, 0.68, 12.0),
+        _seeded(3, 1, 0.61, 30.0), _seeded(3, 2, 0.56, 30.0), _seeded(3, 3, 0.67, 30.0),
+    ]
+    groups = aggregate_seeds(scored, "max", "seconds_per_epoch")
+    delta, _ = tie_delta(groups)
+    gap = groups[0]["value"] - groups[1]["value"]
+    assert gap < delta                                   # the gap is inside the noise
+    best, suggested, frontier = select_winner(groups, "max", delta, "seconds_per_epoch")
+    assert len(frontier) == 2                            # both survive
+    assert suggested["point"]["n_layers"] == 2           # the cheaper of the tied
+    reason = tie_reason(frontier, delta)
+    assert "EMPATE" in reason and "no los distingue" in reason
+    # control: a gap wider than the band is NOT a tie
+    _, _, frontier2 = select_winner(groups, "max", gap / 2, "seconds_per_epoch")
+    assert len(frontier2) == 1
+    assert "despega" in tie_reason(frontier2, gap / 2)
+
+
+def test_suggest_winner_derives_delta_when_none_is_given(world):
+    """The API default: no δ in the query -> δ comes from the seeds, and the
+    answer declares where it came from."""
+    from fv.sweeps.generate import generate_sweep
+    from fv.sweeps.runner import run_sweep
+    from fv.sweeps.store import SweepStore
+    from fv.sweeps.winner import suggest_winner
+    from fv.training.registry import RunStore
+    store, rstore = SweepStore(), RunStore()
+    generate_sweep("tie1", world["dataset"], "lr", [1e-3, 3e-3], seeds=2,
+                   base_recipe_value={"epochs": 1, "batch_size": 32, "lr": 1e-3},
+                   sstore=store)
+    run_sweep("tie1", store, rstore)
+    sug = suggest_winner("tie1", store=store, run_store=rstore)   # δ omitted
+    assert sug["delta"] >= 0.0 and "1-SE" in sug["delta_source"]
+    assert sug["best"]["n_seeds"] == 2                # 2 seeds per lr value
+    assert isinstance(sug["tie"], bool) and sug["tie_reason"]
+    # an explicit δ still wins, and says so
+    fixed = suggest_winner("tie1", delta=0.5, store=store, run_store=rstore)
+    assert fixed["delta"] == 0.5 and fixed["delta_source"] == "fijada a mano"
+
+
 def test_winner_overrides_only_network_fields_with_from():
     point = {"n_layers": 3, "lr": 0.003}   # lr is a recipe (D) field, not carried here
     carried = winner_overrides(point, "estudio-01/paso-1")

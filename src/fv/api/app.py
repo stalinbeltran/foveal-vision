@@ -546,10 +546,12 @@ def create_app() -> FastAPI:
         return sweep_trials(name, sstore, runs)
 
     @app.get("/sweeps/{name}/winner")
-    def get_sweep_winner(name: str, delta: float = 0.0,
+    def get_sweep_winner(name: str, delta: float | None = None,
                          cost_metric: str = "seconds_per_epoch"):
         """D-W1: SUGGEST the cheapest point within δ of the best (the user
-        confirms before carrying it). δ and the cost metric are inputs."""
+        confirms before carrying it). Omitting δ derives it from the seed
+        dispersion the sweep measured (1-SE, protocolo §1.5); passing one
+        overrides it. The cost metric is an input."""
         return suggest_winner(name, delta=delta, cost_metric=cost_metric,
                               store=sstore, run_store=runs)
 
