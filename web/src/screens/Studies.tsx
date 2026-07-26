@@ -155,7 +155,11 @@ export default function Studies() {
             <div className="grow"><Field label="objetivo">
               <select value={form.objective}
                 onChange={(e) => setForm({ ...form, objective: e.target.value })}>
-                <option>f1</option><option>pos_err_px</option>
+                {/* mismo vocabulario que Recorridos y que el validador: esta
+                    pantalla ofrecía dos objetivos y la otra tres, y nadie podía
+                    saber si la diferencia era deliberada. Ahora 'loss' se ofrece
+                    y validate_plan rechaza la combinación que rompe el ⑨. */}
+                {(axesMeta?.objectives ?? []).map((o: string) => <option key={o}>{o}</option>)}
               </select></Field></div>
             <div className="grow"><Field label="semillas (confirmación)">
               <input type="number" value={form.seeds}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { api, CORNERS, CORNER_CSS } from "../api";
+import { api, CORNER_CSS, Corner } from "../api";
 import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 
@@ -161,7 +161,9 @@ export default function Predict() {
             </dl>
             <p className="sub">El payload devuelve los knobs con que se calculó: los sliders son
               en vivo y las respuestas llegan desordenadas.</p>
-            {CORNERS.map((c) => {
+            {/* el vocabulario de esquinas viene en la respuesta (corner_order),
+                no de una constante del front */}
+            {(result.corner_order ?? []).map((c: Corner) => {
               const n = result.corners.filter((d: any) => d.corner === c).length;
               return <div key={c}><span className={`corner-${c}`}>{c}</span>: {n} esquinas</div>;
             })}

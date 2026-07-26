@@ -9,7 +9,11 @@ import { WinnerVerdict } from "../components/WinnerVerdict";
 // H — fix B, build a space over C and/or D. Geometry axes offer the
 // CALCULATED ranges ("auto"); the (9) block is active in the form; the budget
 // declares its unit. State lives on disk: stop/resume survive restarts.
-const GEO_AXES = ["d", "k_center", "k_periph", "s_center", "s_periph"];
+//
+// The axis/objective vocabulary comes from /sweeps/axes, which serves the same
+// constants the validators use. This screen used to keep its own GEO_AXES list
+// and its own <option>s: a copy that only diverges the day someone adds an axis
+// in Python — and then the form silently cannot reach it.
 
 export default function Sweeps() {
   const [sweeps, setSweeps] = useState<any[] | null>(null);
@@ -20,6 +24,7 @@ export default function Sweeps() {
   const [sel, setSel] = useState<string | null>(null);
   const [trials, setTrials] = useState<any>(null);
   const [winner, setWinner] = useState<any>(null);
+  const [axesMeta, setAxesMeta] = useState<any>(null);
   const [curves, setCurves] = useState<Record<string, any[]>>({});
   const curvesRef = useRef<Record<string, any[]>>({});
   // runs whose curve is final: fetched WITH a terminal status, never re-fetched
@@ -57,8 +62,12 @@ export default function Sweeps() {
       if (d.recipes[0])
         setForm((f: any) => f.base_recipe ? f : { ...f, base_recipe: d.recipes[0].name });
     }).catch(setError);
+    api.get("/sweeps/axes").then(setAxesMeta).catch(setError);
     return () => clearInterval(t);
   }, []);
+
+  // the geometry axes (those whose range is CALCULATED) come from the backend
+  const GEO_AXES: string[] = axesMeta?.geometry_auto ?? [];
 
   // Poll the trials AND fan out per-run metrics on the same 3s cadence, so a
   // running sweep animates its curve overlay. Curves live in a ref so the tick
@@ -131,8 +140,10 @@ export default function Sweeps() {
     space.lr = form.lr_list.split(",").map((s: string) => +s.trim()).filter((v: number) => v > 0);
   if (form.lambda_list.trim())
     space.lambda_pos = form.lambda_list.split(",").map((s: string) => +s.trim());
+  // contract (9) previewed with the SAME list the validator uses (/sweeps/axes),
+  // not a copy of it: a weight added there must light this warning up by itself
   const nineViolated = form.objective === "loss" &&
-    ["lambda_pos", "pos_weight", "smooth_l1_beta"].some((k) => k in space);
+    (axesMeta?.loss_weight_params ?? []).some((k: string) => k in space);
 
   const removeSweep = (s: any) => {
     const n = s.state?.done ?? 0;
@@ -237,7 +248,7 @@ export default function Sweeps() {
           <Field label="objetivo">
             <select value={form.objective}
               onChange={(e) => setForm({ ...form, objective: e.target.value })}>
-              <option>f1</option><option>pos_err_px</option><option>loss</option>
+              {(axesMeta?.objectives ?? []).map((o: string) => <option key={o}>{o}</option>)}
             </select></Field>
           {nineViolated ? (
             <div className="error-box" data-testid="nine-block">

@@ -13,8 +13,8 @@ import re
 
 from fv.models.builder import DEFAULT_CHANNEL, NETWORK_DEFAULTS
 from fv.sweeps.generate import generate_sweep
-from fv.sweeps.spec import (GEOMETRY_AUTO, NETWORK_PARAMS, OBJECTIVES,
-                            RECIPE_PARAMS, WINDOW_SIZE_FIELDS)
+from fv.sweeps.spec import (GEOMETRY_AUTO, LOSS_WEIGHT_PARAMS, NETWORK_PARAMS,
+                            OBJECTIVES, RECIPE_PARAMS, WINDOW_SIZE_FIELDS)
 from fv.sweeps.store import SweepStore
 from fv.sweeps.winner import winner_overrides
 
@@ -49,6 +49,18 @@ def validate_plan(plan: dict) -> list[dict]:
     if not axes:
         _bad(problems, "no_axes", "el estudio no tiene ejes que barrer",
              "declara al menos un eje en 'axes' (orden = orden de barrido)")
+    # Contract (9), at THIS gate too. check_sweep already refuses it, but a study
+    # reaches that check inside `advance` — half a plan later, in the job. The
+    # study screen simply did not offer 'loss' in its select, which HID the gap
+    # instead of closing it: the laxer gate is the one an automated chain walks
+    # through (same shape as the N/c_frac bug).
+    loss_axes = sorted({a.get("axis") for a in axes} & LOSS_WEIGHT_PARAMS)
+    if obj == "loss" and loss_axes:
+        _bad(problems, "objective_varies_with_space",
+             f"la loss no puede rankear un estudio que barre {loss_axes}: cada "
+             f"punto se mediria con una perdida distinta y lambda->0 gana por "
+             f"definicion",
+             "usa 'f1' o 'pos_err_px' como objetivo del estudio")
     valid_fields = NETWORK_PARAMS | RECIPE_PARAMS
     for a in axes:
         axis = a.get("axis", "")

@@ -7,9 +7,11 @@ import { ErrorBox, Field, Working } from "../components/ui";
 // shows the derived dims, the CALCULATED ranges and the zone diagram LIVE
 // (FG1), via POST /networks/validate. Broken asserts show with their reason.
 
-const DEFAULTS = { name: "", N: 20, c_frac: 0.8, d: 2, pen_frac: 0.1,
-  n_layers: 2, k_center: 3, k_periph: 3, s_center: 1, s_periph: 1,
-  channels: [16, 16], merge: "concat", pool_mode: "avg", pad_mode: "edge" };
+// The C defaults are NOT written here: /networks serves them, resolved by the
+// same full_config the builder uses. The copy that used to live in this file had
+// already drifted (channels [16,16] vs the derived [16]*n_layers). Until they
+// arrive the form is empty-but-typed, so nothing renders a made-up number.
+const EMPTY = { name: "" } as any;
 
 function ZoneDiagram({ dims }: { dims: any }) {
   const N = dims.N, s = Math.min(12, Math.floor(240 / N));
@@ -35,20 +37,29 @@ function ZoneDiagram({ dims }: { dims: any }) {
 
 export default function Networks() {
   const [list, setList] = useState<any[]>([]);
+  const [defaults, setDefaults] = useState<any>(null);
   const [error, setError] = useState<unknown>(null);
-  const [form, setForm] = usePersistedState<any>("networks.form", DEFAULTS);
+  const [form, setForm] = usePersistedState<any>("networks.form", EMPTY);
   const [validation, setValidation] = useState<any>(null);
+  const ready = form.N != null;   // the served defaults (or a remembered form) landed
 
-  const refresh = () => api.get("/networks").then((d) => setList(d.networks)).catch(setError);
+  const refresh = () => api.get("/networks").then((d) => {
+    setList(d.networks);
+    setDefaults(d.defaults);
+    // fill only what the form does not have yet: a remembered edit wins over the
+    // defaults, and the defaults win over nothing — never over the user
+    setForm((f: any) => ({ ...d.defaults, ...f }));
+  }).catch(setError);
   useEffect(() => { refresh(); }, []);
 
   // live validation: the user sees what N and the fractions imply BEFORE saving
   useEffect(() => {
+    if (!ready) return;           // no half-form probing: it would 400 on nothing
     const t = setTimeout(() => {
       api.post("/networks/validate", form).then(setValidation).catch(setError);
     }, 250);
     return () => clearTimeout(t);
-  }, [form]);
+  }, [form, ready]);
 
   const save = async () => {
     setError(null);
@@ -81,6 +92,8 @@ export default function Networks() {
       <h2>Redes foveadas (C)</h2>
       <p className="sub">Todo se deriva de N y las fracciones; los rangos de búsqueda se calculan, nunca se escriben.</p>
       <ErrorBox error={error} />
+      <Working on={!ready} />
+      {!ready ? null : (
       <div className="row">
         <div className="card" style={{ width: 320 }}>
           <Field label="nombre"><input value={form.name}
@@ -159,6 +172,7 @@ export default function Networks() {
           )}
         </div>
       </div>
+      )}
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Guardadas</h3>
         <table className="data" data-testid="networks-table">
@@ -166,7 +180,7 @@ export default function Networks() {
             <th>strides</th><th>merge</th><th></th></tr></thead>
           <tbody>
             {list.map((n) => (
-              <tr key={n.name} onClick={() => setForm({ ...DEFAULTS, ...n })}>
+              <tr key={n.name} onClick={() => setForm({ ...defaults, name: "", ...n })}>
                 <td>{n.name}</td><td>{n.N}</td><td>{n.c_frac}</td><td>{n.d}</td>
                 <td>{n.k_center}/{n.k_periph}</td><td>{n.s_center}/{n.s_periph}</td>
                 <td>{n.merge}</td>

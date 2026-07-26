@@ -44,8 +44,13 @@ export async function waitJob(jobId: string, onTick?: (j: any) => void): Promise
   }
 }
 
-export const CORNERS = ["TL", "TR", "BR", "BL"] as const;
-export const CORNER_CSS = {
+// The corner ORDER is not a constant of the front: it belongs to the dataset
+// (manifest.corner_order) and travels in every payload indexed by it — the
+// diagnostics summary and the predict answer. What lives here is only the COLOUR
+// each name gets, which is a UI decision. Keeping a local order was a second
+// definition of fv.metrics.CORNER_NAMES waiting to disagree with it.
+export type Corner = "TL" | "TR" | "BR" | "BL";
+export const CORNER_CSS: Record<Corner, string> = {
   TL: "var(--corner-tl)", TR: "var(--corner-tr)",
   BR: "var(--corner-br)", BL: "var(--corner-bl)",
-} as const;
+};

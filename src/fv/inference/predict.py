@@ -64,6 +64,9 @@ def predict_image(model, image: np.ndarray, threshold: float = 0.5,
     corners = _nms(raw, nms_radius)
     paragraphs = _reconstruct(corners, min_size)
     return {"raw": raw, "corners": corners, "paragraphs": paragraphs,
+            # the corner vocabulary travels with the answer (fv.metrics is its
+            # ONE definition): a reader that keeps its own copy drifts silently
+            "corner_order": list(CORNER_NAMES),
             "image_size": [W, H],
             "knobs": {"threshold": threshold, "stride": stride,
                       "nms_radius": nms_radius, "min_size": min_size,

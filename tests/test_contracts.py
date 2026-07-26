@@ -331,6 +331,77 @@ def test_ranking_refuses_to_invent_a_value_without_a_checkpoint(world):
     assert row["value_last"] == 0.80                 # visible, but it does not rank
 
 
+def test_the_api_serves_every_vocabulary_the_ui_would_otherwise_copy(world):
+    """Costura front↔backend: cada lista que una pantalla necesita se SIRVE.
+
+    El patrón que produjo la mayoría de los fallos de este repo es «el mismo dato
+    en dos sitios y solo uno se actualiza». Las cuatro copias que vivían en el
+    front (defaults de C, ejes de geometría, objetivos, orden de esquinas) ya
+    habían divergido en dos casos. Este test falla si alguna vuelve a existir
+    sólo en Python: si el API no lo sirve, la pantalla tendrá que inventárselo.
+    """
+    from fastapi.testclient import TestClient
+    from fv.api.app import create_app
+    from fv.models.builder import full_config
+    from fv.sweeps.spec import GEOMETRY_AUTO, LOSS_WEIGHT_PARAMS, OBJECTIVES
+    client = TestClient(create_app())
+
+    # C: los defaults salen resueltos por full_config, la MISMA regla del builder
+    nets = client.get("/networks").json()
+    assert nets["defaults"] == full_config({})
+    assert nets["defaults"]["channels"] == [16] * nets["defaults"]["n_layers"]
+
+    # H/I: el vocabulario de ejes y objetivos, de las mismas constantes
+    axes = client.get("/sweeps/axes").json()
+    assert axes["objectives"] == sorted(OBJECTIVES)
+    assert axes["geometry_auto"] == sorted(GEOMETRY_AUTO)
+    assert axes["loss_weight_params"] == sorted(LOSS_WEIGHT_PARAMS)
+
+
+def test_corner_order_travels_with_every_payload_indexed_by_it(world):
+    """B/E/F: quien dibuja `y`/`scores` por POSICIÓN necesita saber qué significa
+    cada fila. El orden es del dataset (manifest), no una constante del lector."""
+    from fastapi.testclient import TestClient
+    from fv.api.app import create_app
+    from fv.metrics import CORNER_NAMES
+    from fv.training.loop import train
+    from fv.training.recipe import Recipe
+    from fv.training.registry import RunStore
+    client = TestClient(create_app())
+    ds = world["dataset"]
+    w = client.get(f"/window-datasets/{ds}/windows/0").json()
+    assert w["corner_order"] == list(CORNER_NAMES)
+    assert len(w["y"]) == len(w["corner_order"])     # una fila por esquina
+
+    store = RunStore()
+    train("co", ds, "n", TINY_NET, "r", Recipe(epochs=1, batch_size=32), store=store)
+    s = client.get("/runs/co/diagnostics/summary").json()
+    assert s["corner_order"] == list(CORNER_NAMES)
+
+
+def test_contract_09_the_study_gate_is_not_laxer_than_the_sweep_gate(world):
+    """⑨ en la puerta de I, no solo en la de H.
+
+    `validate_plan` aceptaba objetivo `loss` con un eje de peso de la pérdida;
+    `check_sweep` lo rechaza. El estudio moría dentro de `advance`, media cadena
+    después — la trampa que R4 prohíbe. La pantalla lo tapaba no ofreciendo
+    'loss' en su select, que es peor: escondía el hueco en vez de cerrarlo."""
+    from fv.studies.driver import validate_plan
+    from fv.sweeps.spec import check_sweep
+    plan = {"window_dataset": world["dataset"], "base_recipe": "corta",
+            "objective": "loss", "seeds": 1,
+            "axes": [{"axis": "lambda_pos", "range": [0.5, 1.0]}]}
+    codes = [p["code"] for p in validate_plan(plan)]
+    assert "objective_varies_with_space" in codes
+    # la misma combinación, en la puerta de H: el mismo código
+    sweep_codes = [p["code"] for p in check_sweep(
+        {"space": {"lambda_pos": [0.5, 1.0]}, "objective": "loss"})]
+    assert "objective_varies_with_space" in sweep_codes
+    # control: con un objetivo de tarea, el mismo plan pasa
+    ok = dict(plan, objective="f1")
+    assert "objective_varies_with_space" not in [p["code"] for p in validate_plan(ok)]
+
+
 def test_no_validation_split_refuses_to_train(world):
     from fv import settings
     from fv.training.loop import train

@@ -76,7 +76,8 @@ export default function WindowDatasetDetail() {
         <div className="thumbgrid" style={{ marginTop: 10 }} data-testid="window-grid">
           {windows.map((w) => (
             <div className="thumb" key={w.index}>
-              <WindowCanvas pixels={w.pixels} y={w.y} scale={6} />
+              <WindowCanvas pixels={w.pixels} y={w.y}
+                cornerOrder={w.corner_order} scale={6} />
               <div className="cap">#{w.index} · img {w.sample_idx} · ({w.window_xy.join(",")})</div>
             </div>
           ))}

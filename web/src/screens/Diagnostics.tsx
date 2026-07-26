@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api, CORNERS, CORNER_CSS } from "../api";
+import { api, CORNER_CSS, Corner } from "../api";
 import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 import { WindowCanvas } from "../components/WindowCanvas";
@@ -148,7 +148,8 @@ export default function Diagnostics() {
                 <div className="thumb" key={it.row} onClick={() => openProbes(it)}
                   style={{ cursor: "pointer" }}>
                   {pix ? <WindowCanvas pixels={pix.pixels} y={it.y_true}
-                    pred={it.xy_pred} scale={6} /> : <Working on />}
+                    pred={it.xy_pred} cornerOrder={summary?.corner_order}
+                    scale={6} /> : <Working on />}
                   <div className="cap">#{it.window_idx} · err {it.err_px.filter((e: any) => e != null)
                     .map((e: number) => e.toFixed(1)).join("/") || "—"}</div>
                 </div>
@@ -161,7 +162,11 @@ export default function Diagnostics() {
         <div className="card" data-testid="probes">
           <h3 style={{ marginTop: 0 }}>Sondas de la ventana #{probe.item.window_idx}</h3>
           <div className="row" style={{ marginBottom: 6 }}>
-            {CORNERS.map((c, i) => {
+            {/* el orden de las esquinas viaja con los datos (summary.corner_order,
+                del manifest de B): estas barras se indexan POR POSICIÓN, así que
+                una copia local del orden en el front las etiqueta mal en silencio
+                el día que B cambie de orden */}
+            {(summary?.corner_order ?? []).map((c: Corner, i: number) => {
               const s = probe.item.scores[i];
               return (
                 <div key={c} className="meter" style={{ width: 200 }}>

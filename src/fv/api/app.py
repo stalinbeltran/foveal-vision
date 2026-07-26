@@ -187,6 +187,9 @@ def create_app() -> FastAPI:
                 "sample_idx": int(arrays["sample_idx"][index]),
                 "window_xy": [wx0, wy0],
                 "y": arrays["y"][index].tolist(),
+                # `y` rows are ordered by THIS dataset's corner_order: whoever
+                # draws them by index needs it, and must not keep its own copy
+                "corner_order": list(m["corner_order"]),
                 "pixels": crop.tolist(),
                 "split": int(arrays["split"][index])}
 
@@ -207,7 +210,12 @@ def create_app() -> FastAPI:
     # -------------------------------------------------------------- networks (C)
     @app.get("/networks")
     def list_networks():
-        return {"networks": nstore.list()}
+        # the C defaults travel with the list (like /recipes serves Recipe()):
+        # a screen that hardcodes its own copy drifts the day one changes here —
+        # measured: the form said channels [16,16] while the builder derives
+        # [16]*n_layers. full_config resolves them with the SAME rule the builder
+        # uses, so what the form pre-fills is what an empty config would build.
+        return {"networks": nstore.list(), "defaults": full_config({})}
 
     @app.post("/networks")
     def save_network(body: dict):
@@ -463,10 +471,18 @@ def create_app() -> FastAPI:
         select can't drift from what check_sweep/study accepts (the 'define it
         twice' trap). geometry_auto = the axes whose range may be 'auto' (their
         range is CALCULATED); channels_indexed is the special OAT sub-axis."""
-        from fv.sweeps.spec import GEOMETRY_AUTO, NETWORK_PARAMS, RECIPE_PARAMS
+        from fv.sweeps.spec import (GEOMETRY_AUTO, LOSS_WEIGHT_PARAMS,
+                                    NETWORK_PARAMS, OBJECTIVES, RECIPE_PARAMS,
+                                    WINDOW_SIZE_FIELDS)
         return {"network": sorted(NETWORK_PARAMS), "recipe": sorted(RECIPE_PARAMS),
                 "geometry_auto": sorted(GEOMETRY_AUTO),
-                "channels_indexed": "channels[i]"}
+                "channels_indexed": "channels[i]",
+                # the rest of the vocabulary, from the same constants the
+                # validators use: objectives, the fields that can never be axes,
+                # and the loss weights that contract (9) forbids ranking by loss
+                "objectives": sorted(OBJECTIVES),
+                "loss_weight_params": sorted(LOSS_WEIGHT_PARAMS),
+                "window_size_fields": sorted(WINDOW_SIZE_FIELDS)}
 
     @app.post("/sweeps", status_code=202)
     def create_sweep(body: dict):

@@ -7,12 +7,15 @@ Usage: .venv\\Scripts\\python scripts\\verify_ui.py
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-BASE = "http://localhost:5173"
+# 5173 por defecto; FV_UI_BASE permite verificar contra una instancia aparte
+# (útil cuando la de siempre tiene un recorrido entrenando y no se puede tocar)
+BASE = os.environ.get("FV_UI_BASE", "http://localhost:5173")
 SHOTS = Path(__file__).resolve().parents[1] / "data" / "ui-shots"
 SHOTS.mkdir(parents=True, exist_ok=True)
 
