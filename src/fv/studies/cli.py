@@ -44,7 +44,11 @@ def main() -> int:
     ap.add_argument("--plan", help="YAML/JSON plan file (omit to continue an existing study)")
     ap.add_argument("--auto", action="store_true",
                     help="auto-confirm the suggested winner and walk the whole chain")
-    ap.add_argument("--delta", type=float, default=0.0)
+    # default None = δ measured from the seed dispersion (1-SE). A hard 0.0 here
+    # would crown the top row in the UNATTENDED path — the one that carries a
+    # winner through every later step of the study.
+    ap.add_argument("--delta", type=float, default=None,
+                    help="margen de calidad; por defecto se mide de las semillas (1-SE)")
     ap.add_argument("--cost-metric", default="seconds_per_epoch")
     args = ap.parse_args()
 
@@ -87,9 +91,12 @@ def _run_chain(args, store, sstore, rstore) -> None:
         sug = suggest_winner(step["sweep"], delta=args.delta,
                              cost_metric=args.cost_metric, store=sstore, run_store=rstore)
         point = sug["suggested"]["point"]
-        print(f"  mejor: {sug['best']['point']} ({sug['best']['value']})")
-        print(f"  ganador sugerido (delta={args.delta}, {args.cost_metric}): "
-              f"{point} -> se confirma auto")
+        band = (f" banda {sug['best']['value_min']:.4f}-{sug['best']['value_max']:.4f}"
+                f" n={sug['best']['n_seeds']}" if sug["best"]["n_seeds"] > 1 else "")
+        print(f"  mejor: {sug['best']['point']} ({sug['best']['value']:.4f}{band})")
+        print(f"  delta={sug['delta']:.4f} ({sug['delta_source']})")
+        print(f"  {sug['tie_reason']}")
+        print(f"  ganador sugerido ({args.cost_metric}): {point} -> se confirma auto")
         confirm(args.name, point, store)
 
 

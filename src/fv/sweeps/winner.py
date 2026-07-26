@@ -116,12 +116,15 @@ def tie_delta(groups: list[dict]) -> tuple[float, str]:
 def tie_reason(frontier: list[dict], delta: float) -> str:
     """What the frontier means, in words — a number the reader has to interpret
     alone is a number that gets over-read."""
+    # ASCII-safe on purpose: this string is printed by fv-oat/fv-study, and the
+    # Windows console is cp1252 — a Greek delta there is a UnicodeEncodeError
+    # that kills an unattended study. The web UI writes the δ in its own labels.
     if len(frontier) <= 1:
-        return (f"el mejor punto despega del resto por más de δ={delta:.4f}: "
+        return (f"el mejor punto despega del resto por más de delta={delta:.4f}: "
                 f"la diferencia supera la banda de ruido medida")
     pts = ", ".join(str(t["point"]) for t in frontier[:6])
     more = f" (+{len(frontier) - 6})" if len(frontier) > 6 else ""
-    return (f"EMPATE TÉCNICO: {len(frontier)} puntos caen dentro de δ={delta:.4f} "
+    return (f"EMPATE TÉCNICO: {len(frontier)} puntos caen dentro de delta={delta:.4f} "
             f"({pts}{more}). Sus diferencias no superan el ruido entre semillas, "
             f"así que este recorrido no los distingue: el sugerido es el más barato "
             f"de la frontera, no «el mejor»")

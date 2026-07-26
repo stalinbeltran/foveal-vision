@@ -21,6 +21,7 @@ from fv.sweeps.generate import generate_sweep
 from fv.sweeps.runner import run_sweep, sweep_trials
 from fv.sweeps.spec import SweepError
 from fv.sweeps.store import SweepStore
+from fv.sweeps.winner import suggest_winner
 
 
 def _parse_range(text: str):
@@ -79,9 +80,23 @@ def main() -> int:
     print(f"\nestado final: {state.get('status')} "
           f"({state.get('done')}/{state.get('total')})")
     trials = sweep_trials(args.name, store)
-    print(f"ranking por {trials['objective']} ({trials['direction']}):")
+    print(f"ranking por {trials['objective']} ({trials['direction']}) "
+          f"medido en el checkpoint (best.pt, {'/'.join(trials['monitors'])}):")
     for t in trials["trials"][:10]:
-        print(f"  {t['run']}: {t['value']}  {json.dumps(t['point'])}")
+        ep = f"ep {t['epoch']}/{t['epochs']}" if t["epoch"] else "sin checkpoint"
+        print(f"  {t['run']}: {t['value']}  [{ep}]  {json.dumps(t['point'])}")
+    if not trials["monitor_matches_objective"]:
+        print(f"  aviso: el monitor ({'/'.join(trials['monitors'])}) elige la epoca "
+              f"guardada y el ranking la mide con {trials['objective']}")
+    try:
+        sug = suggest_winner(args.name, store=store)   # delta auto (1-SE)
+        print(f"\nveredicto: {'EMPATE' if sug['tie'] else 'ganador distinguible'} "
+              f"(delta={sug['delta']:.4f}, {sug['delta_source']})")
+        print(f"  {sug['tie_reason']}")
+        print(f"  sugerido: {json.dumps(sug['suggested']['point'])} "
+              f"({sug['suggested']['value']:.4f})")
+    except SweepError as e:
+        print(f"\nsin veredicto: {e.message}")
     return 0
 
 
