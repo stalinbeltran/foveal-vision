@@ -20,6 +20,8 @@ export default function Sweeps() {
   const [trials, setTrials] = useState<any>(null);
   const [curves, setCurves] = useState<Record<string, any[]>>({});
   const curvesRef = useRef<Record<string, any[]>>({});
+  // runs whose curve is final: fetched WITH a terminal status, never re-fetched
+  const settledRef = useRef<Set<string>>(new Set());
   const [baseDims, setBaseDims] = useState<any>(null);
   const [sf, setSf] = usePersistedState("sweeps.filters", {
     window_dataset: "", base_network: "", base_recipe: "", objective: "", q: "",
@@ -57,13 +59,22 @@ export default function Sweeps() {
   }, []);
 
   // Poll the trials AND fan out per-run metrics on the same 3s cadence, so a
-  // running sweep animates its curve overlay. A terminal run's curve is fetched
-  // once (its file won't grow); live runs re-fetch every tick. Curves live in a
-  // ref so the tick sees the previous fill without re-subscribing the effect.
+  // running sweep animates its curve overlay. Curves live in a ref so the tick
+  // sees the previous fill without re-subscribing the effect.
+  //
+  // A run's curve is only frozen ("settled") after it has been fetched WITH its
+  // status already terminal. Caching on "terminal + we have something" was the
+  // measured bug: the copy we had was taken by the previous tick, while the run
+  // was still training, so every epoch trained between that tick and the end was
+  // dropped from the chart for good (up to a whole minute of them if the tab was
+  // backgrounded, since browsers throttle setInterval there). The loop writes the
+  // last metrics line BEFORE flipping status to done, so a fetch made once the
+  // status reads terminal always sees the complete file — one extra request per
+  // run, exactly once.
   useEffect(() => {
     if (!sel) return;
     let alive = true;
-    curvesRef.current = {}; setCurves({});
+    curvesRef.current = {}; setCurves({}); settledRef.current = new Set();
     const TERMINAL = new Set(["done", "cancelled", "failed"]);
     const load = async () => {
       let t: any;
@@ -73,11 +84,12 @@ export default function Sweeps() {
       setTrials(t);
       const runs = (t.trials || []).filter((r: any) => r.status);
       await Promise.all(runs.map(async (r: any) => {
-        if (TERMINAL.has(r.status) && curvesRef.current[r.run]?.length) return;
+        if (settledRef.current.has(r.run)) return;
         try {
           const m = await api.get(`/runs/${r.run}/metrics?since=0`);
           curvesRef.current[r.run] = m.records;
-        } catch { /* a run mid-write or just gone: keep what we had */ }
+          if (TERMINAL.has(r.status)) settledRef.current.add(r.run);
+        } catch { /* a run mid-write or just gone: keep what we had, retry next tick */ }
       }));
       if (alive) setCurves({ ...curvesRef.current });
     };
