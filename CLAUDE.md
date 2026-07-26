@@ -50,6 +50,15 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    así que un grupo con réplicas a distinta altura fingía converger al final. Se corta donde
 >    faltan réplicas y se dice dónde.
 >
+> **Regresión propia detectada por el usuario y arreglada el mismo día:** cambiar `studies.delta`
+> de número a cadena dejaba **Estudios en blanco** al abrir un estudio con un paso sin confirmar
+> (el 0 recordado del navegador llegaba a `delta.trim()`). Dos capas: `usePersistedState` **rechaza
+> un valor recordado cuyo tipo no encaje con el default** (deriva de esquema, no preferencia — mata
+> toda la familia), y hay **error boundary por ruta**: una pantalla que revienta ya no borra la app,
+> muestra la razón y ofrece olvidar las preferencias. `verify_ui.py` siembra el valor viejo y hace
+> click en TODOS los estudios. **Lección: una página en blanco es el fallo silencioso definitivo —
+> verificar en la UI, no solo con tests.**
+>
 > UI nueva: columnas «época»/«última» en el ranking, aviso cuando `monitor != objective` (el caso
 > de los tres recorridos vivos), y componente `WinnerVerdict` — **Recorridos estrena veredicto**,
 > antes esa pantalla no mostraba ganador ninguno. Los CLIs (`fv-oat`, `fv-sweep`, `fv-study`) lo
