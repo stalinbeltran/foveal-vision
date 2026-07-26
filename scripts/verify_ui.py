@@ -71,10 +71,32 @@ def main() -> int:
             page.wait_for_selector("[data-testid=compat]", timeout=15000)
         check(page, "/train", "text=nombre del run", "06-entrenar", train_extra)
 
-        # Recorridos: table + select a done sweep -> trials ranking; (9) block live
+        # Recorridos: table + select a done sweep -> trials ranking, verdict and
+        # curve overlay; (9) block live
         def sweeps_extra(page):
-            page.click("[data-testid=sweeps-table] tbody tr:has-text('test4-s0-n_layers')")
+            page.click("[data-testid=sweeps-table] tbody tr:has-text('fast-lr-2-s0-lr')")
             page.wait_for_selector("[data-testid=trials-table]", timeout=15000)
+            # the ranking describes the CHECKPOINT: the epoch column says which
+            # epoch each value came from, and the monitor/objective mismatch is
+            # announced instead of left for the reader to discover
+            page.wait_for_selector("[data-testid=trials-table] th:has-text('época')", timeout=5000)
+            page.wait_for_selector("[data-testid=monitor-mismatch]", timeout=5000)
+            # the verdict: mean ± band per axis value, δ from the seeds, and the
+            # technical tie declared out loud (this sweep ties all six lr values)
+            page.wait_for_selector("[data-testid=sweep-winner]", timeout=20000)
+            page.wait_for_selector("[data-testid=winner-verdict]:has-text('Empate técnico')",
+                                   timeout=10000)
+            page.wait_for_selector("[data-testid=winner-table]", timeout=5000)
+            page.screenshot(path=str(SHOTS / "07d-recorridos-veredicto.png"), full_page=True)
+            # curves: both modes, and hide/show all
+            page.wait_for_selector("[data-testid=sweep-curves] svg", timeout=15000)
+            page.click("button:has-text('media ± banda')")
+            page.wait_for_timeout(400)
+            page.screenshot(path=str(SHOTS / "07e-recorridos-banda.png"), full_page=True)
+            page.click("button:has-text('ocultar todo')")
+            page.wait_for_timeout(200)
+            page.click("button:has-text('mostrar todo')")
+            page.click("button:has-text('líneas por run')")
             page.fill("input[placeholder='0.5, 1.0']", "0.5, 1.0")
             objetivo = page.locator("label.field", has_text="objetivo").locator("select")
             objetivo.select_option("loss")

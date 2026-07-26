@@ -42,6 +42,7 @@ type Entity = {
   // one of the two shapes, by mode:
   records?: Records;                                    // lines
   metrics?: Record<string, { mean: [number, number][]; band: [number, number, number][] }>;  // band
+  cutAt?: number;   // last epoch where ALL replicas of the group have data
 };
 
 export function SweepCurves(props: { trials: { trials: Trial[] }; curves: Record<string, Records> }) {
@@ -70,12 +71,24 @@ export function SweepCurves(props: { trials: { trials: Trial[] }; curves: Record
     });
     const list = [...groups.values()].sort((a, b) => a.key.localeCompare(b.key));
     return list.map((g, gi) => {
+      // The band is only honest where EVERY replica of the group has reached the
+      // epoch. Averaging whatever happens to be present makes the band narrow by
+      // itself at the right edge (fewer seeds = less spread) and the mean jump —
+      // it reads as "the seeds converge at the end" when it only means "some runs
+      // are not there yet". So cut at the last epoch all of them reached, and say
+      // where the cut is instead of drawing a shrinking tail.
+      const lastOf = (t: Trial) => {
+        const recs = curves[t.run] || [];
+        return recs.length ? recs[recs.length - 1].epoch : 0;
+      };
+      const cutAt = Math.min(...g.members.map(lastOf));
+      const maxSeen = Math.max(...g.members.map(lastOf));
       const metrics: Entity["metrics"] = {};
       METRICS.forEach((m) => {
         const byEpoch = new Map<number, number[]>();
         g.members.forEach((t) => (curves[t.run] || []).forEach((r) => {
           const v = m.get(r);
-          if (v == null) return;
+          if (v == null || r.epoch > cutAt) return;
           if (!byEpoch.has(r.epoch)) byEpoch.set(r.epoch, []);
           byEpoch.get(r.epoch)!.push(v);
         }));
@@ -84,17 +97,22 @@ export function SweepCurves(props: { trials: { trials: Trial[] }; curves: Record
         const band: [number, number, number][] = [];
         epochs.forEach((e) => {
           const vs = byEpoch.get(e)!;
+          // a metric missing in SOME replica of an otherwise complete epoch
+          // (pos_err_px can be null) is the same problem one level down
+          if (vs.length < g.members.length) return;
           mean.push([e, vs.reduce((a, b) => a + b, 0) / vs.length]);
           band.push([e, Math.min(...vs), Math.max(...vs)]);
         });
         metrics![m.key] = { mean, band };
       });
-      return { id: g.key, label: g.label, color: colorOf(gi), n: g.members.length, metrics };
+      return { id: g.key, label: g.label, color: colorOf(gi), n: g.members.length,
+               metrics, cutAt: maxSeen > cutAt ? cutAt : undefined };
     });
   }, [rows, curves]);
 
   const entities = mode === "lines" ? lineEntities : bandEntities;
   const visible = entities.filter((e) => !hidden.has(e.id));
+  const cutGroups = visible.filter((e) => e.cutAt != null);
 
   const toggle = (id: string) => setHidden((h) => {
     const n = new Set(h);
@@ -141,7 +159,18 @@ export function SweepCurves(props: { trials: { trials: Trial[] }; curves: Record
       <p className="sub" style={{ margin: "0 0 10px" }}>
         {mode === "lines"
           ? "Una línea por run; pasa el ratón por la leyenda para resaltar, o oculta lo que estorbe."
-          : "Agrupado por config (misma red/receta, distinta semilla): línea media, sombra = min–max."}
+          : "Agrupado por config (misma red/receta, distinta semilla): línea media, sombra = min–max. " +
+            "La banda se corta donde deja de haber TODAS las réplicas — si no, se estrecharía sola."}
+        {mode === "band" && cutGroups.length ? (
+          <span data-testid="band-cut">{" "}
+            <strong>{cutGroups.length}</strong>{" "}
+            {cutGroups.length === 1 ? "grupo cortado" : "grupos cortados"} por réplicas
+            aún en marcha:{" "}
+            <span className="mono">
+              {cutGroups.map((e) => `${e.label} (hasta ep ${e.cutAt})`).join(" · ")}
+            </span>.
+          </span>
+        ) : null}
       </p>
       <div className="row" style={{ gap: 18 }}>
         {METRICS.map((m) => (
