@@ -226,6 +226,49 @@ def holdout(world):
             "manifest": manifest}
 
 
+def test_holdout_touch_is_recorded(trained, holdout):
+    """§6.4.2 / F14 — «una sola vez» has to be a checkable FACT, not a promise.
+
+    The second look is the dangerous one: it comes from cache, so it is free and
+    used to leave no trace at all. It must leave a line too."""
+    from fv.task import holdout_touches, task_score
+
+    assert holdout_touches(trained["run"], trained["store"]) == []
+    first = task_score(trained["run"], "test", window_dataset=holdout["dataset"],
+                       store=trained["store"])
+    assert first["cached"] is False and first["holdout_touches"] == 1
+
+    second = task_score(trained["run"], "test", window_dataset=holdout["dataset"],
+                        store=trained["store"])
+    assert second["cached"] is True, "el segundo vistazo tiene que venir de cache"
+    assert second["holdout_touches"] == 2, "un vistazo cacheado sigue siendo un vistazo"
+
+    lines = holdout_touches(trained["run"], trained["store"])
+    assert len(lines) == 2
+    assert [ln["from_cache"] for ln in lines] == [False, True]
+    for ln in lines:                       # each line stands on its own
+        assert ln["window_dataset"] == holdout["dataset"]
+        assert ln["source"] == holdout["source"]
+        assert ln["split"] == "test" and ln["images"] == 6
+        assert ln["f1"] == first["macro"]["f1"] and ln["knobs"] and ln["when"]
+
+    # scoring against its OWN val is not a holdout look and writes nothing
+    task_score(trained["run"], "val", store=trained["store"])
+    assert len(holdout_touches(trained["run"], trained["store"])) == 2
+
+
+def test_holdout_is_recognised_by_flag_over_name(world):
+    """The explicit `"holdout": true` wins in BOTH directions: a convention must
+    never override a statement, or a source could not opt out of its own name."""
+    from fv.task import is_holdout_source
+    assert is_holdout_source("local/foo-holdout") is True
+    assert is_holdout_source("local/foo") is False
+    assert is_holdout_source("local/foo", {"holdout": True}) is True
+    assert is_holdout_source("local/foo-holdout", {"holdout": False}) is False
+    # a dataset.json without the field falls back to the convention
+    assert is_holdout_source("local/foo-holdout", {"count": 10}) is True
+
+
 def test_task_score_scores_another_dataset(trained, holdout):
     """§6.3: with `window_dataset=<other B>` the payload names THAT dataset and
     THAT source — the number must say what it measured, or it is unreadable."""

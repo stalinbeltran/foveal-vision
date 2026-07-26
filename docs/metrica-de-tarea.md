@@ -1,13 +1,23 @@
 # La métrica de tarea: cablearla, dimensionarla y usarla
 
-> **Estado: FASES 1 y 2 HECHAS (2026-07-26). 3b, 3 y 4 pendientes.** La Fase 1 (validar el
-> proxy) está medida — sus números están en §2 y son la razón de que el resto tenga esta forma.
-> La **Fase 2 está construida y verificada**: `fv.task.task_score`, `GET /runs/{name}/task-score`,
-> bloque en el detalle de un run, botón en el veredicto de Recorridos, `fv-oat --task-score` /
-> `fv-study --task-score`, 8 tests (7 de §3.9 + el contrato ⑬). Detalle de lo construido y de las
-> desviaciones, al final de §3. Las fases **3b, 3 y 4** siguen pendientes: este documento las
-> especifica para que otra sesión las implemente sin volver a decidir nada. Lo que queda abierto
-> está marcado como **DECISIÓN DEL USUARIO** y no se toma solo (decisiones.md).
+> **Estado (2026-07-26): FASES 1, 2 y 3b HECHAS. La 3 aplazada por decisión del usuario (F11); la
+> 4 tiene todo el código escrito y espera el dato.**
+>
+> - **Fase 1** — el proxy de ventana validado en un eje de **D** (§2): Spearman agregado +0,956.
+> - **Fase 2** — `task_score` cableada (§3): módulo `fv.task`, contrato ⑬, API, UI, los dos CLIs.
+> - **Fase 3b** — ✅ **el proxy vale TAMBIÉN para C** (§2 bis): sobre el eje `d`, Spearman agregado
+>   **+1,000**, mismo ganador, dentro de la frontera δ. **`OBJECTIVES` no cambia y §5.5 no se
+>   ejecuta.** De regalo, la media respuesta a §9.9: **la periferia no está aportando** (§2 bis.1).
+> - **Fase 3** — ⏸ aplazada: **F11 cerrada, no se regenera el dato por ahora**. Se sigue con 20
+>   imágenes de val y la métrica de tarea queda como *informe del ganador*, nunca como criterio
+>   para elegir entre puntos. §4 conserva toda la aritmética para reabrirla.
+> - **Fase 4** — 🟡 el **código está hecho y probado** (selectores de dataset/split, las guardas, el
+>   registro de F14, 5 tests); falta **la fuente**, que depende de F11.
+> - **§9** — 8 de las 10 pruebas hechas, ninguna entrenando nada salvo la 3b. Dos **corrigen** al
+>   documento (§9.4: la sd sube; §9.2: los tres defaults de F están mal). Quedan 9.8 (no hacer
+>   hasta que duela) y 9.9 (bloqueada por F12, pero §2 bis.1 la contesta a medias).
+>
+> Lo que quede abierto va marcado como **DECISIÓN DEL USUARIO** y no se toma solo (decisiones.md).
 
 Documento hermano de [protocolo.md](protocolo.md) §2, que fija *qué* métrica manda. Este fija
 **cómo se construye, cuánto cuesta y qué hace falta para que sirva**.
@@ -77,6 +87,84 @@ muestra efectivo lo dan las imágenes, no las ventanas*.
 
 **Script de referencia**: la medición se hizo con un script de un solo uso; la Fase 2 lo
 convierte en código de primera clase y §5 lo repite sobre un eje de C.
+
+---
+
+## 2 bis. Fase 3b — HECHA (2026-07-26): **el proxy vale también para C**
+
+**Fecha:** 2026-07-26 · **Dataset:** `dirty-paragraphs-fast-80px` (20 imágenes de val) ·
+**Recorrido:** `proxy-c-d` · **Eje:** `d` (submuestreo de la periferia, dominio **C**) ·
+**6 valores × 5 semillas = 30 runs**, 20 épocas, receta `corta`, objetivo de ventana `f1`, monitor
+`val_loss` · **knobs de F por defecto** (los mismos que §2, a propósito: si no, las dos
+correlaciones no serían comparables — ver §9.2 y F15).
+
+| `d` | ventana (f1) | sem entre semillas | **tarea** (macro F1) | periferia real | entrada | s/época |
+|---|---|---|---|---|---|---|
+| 1 | 0,6213 | 0,0219 | 0,5421 | 2 px | 20 | 7,2 |
+| **2** | **0,6244** | 0,0153 | **0,5533** | 4 px | 24 | 8,8 |
+| 3 | 0,6089 | 0,0125 | 0,5065 | 6 px | 28 | 8,6 |
+| 4 | 0,5965 | 0,0131 | 0,4958 | 8 px | 32 | 7,1 |
+| 5 | 0,6112 | 0,0104 | 0,5342 | 10 px | 36 | 7,0 |
+| 6 | 0,6063 | 0,0112 | 0,4974 | 12 px | 40 | 7,0 |
+
+| | valor |
+|---|---|
+| **Spearman agregado** (n = 6 puntos) | **+1,000** — orden idéntico, punto por punto |
+| Spearman por run (n = 30) | +0,257 |
+| ganador por ventana | `d = 2` |
+| **ganador por tarea** | **`d = 2`** — el mismo |
+| frontera δ = 0,0153 (1-SE de las semillas del mejor) | `d ∈ {2, 1, 5}` → el ganador por tarea **cae dentro** |
+
+**VEREDICTO: ✅ el proxy de ventana ordena igual que la tarea también en un eje de C.** Se cumplen
+las dos condiciones de §5.4 (agregado ≥ 0,90 y ganador por tarea dentro de la frontera δ).
+**`OBJECTIVES` no cambia** y §5.5 **no se ejecuta**. El criterio estaba escrito antes de mirar, y
+es comprobable: las constantes `SPEARMAN_PASS`/`MIN_POINTS` viven en `scripts/proxy_vs_task.py`,
+commiteado **antes** de que el recorrido terminara (protocolo.md §1).
+
+**Las tres reservas, que hay que decir siempre que se cite esto:**
+
+1. **El eje separa poco.** La amplitud de la métrica de ventana en los 6 puntos es **0,0278**
+   (contra 0,52 en el eje `lr` de §2), y δ = 0,0153 se come **3 de los 6 puntos**. Por eso el
+   Spearman **por run** se hunde a +0,257: no es que el proxy falle, es que el ruido por run
+   (±0,09) es tres veces la señal que hay que ordenar. El agregado sobre 5 semillas la recupera.
+2. **+1,000 con n = 6 es fuerte pero corto.** Un orden exacto entre 6 puntos tiene 1/720 de salir
+   por azar, así que es señal de verdad — pero **6 puntos son 6 puntos**. Lo que este resultado
+   descarta con confianza es que el proxy **invierta** el orden al mover la geometría, que era el
+   miedo concreto de protocolo.md §2; no demuestra que coincidan en cualquier eje de C.
+3. **Un solo eje de C.** `d` cambia cuánto contexto ve la red **sin tocar la fóvea**. Ejes que
+   muevan kernels, strides o `n_layers` siguen sin medirse — aunque son los que menos tocan «la
+   regla de mirar», así que el riesgo es menor que el de `d`.
+
+### 2 bis.1 El hallazgo colateral: **la periferia no está aportando** (media respuesta a §9.9)
+
+Es el resultado que más dice sobre el proyecto, y sale gratis de este mismo recorrido. `d` es
+exactamente el mando del contexto periférico: de `d=1` (2 px de periferia real) a `d=6` (12 px).
+
+- El máximo está en **`d = 2`**, es decir **4 px de contexto**, y `d = 1` —casi sin periferia— queda
+  **segundo** en las dos métricas.
+- A partir de ahí **más contexto es peor**: `d = 6` (12 px) es de los últimos en ventana y en tarea.
+- El coste **no es la explicación**: los s/época apenas se mueven (7,0–8,8), así que el contexto
+  extra es prácticamente gratis y **aun así no se paga**.
+- ⚠ **Honestidad sobre la fuerza del efecto:** mejor − peor en tarea son **0,0576 = 1,43 SE** de la
+  media de 5 semillas (±0,0403). Y `d = 5` rompe la tendencia (0,5342, por encima de `d=4` y
+  `d=6`), que es justo el aspecto que tiene el ruido de 1,4 SE. **No se puede afirmar «la periferia
+  estorba»; sí se puede afirmar «la periferia no está ayudando de forma medible».**
+
+**Qué se hace con esto:** protocolo.md §6 y F12 preguntan si fóvea+periferia gana a una CNN plana
+equivalente. Este recorrido dice que, **en este dataset y con esta geometría, el margen que ese
+experimento podría encontrar es pequeño o nulo** — y lo dice sin construir el control que F12
+bloquea. Es información que vale antes de invertir en la comparación. Ojo: encaja con §9.1 y §9.3
+(el techo de detección es ~0,66 y el cuello es la red), y con que el dataset sea de 80×60 px, donde
+12 px de periferia son un quinto de la imagen.
+
+**Reproducirlo:**
+
+```powershell
+.\.venv\Scripts\python.exe scripts\proxy_vs_task.py --sweep proxy-c-d --split val
+```
+
+Detalle completo por run y por punto en `data/proxy-c-d-3b.json` (comiteado: son ~30 números, no
+carga).
 
 ---
 
@@ -461,9 +549,15 @@ primer experimento, que hoy no se puede construir (`no_periphery`).
 
 ---
 
-## 5. Fase 3b — PENDIENTE: repetir la validación del proxy sobre un eje de C
+## 5. Fase 3b — HECHA (2026-07-26): la receta que se siguió
 
-Es la fase **más barata y la que más puede cambiar el plan**, y por eso va antes que la 4.
+> **El resultado está en [§2 bis](#2-bis-fase-3b--hecha-2026-07-26-el-proxy-vale-también-para-c):
+> ✅ pasa, Spearman agregado +1,000, mismo ganador.** Lo que sigue es la receta tal como se escribió
+> antes de ejecutarla; se conserva porque **§5.5 sigue siendo la lista de lo que habría que tocar**
+> si algún día otro eje de C la contradice, y porque §5.1/§5.2/§5.3 documentan cómo repetirlo.
+> Coste real: **30 runs en ~68 min** de CPU (contra los ~70 min estimados), 12 s de análisis.
+
+Era la fase **más barata y la que más podía cambiar el plan**, y por eso fue antes que la 4.
 
 **Por qué:** §2 validó el proxy sobre `lr` (D). Un eje de C cambia **la vista foveada**, es decir
 la regla de mirar. protocolo.md §2 es explícito: *aquí se barre C, así que ninguna métrica de
@@ -684,16 +778,24 @@ Invoke-RestMethod ("http://localhost:8010/runs/<ganador>/task-score" +
    tiene sentido: `TaskScore` lo recibe por prop `chooser`, y el **veredicto de Recorridos no lo
    lleva** — allí se mide el val del ganador, y ofrecer apuntar al holdout mientras aún se está
    eligiendo sería justo lo que el protocolo prohíbe.
-2. **Registro de que se tocó.** El protocolo dice «una sola vez», y hoy nada lo recuerda: la caché
-   hace que la segunda llamada sea gratis e invisible. Propuesta concreta: al puntuar contra un B
-   cuyo `source_id` acaba en `-holdout` (o marcado como tal en su `dataset.json`), **anexar una
-   línea a `runs/<run>/holdout.jsonl`** con `{when, window_dataset, split, macro.f1, sem, knobs}`.
-   Así «cuántas veces se ha mirado el holdout» es un hecho comprobable, no una promesa.
-   ⚠ **Es una decisión de diseño, no un detalle**: convierte una caché pura en algo que escribe
-   en el artefacto del run. Decidirla explícitamente antes de escribirla.
-3. **Marcar la fuente como holdout.** Hoy la única señal es el nombre. Alternativa robusta:
-   un campo `"holdout": true` en el `dataset.json` de la fuente, y que la guarda lo lea. Mientras
-   no exista, el convenio de nombre `-holdout` es lo único que hay — **escribirlo en el README**.
+2. **Registro de que se tocó — HECHA (2026-07-26, F14 decidida por el usuario).**
+   `fv.task.record_holdout_touch` anexa una línea a **`runs/<run>/holdout.jsonl`** por cada
+   medición contra un B de holdout, con `{when, window_dataset, source, split, images, f1, sem,
+   knobs, checkpoint, from_cache}`. **Se escribe también cuando el número sale de caché** — ese era
+   el punto: el segundo vistazo es gratis, y por eso era el invisible. `task_score` devuelve
+   `holdout_touches` (el conteo) y la UI lo enseña en ámbar sobre el propio bloque, porque un
+   registro que nadie abre no vigila nada.
+   El registro es **append-only y no bloquea**: dice cuántas veces se ha mirado, no impide mirar.
+   Convertir la caché en algo que escribe en el artefacto del run era la parte que había que
+   decidir, y está decidida.
+3. **Marcar la fuente como holdout — HECHA (2026-07-26).** Qué cuenta como holdout lo dice **una
+   sola función**, `fv.task.is_holdout_source(source_id, source_meta)`, con dos señales: el campo
+   **`"holdout": true`** del `dataset.json` de la fuente y, como respaldo, el convenio de nombre
+   **`-holdout`**. El campo explícito **manda en los dos sentidos** — una fuente puede declararse
+   *no* holdout pese a su nombre, porque un convenio jamás debe pisar una afirmación. El
+   `dataset.json` se lee con `fv.datasets.loader.source_meta`, el **mismo** lector que
+   `discover_sources` (antes eran dos: se unificó al escribir esto).
+   Ambas señales están en el README.
 
 ### 6.5 Tests de esta fase — **los tres primeros ESCRITOS y en verde (2026-07-26)**
 
@@ -702,48 +804,72 @@ Invoke-RestMethod ("http://localhost:8010/runs/<ganador>/task-score" +
 | `test_task_score_scores_another_dataset` | Con `window_dataset=<otro B>` (otra fuente) puntúa y el payload dice **ese** dataset y **esa** fuente | ✅ |
 | `test_holdout_dataset_can_be_100_percent_test` | `val_frac=0, test_frac=1` → `split.json` mete todas las imágenes en `test`, y `check_run` lo rechaza para entrenar (`no_validation_split`) | ✅ |
 | `test_task_score_on_holdout_ignores_the_run_fingerprint` | Reconstruido el B **del run**, puntuar contra el holdout **sigue funcionando** (esa huella no protege este número) | ✅ |
-| `test_holdout_touch_is_recorded` | Solo si se implementa 6.4.2: dos llamadas dejan dos líneas, aunque la segunda salga de caché | ⛔ F14 |
+| `test_holdout_touch_is_recorded` | Dos llamadas dejan dos líneas, **y la segunda sale de caché** — más: puntuar el val propio no escribe nada | ✅ |
+| `test_holdout_is_recognised_by_flag_over_name` | El campo `"holdout"` gana al nombre **en los dos sentidos** | ✅ |
 
-Los tres verdes viven en `tests/test_task.py` con una fixture `holdout` que construye **una segunda
-fuente y un B 100 % test** sobre ella — así el camino del holdout queda fijado **antes** de que
-exista el dato real, y el día que la fuente exista no hay que re-deducir nada. El cuarto depende de
-F14 y no se escribe hasta que se decida.
+Viven en `tests/test_task.py` con una fixture `holdout` que construye **una segunda fuente y un B
+100 % test** sobre ella — así el camino del holdout queda fijado **antes** de que exista el dato
+real, y el día que la fuente exista no hay que re-deducir nada.
 
 **Lo que queda de la Fase 4 es, literalmente, la fuente**: una corrida del generador hermano con la
-misma receta y otra semilla, más el resize (§4.3, F13). Todo lo demás está construido y probado.
+misma receta y otra semilla, más el resize (§4.3, F13) — **aparcado con F11**. Todo el código está
+construido y probado.
 
 ---
 
 ## 7. Orden recomendado y coste
 
-| Fase | Qué | Coste (medido donde se pudo) | Bloquea a | ¿Decisión del usuario? |
-|---|---|---|---|---|
-| ~~2~~ | ~~Cablear `task_score` (§3)~~ — **HECHA 2026-07-26** | — | — | — |
-| **3b** | Validar el proxy sobre el eje `d` (§5) | **~70 min** de CPU (30 runs × 140 s medidos) + `spearman` (~30 líneas + test) + el script (~120 líneas) + **12 s** de medición | la decisión de cambiar el objetivo de ranking | No: el criterio ya está escrito (§5.4) |
-| **3** | Regenerar el dato (§4) | Ruta A: corrida larga del generador hermano **+ el resize, que no está portado** (§4.3) + reentrenar lo que importe | que la métrica de tarea pueda **decidir** entre puntos | **Sí (F11)**, y además **por qué ruta** |
-| **4** | Holdout (§6) | Otra corrida del generador (~500 imágenes) + 3 piezas pequeñas de código (§6.4) | el número que se **reporta** | Sí: el registro de «se tocó» (§6.4.2) |
+| Fase | Qué | Coste real | Estado |
+|---|---|---|---|
+| ~~2~~ | ~~Cablear `task_score` (§3)~~ | — | ✅ **HECHA 2026-07-26** |
+| ~~3b~~ | ~~Validar el proxy sobre el eje `d` (§5)~~ | **68 min** de CPU (30 runs) + `spearman` + el script + **12 s** de análisis | ✅ **HECHA 2026-07-26 → §2 bis: PASA (+1,000)** |
+| **3** | Regenerar el dato (§4) | Ruta A: corrida larga del generador hermano + el resize, no portado (§4.3) | ⏸ **APLAZADA (F11 cerrada 2026-07-26: no se regenera por ahora)** |
+| **4** | Holdout (§6) | El **código está hecho**; falta la fuente (~500 imágenes del generador hermano) | 🟡 **CÓDIGO HECHO** (UI, guardas, registro F14, 5 tests); **bloqueada por el dato, con F11** |
 
-**La 3b se puede hacer con el dato de hoy y es la que más puede cambiar el plan** — por eso va
-primera. La 3 es la que cuesta comparabilidad. La 4 depende de la 3: el holdout debe salir de la
-**misma** receta que la fuente de entrenamiento que se acabe usando; generarlo antes de decidir la
-3 es tirar una corrida del generador.
+**Cómo queda el plan tras las decisiones del 2026-07-26:**
+
+- La **3b pasó**: el proxy de ventana ordena igual que la tarea también en un eje de C, así que
+  `OBJECTIVES` no cambia y **§5.5 no se ejecuta**. El ranking barato se queda.
+- La **3 se aplaza** (F11): se sigue con 20 imágenes de val, y la métrica de tarea es **informe del
+  ganador**, nunca criterio para elegir entre puntos. La UI y los CLIs ya lo dicen en pantalla
+  siempre que n < 100. Se reabre cuando el ruido estorbe de verdad — la aritmética de §4.1 está
+  lista para rehacer la cuenta.
+- La **4 queda con todo el código escrito y probado** y solo esperando su fuente, que depende de la
+  3. Esto es a propósito: fijar el camino con tests **antes** de tener el dato es lo que evita
+  re-deducirlo el día que aparezca.
+- Los **knobs de F no se tocan** (F15): la medición de §9.2 queda registrada para cuando se reabra.
+
+**Lo que sigue teniendo más valor por CPU gastada** (ninguna es de este documento):
+
+1. **La red es el cuello de botella** — §9.1 (techo 0,97) y §9.3 (techo de **detección** ~0,66) lo
+   dicen a coro. El trabajo está en detectar esquinas, no en reconstruir párrafos.
+2. **La periferia no está aportando de forma medible** (§2 bis.1). Antes de invertir en el control
+   de F12, conviene saber si eso cambia con otra fóvea o con otro dataset.
+3. **Las 7 imágenes que fallan siempre** (§9.5): un modo de fallo concreto que mirar con
+   Diagnóstico/Predecir, y que vale más que cualquier décima de F1 promedio.
 
 ---
 
-## 8. Resumen para quien implemente esto en frío
+## 8. Resumen para quien lea esto en frío
 
-1. La Fase 2 ya existe: `src/fv/task/__init__.py` (es `fv/diagnostics/table.py` con «por imagen»
-   en vez de «por ventana» y con la verdad viniendo de A). Léelo antes de tocar métricas.
-2. No añadas `paragraph_f1` a `OBJECTIVES` todavía. §2 dice por qué, con números — y §5.5 dice
-   todo lo que habría que tocar además de esa línea (el ranking se quedaría en `None` sin avisar).
-3. No regeneres el dataset sin preguntar (§4.7), y si se regenera, **lee §4.2 antes**: el dato de
-   verdad no lo hace el generador local.
+1. La Fase 2 existe: `src/fv/task/__init__.py` (es `fv/diagnostics/table.py` con «por imagen» en
+   vez de «por ventana» y con la verdad viniendo de A). Léelo antes de tocar métricas.
+2. **No añadas `paragraph_f1` a `OBJECTIVES`.** §2 (eje de D) y §2 bis (eje de C) miden que el
+   proxy barato **ordena igual**, así que no hay nada que ganar y sí un coste que pagar. §5.5
+   sigue ahí como la lista de lo que habría que tocar el día que algún eje lo contradiga — y su
+   punto 2 es el que rompe en silencio (el ranking se quedaría en `None` sin avisar).
+3. **No regeneres el dataset**: F11 está cerrada en «no por ahora». Si se reabre, **lee §4.2
+   antes** — el dato de verdad no lo hace el generador local, y el resize no está portado (F13).
 4. Los knobs de F entran en la clave de caché; el `threshold` de diagnostics **no** entra en la
    suya. No es una incoherencia: allí re-umbralizar lee scores guardados, aquí hay que re-inferir.
+   Y **no los cambies** sin reabrir F15, aunque §9.2 mida que los defaults son malos: mover uno
+   mueve todos los números reportados y la caché no avisa.
 5. Todo número que salga de aquí viaja con su `sem` y su n de imágenes. Un F1 de tarea sin banda
-   es exactamente el error que este proyecto acaba de arreglar en el ranking.
-6. Casi todo lo de §9 **no necesita entrenar nada**: son preguntas que los 130 runs de disco ya
-   pueden contestar. Empieza por ahí antes de gastar CPU.
+   es exactamente el error que este proyecto arregló en el ranking. El `sem` está **validado por
+   bootstrap** (§9.6), así que puedes fiarte de él: lo que falta es `n`, no fórmula.
+6. Casi todo lo de §9 **no necesita entrenar nada** — 8 de 10 hechas así. Si buscas la siguiente
+   pregunta que valga la pena, mira el final de §7: la respuesta corta es **la red detecta mal las
+   esquinas**, y ahí es donde hay 0,33 de F1 sobre la mesa.
 
 ---
 

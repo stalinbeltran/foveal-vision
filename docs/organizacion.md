@@ -407,9 +407,18 @@ Consecuencias que el módulo hace explícitas:
   re-lee un score guardado.
 - **Holdout** (protocolo.md §3): se puede puntuar contra **otro** B (`window_dataset=…`), y si
   ese B comparte `source_id` con el de entrenamiento se rechaza (`holdout_shares_source`) —
-  porque entonces no es un holdout.
+  porque entonces no es un holdout. Cuando el B es otro, la **huella no aplica**: esa huella
+  protege el split del run, no el del holdout.
+- **La única escritura** (F14, 2026-07-26): puntuar contra un holdout **anexa una línea a
+  `runs/<run>/holdout.jsonl`**, también cuando el número sale de caché. Es la excepción declarada
+  a «esto es una caché»: sin ella, «el holdout se mira una vez» es una promesa incomprobable,
+  porque la segunda mirada es gratis e invisible. Es append-only y **no bloquea nada** — registra.
+  Qué cuenta como holdout lo dice una sola función (`fv.task.is_holdout_source`): el campo
+  `"holdout"` del `dataset.json` de la fuente manda **en los dos sentidos**, y el nombre
+  `-holdout` es el respaldo. Un convenio no pisa una afirmación.
 - **No es el objetivo del ranking** (`OBJECTIVES` no la incluye) y **no se calcula por época**:
-  medido, el proxy de ventana ordena igual en ejes de D (metrica-de-tarea.md §2).
+  medido, el proxy de ventana ordena igual en ejes de **D** (metrica-de-tarea.md §2, Spearman
+  agregado +0,956) **y de C** (§2 bis, sobre el eje `d`: **+1,000**, mismo ganador).
 
 ---
 

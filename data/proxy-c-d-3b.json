@@ -1,0 +1,461 @@
+{
+  "sweep": "proxy-c-d",
+  "split": "val",
+  "objective": "f1",
+  "direction": "max",
+  "axes": [
+    "d"
+  ],
+  "domain": "C (la red: cambia la vista foveada)",
+  "measured_at": "2026-07-26T18:35:07",
+  "spearman_per_run": 0.2565072302558398,
+  "spearman_aggregated": 1.0,
+  "criterion": {
+    "spearman_pass": 0.9,
+    "min_points": 4
+  },
+  "verdict": "pass",
+  "verdict_text": "OK: el proxy de ventana ordena igual que la tarea sobre d [C (la red: cambia la vista foveada)] (agregado +1.000 >= 0.9 y el ganador por tarea cae en la frontera). No se cambia nada; anotalo con su fecha y su dataset",
+  "delta": 0.015314299038248042,
+  "delta_source": "1-SE: error est\u00e1ndar de las 5 semillas del mejor punto",
+  "frontier": [
+    "{\"d\": 2}",
+    "{\"d\": 1}",
+    "{\"d\": 5}"
+  ],
+  "window_winner": {
+    "d": 2
+  },
+  "suggested": {
+    "d": 5
+  },
+  "task_winner": {
+    "d": 2
+  },
+  "task_winner_in_frontier": true,
+  "skipped_runs": [],
+  "per_run": [
+    {
+      "run": "proxy-c-d-0003-d1_seed4",
+      "point": {
+        "d": 1,
+        "seed": 4
+      },
+      "window": 0.6735197368421053,
+      "task": 0.4961904761904762,
+      "task_sem": 0.09005415352382934,
+      "images": 20,
+      "micro_f1": 0.5411764705882353
+    },
+    {
+      "run": "proxy-c-d-0004-d1_seed5",
+      "point": {
+        "d": 1,
+        "seed": 5
+      },
+      "window": 0.6734860883797055,
+      "task": 0.4633333333333334,
+      "task_sem": 0.08802245859082936,
+      "images": 20,
+      "micro_f1": 0.4337349397590361
+    },
+    {
+      "run": "proxy-c-d-0008-d2_seed4",
+      "point": {
+        "d": 2,
+        "seed": 4
+      },
+      "window": 0.6524822695035462,
+      "task": 0.5695238095238095,
+      "task_sem": 0.08290754091956602,
+      "images": 20,
+      "micro_f1": 0.588235294117647
+    },
+    {
+      "run": "proxy-c-d-0005-d2_seed1",
+      "point": {
+        "d": 2,
+        "seed": 1
+      },
+      "window": 0.6491372226787181,
+      "task": 0.5416666666666667,
+      "task_sem": 0.10601431548484053,
+      "images": 20,
+      "micro_f1": 0.5348837209302325
+    },
+    {
+      "run": "proxy-c-d-0013-d3_seed4",
+      "point": {
+        "d": 3,
+        "seed": 4
+      },
+      "window": 0.648171500630517,
+      "task": 0.6238095238095238,
+      "task_sem": 0.07797257926551553,
+      "images": 20,
+      "micro_f1": 0.6206896551724138
+    },
+    {
+      "run": "proxy-c-d-0023-d5_seed4",
+      "point": {
+        "d": 5,
+        "seed": 4
+      },
+      "window": 0.6434855467113532,
+      "task": 0.6052380952380952,
+      "task_sem": 0.08236704360543601,
+      "images": 20,
+      "micro_f1": 0.6436781609195403
+    },
+    {
+      "run": "proxy-c-d-0009-d2_seed5",
+      "point": {
+        "d": 2,
+        "seed": 5
+      },
+      "window": 0.6426451886392539,
+      "task": 0.525,
+      "task_sem": 0.09163476318822134,
+      "images": 20,
+      "micro_f1": 0.5060240963855421
+    },
+    {
+      "run": "proxy-c-d-0018-d4_seed4",
+      "point": {
+        "d": 4,
+        "seed": 4
+      },
+      "window": 0.6364406779661017,
+      "task": 0.61,
+      "task_sem": 0.0858769689798702,
+      "images": 20,
+      "micro_f1": 0.588235294117647
+    },
+    {
+      "run": "proxy-c-d-0028-d6_seed4",
+      "point": {
+        "d": 6,
+        "seed": 4
+      },
+      "window": 0.6294289287203001,
+      "task": 0.6285714285714286,
+      "task_sem": 0.08512187369337994,
+      "images": 20,
+      "micro_f1": 0.6823529411764706
+    },
+    {
+      "run": "proxy-c-d-0025-d6_seed1",
+      "point": {
+        "d": 6,
+        "seed": 1
+      },
+      "window": 0.6290115532734275,
+      "task": 0.5233333333333333,
+      "task_sem": 0.10466040879716954,
+      "images": 20,
+      "micro_f1": 0.5365853658536586
+    },
+    {
+      "run": "proxy-c-d-0014-d3_seed5",
+      "point": {
+        "d": 3,
+        "seed": 5
+      },
+      "window": 0.627568493150685,
+      "task": 0.5,
+      "task_sem": 0.08712429784425123,
+      "images": 20,
+      "micro_f1": 0.48780487804878053
+    },
+    {
+      "run": "proxy-c-d-0020-d5_seed1",
+      "point": {
+        "d": 5,
+        "seed": 1
+      },
+      "window": 0.6258445945945945,
+      "task": 0.45666666666666667,
+      "task_sem": 0.10709071412887103,
+      "images": 20,
+      "micro_f1": 0.4337349397590361
+    },
+    {
+      "run": "proxy-c-d-0029-d6_seed5",
+      "point": {
+        "d": 6,
+        "seed": 5
+      },
+      "window": 0.6120171673819743,
+      "task": 0.43166666666666664,
+      "task_sem": 0.0794526229790157,
+      "images": 20,
+      "micro_f1": 0.425
+    },
+    {
+      "run": "proxy-c-d-0015-d4_seed1",
+      "point": {
+        "d": 4,
+        "seed": 1
+      },
+      "window": 0.6056155507559395,
+      "task": 0.515,
+      "task_sem": 0.09110995221057283,
+      "images": 20,
+      "micro_f1": 0.5060240963855421
+    },
+    {
+      "run": "proxy-c-d-0006-d2_seed2",
+      "point": {
+        "d": 2,
+        "seed": 2
+      },
+      "window": 0.6031475967673331,
+      "task": 0.5635714285714286,
+      "task_sem": 0.09482068616795082,
+      "images": 20,
+      "micro_f1": 0.5348837209302325
+    },
+    {
+      "run": "proxy-c-d-0021-d5_seed2",
+      "point": {
+        "d": 5,
+        "seed": 2
+      },
+      "window": 0.6015657189946437,
+      "task": 0.4533333333333333,
+      "task_sem": 0.08952114324403647,
+      "images": 20,
+      "micro_f1": 0.4096385542168675
+    },
+    {
+      "run": "proxy-c-d-0001-d1_seed2",
+      "point": {
+        "d": 1,
+        "seed": 2
+      },
+      "window": 0.6005132591958938,
+      "task": 0.5983333333333334,
+      "task_sem": 0.08301606270274847,
+      "images": 20,
+      "micro_f1": 0.5783132530120482
+    },
+    {
+      "run": "proxy-c-d-0024-d5_seed5",
+      "point": {
+        "d": 5,
+        "seed": 5
+      },
+      "window": 0.6004319654427646,
+      "task": 0.5783333333333334,
+      "task_sem": 0.08632439159817647,
+      "images": 20,
+      "micro_f1": 0.5783132530120482
+    },
+    {
+      "run": "proxy-c-d-0016-d4_seed2",
+      "point": {
+        "d": 4,
+        "seed": 2
+      },
+      "window": 0.5966942148760331,
+      "task": 0.4276190476190476,
+      "task_sem": 0.08795972778978776,
+      "images": 20,
+      "micro_f1": 0.3809523809523809
+    },
+    {
+      "run": "proxy-c-d-0010-d3_seed1",
+      "point": {
+        "d": 3,
+        "seed": 1
+      },
+      "window": 0.5947826086956521,
+      "task": 0.4935714285714286,
+      "task_sem": 0.09399900396361172,
+      "images": 20,
+      "micro_f1": 0.5238095238095237
+    },
+    {
+      "run": "proxy-c-d-0012-d3_seed3",
+      "point": {
+        "d": 3,
+        "seed": 3
+      },
+      "window": 0.5925925925925927,
+      "task": 0.5569047619047619,
+      "task_sem": 0.0850920571681153,
+      "images": 20,
+      "micro_f1": 0.5542168674698795
+    },
+    {
+      "run": "proxy-c-d-0000-d1_seed1",
+      "point": {
+        "d": 1,
+        "seed": 1
+      },
+      "window": 0.5897887323943662,
+      "task": 0.6361904761904762,
+      "task_sem": 0.09514431472964087,
+      "images": 20,
+      "micro_f1": 0.6511627906976745
+    },
+    {
+      "run": "proxy-c-d-0017-d4_seed3",
+      "point": {
+        "d": 4,
+        "seed": 3
+      },
+      "window": 0.5889464594127806,
+      "task": 0.5478571428571428,
+      "task_sem": 0.09421219064417545,
+      "images": 20,
+      "micro_f1": 0.588235294117647
+    },
+    {
+      "run": "proxy-c-d-0026-d6_seed2",
+      "point": {
+        "d": 6,
+        "seed": 2
+      },
+      "window": 0.5865102639296188,
+      "task": 0.4166666666666667,
+      "task_sem": 0.09020768759138434,
+      "images": 20,
+      "micro_f1": 0.38554216867469876
+    },
+    {
+      "run": "proxy-c-d-0022-d5_seed3",
+      "point": {
+        "d": 5,
+        "seed": 3
+      },
+      "window": 0.5849139832377591,
+      "task": 0.5773809523809523,
+      "task_sem": 0.09737506952590504,
+      "images": 20,
+      "micro_f1": 0.6428571428571429
+    },
+    {
+      "run": "proxy-c-d-0011-d3_seed2",
+      "point": {
+        "d": 3,
+        "seed": 2
+      },
+      "window": 0.5816072908036454,
+      "task": 0.3583333333333333,
+      "task_sem": 0.09230242056471359,
+      "images": 20,
+      "micro_f1": 0.32098765432098764
+    },
+    {
+      "run": "proxy-c-d-0027-d6_seed3",
+      "point": {
+        "d": 6,
+        "seed": 3
+      },
+      "window": 0.5744680851063829,
+      "task": 0.48690476190476184,
+      "task_sem": 0.08623752506423153,
+      "images": 20,
+      "micro_f1": 0.5238095238095237
+    },
+    {
+      "run": "proxy-c-d-0007-d2_seed3",
+      "point": {
+        "d": 2,
+        "seed": 3
+      },
+      "window": 0.5743453173546383,
+      "task": 0.5669047619047619,
+      "task_sem": 0.08715817757051014,
+      "images": 20,
+      "micro_f1": 0.5476190476190477
+    },
+    {
+      "run": "proxy-c-d-0002-d1_seed3",
+      "point": {
+        "d": 1,
+        "seed": 3
+      },
+      "window": 0.5694261936049059,
+      "task": 0.5166666666666667,
+      "task_sem": 0.09957512078005516,
+      "images": 20,
+      "micro_f1": 0.5411764705882353
+    },
+    {
+      "run": "proxy-c-d-0019-d4_seed5",
+      "point": {
+        "d": 4,
+        "seed": 5
+      },
+      "window": 0.555006735518635,
+      "task": 0.3783333333333333,
+      "task_sem": 0.08180260794538684,
+      "images": 20,
+      "micro_f1": 0.36363636363636365
+    }
+  ],
+  "per_point": [
+    {
+      "point": {
+        "d": 2
+      },
+      "window": 0.6243515189886979,
+      "task": 0.5533333333333333,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.015314299038248042
+    },
+    {
+      "point": {
+        "d": 1
+      },
+      "window": 0.6213468020833954,
+      "task": 0.5421428571428571,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.021870320246106106
+    },
+    {
+      "point": {
+        "d": 5
+      },
+      "window": 0.611248361796223,
+      "task": 0.5341904761904762,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.010383962632143662
+    },
+    {
+      "point": {
+        "d": 3
+      },
+      "window": 0.6089444971746184,
+      "task": 0.5065238095238096,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.012451662031964131
+    },
+    {
+      "point": {
+        "d": 6
+      },
+      "window": 0.6062871996823407,
+      "task": 0.49742857142857144,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.011154262949659955
+    },
+    {
+      "point": {
+        "d": 4
+      },
+      "window": 0.596540727705898,
+      "task": 0.49576190476190474,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.013147485349653681
+    }
+  ]
+}

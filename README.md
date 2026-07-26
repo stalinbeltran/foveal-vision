@@ -231,26 +231,48 @@ eso está esperando decisión (F11 en [docs/decisiones.md](docs/decisiones.md)).
 El val hace **dos trabajos** —elegir `best.pt` y rankear—, así que el número del val del ganador
 está **sesgado al alza** y no se reporta como resultado. Para eso está el holdout: otro dataset de
 ventanas (B) extraído de una **fuente propia de la que jamás se entrena**. El camino está cableado
-de punta a punta; **lo que falta es la fuente**, que depende de F11/F13.
+de punta a punta y **verificado con un holdout real** (lo que falta para el holdout *de verdad* es
+la fuente buena, que depende de F11/F13 en [docs/decisiones.md](docs/decisiones.md)):
 
 ```powershell
-# el holdout es "todo test": asi no se puede usar para entrenar, ni por accidente
-.\.venv\Scripts\fv-extract.exe --source local/<fuente>-holdout --name <fuente>-holdout-b16 `
+# 1. una fuente propia, misma configuracion y OTRA semilla
+.\.venv\Scripts\python scripts\make_synth_source.py --name synth-01-holdout --count 60 --width 96 --height 72 --seed 4242
+
+# 2. el holdout es "todo test": asi no se puede usar para entrenar, ni por accidente
+.\.venv\Scripts\fv-extract.exe --source local/synth-01-holdout --name synth-01-holdout-b16 `
   --window-size 16 --stride 8 --val-frac 0 --test-frac 1 --seed 1
 
-Invoke-RestMethod ("http://localhost:8010/runs/<ganador>/task-score" +
-  "?window_dataset=<fuente>-holdout-b16&split=test") | ConvertTo-Json -Depth 3
+# 3. el numero
+Invoke-RestMethod ("http://localhost:8010/runs/fov-16-param/task-score" +
+  "?window_dataset=synth-01-holdout-b16&split=test") | ConvertTo-Json -Depth 3
 ```
+
+> **Ejecutado (2026-07-26)**, los tres pasos. El `fv-extract` responde
+> `splits: {'train': 0, 'val': 0, 'test': 5280}` y avisa por su cuenta:
+> *«AVISO: val vacio - este dataset no sirve para medir (entrenar se negara)»* — que aquí es la
+> propiedad que se busca. La llamada devuelve `f1 = 0,0278 ± 0,0159` sobre **60 imágenes**, fuente
+> `local/synth-01-holdout`, `holdout_touches = 1`; repetida sale `cached = true` y
+> `holdout_touches = 2`.
+>
+> ⚠ Ese 0,0278 es de un run de demo (`fov-16-param`) contra un holdout de juguete: lo verificado
+> aquí es **el camino**, no la calidad del modelo. Y las dos líneas que hay en
+> `runs/fov-16-param/holdout.jsonl` son las de esta verificación — se dejan a propósito: borrar un
+> registro incómodo es justo lo que este mecanismo existe para impedir.
 
 En la web app, el bloque de tarea del **detalle de un run** trae dos selectores (**dataset** y
 **split**); al elegir un dataset distinto del propio aparece el aviso de que **el holdout se toca
 una sola vez, al final y solo con el ganador**.
 
-> **Convenio, mientras no exista una marca en disco**: la única señal de que una fuente es holdout
-> es que su nombre acabe en **`-holdout`**. Un campo `"holdout": true` en su `dataset.json` sería
-> más robusto y está propuesto; hoy no existe (F14 en [docs/decisiones.md](docs/decisiones.md)
-> cubre además si se **registra** que el holdout se miró — hoy nada lo recuerda, y la caché hace
-> que la segunda mirada sea gratis e invisible).
+**Cada mirada al holdout queda anotada.** El protocolo dice «una sola vez» y hasta ahora nada lo
+recordaba: la caché hacía que el segundo vistazo fuese gratis **e invisible**. Ahora cada medición
+contra un holdout anexa una línea a `runs/<run>/holdout.jsonl` —**también cuando el número sale de
+caché**—, la respuesta trae `holdout_touches`, y la UI lo enseña en ámbar. Es **append-only**:
+registra miradas, nunca impide una.
+
+> **Qué cuenta como holdout** lo dice una sola función (`fv.task.is_holdout_source`), con dos
+> señales: el campo **`"holdout": true`** en el `dataset.json` de la fuente, y el convenio de nombre
+> **`-holdout`** como respaldo. El campo explícito **manda en los dos sentidos** — una fuente puede
+> declararse *no* holdout pese a su nombre, porque un convenio no debe pisar una afirmación.
 >
 > Lo que el código **sí** garantiza hoy, con test: un B que salga de **la misma fuente** que el de
 > entrenamiento se rechaza con `holdout_shares_source` (no sería un holdout, sería entrenamiento con

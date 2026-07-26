@@ -39,6 +39,18 @@ function One({ p }: { p: any }) {
         knobs (F): {Object.entries(p.knobs ?? {})
           .map(([k, v]) => `${k}=${v}`).join(" · ")}
       </div>
+      {p.holdout_touches ? (
+        // F14: the ledger only works if it is SEEN. "Once" is a rule nobody can
+        // check while the count lives in a file nobody opens.
+        <div className="sub" data-testid="task-holdout-touches"
+             style={{ margin: "2px 0 0", color: "var(--warn)" }}>
+          <strong>El holdout de este run se ha mirado {p.holdout_touches}{" "}
+          {p.holdout_touches === 1 ? "vez" : "veces"}</strong>{" "}
+          (queda anotado en <span className="mono">runs/{p.run}/holdout.jsonl</span>,
+          también cuando el número sale de caché). El protocolo dice una sola vez,
+          al final y solo con el ganador.
+        </div>
+      ) : null}
     </div>
   );
 }

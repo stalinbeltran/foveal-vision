@@ -58,6 +58,14 @@ cambiar uno cambia la reconstrucción entera y obliga a re-inferir — no es una
 `threshold` del diagnóstico, que solo re-lee scores guardados. Es carga: se ignora
 (`/data/cache/` ya está en `.gitignore`) y borrarlo solo cuesta tiempo.
 
+**`runs/<name>/holdout.jsonl`** (implementado, F14) — **la excepción a lo anterior, y la única**:
+un JSONL **append-only** con una línea por cada vez que se ha puntuado ese run contra un **holdout**
+(`{when, window_dataset, source, split, images, f1, sem, knobs, checkpoint, from_cache}`). No es
+caché: **se versiona**, porque es descripción y no carga (§5) y porque su valor entero está en que
+sobreviva. Se escribe **también cuando el número salió de caché** — protocolo.md §3 dice que el
+holdout se mira una sola vez, y el vistazo cacheado era precisamente el que no dejaba rastro.
+Borrarlo **sí** pierde algo: es la única prueba de cuántas veces se miró. Registra, nunca bloquea.
+
 ## 4. Los artefactos
 
 ### 4.1 `data/window-datasets/<name>/` — el dataset de ventanas (B)

@@ -61,9 +61,18 @@ su coste.
 > §2.** Sobre los 65 runs de `fast-lr-s0-lr` (13 valores de `lr` × 5 semillas): Spearman **+0,736**
 > por run y **+0,956** agregado por valor del eje, con el **mismo ganador** en las dos métricas.
 > El proxy de ventana **vale para rankear ejes de receta**, y por eso `OBJECTIVES` no cambia.
-> **⚠ Sigue SIN medirse para ejes de C**, que es donde esta misma sección dice que el proxy tiene
-> papeletas de romperse (barrer la geometría cambia la vista). La receta para medirlo está en
-> metrica-de-tarea.md §5.
+>
+> **✅ Y TAMBIÉN PARA C (2026-07-26) — metrica-de-tarea.md §2 bis.** Se repitió sobre el eje `d`
+> (recorrido `proxy-c-d`, 6 valores × 5 semillas, 20 épocas): **Spearman agregado +1,000**, mismo
+> ganador (`d=2`) con las dos métricas y dentro de la frontera δ. El miedo concreto de esta
+> sección —que barrer la geometría invierta el orden— **no se materializa**. Reservas escritas
+> allí: el eje separa poco (amplitud 0,028, δ se come 3 de 6 puntos), n = 6, y es **un solo** eje
+> de C.
+>
+> **Hallazgo colateral que vale más que la validación**: el F1 apenas se mueve con `d`, y `d=2`
+> (4 px de periferia) gana a `d=6` (12 px) — **la periferia no está aportando de forma medible**,
+> y el coste tampoco lo explica (7,0–8,8 s/época). Es media respuesta al §6 de aquí abajo, sin
+> construir el control que F12 bloquea.
 >
 > El mismo trabajo destapó el límite que manda ahora: sd del F1 de párrafo **entre imágenes** =
 > **0,4148** sobre **20 imágenes de val** → **±0,093** por run. La métrica de tarea, hoy, es más

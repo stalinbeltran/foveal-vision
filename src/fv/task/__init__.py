@@ -24,21 +24,34 @@ and it is NOT a sweep objective — the window proxy ranks the same on axes of D
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import statistics
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fv import settings
-from fv.datasets.loader import SourceDataset, SourceError
+from fv.datasets.loader import (SourceDataset, SourceError, resolve_source,
+                                source_meta)
 from fv.diagnostics.table import SPLITS   # ONE split vocabulary, two readers
 from fv.inference.checkpoint import MODEL_CACHE
 from fv.inference.predict import predict_image
-from fv.ioutils import read_json_retrying, write_json_atomic
+from fv.ioutils import read_json_retrying, read_text_retrying, write_json_atomic
 from fv.metrics import paragraph_f1
 from fv.training.registry import RunError, RunStore
 from fv.windows.store import WindowDatasetStore
 
 CHECKPOINT = "best.pt"   # what survives, and what Diagnostico/Predecir load
+
+# F14 (decided by the user, 2026-07-26): the protocol says the holdout is looked
+# at ONCE, at the end, with the winner only — and until now nothing remembered.
+# The cache makes the second look free and INVISIBLE, which is the worst shape a
+# rule can have: obeyed by discipline, unfalsifiable by inspection. So every
+# scoring against a holdout appends a line here, cached or not. This is the one
+# place the task metric stops being a pure cache and writes into the run: it is
+# deliberate, and the ledger is append-only — it records looks, never blocks one.
+HOLDOUT_LEDGER = "holdout.jsonl"
+HOLDOUT_SUFFIX = "-holdout"
 
 
 def _cache_key(run: str, fingerprint: str, split: str, ckpt: Path,
@@ -89,6 +102,59 @@ def _aggregate(per_image: list[dict]) -> dict:
         "mean_iou": (sum(v * c for v, c in matched) / sum(c for _v, c in matched)
                      if matched else None),
     }
+
+
+def is_holdout_source(source_id: str, source_meta: dict | None = None) -> bool:
+    """Is this source a holdout? ONE definition, so the ledger and any future
+    guard cannot disagree about what counts.
+
+    Two signals, both honoured: an explicit `"holdout": true` in the source's
+    `dataset.json` (robust, and what should be written from now on) and the name
+    convention `<algo>-holdout` (all there was before the field existed). The
+    explicit field WINS in both directions — a source can declare itself not a
+    holdout despite its name, because a convention should never override a
+    statement (README documents both).
+    """
+    if source_meta is not None and "holdout" in source_meta:
+        return bool(source_meta["holdout"])
+    return source_id.rstrip("/").endswith(HOLDOUT_SUFFIX)
+
+
+def _source_meta(source_id: str) -> dict:
+    """The source's dataset.json on the CACHED path, where no SourceDataset was
+    opened. A source that has since vanished simply has no metadata: the cached
+    number is still valid (it was measured when the source was there), so this
+    must not raise — it falls back to the name convention."""
+    try:
+        return source_meta(resolve_source(source_id))
+    except SourceError:
+        return {}
+
+
+def record_holdout_touch(run_name: str, payload: dict, store: RunStore) -> None:
+    """Append one line per look at a holdout (F14). Called even when the number
+    came from cache: what is being recorded is that somebody LOOKED, and a cached
+    look is exactly the one that used to leave no trace."""
+    line = {
+        "when": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "window_dataset": payload["window_dataset"], "source": payload["source"],
+        "split": payload["split"], "images": payload["images"],
+        "f1": payload["macro"]["f1"], "sem": payload["macro"]["sem"],
+        "knobs": payload["knobs"], "checkpoint": payload["checkpoint"],
+        "from_cache": bool(payload.get("cached")),
+    }
+    path = store.path(run_name) / HOLDOUT_LEDGER
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(line) + "\n")
+
+
+def holdout_touches(run_name: str, store: RunStore | None = None) -> list[dict]:
+    """Every look at a holdout this run has had — the fact, not the promise."""
+    store = store or RunStore()
+    path = store.path(run_name) / HOLDOUT_LEDGER
+    if not path.exists():
+        return []
+    return [json.loads(ln) for ln in read_text_retrying(path).splitlines() if ln.strip()]
 
 
 def task_score(run_name: str, split: str = "val", *,
@@ -156,6 +222,11 @@ def task_score(run_name: str, split: str = "val", *,
     if cache_file.exists():
         payload = read_json_retrying(cache_file)
         payload["cached"] = True
+        # a cached look is STILL a look (F14): the free-and-invisible second
+        # glance is precisely what the ledger exists to make visible
+        if is_holdout_source(payload["source"], _source_meta(payload["source"])):
+            record_holdout_touch(run_name, payload, store)
+        payload["holdout_touches"] = len(holdout_touches(run_name, store))
         return payload
 
     source_id = manifest["source_id"]
@@ -201,4 +272,7 @@ def task_score(run_name: str, split: str = "val", *,
     }
     write_json_atomic(cache_file, payload)
     payload["cached"] = False
+    if is_holdout_source(source_id, source.meta):
+        record_holdout_touch(run_name, payload, store)
+    payload["holdout_touches"] = len(holdout_touches(run_name, store))
     return payload

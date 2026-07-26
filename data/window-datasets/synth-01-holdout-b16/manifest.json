@@ -1,0 +1,46 @@
+{
+  "format_version": 1,
+  "fingerprint": "sha256:f4ab59b3d30030ba9c22aaea745a58504312b01c25d8c983f4a9f62806b9b549",
+  "has_images": true,
+  "images": {
+    "shape": [
+      60,
+      72,
+      96
+    ],
+    "bytes": 414720,
+    "budget_bytes": 1000000000
+  },
+  "source_id": "local/synth-01-holdout",
+  "config": {
+    "source": "local/synth-01-holdout",
+    "window_size": 16,
+    "stride": 8,
+    "target_kinds": [
+      "paragraph"
+    ],
+    "val_frac": 0.0,
+    "test_frac": 1.0,
+    "seed": 1
+  },
+  "num_samples": 60,
+  "num_windows": 5280,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ],
+  "label_window": "center",
+  "windows_per_split": {
+    "train": 0,
+    "val": 0,
+    "test": 5280
+  },
+  "positives_per_corner": {
+    "TL": 398,
+    "TR": 393,
+    "BR": 392,
+    "BL": 400
+  }
+}
