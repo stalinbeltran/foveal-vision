@@ -1,0 +1,6 @@
+{"epoch": 1, "train_loss": 1.0146959225336711, "val": {"loss": 0.9019191319292242, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 7.031075954437256}, "lr": 0.002, "seconds": 7.969}
+{"epoch": 2, "train_loss": 0.8092502090666029, "val": {"loss": 0.8320643630894747, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.199523448944092}, "lr": 0.002, "seconds": 7.719}
+{"epoch": 3, "train_loss": 0.7866286304261949, "val": {"loss": 0.8151275678114458, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.131450176239014}, "lr": 0.002, "seconds": 7.922}
+{"epoch": 4, "train_loss": 0.7786896096335517, "val": {"loss": 0.8129221092570912, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.118985652923584}, "lr": 0.002, "seconds": 10.063}
+{"epoch": 5, "train_loss": 0.7775390214390225, "val": {"loss": 0.8136321577158842, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.129903793334961}, "lr": 0.002, "seconds": 8.922}
+{"epoch": 6, "train_loss": 0.7762156460020277, "val": {"loss": 0.8033215511928905, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.001145839691162}, "lr": 0.002, "seconds": 7.547}
