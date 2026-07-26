@@ -74,12 +74,15 @@ def main() -> int:
         description="Correlacion proxy de ventana <-> metrica de tarea (Fase 3b)")
     ap.add_argument("--sweep", required=True)
     ap.add_argument("--split", default="val")
+    ap.add_argument("--objective", default=None,
+                    help="re-lee el mismo recorrido con OTRO proxy de ventana "
+                         "(f1, pos_err_px, loss) sin tocar el spec — apartado 9.7")
     ap.add_argument("--json", dest="json_out", default=None,
                     help="guarda el detalle por run y por punto")
     args = ap.parse_args()
 
     t0 = time.time()
-    trials = sweep_trials(args.sweep)
+    trials = sweep_trials(args.sweep, objective=args.objective)
     objective = trials["objective"]
     direction = trials["direction"]
     rows = trials["trials"]
@@ -91,6 +94,10 @@ def main() -> int:
     print(f"eje(s): {', '.join(axes)}   dominio: {domain}")
     print(f"objetivo de ventana: {objective} ({direction})   "
           f"valor de: {trials.get('value_from')}")
+    if trials.get("objective_overridden"):
+        print(f"  RE-LECTURA: el recorrido se entreno y ordeno con "
+              f"'{trials['sweep_objective']}'; aqui se re-rankea con "
+              f"'{objective}' sobre los MISMOS runs (apartado 9.7)")
     if not trials.get("monitor_matches_objective"):
         print(f"  aviso: el checkpoint lo elige {trials['monitors']}, "
               f"el ranking mide val_{objective} (legal, pero hay que saberlo)")
@@ -127,7 +134,7 @@ def main() -> int:
                       [p["task"] for p in per_run])
 
     # ---- agregado por valor del eje ---------------------------------------
-    w = suggest_winner(args.sweep)
+    w = suggest_winner(args.sweep, objective=args.objective)
     groups = []
     for g in w["trials"]:
         vals = [cache[r]["f1"] for r in g["runs"]

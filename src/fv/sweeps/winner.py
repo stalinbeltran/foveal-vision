@@ -36,7 +36,8 @@ def _num_params_of(run_name: str, run_store: RunStore) -> int | None:
 def suggest_winner(name: str, delta: float | None = None,
                    cost_metric: str = "seconds_per_epoch",
                    store: SweepStore | None = None,
-                   run_store: RunStore | None = None) -> dict:
+                   run_store: RunStore | None = None,
+                   objective: str | None = None) -> dict:
     """Suggest the winner of a finished sweep by the cost/quality rule (D-W1).
 
     Returns {objective, direction, delta, delta_source, tie, tie_reason,
@@ -46,6 +47,11 @@ def suggest_winner(name: str, delta: float | None = None,
 
     δ defaults to the noise the sweep MEASURED ITSELF (`tie_delta`): pass a
     number to override it.
+
+    `objective` re-reads the same finished runs by another val metric without
+    touching the spec (see `sweep_trials`). The frontier must be computed with
+    THE SAME proxy being judged, or the tie band would belong to one metric and
+    the ranking to another.
     """
     store = store or SweepStore()
     run_store = run_store or RunStore()
@@ -53,7 +59,7 @@ def suggest_winner(name: str, delta: float | None = None,
         raise SweepError("unknown_cost_metric",
                          f"métrica de coste '{cost_metric}' no existe",
                          f"usa una de {list(COST_METRICS)}")
-    trials = sweep_trials(name, store, run_store)
+    trials = sweep_trials(name, store, run_store, objective=objective)
     scored = [dict(t) for t in trials["trials"] if t["value"] is not None]
     if not scored:
         raise SweepError("no_scored_trials",
@@ -80,6 +86,8 @@ def suggest_winner(name: str, delta: float | None = None,
         "tie": len(frontier) > 1, "tie_reason": tie_reason(frontier, delta),
         # the ranking's own provenance travels with the suggestion
         "value_from": trials.get("value_from"),
+        "objective_overridden": trials.get("objective_overridden"),
+        "sweep_objective": trials.get("sweep_objective"),
         "monitor_matches_objective": trials.get("monitor_matches_objective"),
     }
 

@@ -254,6 +254,19 @@ entrenado**, sin reentrenar nada:
 El criterio de aceptación está escrito **antes** de mirar (protocolo.md §1), como constantes del
 script: Spearman agregado ≥ 0,90 **y** el ganador por tarea dentro de la frontera δ.
 
+`--objective` re-lee **los mismos runs terminados** con otro proxy de ventana, sin tocar el spec ni
+reentrenar, para preguntar cuál sigue mejor a la tarea:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\proxy_vs_task.py --sweep fast-lr-s0-lr --objective pos_err_px
+```
+
+> Verificado (2026-07-26) sobre `fast-lr-s0-lr`, Spearman agregado: **`f1` +0,956** · `loss` +0,780 ·
+> `pos_err_px` +0,544. Los dos últimos además **eligen otro ganador**, y fuera de la banda de ruido
+> del bueno. El default `f1` era el correcto — ahora con evidencia, no por costumbre. La re-lectura
+> se declara en la salida (`objective_overridden`) para que nunca se confunda con lo que el
+> recorrido optimizó de verdad, y un objetivo desconocido se rechaza en la puerta.
+
 ### Qué ejes se pueden barrer
 
 Cualquier campo de la **red (C)** o de la **receta (D)** es un eje válido — **excepto `N` y

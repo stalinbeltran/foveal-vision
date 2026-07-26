@@ -58,6 +58,48 @@ def test_sweep_runs_ranks_and_resumes(world):
     assert state2["done"] == 2
 
 
+def test_trials_can_be_reread_with_another_objective(world):
+    """§9.7: re-rank the SAME finished runs by another val metric, without
+    touching the spec — and say so, so a re-reading is never mistaken for what
+    the sweep actually optimised."""
+    from fv.sweeps.runner import prepare_sweep, run_sweep, sweep_trials
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    store, rstore = SweepStore(), RunStore()
+    prepare_sweep("sw-reread", _spec(world, points=2, epochs=1), TINY_NET, store)
+    run_sweep("sw-reread", store, rstore)
+
+    own = sweep_trials("sw-reread", store, rstore)
+    assert own["objective"] == "f1" and own["direction"] == "max"
+    assert own["objective_overridden"] is False
+
+    other = sweep_trials("sw-reread", store, rstore, objective="loss")
+    assert other["objective"] == "loss" and other["direction"] == "min"
+    # the override is DECLARED and the sweep's own objective still travels
+    assert other["objective_overridden"] is True
+    assert other["sweep_objective"] == "f1"
+    # same runs, same epoch source — only the number read changes
+    assert {t["run"] for t in other["trials"]} == {t["run"] for t in own["trials"]}
+    assert other["value_from"] == "checkpoint"
+    assert all(t["value"] is not None for t in other["trials"])
+    # the spec is untouched: asking again without the override says f1
+    assert store.spec("sw-reread")["objective"] == "f1"
+
+
+def test_rereading_with_an_unknown_objective_is_refused(world):
+    """At the door, with the reason — not a silent table of None (R4)."""
+    from fv.sweeps.runner import prepare_sweep, run_sweep, sweep_trials
+    from fv.sweeps.spec import SweepError
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    store, rstore = SweepStore(), RunStore()
+    prepare_sweep("sw-badobj", _spec(world, points=1, epochs=1), TINY_NET, store)
+    run_sweep("sw-badobj", store, rstore)
+    with pytest.raises(SweepError) as e:
+        sweep_trials("sw-badobj", store, rstore, objective="paragraph_f1")
+    assert e.value.code == "unknown_objective"
+
+
 def test_delete_sweep_cascades_and_leaves_no_orphan(world):
     from fv.sweeps.runner import delete_sweep, point_run_name, prepare_sweep, run_sweep
     from fv.sweeps.store import SweepStore

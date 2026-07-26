@@ -182,8 +182,16 @@ def delete_sweep(name: str, store: SweepStore | None = None,
 
 
 def sweep_trials(name: str, store: SweepStore | None = None,
-                 run_store: RunStore | None = None) -> dict:
+                 run_store: RunStore | None = None,
+                 objective: str | None = None) -> dict:
     """The points table ordered by the objective.
+
+    `objective` overrides the sweep's own for READING ONLY — it re-ranks the same
+    finished runs by another val metric (metrica-de-tarea.md §9.7: is `f1` really
+    the proxy that tracks the task best, or would `pos_err_px` do better?). It
+    does NOT touch the spec: the sweep still trained and checkpointed under its
+    own objective, and the answer travels as `objective_overridden` so no reader
+    mistakes a re-reading for what the sweep actually optimised.
 
     A point is scored by the objective AT THE EPOCH THAT `best.pt` KEPT, not at
     the last one. `best.pt` is what survives the run — what diagnostics load,
@@ -200,7 +208,12 @@ def sweep_trials(name: str, store: SweepStore | None = None,
     store = store or SweepStore()
     run_store = run_store or RunStore()
     spec = store.spec(name)
-    objective = spec.get("objective", "f1")
+    own_objective = spec.get("objective", "f1")
+    if objective is not None and objective not in OBJECTIVES:
+        raise SweepError("unknown_objective",
+                         f"objetivo '{objective}' no existe",
+                         f"usa uno de {sorted(OBJECTIVES)}")
+    objective = objective or own_objective
     direction = OBJECTIVES.get(objective, "max")
     base_monitor = (spec.get("base_recipe_value") or {}).get("monitor", "val_loss")
     rows = []
@@ -248,6 +261,9 @@ def sweep_trials(name: str, store: SweepStore | None = None,
     pending = [r for r in rows if r["value"] is None]
     monitors = sorted({r["monitor"] for r in rows if r["monitor"]})
     return {"objective": objective, "direction": direction,
+            # a re-reading is never mistaken for what the sweep optimised
+            "objective_overridden": objective != own_objective,
+            "sweep_objective": own_objective,
             # declared, so a reader never has to guess which epoch it is looking at
             "value_from": "checkpoint",
             "monitors": monitors,

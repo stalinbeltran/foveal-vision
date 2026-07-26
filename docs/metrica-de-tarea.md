@@ -929,16 +929,36 @@ es aún más necesaria de lo que dice §4.1. **Hay motivo concreto para sospecha
 7 de 20 imágenes cargan casi todo el fallo y que una falla en 20/20 réplicas — una distribución
 así de bimodal y desbalanceada es justo donde `sd/√n` peor aproxima.
 
-### 9.7 ¿Qué proxy de ventana correlaciona mejor con la tarea?
+### 9.7 ¿Qué proxy de ventana correlaciona mejor? — HECHA: **`f1`, y no de poco**
 
 **Pregunta:** §2 midió `f1` de ventana. ¿Y `pos_err_px`? ¿Y una combinación?
 
 **Cómo:** los datos ya están: `sweep_trials` con `objective="pos_err_px"` sobre el mismo recorrido
 `fast-lr-s0-lr`, y el mismo Spearman de §5.2. **Coste: segundos** (con la caché de tarea llena).
 
-**Qué se hace con la respuesta:** si `pos_err_px` correlaciona mejor, el `objective` por defecto de
-los recorridos debería ser ese — es un cambio de una línea en la receta de recorrido, con evidencia
-detrás en vez de por costumbre.
+**Medido** (2026-07-26, los mismos 65 runs de `fast-lr-s0-lr`, re-leídos sin reentrenar nada):
+
+| proxy de ventana | Spearman por run (n=65) | **agregado** (n=13) | ¿mismo ganador que la tarea? |
+|---|---|---|---|
+| **`f1`** | **+0,737** | **+0,956** | **sí** |
+| `loss` | +0,608 | +0,780 | no (y fuera de la frontera δ) |
+| `pos_err_px` | +0,402 | +0,544 | no (y fuera de la frontera δ) |
+
+**Qué se hace con la respuesta: nada — y eso es el resultado.** El `objective` por defecto de los
+recorridos ya era `f1`, y ahora lo es **con evidencia detrás en vez de por costumbre**. Los otros
+dos no solo correlacionan peor: **eligen otro ganador**, y uno que ni siquiera cae dentro de la
+banda de ruido del bueno. `pos_err_px` es el peor de los tres, lo cual encaja con 9.3 — solo mide
+las esquinas que **existen**, y el techo del problema es de **detección** (~0,66), no de posición.
+
+**Cableado para poder repetirlo:** `sweep_trials(..., objective=…)` y `suggest_winner(..., objective=…)`
+re-leen los mismos runs terminados con otro proxy **sin tocar el spec**, y la respuesta lleva
+`objective_overridden` + `sweep_objective` para que nadie confunda una re-lectura con lo que el
+recorrido optimizó de verdad. Un objetivo desconocido se **rechaza en la puerta** con su razón, no
+devuelve una tabla de `None` (R4). Dos tests en `tests/test_sweeps.py`. Desde el script:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\proxy_vs_task.py --sweep fast-lr-s0-lr --objective pos_err_px
+```
 
 ### 9.8 El coste: vectorizar `build_view` (si alguna vez molesta)
 
