@@ -50,6 +50,21 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    así que un grupo con réplicas a distinta altura fingía converger al final. Se corta donde
 >    faltan réplicas y se dice dónde.
 >
+> **2026-07-26 — LA MÉTRICA DE TAREA: EL PROXY VALIDADO (PARA D) Y EL RESTO ESPECIFICADO.**
+> `paragraph_f1` existía desde el día 1 sin que la llamara nadie. Se ejecutó el **paso obligado**
+> de protocolo.md §2 usando **runs ya entrenados** (cero entrenamiento, 40 s de inferencia):
+> Spearman ventana↔tarea **+0,736** por run y **+0,956** agregado, sobre los 65 de `fast-lr-s0-lr`,
+> con el **mismo ganador**. ⇒ **`OBJECTIVES` no cambia**: el proxy barato ordena igual que el caro.
+> ⚠ Medido solo sobre un eje de **D**; para ejes de **C** (que cambian la vista) sigue sin medirse.
+> El mismo trabajo destapó el límite real: sd entre imágenes 0,372 sobre **20 imágenes de val** →
+> **±0,083** por run, más ruido que las diferencias a distinguir. **El bloqueo no es código, es el
+> tamaño del val.** Todo lo pendiente —cablear `task_score` (módulo nuevo `fv.task`, contrato ⑬),
+> validar el proxy en el eje `d`, dimensionar el dato, el holdout— está especificado al detalle en
+> **[docs/metrica-de-tarea.md](docs/metrica-de-tarea.md)**, con firmas, payloads, claves de caché,
+> tests y costes medidos. Dos decisiones quedaron **abiertas y son del usuario**: **F11** (regenerar
+> el dato invalida la comparabilidad con los 130 runs actuales) y **F12** (qué es la «CNN plana
+> equivalente» del primer experimento, que hoy no se puede construir por `no_periphery`).
+>
 > **2026-07-26 — EL PATRÓN DETRÁS DE CASI TODOS LOS FALLOS: «el mismo dato en dos sitios».**
 > A petición del usuario se analizó el historial de arreglos y sale un modo de fallo dominante:
 > un hecho representado dos veces (escritor↔lector, fuente↔caché, productor↔consumidor,
@@ -288,6 +303,7 @@ Los demás documentos, en orden de lectura:
 | [docs/api.md](docs/api.md) · [docs/ui.md](docs/ui.md) | La organización proyectada sobre HTTP y sobre pantallas |
 | [docs/plan.md](docs/plan.md) | El plan de ejecución, por fases verticales |
 | [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) | **IMPLEMENTADO (2026-07-24).** Barrido OAT (un eje a la vez) con base derivada del problema, defaults estáticos, arrastre del ganador y estudio (dominio I). Ver `fv.models.derive`, `fv.sweeps.generate/winner`, `fv.studies`, CLIs `fv-oat`/`fv-study` |
+| [docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) | **DISEÑADO, NO CONSTRUIDO (2026-07-26).** La métrica que manda (párrafo por imagen): qué está medido ya (el proxy de ventana correlaciona 0,956 en ejes de D), y la especificación detallada de lo pendiente — cablear `task_score`, validar el proxy en un eje de C, dimensionar el dato, el holdout. **Léelo antes de tocar métricas de ranking** |
 | [docs/formatos.md](docs/formatos.md) · [docs/tests.md](docs/tests.md) | Los artefactos en disco; qué se testea |
 | [docs/decisiones.md](docs/decisiones.md) | Lo que sigue sin decidir, y qué bloquea. **No tomes tú una decisión que esté ahí: pregunta** |
 | [docs/glosario.md](docs/glosario.md) | Las palabras que significan dos cosas |

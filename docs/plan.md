@@ -107,9 +107,29 @@ GPU con más presupuesto.
   esperable (misma semilla en GPU no garantiza bit-exactitud — se declara, no se esconde).
 - Lanzar el primer recorrido real (presupuesto grande) con el spec ya validado en CPU.
 
+## Fase 9 — la métrica de tarea (pendiente, especificada)
+
+`paragraph_f1` existe desde el día 1 y **no la llama nadie**: los recorridos rankean el proxy de
+ventana. El plan completo —qué está ya medido, qué falta, con firmas, payloads, caché, tests y
+costes medidos— está en **[metrica-de-tarea.md](metrica-de-tarea.md)**. Resumen del orden:
+
+1. **Cablear `task_score`** (módulo nuevo `fv.task`, contrato ⑬ E×A vía F): ~medio día, 0,6 s
+   por run.
+2. **Validar el proxy sobre un eje de C** (`d` con semillas): lo más barato que puede cambiar el
+   plan, porque barrer geometría cambia la vista.
+3. **Dimensionar el dato** (~2000 imágenes, 200 de val): **decisión del usuario**, porque
+   invalida la comparabilidad con todo lo entrenado hasta hoy.
+4. **Holdout** de ~500 imágenes, fuente propia, tocado una sola vez.
+
 ## Después: investigación
 
 Con el instrumento montado, la cola de análisis vive en [protocolo.md](protocolo.md) §6. El
 primer experimento ya está fijado: **¿la fóvea + periferia gana a una CNN plana de coste
 equivalente?** — control y tratamiento sobre el mismo B, N semillas, criterio escrito antes de
 mirar (el análogo del P4 del hermano, que es la evidencia de que hay algo que ganar).
+
+> ⚠ Ese control **no se puede construir hoy**: sin periferia (`periph_out = 0`) la geometría se
+> rechaza con `no_periphery` ([fv/fovea/\_\_init\_\_.py](../src/fv/fovea/__init__.py)), así que
+> lo más cerca que se llega es `d=1`, que sigue siendo dos ramas enmascaradas con banda de
+> penetración. Hace falta decidir qué es exactamente «la CNN plana equivalente» y cómo se
+> construye — no está especificado en ninguna parte.

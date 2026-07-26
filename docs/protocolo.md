@@ -57,6 +57,19 @@ Si es alta, el proxy barato sirve para diagnóstico; si es baja, el eslabón dé
 recomposición de F y mejorar la red no mejora la tarea — cualquiera de las dos respuestas vale
 su coste.
 
+> **✅ HECHO (2026-07-26), para ejes de D — detalle en [metrica-de-tarea.md](metrica-de-tarea.md)
+> §2.** Sobre los 65 runs de `fast-lr-s0-lr` (13 valores de `lr` × 5 semillas): Spearman **+0,736**
+> por run y **+0,956** agregado por valor del eje, con el **mismo ganador** en las dos métricas.
+> El proxy de ventana **vale para rankear ejes de receta**, y por eso `OBJECTIVES` no cambia.
+> **⚠ Sigue SIN medirse para ejes de C**, que es donde esta misma sección dice que el proxy tiene
+> papeletas de romperse (barrer la geometría cambia la vista). La receta para medirlo está en
+> metrica-de-tarea.md §5.
+>
+> El mismo trabajo destapó el límite que manda ahora: sd del F1 de párrafo **entre imágenes** =
+> 0,372 sobre **20 imágenes de val** → **±0,083** por run. La métrica de tarea, hoy, es más
+> ruidosa que las diferencias que se quieren distinguir; el arreglo es el §3 de aquí abajo
+> (dimensionar el dato), no más código.
+
 ## 3. El instrumento antes que el experimento
 
 **Orden: 0 → sesgos → suelo de ruido → proxy → recorrido.**
