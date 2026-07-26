@@ -13,7 +13,19 @@ const NS = "fv.ui.";
 function load<T>(key: string, initial: T): T {
   try {
     const v = localStorage.getItem(NS + key);
-    return v == null ? initial : (JSON.parse(v) as T);
+    if (v == null) return initial;
+    const parsed = JSON.parse(v);
+    // A remembered slice is a CONVENIENCE, and the screen that reads it can
+    // change shape after the value was written: `studies.delta` went from a
+    // number to a string the day δ became optional, and the remembered 0 then
+    // reached `delta.trim()` and blanked the whole page. A stale type is not a
+    // preference to honour — it is schema drift. Mismatch falls back to the
+    // default, which is also the right migration (the old value WAS the old
+    // default).
+    if (parsed === null && initial !== null) return initial;
+    if (Array.isArray(parsed) !== Array.isArray(initial)) return initial;
+    if (typeof parsed !== typeof initial) return initial;
+    return parsed as T;
   } catch {
     return initial;
   }

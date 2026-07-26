@@ -112,6 +112,20 @@ def main() -> int:
             page.wait_for_selector("[data-testid=axis-select]", timeout=10000)
             page.select_option("[data-testid=axis-select]", "channels[i]")
             page.select_option("[data-testid=axis-select]", "k_center")  # geometry
+            # opening a study with an UNCONFIRMED step is the path that blanked
+            # the page (a remembered `studies.delta` written as a number reaching
+            # delta.trim()). Seed the stale value on purpose, then click every
+            # study: none may blank or trip the error boundary.
+            page.evaluate("localStorage.setItem('fv.ui.studies.delta', '0')")
+            page.reload()
+            page.wait_for_selector("[data-testid=studies-table]", timeout=15000)
+            rows = page.locator("[data-testid=studies-table] tbody tr")
+            for i in range(rows.count()):
+                rows.nth(i).click()
+                page.wait_for_timeout(1200)
+                assert page.locator("[data-testid=screen-error]").count() == 0, \
+                    "una pantalla de Estudios cayó al error boundary"
+                assert len(page.inner_text("body").strip()) > 40, "página en blanco"
         check(page, "/studies", "[data-testid=studies-table]", "07c-estudios", studies_extra)
 
         # Runs: list + detail with curves and provenance
