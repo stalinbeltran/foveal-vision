@@ -50,6 +50,27 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    así que un grupo con réplicas a distinta altura fingía converger al final. Se corta donde
 >    faltan réplicas y se dice dónde.
 >
+> **2026-07-26 — EL PATRÓN DETRÁS DE CASI TODOS LOS FALLOS: «el mismo dato en dos sitios».**
+> A petición del usuario se analizó el historial de arreglos y sale un modo de fallo dominante:
+> un hecho representado dos veces (escritor↔lector, fuente↔caché, productor↔consumidor,
+> puerta↔puerta, cabecera↔celda) donde solo una copia se actualizó. Tres propiedades lo hacen
+> caro: **el conflicto se resuelve por precedencia y no por detección** (nadie lanza), **el
+> resultado parece correcto** (un número plausible, no un crash), y **lo encuentra el usuario, no
+> los tests** (un test unitario prueba UN lado de la costura). Se concentra en fronteras **que
+> nadie numeró** — los contratos ①–⑫ protegen bien lo que cubren.
+> Barrido a fondo: se eliminaron las **cuatro copias vivas** que el front tenía (defaults de C,
+> ejes de geometría, objetivos, orden de esquinas); **dos ya habían divergido**. Ahora el API
+> sirve cada vocabulario desde su única definición (`/networks` → `full_config({})`, `/sweeps/axes`
+> → objetivos + `loss_weight_params` + `window_size_fields`, y `corner_order` viaja en todo payload
+> indexado por él). Al servir los objetivos apareció un **hueco real**: `validate_plan` era **más
+> laxa** que `check_sweep` para el contrato ⑨ (objetivo `loss` + eje de peso de la pérdida) — el
+> `<select>` de Estudios lo tapaba no ofreciendo `loss`. Cerrado en la puerta. También la columna
+> «siguiente» de Estudios decía el dataset porque `next_axis` solo existía en el detalle: ahora
+> ambos salen de `fv.studies.driver.summarize`. **99 tests en verde** (+4 de costura).
+> ⚠ **Regla de trabajo que se deriva de esto:** antes de cambiar la forma o el significado de un
+> campo compartido, buscar **todos** sus lectores; y todo dato derivado, una definición y dos
+> lectores — nunca dos definiciones.
+>
 > **Regresión propia detectada por el usuario y arreglada el mismo día:** cambiar `studies.delta`
 > de número a cadena dejaba **Estudios en blanco** al abrir un estudio con un paso sin confirmar
 > (el 0 recordado del navegador llegaba a `delta.trim()`). Dos capas: `usePersistedState` **rechaza
