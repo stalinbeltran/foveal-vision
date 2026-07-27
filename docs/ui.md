@@ -30,6 +30,11 @@ parámetros, y probar los resultados.*
 **Precedencia**: organizacion.md → api.md / protocolo.md / formatos.md / glosario.md → `docs/ui/`.
 Una regla de UI que contradiga a su fuente es un error de la regla de UI.
 
+**Cómo se comprueba que estas reglas se cumplen**: [ui/validador.md](ui/validador.md) — el spec se
+extrae de estos mismos ficheros (bloques `check` junto a cada regla) y `scripts\verify_spec.py` las
+evalúa e informa **por regla en cuatro estados**. Una regla sin bloque `check` es un fallo del lint,
+nunca un aprobado.
+
 **Las dos reglas fundacionales**, que estos ocho tipos desarrollan:
 
 - **Una pantalla, un dominio** → [1-estructura.md](ui/1-estructura.md) U1.1.
