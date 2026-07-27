@@ -366,8 +366,9 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > recorridos (hoy corre todos los puntos); (5) pantalla Entrenar: el estimador solo usa runs
 > comparables (hecho) pero no hay curva de coste por punto del recorrido.
 >
-> **Servidores dev**: al cerrar esta sesión quedaron corriendo backend (:8010) y vite (:5173)
-> — pararlos o reusarlos.
+> **Servidores dev**: ~~al cerrar esta sesión quedaron corriendo backend (:8010) y vite (:5173)~~
+> — **OBSOLETO (2026-07-27)**: se pararon, y la regla ahora es cerrarlos siempre al terminar
+> (ver «Convenciones»).
 >
 > Nada de lo documentado está construido ni verificado. Cuando un documento cita código
 > (`loop.py:166`, `extract.py:127`), habla del **proyecto hermano** — es la evidencia que motivó
@@ -478,6 +479,13 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
 - **README verificado**: antes de decir que un comando documentado funciona, **ejecútalo** en
   PowerShell tal como está escrito (regla global del usuario). Nunca presentar una instrucción
   no probada como verificada.
+- **Probar ejecutando, sí; dejarlo corriendo, no.** Lanzar procesos del proyecto para verificar
+  (backend `fv-api`, `npm run dev`, entrenamientos, Playwright) está **siempre permitido** y no
+  hace falta pedirlo. Pero **al terminar la tarea se cierran todos** y se comprueba que los
+  puertos (`:8010`, `:5173`) quedan libres: el usuario prueba a mano después, y un server viejo
+  vivo le ocupa el puerto o le contesta con rutas obsoletas. Matar hijos antes que padres (vite
+  antes de `npm run dev`; el `fv-api` que escucha antes de su lanzador) y filtrar por ruta —
+  en esta máquina hay pythons ajenos al proyecto.
 - `data/`, `runs/` y `sweeps/` son artefactos: **se versiona la descripción (configs, métricas,
   manifests, specs), se ignora la carga (`.npz`, `.pt`, `optuna.db`)** — formatos.md §5.
 - **Enlaces a ficheros en las respuestas**: siempre en formato markdown `[texto](ruta)` con la
