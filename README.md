@@ -370,6 +370,42 @@ Con backend y front corriendo (y los datos de arriba creados):
 > en `data\ui-shots\`. Diagnóstico/Predecir usan `fov-16-param` (entrenado con el builder
 > paramétrico): los checkpoints anteriores son incompatibles a propósito (barrido §13).
 
+## Validar la especificación de la UI
+
+**No es una suite de tests**: los tests dicen que un comportamiento es correcto; esto dice que
+**las reglas declaradas en [docs/ui/](docs/ui/) se cumplen**, y se alimenta de las propias reglas
+(los bloques ` ```check ` que viven pegados a cada una). Diseño en
+[docs/ui/validador.md](docs/ui/validador.md).
+
+```powershell
+.\.venv\Scripts\python.exe scripts\verify_spec.py
+```
+
+Otras formas:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\verify_spec.py --rule U7.9 -v
+.\.venv\Scripts\python.exe scripts\verify_spec.py --type 3
+.\.venv\Scripts\python.exe scripts\verify_spec.py --live      # + sustratos http/dom (fases 3-4)
+.\.venv\Scripts\python.exe scripts\verify_spec.py --coverage  # solo el cuadro
+```
+
+Cada regla sale en uno de **cuatro estados** —`ok`, `violada`, `no_verificable` (ninguna
+herramienta puede decidirlo), `no_aplicable` (el sustrato no estaba disponible, o el verbo aún no
+está construido)—. **El código de salida es ≠ 0 solo si hay una `violada`**: `no_verificable` no es
+un fallo, es el mapa de lo que sigue dependiendo de una persona. La cobertura **la calcula la
+herramienta**; no se mantiene a mano en ningún documento.
+
+> Verificado (2026-07-27, fase 0): **76 reglas**, 15 `ok`, **1 `violada`**, 5 `no_verificable`,
+> 55 `no_aplicable` (fase 1: 2 · fase 2: 11 · fase 3: 23 · fase 4: 19) → **21 % de cobertura
+> mecánica hoy**, sobre un techo previsto del 87 % cuando estén las cuatro fases. La violada es
+> **U3.1**: cuatro colores literales fuera de `tokens.css` y `npm run validate:palette` sin portar.
+> `--live` **no añade nada todavía**: sus verbos son de las fases 3-4, así que esas reglas siguen
+> saliendo `no_aplicable` (corre sin error, no arranca servidores).
+> Salida ASCII, probada bajo `PYTHONIOENCODING=cp1252`. **Control**: quitar un bloque `check` hace
+> que el lint aborte nombrando la regla (`U8.6 … sin bloque check`, salida 2) — un spec malformado
+> nunca produce un verde.
+
 ## Por dónde empezar a leer
 
 [CLAUDE.md](CLAUDE.md) abre con el estado y enlaza los documentos en orden:

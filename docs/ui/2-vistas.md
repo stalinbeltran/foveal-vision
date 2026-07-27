@@ -14,20 +14,60 @@
 **U2.1 — Toda vista de análisis declara `(qué fija, qué varía, qué mide)`.** Un recorrido fija B,
 varía C/D y mide el objetivo. Un mapa de activaciones fija E y la ventana, y varía la capa.
 
+```check U2.1
+substrate: mixed
+kind: catalog_match
+args:
+  left: doc_view_ids
+  right: dom_data_view
+strength: strong
+```
+
 **U2.2 — Si no puedes decir qué fija una vista, la vista no sabe lo que enseña** — y no se
 construye. La tripleta es un requisito de diseño, no documentación posterior.
+
+```check U2.2
+substrate: none
+reason: "juicio de diseno: ninguna herramienta decide si una vista sabe lo que ensena.
+  B6 comprueba que alguien lo declaro, no que la declaracion sea cierta"
+```
 
 **U2.3 — La tripleta viaja a la pantalla.** Donde quepa, va como subtítulo de la vista (p. ej. el
 subtítulo de las curvas de un recorrido dice qué agrupa y qué banda dibuja). El usuario no debería
 tener que abrir este documento para saber qué está mirando.
+
+```check U2.3
+substrate: dom
+kind: dom_query
+scope: "*"
+args:
+  selector: "[data-view]"
+  must_have_attr: ["data-fixes", "data-varies", "data-measures"]
+strength: strong
+```
 
 **U2.4 — La vista es del proyecto, no de la pantalla.** Una vista heredada del hermano **conserva
 su número** (`V1`…`V19`) aunque cambie de sitio o de forma: es lo que permite leer su evidencia
 original. Las propias de la geometría foveada se numeran `FG#`. `V19` se renombró a **`F0`** porque
 aquí dejó de ser una sonda y pasó a ser vista fundamental.
 
+```check U2.4
+substrate: doc
+kind: spec_lint
+args:
+  assert: view_ids_unique
+strength: strong
+```
+
 **U2.5 — Una vista sin (fija, varía, mide) escrito aquí no se implementa**, y una implementada que
 no está en el catálogo es deuda: o entra, o se quita.
+
+```check U2.5
+substrate: same_as
+target: U2.1
+reason: "el catalogo se casa en los dos sentidos: la misma comprobacion cubre la vista
+  huerfana y la vista sin implementar"
+```
 
 ## El catálogo
 

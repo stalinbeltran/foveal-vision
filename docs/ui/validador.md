@@ -23,7 +23,7 @@ parsea `docs/ui/*.md` y extrae los bloques.
 **U3.1 — La paleta vive en tokens.css y solo ahí, y se valida con script, nunca a ojo.** …
 
 ```check U3.1
-substrate: ast
+substrate: fs
 kind: no_match_outside
 scope: "web/src/**/*.{ts,tsx,css}"
 args:
@@ -198,7 +198,7 @@ medido por ella misma, no estimado.
 
 | Fase | Qué | Deja |
 |---|---|---|
-| **0** | `extract` + `engine` + estados + informe + `spec_lint` (B1) + los 76 bloques `check` escritos (muchos aún `none`) | La **cobertura real medida hoy**, y los ocho documentos protegidos contra su propia deriva |
+| **0 ✅ (2026-07-27)** | `extract` + `engine` + los cuatro estados + informe + `spec_lint` (B1) + los **76 bloques `check`** + los verbos que no piden dependencias nuevas: `file_exists`, `json_path`, `must_match`, `no_match_outside` y **`catalog_match` con extractores de fichero** | La **cobertura real medida** (§8 bis) y los ocho documentos protegidos contra su propia deriva |
 | **1** | B2: `css_tokens`, `palette_contrast`, `palette_cvd_delta_e` | Cierra la deuda declarada (`validate:palette`, que hoy **no existe**) |
 | **2** | B3 + B7: `ast_query`, `no_match_outside`, `single_definition` | La regla que ya costó cuatro copias vivas (U4.2) pasa a ser mecánica |
 | **3** | B4: `http_shape`, `http_refuses` | Los `code` del backend y los que la UI conoce se casan (U5.1, U5.5) |
@@ -249,6 +249,45 @@ incumplen: **U3.1** (no existe `validate:palette`) y **U7.9** (`verify_ui.py` re
 con una lista propia, que nadie casa contra las rutas reales de `App.tsx`).
 
 ---
+
+## 8 bis. Lo medido en la fase 0 (2026-07-27)
+
+Primera corrida real, `scriptserify_spec.py` en modo estatico:
+
+```
+TOTAL  76 reglas : 15 ok  1 violada  5 no-verificables  55 no-aplicables   cobertura 21%
+pendientes por construir -> fase 1: 2 | fase 2: 11 | fase 3: 23 | fase 4: 19
+```
+
+**21 % hoy, 87 % previsto** cuando estén las cuatro fases: el `no_aplicable` mayoritario es *«el
+verbo aún no existe»*, y el informe lo dice con su fase para que el número no se lea como techo.
+
+Lo que la fase 0 ya afirma de verdad (15 reglas, todas con sustancia): las **12 rutas** del
+documento casan con `App.tsx` (U1.2); las **10 etiquetas de nav** casan con la tabla (U1.4, y U8.3
+por `same_as` — es la comprobación que habría cazado «Barrido por ejes» contra «Estudios»); los
+**16 ids de vista** del catálogo no se repiten (U2.4); el front **no recalcula geometría** (U5.4);
+`verify_ui.py` **cubre las 12 rutas** (U7.9); ningún `print` con no-ASCII en `fv` (U8.6); ningún
+número de resultado cableado en la UI (U6.13); y el contrato ① **delegado** a su test, que existe
+(U5.9).
+
+**Dos hallazgos en la primera corrida** — el objetivo de construir esto:
+
+1. **U3.1 `violada`** (predicha): cuatro colores literales fuera de `tokens.css`
+   (`MatrixCanvas.tsx:44,45`, `WindowCanvas.tsx:39,41` — fallbacks que duplican `--div-neg`,
+   `--div-pos`) y **`npm run validate:palette` sin portar**. Se deja violada a propósito: es la
+   deuda declarada, y ahora tiene código de salida.
+2. **U7.11 `violada` y ya arreglada**: el inventario de `data-testid` del documento **no tenía
+   `runs-table`**. La lista se armó con un `grep` que trató `Runs.tsx` como binario y lo saltó. Es
+   justo el modo de fallo del proyecto —*el mismo dato en dos sitios, y solo una copia se
+   actualizó*— cazado por la herramienta el día que nació.
+
+**Corrección a §8**: predije que U7.9 saldría `violada`. **No lo está** — `verify_ui.py` sí recorre
+las 12 rutas. La predicción estaba razonada, no medida.
+
+**Control (obligatorio, y ejecutado)**: al quitar el bloque `check` de U8.6, el lint aborta con
+`U8.6 (docs/ui/8-lexico.md:87): sin bloque check` y salida **2**, sin evaluar nada. Un spec
+malformado no produce un verde. El control se cobró solo, además, en vivo: un `git checkout` de mi
+parte borró los ocho bloques del fichero léxico y **el lint lo dijo en la corrida siguiente**.
 
 ## 9. Lo que este validador no puede afirmar
 

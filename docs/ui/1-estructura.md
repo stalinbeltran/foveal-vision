@@ -17,36 +17,82 @@ pantalla: listar, crear, nombrar, borrar. **Un formulario que mezcla dos dominio
 organización**, no una decisión de diseño, y se arregla partiendo la pantalla — nunca añadiendo
 una pestaña.
 
+```check U1.1
+substrate: mixed
+kind: catalog_match
+args:
+  left: doc_screen_labels
+  right: dom_data_domain
+strength: strong
+```
+
 **U1.2 — F es un verbo, no una entidad.** La inferencia no se lista ni se guarda: es un panel de
 resultados sobre un E. Lo mismo vale para los **cruces** (E×B diagnóstico, E×A métrica de tarea):
 son cachés, no entidades, y **viven dentro de la pantalla del dominio dueño** — el bloque de tarea
 está en el detalle de un run, no en una pantalla «Métricas».
 
+```check U1.2
+substrate: doc
+kind: catalog_match
+args:
+  left: doc_screen_routes
+  right: app_routes
+strength: strong
+```
+
 **U1.3 — Sin números de paso.** No hay wizard ni pipeline numerado: en investigación no se recorre
 un flujo, se **itera sobre un punto y se vuelve**. Los grupos del nav (Datos / Modelo / Entrenar /
 Analizar) ordenan por dependencia de dominio, no por secuencia temporal.
 
+```check U1.3
+substrate: dom
+kind: dom_absent_text
+scope: "/"
+args:
+  words: ["Paso 1", "Paso 2", "Siguiente paso"]
+strength: weak
+```
+
 **U1.4 — Una pantalla nueva se justifica por un dominio nuevo.** Si algo pide pantalla y no es un
 sustantivo de organizacion.md §1, la pregunta correcta es de qué dominio es un panel. El dominio
 **I** (estudios) apareció así: primero fue dominio, después pantalla.
+
+```check U1.4
+substrate: doc
+kind: catalog_match
+args:
+  left: doc_screen_labels
+  right: nav_labels
+strength: strong
+```
 
 **U1.5 — Verificar un objeto no exige entrenar.** Requisito literal del usuario: *en todo momento
 debe ser posible verificar los objetos creados — fuentes, datasets, redes, runs, recorridos,
 análisis*. De ahí que Ventanas enseñe el recorte crudo sin modelo, y que Redes enseñe geometría
 sin pesos.
 
+```check U1.5
+substrate: dom
+kind: dom_query
+scope: "/window-datasets/:name"
+args:
+  selector: "[data-testid=window-grid] canvas"
+  requires_run: false
+strength: strong
+```
+
 ## El mapa de pantallas
 
 | Grupo | Pantalla | Ruta | Dominio |
 |---|---|---|---|
 | **Datos** | Fuentes | `/sources` | A (+ derivadas y resize) |
-| | Ventanas | `/window-datasets` (+ `/{name}`) | B (+ detalle paginado con los recortes crudos) |
+| | Ventanas | `/window-datasets` · `/window-datasets/:name` | B (+ detalle paginado con los recortes crudos) |
 | **Modelo** | Redes | `/networks` | C |
 | | Recetas | `/recipes` | D |
 | **Entrenar** | Entrenar | `/train` | B×C×D + X → E |
 | | Recorridos | `/sweeps` | H |
 | | Estudios | `/studies` | I (estudio OAT; genera recorridos H, guía paso a paso) |
-| | Runs | `/runs` (+ `/{name}`) | E (lista + detalle) |
+| | Runs | `/runs` · `/runs/:name` | E (lista + detalle) |
 | **Analizar** | Diagnóstico | `/diagnostics` | E×B |
 | | Predecir | `/predict` | F |
 

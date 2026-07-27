@@ -22,6 +22,15 @@ interpretar unos números viaja con ellos:
 | los `knobs` con que se calculó | con sliders en vivo **las respuestas llegan desordenadas** |
 | `min/max/mean` y `truncated` | una matriz recortada dibujada como completa es una mentira silenciosa |
 
+```check U4.1
+substrate: http
+kind: http_shape
+scope: "introspection:*"
+args:
+  requires: ["color_work", "branch", "region"]
+strength: strong
+```
+
 **U4.2 — Una definición y dos lectores; jamás dos definiciones.** El front **no define
 vocabularios**: los defaults de C, los ejes barribles, los objetivos, el orden de esquinas, los
 campos que fijan `window_size` — todos salen del API (`/networks`, `/sweeps/axes`, …), que los sirve
@@ -29,13 +38,41 @@ desde su única definición. Es la regla que costó cuatro copias vivas, **dos d
 divergidas** (2026-07-26). Corolario operativo: **antes de cambiar la forma o el significado de un
 campo compartido, buscar todos sus lectores.**
 
+```check U4.2
+substrate: ast
+kind: single_definition
+args:
+  seams: ["objectives", "sweep_axes", "network_defaults", "corner_order", "window_size_fields"]
+  owner: "api"
+strength: strong
+```
+
 **U4.3 — Los agregados se calculan en el servidor.** El navegador nunca recibe 10⁵ filas; las
 tablas van filtradas y paginadas con `limit` acotado por la ruta. Una media calculada en el front
 es una segunda definición de una métrica (U4.2).
 
+```check U4.3
+substrate: http
+kind: http_shape
+scope: "/window-datasets/{name}/windows"
+args:
+  max_rows_param: "limit"
+strength: weak
+```
+
 **U4.4 — Polling incremental, nunca historial completo.** Las métricas se piden con `?since=N`. Las
 listas vivas se refrescan cada ~3 s; la carga pesada se gatea con un booleano estable para no
 recomputar en cada pasada.
+
+```check U4.4
+substrate: fs
+kind: must_match
+scope: "web/src/**/*.{ts,tsx}"
+args:
+  pattern: "since="
+  min: 1
+strength: weak
+```
 
 **U4.5 — Un dato solo se cachea cuando llega junto a su estado terminal.** La trampa medida
 (2026-07-26): se cacheaba la curva de un run en cuanto el estado leía `done` **y había algo
@@ -43,26 +80,81 @@ cacheado**, pero ese algo venía del sondeo **anterior**, tomado mientras el run
 perdían las épocas de esa ventana (3 s normalmente, hasta un minuto con la pestaña de fondo, más
 tras hibernar). Un run se «settle» **solo** al traerlo *con* el estado ya terminal.
 
+```check U4.5
+substrate: ast
+kind: settle_guard
+scope: "web/src/screens/Sweeps.tsx"
+args:
+  assert: "solo se cachea la curva cuando el estado terminal llego en la MISMA respuesta"
+strength: strong
+```
+
 **U4.6 — El `code` del error es contrato; el `hint` es parte de la respuesta, no adorno.** La UI
 reacciona al `code` (no al texto), y muestra `message` + `hint`. Tragarse el `hint` convierte una
 negativa útil en un callejón — ver [5-invariantes.md](5-invariantes.md) U5.2.
+
+```check U4.6
+substrate: http
+kind: http_refuses
+scope: "POST /runs"
+args:
+  body: {invalid: true}
+  expect_fields: ["code", "message", "hint"]
+strength: strong
+```
 
 **U4.7 — Lo que cuesta, se pide a mano.** Nada que dispare inferencia de imagen completa entra en un
 sondeo periódico: la métrica de tarea se pide **con un botón** (U6.8). Un poll de 3 s sobre algo que
 cuesta 0,6 s de CPU por run es un bucle de calor, no una UI viva.
 
+```check U4.7
+substrate: ast
+kind: ast_query
+scope: "web/src/**/*.tsx"
+args:
+  forbid: "task-score dentro de setInterval/poll"
+strength: strong
+```
+
 **U4.8 — `/ui-state` es un blob opaco, no una segunda fuente de verdad.** Las pantallas siguen
 leyendo el A–I real del API. Ver [7-operacion.md](7-operacion.md) U7.2–U7.3.
+
+```check U4.8
+substrate: ast
+kind: ast_query
+scope: "web/src/**/*.tsx"
+args:
+  forbid: "poblar A-I desde /ui-state"
+strength: weak
+```
 
 **U4.9 — Las rutas se resuelven dentro del dominio.** No existe `GET /image?path=`: allowlist de
 raíces (403 fuera) y CORS cerrado al origen del front. **No es teórico**: este API acabará
 corriendo en un server con GPU.
+
+```check U4.9
+substrate: http
+kind: http_refuses
+scope: "GET /image?path=../../etc"
+args:
+  expect_status: [403, 404]
+strength: strong
+```
 
 **U4.10 — Si el número tiene una procedencia rara, el payload la declara y la UI la enseña.**
 Ejemplos vivos: `objective_overridden` (un recorrido releído con otro proxy), `from_cache`,
 `holdout_touches`, `n_seeds`, el conteo de puntos descartados por geometría inválida. La regla
 general está en [6-numeros.md](6-numeros.md); aquí lo que importa es que **viaja en el payload**,
 no que el front lo deduzca.
+
+```check U4.10
+substrate: http
+kind: http_shape
+scope: "/sweeps/{name}/trials"
+args:
+  requires_when_present: ["objective_overridden", "n_seeds"]
+strength: strong
+```
 
 ## Cumplimiento (verificado 2026-07-27)
 

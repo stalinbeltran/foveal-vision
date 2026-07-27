@@ -15,6 +15,12 @@
 estilo: es la diferencia entre «980 ejemplos de val» y «20 imágenes correlacionadas», que es el
 malentendido que ya se pagó.
 
+```check U8.1
+substrate: same_as
+target: U8.2
+reason: "cualificar se comprueba por su contrapositivo: la palabra a secas no aparece"
+```
+
 **U8.2 — Las palabras ambiguas no entran al vocabulario visible.** Ni en rutas, ni en encabezados,
 ni en botones:
 
@@ -29,29 +35,94 @@ ni en botones:
 | «trial» en la UI | **punto** (del recorrido) o **run** | `trial` es vocabulario de optuna; el **job** es la ejecución en cola |
 | «test» como sinónimo de val | **val** o **holdout** | el test se toca una vez, al final, y solo el ganador |
 
+```check U8.2
+substrate: dom
+kind: dom_absent_text
+scope: "*"
+args:
+  words: ["muestras", "el modelo", "el dataset", "los samples", "trial"]
+  allow_qualified: ["dataset de ventanas", "modelo entrenado"]
+strength: strong
+```
+
 **U8.3 — El nombre en pantalla manda sobre el nombre en el documento.** Cuando divergen, se corrige
 el documento. Caso vivo: la pantalla del dominio I se llama **Estudios**; «Barrido por ejes» es el
 **método** ([barrido-por-ejes.md](../barrido-por-ejes.md)), no la pantalla.
+
+```check U8.3
+substrate: same_as
+target: U1.4
+reason: "el nav contra la tabla del documento es la misma comprobacion; habria cazado
+  'Barrido por ejes' contra 'Estudios'"
+```
 
 **U8.4 — Las etiquetas humanas viven en un solo sitio.** El vocabulario de dominio (ejes,
 objetivos, defaults, estados) lo sirve el API ([4-datos.md](4-datos.md) U4.2); su traducción a
 palabras visibles se escribe una vez en el front. Dos listas de etiquetas divergen igual que dos
 listas de valores.
 
+```check U8.4
+substrate: ast
+kind: single_definition
+args:
+  seams: ["state_labels", "axis_labels", "objective_labels"]
+  owner: "web/src/labels"
+strength: strong
+```
+
 **U8.5 — Los estados se dicen con la palabra exacta del dominio**, no con un sinónimo cómodo:
 `queued`, `running`, `done`, `error`, `cancelled`, `interrupted`. **`interrupted` es terminal**
 (borrable y reanudable, badge ámbar) y no significa «falló»: significa que su proceso dueño murió y
 alguien lo reconcilió.
+
+```check U8.5
+substrate: mixed
+kind: catalog_match
+args:
+  left: backend_states
+  right: badge_states
+strength: strong
+```
 
 **U8.6 — Todo texto que pueda acabar en una consola es ASCII.** La consola de Windows es cp1252: una
 `δ` griega en un `tie_reason` **mató un estudio nocturno en su última línea** — reproducido y
 arreglado. El texto que solo vive en el navegador puede llevar acentos y símbolos; el que viaja a
 un CLI, no. Si una cadena viaja a los dos sitios, gana la restricción del CLI.
 
+```check U8.6
+substrate: fs
+kind: no_match_outside
+scope: "src/fv/**/*.py"
+args:
+  pattern: "print\\([^)]*[^\\x00-\\x7F]"
+  allow: []
+strength: weak
+```
+
 **U8.7 — El idioma: pantalla y documentación en español; código en inglés.** Identificadores,
 docstrings, `code` de error y claves de payload en inglés (son contrato); lo que lee el usuario, en
 español. Un `code` traducido deja de ser contrato ([4-datos.md](4-datos.md) U4.6).
 
+```check U8.7
+substrate: fs
+kind: no_match_outside
+scope: "src/fv/**/*.py"
+args:
+  pattern: "code=\"[^\"]*[A-Z ][^\"]*\""
+  allow: []
+strength: weak
+```
+
 **U8.8 — Una negativa se escribe como razón + arreglo, en ese orden**, y en segunda persona del
 plural impersonal («no se puede…», «barre `d`, o usa un dataset con esa ventana»). Un mensaje que
 solo dice qué falló obliga al usuario a adivinar la mitad que importa.
+
+```check U8.8
+substrate: http
+kind: http_refuses
+scope: "POST /runs"
+args:
+  assert_hint_non_empty: true
+strength: strong
+```
+
