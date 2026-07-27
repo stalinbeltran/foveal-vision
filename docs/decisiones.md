@@ -95,7 +95,7 @@ en 20; aquí esa relación es un eje de diseño, no un accidente).
   antes de pagar el formato de `last.pt` bit-exacto. Reanudar el recorrido sí se construye.
 - **Sondas multicanal** (occlusion/deconvolución sobre entrada compuesta): el hermano lo dejó
   como «diseño real, no un fix». Aquí V4 se diseña ocluyendo **en la imagen original**, pre-
-  muestreo (ui.md §3), cuando llegue su fase.
+  muestreo ([ui/2-vistas.md](ui/2-vistas.md), V4), cuando llegue su fase.
 
 ## 4. Cerradas
 
@@ -111,6 +111,6 @@ en 20; aquí esa relación es un eje de diseño, no un accidente).
 | C8 | Se versiona la descripción, se ignora la carga | formatos.md §5 |
 | C9 | **F1**: cabezas de esquina `4×[exists, x, y]` sobre el backbone foveado (2026-07-21, decisión del usuario). El clasificador de la spec era placeholder; el avg-pool global se sustituye | herencia.md §2, organizacion.md §1-C, formatos.md §4.1 |
 | C10 | **F1b**: la ventana etiquetada es la **fóvea** (2026-07-21, decisión del usuario): `center_out(C) == window_size(B)` es el contrato ①a; la periferia es solo contexto; `corner_evidence` se congela contra la fóvea | organizacion.md §2-①, formatos.md §4.1, `fv/validation` |
-| C11 | Relleno de bordes en la vista: `pad_mode: edge` (replicar borde; nunca ceros a secas — «no hay texto» enseña una regla falsa), con **máscara de cobertura** calculada y enseñada en F0 para depurar. Un canal de máscara como entrada de la red queda como trabajo futuro (F7 sigue abierta para esa mitad) | `fv/fovea.build_view`, ui.md F0 |
+| C11 | Relleno de bordes en la vista: `pad_mode: edge` (replicar borde; nunca ceros a secas — «no hay texto» enseña una regla falsa), con **máscara de cobertura** calculada y enseñada en F0 para depurar. Un canal de máscara como entrada de la red queda como trabajo futuro (F7 sigue abierta para esa mitad) | `fv/fovea.build_view`, [ui/2-vistas.md](ui/2-vistas.md) F0 |
 | C12 | El anillo periférico se construye con **pooling anisótropo por zonas** (celdas de esquina d×d, bandas d×1/1×d, centro 1×1 copiado exacto), co-registrado columna a columna con la fóvea. El código de referencia de instructionsNewNN.md §5 (`avg_pool2d` de la imagen entera + pegar bordes) **no tipa para d>1** (el pooled mide original/d ≠ N); esta construcción reproduce exactamente la tabla de coordenadas de §4, que es la intención del documento. Implementado con `np.add.reduceat` (C-speed, sin bucle Python); tests contra la tabla | `fv/fovea.build_foveated_input`, tests/test_fovea.py |
 | C13 | **Barrido por ejes (OAT)** — 12 decisiones de **diseño** cerradas con el usuario (2026-07-23), **código pendiente en otra sesión**: builder paramétrico (`channels` lista, stride en 1ª capa ⇒ `n_layers` fuera de `stride_range`, `n_layers` único), derivador de base desde `window_size` (expone `d`/`c_frac`, desempate `N` mínimo, sin `N` → aflojar `c_frac` con razón), schedule como **dominio nuevo `studies/`** no ejecutor, base inline (`base_label` + `derivation`), ganador **sugerido** coste/calidad (`δ`, usuario confirma), semillas de confirmación configurables (default 3). Runs de ejemplo **descartados** (sin migración de checkpoints) | barrido-por-ejes.md §13; organizacion.md §1-I y ⑫; formatos.md §4.7 |

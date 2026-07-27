@@ -362,7 +362,7 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > ¿fóvea+periferia gana a una CNN plana de coste equivalente? — control con `d=1`/`c_frac`→1
 > o red plana equivalente, N semillas, criterio escrito antes); (2) el holdout y el dato de
 > verdad (fuente del generador reducida con resize — el resize aún NO está portado, decisión
-> al llegar); (3) V16/occlusion pre-muestreo (diseño en ui.md); (4) poda en el runner de
+> al llegar); (3) V16/occlusion pre-muestreo (diseño en [docs/ui/2-vistas.md](docs/ui/2-vistas.md)); (4) poda en el runner de
 > recorridos (hoy corre todos los puntos); (5) pantalla Entrenar: el estimador solo usa runs
 > comparables (hecho) pero no hay curva de coste por punto del recorrido.
 >
@@ -394,7 +394,7 @@ Los demás documentos, en orden de lectura:
 | [docs/organizacion.md](docs/organizacion.md) | **La raíz.** Dominios (A–I, X, G) y contratos ①–⑫ donde se tocan |
 | [docs/herencia.md](docs/herencia.md) | Qué viene de `image-text-finder`, qué se adapta y qué se descarta |
 | [docs/protocolo.md](docs/protocolo.md) | Cuándo un resultado es creíble. **Léelo antes de sacar conclusiones de un entrenamiento** |
-| [docs/api.md](docs/api.md) · [docs/ui.md](docs/ui.md) | La organización proyectada sobre HTTP y sobre pantallas |
+| [docs/api.md](docs/api.md) · [docs/ui.md](docs/ui.md) | La organización proyectada sobre HTTP y sobre pantallas. **`ui.md` es el índice**: las reglas de UI viven en `docs/ui/`, una por **tipo de especificación** — [1 estructura](docs/ui/1-estructura.md) · [2 vistas](docs/ui/2-vistas.md) · [3 representación](docs/ui/3-representacion.md) · [4 datos](docs/ui/4-datos.md) · [5 invariantes](docs/ui/5-invariantes.md) · [6 números](docs/ui/6-numeros.md) · [7 operación](docs/ui/7-operacion.md) · [8 léxico](docs/ui/8-lexico.md) |
 | [docs/plan.md](docs/plan.md) | El plan de ejecución, por fases verticales |
 | [docs/barrido-por-ejes.md](docs/barrido-por-ejes.md) | **IMPLEMENTADO (2026-07-24).** Barrido OAT (un eje a la vez) con base derivada del problema, defaults estáticos, arrastre del ganador y estudio (dominio I). Ver `fv.models.derive`, `fv.sweeps.generate/winner`, `fv.studies`, CLIs `fv-oat`/`fv-study` |
 | [docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) | **FASES 1, 2 y 3b HECHAS (2026-07-26); la 3 aplazada (F11), la 4 con el código hecho.** La métrica que manda (párrafo por imagen): el proxy de ventana ordena igual en ejes de **D** (+0,956) **y de C** (+1,000, §2 bis) → `OBJECTIVES` no cambia. `task_score` cableada (`fv.task`, contrato ⑬) con registro de holdout. 8 de las 10 pruebas de §9, medidas. **Léelo antes de tocar métricas de ranking** |

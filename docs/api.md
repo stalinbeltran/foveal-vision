@@ -132,7 +132,8 @@ imágenes). La UI la dispara con un botón.
 ### Introspección (`/runs/{name}/…`)
 
 `GET /kernels` · `POST /feature-maps` · `POST /input-view` (la entrada canal a canal con su
-máscara de cobertura — la vista de depuración fundamental aquí, ui.md V19) · sondas según ui.md.
+máscara de cobertura — la vista de depuración fundamental aquí, F0 en [ui/2-vistas.md](ui/2-vistas.md)) ·
+sondas según [ui/2-vistas.md](ui/2-vistas.md).
 Todos devuelven el payload de `matrixview` (números + min/max/mean + `truncated`) y **declaran
 el trabajo de color** (`sequential | diverging`): el cliente no puede saber si mira un peso con
 signo o una activación.

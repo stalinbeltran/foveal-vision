@@ -446,5 +446,5 @@ Trampas **nuevas, propias de la red foveada** (de instructionsNewNN.md y de P4 d
 5. **`avg_pool2d` puede borrar trazos finos en la periferia** (medido en el hermano: reducir
    mucho deja la tinta en 0,2 %). `pool_mode` es un eje a barrer, no una constante.
 6. **Una máscara desplazada o transpuesta no falla**: entrena igual con contexto mal etiquetado.
-   La vista de depuración de entrada (V19 en ui.md) existe para cazarla, con la cobertura como
+   La vista de depuración de entrada (F0 en [ui/2-vistas.md](ui/2-vistas.md)) existe para cazarla, con la cobertura como
    número.
