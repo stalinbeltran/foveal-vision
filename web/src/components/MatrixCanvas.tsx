@@ -12,8 +12,13 @@ type MapPayload = {
   color: "sequential" | "diverging";
 };
 
+// A colour literal here would be a SECOND definition of a token (ui/3-representacion.md
+// U3.1), and the copy that diverges is always the one nobody looks at. A missing
+// token is a broken stylesheet: fail with the reason, never paint an invented colour.
 function css(varName: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  if (!v) throw new Error(`falta el token ${varName} en tokens.css`);
+  return v;
 }
 
 function hex2rgb(h: string): [number, number, number] {
@@ -41,10 +46,10 @@ export function MatrixCanvas({ payload, scale = 8 }: { payload: MapPayload; scal
     cv.height = rows;
     const ctx = cv.getContext("2d")!;
     const img = ctx.createImageData(cols, rows);
-    const neg = hex2rgb(css("--div-neg") || "#2166ac");
-    const pos = hex2rgb(css("--div-pos") || "#b2182b");
-    const neutral: [number, number, number] = [245, 244, 240];
-    const dark: [number, number, number] = [22, 30, 40];
+    const neg = hex2rgb(css("--div-neg"));
+    const pos = hex2rgb(css("--div-pos"));
+    const neutral = hex2rgb(css("--surface"));
+    const dark = hex2rgb(css("--text"));
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         const v = m[y][x];

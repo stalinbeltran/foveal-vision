@@ -396,15 +396,33 @@ está construido)—. **El código de salida es ≠ 0 solo si hay una `violada`*
 un fallo, es el mapa de lo que sigue dependiendo de una persona. La cobertura **la calcula la
 herramienta**; no se mantiene a mano en ningún documento.
 
-> Verificado (2026-07-27, fase 0): **76 reglas**, 15 `ok`, **1 `violada`**, 5 `no_verificable`,
-> 55 `no_aplicable` (fase 1: 2 · fase 2: 11 · fase 3: 23 · fase 4: 19) → **21 % de cobertura
-> mecánica hoy**, sobre un techo previsto del 87 % cuando estén las cuatro fases. La violada es
-> **U3.1**: cuatro colores literales fuera de `tokens.css` y `npm run validate:palette` sin portar.
+> Verificado (2026-07-27, fases 0 y 1): **76 reglas**, 18 `ok`, **0 `violadas`**,
+> 5 `no_verificable`, 53 `no_aplicable` (fase 2: 11 · fase 3: 23 · fase 4: 19) → **23 % de cobertura
+> mecánica hoy**, sobre un techo previsto del 87 % cuando estén las cuatro fases.
 > `--live` **no añade nada todavía**: sus verbos son de las fases 3-4, así que esas reglas siguen
 > saliendo `no_aplicable` (corre sin error, no arranca servidores).
 > Salida ASCII, probada bajo `PYTHONIOENCODING=cp1252`. **Control**: quitar un bloque `check` hace
 > que el lint aborte nombrando la regla (`U8.6 … sin bloque check`, salida 2) — un spec malformado
 > nunca produce un verde.
+
+### La paleta se valida, no se mira
+
+```powershell
+cd web
+npm run validate:palette
+```
+
+Lee `src/theme/tokens.css`, saca la rampa categórica (`--series-N`) y la superficie (`--bg`) de
+**cada tema**, y corre los checks computables: banda de luminosidad, suelo de croma, separación CVD
+(simulación protan/deutan), suelo de visión normal y contraste contra la superficie. Salida ≠ 0 si
+algo FALLA.
+
+> Verificado (2026-07-27): **todo pasa**. Claro — peor par adyacente **ΔE 9,1** (protan), suelo de
+> visión normal 19,6, tinta 14,87:1 y 5,21:1. Oscuro — **ΔE 8,4** / 19,3, tinta 14,10:1 y 6,57:1.
+> Queda un **WARN** de contraste en claro (cuatro series por debajo de 3:1 contra el fondo), que es
+> legal **solo** porque el relieve está mandado por la especificación: leyenda con etiqueta y tabla
+> de números gemela. `scriptserify_spec.py` ejecuta **este mismo script** para las reglas U3.8 y
+> U3.13 — una implementación, dos entradas.
 
 ## Por dónde empezar a leer
 

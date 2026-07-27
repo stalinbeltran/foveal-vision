@@ -3,9 +3,9 @@
 > **Qué decide**: la codificación visual — color, ejes, forma, y con qué se dibuja cada cosa.
 > **Qué NO decide**: qué afirma la vista (→ [2-vistas.md](2-vistas.md)); quién decide el tipo de
 > escala, que **viaja en el payload** (→ [4-datos.md](4-datos.md) U4.1).
-> **Cómo se hace cumplir**: la paleta, con **validador ejecutable**; el resto, prosa + Playwright
-> (que ve errores de consola, no un doble eje). Ver «Cumplimiento» abajo: hoy el validador **no
-> está portado**.
+> **Cómo se hace cumplir**: la paleta, con **validador ejecutable** (`npm run validate:palette`,
+> portado y corriendo desde 2026-07-27); el resto, prosa + Playwright (que ve errores de consola, no
+> un doble eje). Ver «Cumplimiento» abajo.
 
 ---
 
@@ -126,6 +126,15 @@ args:
 strength: strong
 ```
 
+```check U3.8
+substrate: css
+kind: palette_cvd_delta_e
+args:
+  warn_is: ok
+  relief: "U3.8 mismo (leyenda + etiqueta) y U3.6 (tabla de numeros)"
+strength: strong
+```
+
 **U3.9 — Las ranuras de esquina son entidades fijas**: el mismo color de TL en **toda** vista
 (`--corner-tl`…`--corner-bl`), y las etiquetas siempre en tinta de texto. El orden de esquinas lo
 sirve el API (U4.2), no el front.
@@ -193,16 +202,31 @@ args:
 strength: strong
 ```
 
-## Cumplimiento (verificado 2026-07-27)
+```check U3.13
+substrate: css
+kind: palette_contrast
+args:
+  ink_min: 4.5
+  warn_is: ok
+  relief: "U3.6 tabla de numeros + U3.8 leyenda con etiqueta"
+strength: strong
+```
+
+## Cumplimiento (verificado 2026-07-27, fase 1 del validador)
 
 | Regla | Estado |
 |---|---|
-| U3.1 tokens únicos | ✅ `tokens.css` tiene la paleta completa, claro + oscuro, con las 8 series y las 4 ranuras de esquina |
-| U3.1 **validador** | ⚠ **NO EXISTE**. `web/package.json` solo tiene `dev`, `build`, `preview`: **`npm run validate:palette` no está portado** del hermano, pese a que [ui.md](../ui.md) lo daba por hecho y [tests.md](../tests.md) §5 lo cita como *la única* comprobación ejecutable de la UI. Hoy U3.1 es prosa como las demás |
-| U3.12 librería de gráficas | ⚠ **No hay Observable Plot** (ni ninguna dependencia de gráficas): [LineChart.tsx](../../web/src/components/LineChart.tsx) es **SVG a mano**, y `MatrixCanvas`/`WindowCanvas` son canvas. La regla se cumple en el reparto (SVG para ejes, canvas para matrices); lo que no se cumple es la librería nombrada. **Manda el reparto**, no el nombre |
-| U3.7/U3.8 | ✅ implementadas en [SweepCurves.tsx](../../web/src/components/SweepCurves.tsx) (color por identidad, leyenda de casillas) |
-| U3.10 | ✅ `data-testid=band-cut` |
+| U3.1 paleta única | ✅ `tokens.css` tiene la paleta completa, claro + oscuro, 8 series y 4 ranuras de esquina |
+| U3.1 **validador** | ✅ **portado**: `npm run validate:palette` existe y corre. Los checks y sus umbrales son los del método computable (banda de luminosidad, suelo de croma, separación CVD, suelo de visión normal, contraste vs superficie); el fichero portado es `web/scripts/validate_palette.js` y **no se toca**: `web/scripts/palette.mjs` solo dice qué token juega cada papel |
+| U3.1 sin literales | ✅ **arreglado**: los cuatro colores escritos a mano (`MatrixCanvas`, `WindowCanvas`) eran segundas definiciones de `--div-neg`/`--div-pos` y dos centinelas. Ahora un token que falta **falla con la razón** en vez de pintar un color inventado, y el mapa secuencial va de `--surface` a `--text` → **sigue al tema**, que antes no hacía |
+| U3.8 / U3.13 medidos | ✅ claro: peor par adyacente **ΔE 9.1** (protan) · suelo de visión normal **19.6** · tinta 14,87:1 y 5,21:1. Oscuro: **ΔE 8.4** · 19.3 · 14,10:1 y 6,57:1 |
+| U3.9 ranuras de esquina | ✅ las cuatro, en los dos temas |
+| U3.12 librería de gráficas | ⚠ **No hay Observable Plot** (ni dependencia de gráficas): `LineChart.tsx` es **SVG a mano** y `MatrixCanvas`/`WindowCanvas` son canvas. La regla se cumple en el **reparto**; lo que no se cumple es la librería nombrada. **Manda el reparto** |
 
-**Deuda declarada**: portar `validate:palette`. Mientras no exista, la afirmación «la paleta se
-valida, no se mira» es incomprobable — exactamente el tipo de promesa que este proyecto exige
-convertir en rastro (ver la decisión F14 como precedente).
+**Un WARN que se queda, y por qué es legal.** En claro, cuatro de las ocho series no llegan a 3:1
+contra el fondo (`#eda100` 2,0 · `#e87ba4` 2,49 · `#1baf7a` 2,6 · `#eb6834` 2,96). El método dice
+que un WARN de contraste **obliga a relieve** —etiquetas visibles o vista de tabla— y **no es
+descartable**. Aquí el relieve está mandado por el propio documento (U3.8 leyenda con etiqueta,
+U3.6 tabla de números gemela), así que la política *«WARN cuenta como ok con este relieve»* está
+escrita **en el bloque `check`**, no escondida en el código del validador.
+

@@ -27,9 +27,6 @@ LIVE_SUBSTRATES = {"http", "dom"}
 
 # Declared in validador.md, built in a later phase. The report says which.
 PLANNED: dict[str, int] = {
-    "css_tokens": 1,
-    "palette_contrast": 1,
-    "palette_cvd_delta_e": 1,
     "ast_query": 2,
     "single_definition": 2,
     "settle_guard": 2,

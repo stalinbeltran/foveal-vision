@@ -17,7 +17,16 @@ TYPE_NAMES = {
 }
 
 
+# Transliterate before stripping: a detail that reads "IE 9.1" instead of "dE 9.1"
+# is ASCII and useless. Only symbols that carry meaning in these reports.
+TRANSLIT = {"Δ": "d", "↔": "<->", "·": "|", "→": "->", "≥": ">=",
+            "≤": "<=", "–": "-", "—": "-", "±": "+/-", "«": '"',
+            "»": '"', "‘": "'", "’": "'", "“": '"', "”": '"'}
+
+
 def ascii_(s: str) -> str:
+    for k, v in TRANSLIT.items():
+        s = s.replace(k, v)
     return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
 
 

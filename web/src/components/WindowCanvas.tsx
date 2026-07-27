@@ -34,11 +34,15 @@ export function WindowCanvas(props: {
         ctx.fillRect(xx * s, yy * s, s, s);
       }
     const order = props.cornerOrder ?? [];
+    // No colour literal, not even as a "cannot happen" marker (U3.1): an unknown
+    // corner or a missing token is a broken contract, and it says so.
     const colorOf = (i: number) => {
       const css = CORNER_CSS[order[i]];
-      if (!css) return "#f00";
-      return getComputedStyle(document.documentElement)
-        .getPropertyValue(css.slice(4, -1)).trim() || "#f00";
+      if (!css) throw new Error(`esquina desconocida: ${order[i]} (corner_order del payload)`);
+      const v = getComputedStyle(document.documentElement)
+        .getPropertyValue(css.slice(4, -1)).trim();
+      if (!v) throw new Error(`falta el token ${css} en tokens.css`);
+      return v;
     };
     for (let c = 0; c < order.length; c++) {
       const t = props.y?.[c];

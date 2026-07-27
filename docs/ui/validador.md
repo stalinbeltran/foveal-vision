@@ -199,7 +199,7 @@ medido por ella misma, no estimado.
 | Fase | Qué | Deja |
 |---|---|---|
 | **0 ✅ (2026-07-27)** | `extract` + `engine` + los cuatro estados + informe + `spec_lint` (B1) + los **76 bloques `check`** + los verbos que no piden dependencias nuevas: `file_exists`, `json_path`, `must_match`, `no_match_outside` y **`catalog_match` con extractores de fichero** | La **cobertura real medida** (§8 bis) y los ocho documentos protegidos contra su propia deriva |
-| **1** | B2: `css_tokens`, `palette_contrast`, `palette_cvd_delta_e` | Cierra la deuda declarada (`validate:palette`, que hoy **no existe**) |
+| **1 ✅ (2026-07-27)** | B2: `css_tokens`, `palette_contrast`, `palette_cvd_delta_e` + el validador de paleta **portado** a `web/scripts/` y expuesto como `npm run validate:palette` | Cierra la deuda declarada. **Una implementación, dos entradas**: el handler de Python *ejecuta el mismo script*, no reimplementa los checks |
 | **2** | B3 + B7: `ast_query`, `no_match_outside`, `single_definition` | La regla que ya costó cuatro copias vivas (U4.2) pasa a ser mecánica |
 | **3** | B4: `http_shape`, `http_refuses` | Los `code` del backend y los que la UI conoce se casan (U5.1, U5.5) |
 | **4** | B6 + B5: anotaciones, `dom_query`, `dom_absent_text`, `catalog_match` completo | Los tipos 1, 2 y 6 dejan de ser solo prosa |
@@ -280,6 +280,37 @@ número de resultado cableado en la UI (U6.13); y el contrato ① **delegado** a
    `runs-table`**. La lista se armó con un `grep` que trató `Runs.tsx` como binario y lo saltó. Es
    justo el modo de fallo del proyecto —*el mismo dato en dos sitios, y solo una copia se
    actualizó*— cazado por la herramienta el día que nació.
+
+### Fase 1, medido (2026-07-27)
+
+```
+TOTAL  76 reglas : 18 ok  0 violadas  5 no-verificables  53 no-aplicables   cobertura 23%
+pendientes por construir -> fase 2: 11 | fase 3: 23 | fase 4: 19
+```
+
+**Cero violadas**: la deuda de U3.1 quedó cerrada por los dos lados —el script existe y los cuatro
+colores literales se fueron—. Los números de la paleta, ahora **computados y no razonados**: claro
+ΔE 9.1 (protan) con suelo de visión normal 19.6; oscuro ΔE 8.4 y 19.3; tinta ≥ 5,2:1 en ambos temas.
+
+**Tres cosas que sólo se ven construyéndolo:**
+
+1. **El riesgo del §10 se materializó en la primera hora.** Escribí el check de U3.13 con
+   `require_override: true` (exigir que cada token tenga **otro** valor en oscuro) y saltó
+   `--series-2`. Pero la regla dice *«cada token tiene su valor en dark»*, no *«uno distinto»*: ese
+   verde pasa los checks en las dos superficies a propósito. **El bloque era más estricto que la
+   prosa, y la prosa gana** — `require_override` fuera. La protección documentada funcionó a la
+   primera vez que hizo falta.
+2. **Un WARN que se queda, con su razón escrita en el bloque.** Cuatro series no llegan a 3:1 en
+   claro; el método dice que eso obliga a relieve y **no es descartable**. El relieve existe (U3.8
+   leyenda + U3.6 tabla), así que la política vive en `warn_is: ok` + `relief:` **dentro del
+   bloque**, no escondida en el código del validador.
+3. **Arreglar U3.1 destapó un bug de verdad**: el mapa secuencial usaba dos colores literales fijos
+   y por eso **no seguía al tema** — se pintaba claro sobre fondo oscuro. Ahora va de `--surface` a
+   `--text`. La regla de color no era cosmética.
+
+**Límite conocido del check de U3.1**: sólo caza literales en `#rrggbb`. Los dos colores que estaban
+escritos como tripletas RGB (`[245, 244, 240]`) **no los habría visto** ningún patrón razonable; se
+encontraron al leer el fichero para arreglar los otros. Cazarlos es trabajo del AST (fase 2).
 
 **Corrección a §8**: predije que U7.9 saldría `violada`. **No lo está** — `verify_ui.py` sí recorre
 las 12 rutas. La predicción estaba razonada, no medida.
