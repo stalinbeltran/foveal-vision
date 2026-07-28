@@ -23,6 +23,37 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-28 — LISTAR NO ES VERIFICAR: LA REGLA U1.6 Y EL PLAN DE UN ESTUDIO.**
+> El usuario reportó que **los parámetros de un estudio no vuelven a verse una vez creado**. Se
+> documentó primero (a petición suya) y se implementó después. Lo que hay que saber:
+>
+> 1. **Regla nueva `U1.6`** en [docs/ui/1-estructura.md](docs/ui/1-estructura.md) — *un objeto
+>    enseña entera la definición con que se creó, y la enseña en su detalle*. Va en el tipo 1 junto
+>    a U1.5 («verificar un objeto no exige entrenar») porque es la misma exigencia. Fija cuatro
+>    cosas: se lee **del objeto guardado**, nunca del formulario recordado (U7.3); **definición y
+>    progreso separados** en pantalla como ya lo están en disco; los valores compuestos **completos**
+>    (el rango de un eje es su lista, no su longitud) y el presupuesto **con unidad**; ausente se
+>    dibuja como ausente. **77 reglas** ahora.
+> 2. **Estudios lo cumple**: bloque `study-plan` (B, receta D, objetivo, semillas, presupuesto) +
+>    `study-axes` (la escalera con el rango literal y `hecho`/`en curso`/`pendiente` por eje, sacado
+>    del progreso vivo); debajo, «El progreso (lo que ha pasado)». **`channels[i]` reconoce sus
+>    propios sub-pasos** (`channels[0..L-1]`) — la única parte no trivial.
+> 3. ⚠ **El bloque no enumera los campos que conoce y calla el resto**: lo que `plan.json` traiga y
+>    la pantalla no nombre se pinta igual bajo su clave. Un campo añadido en Python **no puede
+>    volverse invisible** aquí. Escribir la regla ya destapó uno: **`budget` no estaba descrito en
+>    [docs/formatos.md](docs/formatos.md) §4.7** aunque lo guarda `POST /studies` y lo lee
+>    `driver.advance`. Documentado.
+> 4. **Y un fallo del propio validador**: `sibling_required` **dormía 300 ms fijos** esperando al
+>    DOM — justo lo que `validador.md` §8 prohíbe por escrito tras habérselo cobrado ya una vez.
+>    Ahora espera al selector; si no, el check de U1.6 habría sido intermitente.
+>
+> ⚠ **Verificado, no razonado**: `verify_spec --live` **63 ok, 0 violadas, 81 %** (tipo 1 al 100 %),
+> `verify_ui.py` con las 12 pantallas y las aserciones nuevas sobre **los 5 estudios**, 122 tests,
+> `npm run build` limpio. Los estados que ningún estudio real ejercitaba (`auto`, `channels[i]`
+> expandido, un eje en cola) se probaron con un estudio temporal creado por HTTP y **borrado**
+> después (arrastre comprobado antes: 0 recorridos). Para correr `--live` hubo que **parar el vite
+> del usuario** (con su permiso) y **se le devolvió levantado**; su backend de `:8010` no se tocó.
+
 > **2026-07-27 — LA ESPECIFICACIÓN DE LA UI, EN OCHO TIPOS, Y UN VALIDADOR QUE LA COMPRUEBA.**
 > A petición del usuario se sintetizaron los **tipos** de especificación que rigen la UI y luego se
 > construyó lo que los hace cumplir. Lo que hay que saber:
@@ -31,7 +62,6 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    estructura · 2 vistas · 3 representación · 4 datos · 5 invariantes · 6 números · 7 operación ·
 >    8 léxico), **76 reglas numeradas y citables** (`U4.2`, `U6.7`…). El contenido se **movió**, no
 >    se copió: dejarlo en los dos sitios era el modo de fallo que este proyecto tiene registrado.
-> 2. **`scripts\verify_spec.py` valida esa especificación y se alimenta de ella**: cada regla lleva
 > 2. **`scripts/verify_spec.py` valida esa especificación y se alimenta de ella**: cada regla lleva
 >    pegado un bloque ` ```check ` (opción **A2**: el markdown manda). Motor híbrido (**C3**): 12
 >    verbos declarativos + handlers nombrados; lo que no encaja se declara `substrate: none` **con
