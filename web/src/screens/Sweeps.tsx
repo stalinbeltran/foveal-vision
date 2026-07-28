@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { ACTIVE_STATES, api, isTerminal } from "../api";
 import { usePersistedState } from "../uiState";
 import { Badge, ErrorBox, Field, Working } from "../components/ui";
 import { SweepCurves } from "../components/SweepCurves";
@@ -88,7 +88,6 @@ export default function Sweeps() {
     let alive = true;
     curvesRef.current = {}; setCurves({}); settledRef.current = new Set();
     setWinner(null);
-    const TERMINAL = new Set(["done", "cancelled", "failed"]);
     const load = async () => {
       let t: any;
       try { t = await api.get(`/sweeps/${sel}/trials`); }
@@ -101,7 +100,7 @@ export default function Sweeps() {
         try {
           const m = await api.get(`/runs/${r.run}/metrics?since=0`);
           curvesRef.current[r.run] = m.records;
-          if (TERMINAL.has(r.status)) settledRef.current.add(r.run);
+          if (isTerminal(r.status)) settledRef.current.add(r.run);
         } catch { /* a run mid-write or just gone: keep what we had, retry next tick */ }
       }));
       if (alive) setCurves({ ...curvesRef.current });
@@ -186,7 +185,7 @@ export default function Sweeps() {
     base_recipe: sdistinct((s) => s.spec.base_recipe),
     objective: sdistinct((s) => s.spec.objective),
   };
-  const ACTIVE = ["running", "queued"];
+  const ACTIVE = ACTIVE_STATES as readonly string[];
   const sfiltered = allSweeps.filter((s) => {
     if (sf.window_dataset && s.spec.window_dataset !== sf.window_dataset) return false;
     if (sf.base_network && baseKeyOf(s) !== sf.base_network) return false;

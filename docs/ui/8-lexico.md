@@ -65,9 +65,16 @@ listas de valores.
 substrate: ast
 kind: single_definition
 args:
-  seams: ["state_labels", "axis_labels", "objective_labels"]
-  owner: "web/src/labels"
-strength: strong
+  seams:
+    - name: status_labels
+      owner: "web/src/components/ui.tsx"
+      markers: ["en cola", "corriendo", "terminado", "interrumpido"]
+      min_markers: 2
+    - name: axis_labels
+      owner: "web/src/screens/Sweeps.tsx"
+      markers: ["eje", "objetivo", "presupuesto"]
+      min_markers: 3
+strength: weak
 ```
 
 **U8.5 — Los estados se dicen con la palabra exacta del dominio**, no con un sinónimo cómodo:

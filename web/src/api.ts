@@ -44,6 +44,17 @@ export async function waitJob(jobId: string, onTick?: (j: any) => void): Promise
   }
 }
 
+// The run/sweep state vocabulary, ONCE (ui/4-datos.md U4.2, ui/8-lexico.md U8.5).
+// It was written out in four screens and the copies had already drifted: one of
+// them waited for a state called "failed" — which this system does not have —
+// and none of them knew about `interrupted`, so an interrupted run never settled
+// and was re-fetched forever. The names are the backend's (status.json);
+// ⚠ pendiente: que los sirva el API en vez de declararlos aquí (decisiones.md F16).
+export const TERMINAL_STATES = ["done", "error", "cancelled", "interrupted"] as const;
+export const ACTIVE_STATES = ["queued", "running"] as const;
+export const isTerminal = (s?: string | null) =>
+  TERMINAL_STATES.includes(s as (typeof TERMINAL_STATES)[number]);
+
 // The corner ORDER is not a constant of the front: it belongs to the dataset
 // (manifest.corner_order) and travels in every payload indexed by it — the
 // diagnostics summary and the predict answer. What lives here is only the COLOUR

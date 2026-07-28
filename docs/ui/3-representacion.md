@@ -185,10 +185,10 @@ rendimiento con forma de decisión estética.
 ```check U3.12
 substrate: ast
 kind: ast_query
-scope: "web/src/components/*.tsx"
+scope: "web/src/components/*Canvas.tsx"
 args:
-  assert: "las matrices densas se pintan en canvas, no en <rect> por celda"
-strength: weak
+  require_any_identifier: ["getContext", "createImageData"]
+strength: strong
 ```
 
 **U3.13 — Claro y oscuro son dos superficies, no una con filtro.** Cada token tiene su valor en

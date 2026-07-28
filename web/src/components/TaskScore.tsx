@@ -88,7 +88,7 @@ export function TaskScore(props: {
     } catch (e) { setError(e); } finally { setBusy(false); }
   };
 
-  const small = rows?.length ? rows[0].images < 100 : false;
+  const small = rows?.length ? !!rows[0].small_sample : false;
   const sem = rows?.length ? rows[0].macro?.sem : null;
   const mean = rows?.length
     ? rows.reduce((a, r) => a + r.macro.f1, 0) / rows.length : null;

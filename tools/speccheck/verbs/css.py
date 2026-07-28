@@ -26,6 +26,7 @@ def palette_report(ctx: Context) -> tuple[dict | None, str]:
         proc = subprocess.run(
             ["node", "scripts/palette.mjs", "--json"],
             cwd=ctx.root / "web", capture_output=True, text=True, timeout=120, shell=True,
+            encoding="utf-8", errors="replace",
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return None, f"no se pudo ejecutar node: {exc}"

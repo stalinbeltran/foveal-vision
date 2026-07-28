@@ -28,6 +28,8 @@ import json
 import math
 import statistics
 from datetime import datetime, timezone
+
+from .report import SMALL_SAMPLE
 from pathlib import Path
 
 from fv import settings
@@ -261,6 +263,10 @@ def task_score(run_name: str, split: str = "val", *,
     payload = {
         "run": run_name, "split": split, "window_dataset": ds_name,
         "source": source_id, "images": len(per_image),
+        # The threshold is DEFINED once (report.SMALL_SAMPLE) and travels with the
+        # number: a client that compares against its own 100 is a second definition
+        # of the same fact (ui/6-numeros.md U6.2).
+        "small_sample": len(per_image) < SMALL_SAMPLE,
         **_aggregate(per_image),
         "per_image": [{"index": r["index"], "f1": r["f1"], "tp": r["tp"],
                        "fp": r["fp"], "fn": r["fn"], "mean_iou": r["mean_iou"]}

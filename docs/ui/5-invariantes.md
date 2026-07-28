@@ -36,9 +36,9 @@ después ([api.md](../api.md) R4).
 ```check U5.2
 substrate: ast
 kind: error_hint_propagated
-scope: "web/src/**/*.{ts,tsx}"
+scope: "web/src/screens/*.tsx"
 args:
-  assert: "ningun catch descarta el hint"
+  require_any_identifier: ["ErrorBox"]
 strength: strong
 ```
 

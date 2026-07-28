@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { api, CORNER_CSS, Corner } from "../api";
+import { api, CORNER_CSS, Corner, isTerminal } from "../api";
 import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 
@@ -27,7 +27,7 @@ export default function Predict() {
   // the picker instead of 404-ing on the next predict.
   const refreshLists = () => {
     api.get("/runs").then((d) => {
-      const done = d.runs.filter((r: any) => ["done", "cancelled"].includes(r.status));
+      const done = d.runs.filter((r: any) => isTerminal(r.status));
       setRuns(done);
       setRun((cur) => (cur && done.some((r: any) => r.name === cur)) ? cur : (done[0]?.name ?? ""));
     }).catch(setError);

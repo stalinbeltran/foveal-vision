@@ -31,10 +31,10 @@ diferencias que se quieren distinguir.
 
 ```check U6.2
 substrate: ast
-kind: single_definition
+kind: ast_query
+scope: "web/src/**/*"
 args:
-  seams: ["small_sample_threshold"]
-  owner: "fv.task"
+  forbid_numeric_comparison: ["images\\s*<\\s*100", "n_images\\s*<\\s*100"]
 strength: strong
 ```
 
@@ -109,12 +109,9 @@ no se calcula por época, no la dispara ningún sondeo: **botón explícito**, y
 sugerido y el mejor. El proxy de ventana ordena igual en ejes de D (+0,956) y de C (+1,000).
 
 ```check U6.8
-substrate: ast
-kind: ast_query
-scope: "web/src/**/*.tsx"
-args:
-  forbid: "task-score en un sondeo periodico"
-strength: weak
+substrate: same_as
+target: U4.7
+reason: "es la misma comprobacion: la metrica de tarea no entra en ningun sondeo"
 ```
 
 **U6.9 — Una estimación dice de qué se estimó, o no se da.** Entrenar estima el coste con los

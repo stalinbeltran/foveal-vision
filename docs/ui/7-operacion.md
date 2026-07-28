@@ -48,9 +48,12 @@ pantallas siguen leyendo el A–I real del API.
 ```check U7.3
 substrate: ast
 kind: ast_query
-scope: "web/src/screens/*.tsx"
+scope: "web/src/**/*"
 args:
-  forbid: "leer un objeto de dominio de localStorage sin refrescarlo del API"
+  string_only_in:
+    value: "fv.ui."
+    files: ["web/src/uiState.ts"]
+  require_any_identifier: []
 strength: weak
 ```
 

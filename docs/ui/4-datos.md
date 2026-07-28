@@ -42,8 +42,23 @@ campo compartido, buscar todos sus lectores.**
 substrate: ast
 kind: single_definition
 args:
-  seams: ["objectives", "sweep_axes", "network_defaults", "corner_order", "window_size_fields"]
-  owner: "api"
+  seams:
+    - name: corner_order
+      owner: "web/src/api.ts"
+      markers: ["TL", "TR", "BR", "BL"]
+      min_markers: 3
+    - name: objectives
+      owner: null
+      markers: ["val_loss", "pos_err_px", "val_f1"]
+      min_markers: 2
+    - name: network_fields
+      owner: "web/src/screens/Networks.tsx"
+      markers: ["c_frac", "pen_frac", "k_center", "s_periph"]
+      min_markers: 3
+    - name: run_states
+      owner: "web/src/api.ts"
+      markers: ["queued", "running", "done", "cancelled", "error", "interrupted"]
+      min_markers: 2
 strength: strong
 ```
 
@@ -85,7 +100,9 @@ substrate: ast
 kind: settle_guard
 scope: "web/src/screens/Sweeps.tsx"
 args:
-  assert: "solo se cachea la curva cuando el estado terminal llego en la MISMA respuesta"
+  call_guard:
+    callee: "settledRef.current.add"
+    condition_contains: "isTerminal("
 strength: strong
 ```
 
@@ -112,7 +129,7 @@ substrate: ast
 kind: ast_query
 scope: "web/src/**/*.tsx"
 args:
-  forbid: "task-score dentro de setInterval/poll"
+  forbid_string_in_timer: ["task-score"]
 strength: strong
 ```
 
@@ -122,10 +139,12 @@ leyendo el A–I real del API. Ver [7-operacion.md](7-operacion.md) U7.2–U7.3.
 ```check U4.8
 substrate: ast
 kind: ast_query
-scope: "web/src/**/*.tsx"
+scope: "web/src/**/*"
 args:
-  forbid: "poblar A-I desde /ui-state"
-strength: weak
+  string_only_in:
+    value: "/ui-state"
+    files: ["web/src/uiState.ts"]
+strength: strong
 ```
 
 **U4.9 — Las rutas se resuelven dentro del dominio.** No existe `GET /image?path=`: allowlist de
