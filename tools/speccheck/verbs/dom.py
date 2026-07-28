@@ -187,9 +187,12 @@ def select_matches_served_vocabulary(check: Check, ctx: Context) -> Outcome:
         return Outcome(NA, why)
     from .http import _req
     a = check.args
-    st, body = _req(ctx, "GET", str(a.get("source", "")))
+    # `source` is written the way every other block writes a route: "GET /path"
+    source = str(a.get("source", "")).strip()
+    method, _, path = source.partition(" ") if " " in source else ("GET", "", source)
+    st, body = _req(ctx, method, path or source)
     if st != 200 or not isinstance(body, dict):
-        return Outcome(NA, f"{a.get('source')} contesto {st}: sin vocabulario que comparar")
+        return Outcome(NA, f"{source} contesto {st}: sin vocabulario que comparar")
 
     def dig(d, path):
         for part in str(path).split("."):

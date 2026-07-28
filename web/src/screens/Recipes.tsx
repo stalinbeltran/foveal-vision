@@ -75,6 +75,10 @@ export default function Recipes() {
       opts.unshift({ value: v, label: `${v} (no reconocido)` });
     return opts;
   };
+  const options = (k: string) => optionsFor(k).map((o) => (
+    <option key={o.value} value={o.value}>{o.label}</option>));
+  const onSelect = (k: string) => (e: React.ChangeEvent<HTMLSelectElement>) =>
+    setForm({ ...form, [k]: e.target.value });
   return (
     <div>
       <h2 data-domain="D">Recetas (D)</h2>
@@ -87,12 +91,17 @@ export default function Recipes() {
             onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           {fields.map((k) => (
             <Field key={k} label={k} help={HELP[k]}>
-              {k === "optimizer" || k === "scheduler" || k === "monitor" ? (
-                <select data-testid={`${k}-select`} value={form[k] ?? ""}
-                  onChange={(e) => setForm({ ...form, [k]: e.target.value })}>
-                  {optionsFor(k).map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>))}
-                </select>
+              {/* el data-testid va LITERAL en cada uno: uno calculado no existe
+                  para el verificador que los declara contrato (U7.11) */}
+              {k === "optimizer" ? (
+                <select data-testid="optimizer-select" value={form[k] ?? ""}
+                  onChange={onSelect(k)}>{options(k)}</select>
+              ) : k === "scheduler" ? (
+                <select data-testid="scheduler-select" value={form[k] ?? ""}
+                  onChange={onSelect(k)}>{options(k)}</select>
+              ) : k === "monitor" ? (
+                <select data-testid="monitor-select" value={form[k] ?? ""}
+                  onChange={onSelect(k)}>{options(k)}</select>
               ) : (
                 <input type="number" step="any" value={form[k]}
                   onChange={(e) => setForm({ ...form, [k]: +e.target.value })} />

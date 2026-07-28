@@ -63,7 +63,13 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    **son** las servidas; lo mostrado **es** lo guardado).
 > ⚠ **Verificado, no razonado**: **125 tests** (+2), `npm run build` limpio y el flujo pulsado en
 > la instancia del usuario — opciones = vocabulario servido, enseña `val_loss`, un `f1` recordado
-> sale `f1 (no reconocido)` y guardarlo devuelve `[unknown_monitor]` con razón y arreglo.
+> sale `f1 (no reconocido)` y guardarlo devuelve `[unknown_monitor]` con razón y arreglo. Y
+> `verify_spec --live`: **78 reglas, 64 ok, 0 violadas, 82 %** (U5.10 medida por su propio verbo),
+> más `verify_ui.py` con las 12 pantallas sin un error de consola. Para correr `--live` hubo que
+> **parar el vite del usuario** (con su permiso) y **se le devolvió levantado**.
+> ⚠ La primera corrida volvió a medir al validador, no al código: `U5.10` reventó (`source:
+> "GET /recipes"` se pasaba entero como ruta) y `U7.11` cazó que un **`data-testid` calculado no
+> existe** para el escáner, que lee literales del fuente. Los tres selects lo llevan literal ahora.
 > ⚠ **Corrección de la nota anterior**: en la primera verificación la semilla de `localStorage`
 > usaba la clave sin el prefijo `fv.ui.`, así que **esa mitad no probó nada** (la del clic en la
 > fila sí). Rehecha con la clave real: pasa. **Lección: una aserción que no puede fallar es peor
