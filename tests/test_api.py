@@ -51,6 +51,19 @@ def test_listed_config_can_be_saved_back(world, client):
     assert bad.json()["detail"]["code"] == "unknown_recipe_fields"
 
 
+def test_recipe_monitor_vocabulary_is_served_and_enforced(world, client):
+    # the screen fills its select from here; the gate validates against the same
+    # constant, so the control can never offer what saving would refuse
+    from fv.metrics import MONITORS
+    d = client.get("/recipes").json()
+    assert d["vocabulary"]["monitor"] == list(MONITORS)
+    assert d["defaults"]["monitor"] in d["vocabulary"]["monitor"]
+    bad = client.post("/recipes", json={"name": "by-objective", "monitor": "f1"})
+    assert bad.status_code == 400
+    assert bad.json()["detail"]["code"] == "unknown_monitor"
+    assert all(x["name"] != "by-objective" for x in client.get("/recipes").json()["recipes"])
+
+
 def test_contract_01_http_400_before_job_and_no_run_created(world, client):
     _make_named(client)
     bad = dict(TINY_NET, N=20, c_frac=0.8, name="big")
@@ -76,6 +89,10 @@ def test_full_flow_train_diagnose_predict(world, client):
     assert d["config"]["provenance"]["network"]["name"] == "tiny"
     m = client.get("/runs/api-run/metrics?since=0").json()
     assert m["next"] == 1 and m["records"][0]["epoch"] == 1
+    # the rankable-metrics table is not a wish: every key of it is measured in a
+    # real val record, so a monitor/objective can never name something absent
+    from fv.metrics import VAL_METRICS
+    assert set(VAL_METRICS) <= set(m["records"][0]["val"])
     m2 = client.get(f"/runs/api-run/metrics?since={m['next']}").json()
     assert m2["records"] == []   # never resent
 

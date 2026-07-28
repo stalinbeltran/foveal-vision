@@ -151,7 +151,7 @@ reason: "procedimiento, no propiedad: lo cumple el propio runner en --live"
 **U7.11 — Los `data-testid` son contrato con el verificador**, no adorno: renombrar uno rompe la
 verificación en silencio (el selector expira por timeout y parece lentitud). Los vivos hoy:
 `sources-table`, `wds-table`, `window-grid`, `networks-table`, `validate-panel`, `zone-diagram`,
-`recipes-table`, `compat`, `sweeps-table`, `trials-table`, `sweep-curves`, `sweep-legend`,
+`recipes-table`, `monitor-select`, `compat`, `sweeps-table`, `trials-table`, `sweep-curves`, `sweep-legend`,
 `band-cut`, `sweep-winner`, `winner-verdict`, `winner-table`, `monitor-mismatch`, `studies-table`,
 `study-detail`, `study-plan`, `study-axes`, `axis-select`, `base-nn`, `advance-btn`, `confirm-box`,
 `task-score`, `task-row`,

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 
+from fv.metrics import MONITORS
 from fv.models.builder import DEFAULT_CHANNEL, NETWORK_DEFAULTS
 from fv.sweeps.generate import generate_sweep
 from fv.sweeps.spec import (GEOMETRY_AUTO, LOSS_WEIGHT_PARAMS, NETWORK_PARAMS,
@@ -83,6 +84,13 @@ def validate_plan(plan: dict) -> list[dict]:
         elif rng != "auto" and (not isinstance(rng, list) or not rng):
             _bad(problems, "range_must_be_list", f"el eje '{axis}' necesita una lista o 'auto'",
                  "p. ej. [1, 2, 3]")
+        elif axis == "monitor" and rng != "auto":
+            # misma puerta que check_sweep: un objetivo ('f1') no es un monitor
+            for v in rng:
+                if v not in MONITORS:
+                    _bad(problems, "unknown_monitor", f"'{v}' no es un monitor",
+                         f"usa uno de {sorted(MONITORS)} (el monitor nombra la "
+                         f"metrica de val con su 'val_' delante)")
     return problems
 
 

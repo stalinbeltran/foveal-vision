@@ -13,6 +13,7 @@ from __future__ import annotations
 import itertools
 
 from fv.fovea import build_search_space
+from fv.metrics import MONITORS, VAL_METRICS
 from fv.models.builder import DEFAULT_CHANNEL, NETWORK_DEFAULTS, full_config
 from fv.training.recipe import Recipe
 from fv.validation import check_network
@@ -28,7 +29,9 @@ GEOMETRY_AUTO = {"k_center", "k_periph", "s_center", "s_periph", "d"}
 # that declares them must be refused HERE, with the reason, before any point is
 # reserved — not silently trained and failed deep in the job (R4, §10).
 WINDOW_SIZE_FIELDS = {"N", "c_frac"}
-OBJECTIVES = {"f1": "max", "pos_err_px": "min", "loss": "min"}
+# What H can rank by IS what a val record measures, with its direction: the same
+# table fv.metrics uses to choose best.pt, read from here (it was written twice).
+OBJECTIVES = dict(VAL_METRICS)
 
 
 class SweepError(ValueError):
@@ -82,6 +85,14 @@ def check_sweep(spec: dict) -> list[dict]:
             bad("space_values_must_be_list",
                 f"el eje '{param}' debe ser una lista de valores o 'auto'",
                 "p. ej. {\"lr\": [0.001, 0.003]} o {\"d\": \"auto\"}")
+        elif param == "monitor":
+            # a monitor is not an objective: 'f1' names the value but not its
+            # direction, and best.pt would keep the WORST epoch without a word
+            for v in values:
+                if v not in MONITORS:
+                    bad("unknown_monitor", f"'{v}' no es un monitor",
+                        f"usa uno de {sorted(MONITORS)} (el monitor nombra la "
+                        f"metrica de val con su 'val_' delante)")
     return problems
 
 

@@ -96,6 +96,14 @@ antes de guardar**, con todos los problemas a la vez en vez de con el primero qu
 CRUD simple. El cuerpo es el catálogo de organizacion.md §1-D. `device`/`num_workers` **no
 están** (contrato ⑩).
 
+`GET /recipes` sirve tres cosas: `recipes` (la lista, **sin el sobre del fichero** — formatos.md
+§4.3), `defaults` (`Recipe()`, para prerrellenar) y `vocabulary`, hoy `{"monitor": [...]}`: el
+vocabulario **cerrado** de un campo de D, servido desde la misma constante (`fv.metrics.MONITORS`)
+contra la que valida la puerta, para que el `<select>` no pueda ofrecer lo que guardar rechazaría
+(U4.2/U5.10). Un `monitor` fuera de esa lista se rechaza con **400 `unknown_monitor`** al guardar
+**y** al leer una receta editada a mano — un monitor nombra la métrica de val (`val_f1`), no el
+objetivo (`f1`), y con el nombre equivocado `best.pt` se quedaría con la peor época sin avisar.
+
 ### `/runs` (E)
 
 Como el hermano, entero: `POST` → job con **nombres** + `device` aparte; valida con

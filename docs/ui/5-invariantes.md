@@ -150,3 +150,25 @@ target: "tests/test_contracts.py::test_contract_01_window_size_mismatch_is_refus
 reason: "el contrato (1) ya lo hace cumplir; duplicar la comprobacion seria una segunda definicion"
 ```
 
+**U5.10 — Un control enseña el valor que tiene, y ofrece el vocabulario que la puerta acepta.** Un
+`<select>` cuyo `value` no está entre sus opciones **dibuja la primera y no dice nada** — el
+navegador no avisa, y el DOM ya no conserva rastro de la diferencia. De ahí las dos mitades de la
+regla: las opciones **son** el vocabulario que sirve el API (U4.2) y **el mismo** contra el que
+valida la puerta, y lo mostrado **es** lo guardado. Si el valor no pertenece al vocabulario (un dato
+viejo, un fichero editado a mano), se dibuja **marcado**, nunca sustituido por uno plausible (U5.3).
+Caso vivo (2026-07-28): Recetas llenaba `monitor` con los **objetivos** de un recorrido, así que
+enseñaba `f1` mientras la receta decía `val_loss` — y guardar ese `f1` habría hecho que `best.pt` se
+quedara con la **peor** época, sin una palabra.
+
+```check U5.10
+substrate: dom
+kind: select_matches_served_vocabulary
+scope: "/recipes"
+args:
+  selector: "[data-testid=monitor-select]"
+  source: "GET /recipes"
+  options_path: "vocabulary.monitor"
+  value_path: "defaults.monitor"
+strength: strong
+```
+

@@ -17,7 +17,7 @@ const HELP: Record<string, string> = {
   lambda_pos: "peso de posición vs existencia; ojo al contrato 9 al rankear",
   pos_weight: "peso de la clase positiva en la BCE (parte del desbalance de B)",
   smooth_l1_beta: "umbral cuadrático→lineal; 1.0 anula el Huber con coords [0,1]",
-  monitor: "qué elige best.pt; las opciones las sirve el API (U4.2)",
+  monitor: "qué elige best.pt; nombra la métrica de val (val_f1), no el objetivo (f1)",
   seed: "eje de réplica, no un hiperparámetro a optimizar",
 };
 
@@ -32,16 +32,18 @@ export default function Recipes() {
   const [defaults, setDefaults] = useState<any>(null);
   const [form, setForm] = usePersistedState<any>("recipes.form", { name: "" });
   const [error, setError] = useState<unknown>(null);
-  const [axes, setAxes] = useState<any>(null);
+  // el vocabulario cerrado de D lo sirve el API desde la MISMA constante contra
+  // la que valida la puerta (U4.2): una copia aquí es la que ofrecía objetivos
+  // donde van monitores
+  const [vocabulary, setVocabulary] = useState<any>(null);
 
   const refresh = () => api.get("/recipes").then((d) => {
     setList(d.recipes);
     setDefaults(d.defaults);
+    setVocabulary(d.vocabulary ?? null);
     setForm((f: any) => ({ ...d.defaults, ...f }));
   }).catch(setError);
   useEffect(() => { refresh(); }, []);
-  // el vocabulario de objetivos sale de su unica definicion, no de una copia
-  useEffect(() => { api.get("/sweeps/axes").then(setAxes).catch(() => setAxes(null)); }, []);
 
   const save = async () => {
     setError(null);
@@ -58,6 +60,21 @@ export default function Recipes() {
 
   if (!defaults) return <h2 data-domain="D">Recetas (D)</h2>;
   const fields = Object.keys(defaults);
+
+  // Un <select> cuyo value no está entre sus opciones enseña la PRIMERA y calla:
+  // el control decía 'f1' mientras la receta guardaba 'val_loss'. Lo guardado se
+  // dibuja siempre, marcado si no pertenece al vocabulario — enseñar el valor
+  // real y su rareza, nunca sustituirlo por uno plausible (U5.3).
+  const optionsFor = (k: string): { value: string; label: string }[] => {
+    const known = k === "optimizer" ? OPTIMIZERS
+      : k === "scheduler" ? SCHEDULERS
+      : ((vocabulary?.monitor ?? []) as string[]);
+    const opts = known.map((o) => ({ value: o, label: o }));
+    const v = form[k];
+    if (v != null && v !== "" && !known.includes(v))
+      opts.unshift({ value: v, label: `${v} (no reconocido)` });
+    return opts;
+  };
   return (
     <div>
       <h2 data-domain="D">Recetas (D)</h2>
@@ -71,13 +88,10 @@ export default function Recipes() {
           {fields.map((k) => (
             <Field key={k} label={k} help={HELP[k]}>
               {k === "optimizer" || k === "scheduler" || k === "monitor" ? (
-                <select value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })}>
-                  {/* los objetivos los sirve el API desde su unica definicion
-                      (U4.2); si aun no llegaron, no se inventa una lista */}
-                  {(k === "optimizer" ? OPTIMIZERS
-                    : k === "scheduler" ? SCHEDULERS
-                    : ((axes?.objectives ?? []) as string[])).map((o: string) => (
-                      <option key={o}>{o}</option>))}
+                <select data-testid={`${k}-select`} value={form[k] ?? ""}
+                  onChange={(e) => setForm({ ...form, [k]: e.target.value })}>
+                  {optionsFor(k).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>))}
                 </select>
               ) : (
                 <input type="number" step="any" value={form[k]}

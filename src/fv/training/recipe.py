@@ -16,6 +16,7 @@ import yaml
 
 from fv import settings
 from fv.ioutils import strip_envelope, with_envelope
+from fv.metrics import MONITORS
 
 
 @dataclass
@@ -42,6 +43,19 @@ class RecipeStoreError(ValueError):
     def __init__(self, code: str, message: str, hint: str):
         super().__init__(message)
         self.code, self.message, self.hint = code, message, hint
+
+
+def _check_monitor(cfg: dict, where: str) -> None:
+    """A monitor names a val metric WITH its direction. 'f1' (the objective) is
+    not one: monitor_key finds the value but nothing knows higher is better, so
+    best.pt would keep the worst epoch and no one would be told. Refused at the
+    gate, in words, instead of a plausible number half an hour later (R4)."""
+    m = cfg.get("monitor")
+    if m is not None and m not in MONITORS:
+        raise RecipeStoreError(
+            "unknown_monitor", f"{where}: '{m}' no es un monitor",
+            f"usa uno de {sorted(MONITORS)} — el monitor nombra la metrica de "
+            f"val ('val_f1'), no el objetivo ('f1')")
 
 
 class RecipeStore:
@@ -79,6 +93,7 @@ class RecipeStore:
             raise RecipeStoreError("unknown_recipe_fields",
                                    f"la receta '{name}' trae campos desconocidos: {sorted(bad)}",
                                    f"los validos son: {sorted(Recipe().as_dict())}")
+        _check_monitor(cfg, f"la receta '{name}'")
         return Recipe(**cfg)
 
     def save(self, name: str, cfg: dict, overwrite: bool = False) -> None:
@@ -94,6 +109,7 @@ class RecipeStore:
             raise RecipeStoreError("unknown_recipe_fields",
                                    f"campos desconocidos: {sorted(bad)}",
                                    f"los validos son: {sorted(Recipe().as_dict())}")
+        _check_monitor(cfg, f"la receta '{name}'")
         self.root.mkdir(parents=True, exist_ok=True)
         f = self.root / f"{name}.yaml"
         if f.exists() and not overwrite:

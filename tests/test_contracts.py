@@ -18,6 +18,53 @@ def test_contract_01_window_size_mismatch_is_refused_before_reserving(world):
                 if p["code"] == "window_size_mismatch"]
 
 
+def test_monitor_and_objective_are_one_table_and_the_gates_agree(tmp_path):
+    """A monitor names a val metric ('val_f1'); an objective names the metric
+    ('f1'). Two vocabularies over ONE table — they were written twice and the
+    direction half only knew 'val_f1', so a recipe saying 'f1' found the value
+    and then kept the WORST epoch. Every gate refuses it now, with one code."""
+    from fv.metrics import MONITORS, VAL_METRICS, checkpoint_record, monitor_key
+    from fv.sweeps.spec import OBJECTIVES, check_sweep
+    from fv.studies.driver import validate_plan
+    from fv.training.recipe import RecipeStore, RecipeStoreError
+
+    assert OBJECTIVES == VAL_METRICS                      # one table, two names
+    assert set(MONITORS) == {f"val_{k}" for k in OBJECTIVES}
+    assert all(monitor_key(m) in OBJECTIVES for m in MONITORS)
+
+    # the direction is real, not a set membership: f1 keeps the HIGHEST epoch
+    recs = [{"epoch": 1, "val": {"f1": 0.9, "loss": 0.5}},
+            {"epoch": 2, "val": {"f1": 0.3, "loss": 0.1}}]
+    assert checkpoint_record(recs, "val_f1")["epoch"] == 1
+    assert checkpoint_record(recs, "val_loss")["epoch"] == 2
+
+    # gate D: the recipe store, saving and reading
+    store = RecipeStore(tmp_path)
+    with pytest.raises(RecipeStoreError) as e:
+        store.save("bad", {"monitor": "f1"})
+    assert e.value.code == "unknown_monitor"
+    assert not (tmp_path / "bad.yaml").exists()           # nothing reserved
+    (tmp_path / "hand.yaml").write_text("monitor: f1\n", encoding="utf-8")
+    with pytest.raises(RecipeStoreError) as e:
+        store.get("hand")                                 # hand-edited file too
+    assert e.value.code == "unknown_monitor"
+    store.save("good", {"monitor": "val_f1"})             # control
+
+    # gate H: a sweep axis over monitor
+    problems = check_sweep({"space": {"monitor": ["f1"]}, "objective": "f1"})
+    assert any(p["code"] == "unknown_monitor" for p in problems)
+    assert not [p for p in check_sweep({"space": {"monitor": list(MONITORS)},
+                                        "objective": "f1"})
+                if p["code"] == "unknown_monitor"]        # control
+
+    # gate I: the same axis in a study plan
+    plan = {"window_dataset": "b", "base_recipe": "r", "objective": "f1",
+            "axes": [{"axis": "monitor", "range": ["f1"]}]}
+    assert any(p["code"] == "unknown_monitor" for p in validate_plan(plan))
+    plan["axes"] = [{"axis": "monitor", "range": ["val_f1"]}]
+    assert not [p for p in validate_plan(plan) if p["code"] == "unknown_monitor"]
+
+
 def test_contract_01b_view_needs_images(world):
     from fv.validation import check_compatible
     from fv.windows.store import WindowDatasetStore

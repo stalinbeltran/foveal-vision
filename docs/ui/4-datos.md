@@ -32,9 +32,12 @@ strength: strong
 ```
 
 **U4.2 — Una definición y dos lectores; jamás dos definiciones.** El front **no define
-vocabularios**: los defaults de C, los ejes barribles, los objetivos, el orden de esquinas, los
-campos que fijan `window_size` — todos salen del API (`/networks`, `/sweeps/axes`, …), que los sirve
-desde su única definición. Es la regla que costó cuatro copias vivas, **dos de ellas ya
+vocabularios**: los defaults de C, los ejes barribles, los objetivos, los **monitores** de una
+receta (`GET /recipes` → `vocabulary.monitor`), el orden de esquinas, los campos que fijan
+`window_size` — todos salen del API (`/networks`, `/recipes`, `/sweeps/axes`, …), que los sirve
+desde su única definición. ⚠ Y el vocabulario servido tiene que ser **el del campo**: llenar
+`monitor` con los **objetivos** no es una copia, pero miente igual (U5.10) — son dos vocabularios
+sobre la misma tabla (`f1` es un objetivo; `val_f1`, un monitor). Es la regla que costó cuatro copias vivas, **dos de ellas ya
 divergidas** (2026-07-26). Corolario operativo: **antes de cambiar la forma o el significado de un
 campo compartido, buscar todos sus lectores.**
 

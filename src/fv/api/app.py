@@ -255,8 +255,15 @@ def create_app() -> FastAPI:
     # -------------------------------------------------------------- recipes (D)
     @app.get("/recipes")
     def list_recipes():
+        # `monitor` is a closed vocabulary and the screen must not keep its own
+        # copy: it was filling that select with the sweep OBJECTIVES ('f1'), a
+        # different vocabulary — so the control showed 'f1' while the recipe
+        # said 'val_loss', and saving 'f1' would have made best.pt keep the
+        # worst epoch. Served from the same constant the gate validates against.
+        from fv.metrics import MONITORS
         return {"recipes": rstore.list(),
-                "defaults": Recipe().as_dict()}
+                "defaults": Recipe().as_dict(),
+                "vocabulary": {"monitor": list(MONITORS)}}
 
     @app.post("/recipes")
     def save_recipe(body: dict):

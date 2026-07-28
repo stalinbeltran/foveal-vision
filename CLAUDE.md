@@ -40,10 +40,36 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > verdad desconocido **sigue dando 400**), `npm run build` limpio, y el flujo pulsado con
 > Playwright **en la instancia del usuario** (clic en la fila → Guardar → 200), con **control**:
 > con el código anterior la misma fila devolvía 400. La receta temporal creada se **borró**.
-> ⚠ **Hallazgo aparte, sin arreglar** (es otro bug): el `<select>` de `monitor` se llena con los
-> **objetivos** (`f1`, `loss`, `pos_err_px`) y el default de la receta es `val_loss`, que no está
-> en esa lista → **enseña `f1` mientras guarda `val_loss`**. El valor en disco es correcto; lo que
-> miente es la pantalla. Emparentado con F16 (que el API sirva los enums de receta).
+> **2026-07-28 (2) — UN OBJETIVO NO ES UN MONITOR, Y EL `<select>` LO ENSEÑABA MAL.**
+> Descubierto al verificar lo anterior y arreglado a petición del usuario. El `<select>` de
+> `monitor` se llenaba con los **objetivos** (`f1`, `loss`, `pos_err_px`); el default de la receta
+> es `val_loss`, que no está en esa lista, y **un `<select>` cuyo value no está entre sus opciones
+> dibuja la primera y calla** → enseñaba `f1` guardando `val_loss`. Lo grave no era la pantalla:
+> 1. ⚠ **Elegir `f1` ahí habría corrompido `best.pt` en silencio.** `monitor_key("f1")` encuentra
+>    el valor, pero la dirección vivía en un `frozenset({"val_f1"})` aparte → `f1` caía en
+>    «menor es mejor» y el checkpoint se habría quedado con la **peor** época. Ni un aviso.
+>    **Ningún artefacto está afectado**: los 708 `monitor` en disco dicen `val_loss` (medido).
+> 2. **El mismo dato en dos sitios, otra vez**: `MONITOR_HIGHER_IS_BETTER` y `OBJECTIVES` eran la
+>    misma tabla escrita dos veces, y las mitades no se conocían. Ahora **`fv.metrics.VAL_METRICS`
+>    manda** (`MONITORS = val_ + cada métrica`) y `OBJECTIVES = dict(VAL_METRICS)`.
+> 3. **Tres puertas dicen que no** con el mismo código `unknown_monitor`: la receta (guardar **y**
+>    leer un yaml editado a mano), el eje `monitor` de un recorrido (`check_sweep`) y el de un
+>    estudio (`validate_plan`). Antes **ninguna** validaba el valor.
+> 4. **El API sirve el vocabulario** (`GET /recipes` → `vocabulary.monitor`) desde la constante
+>    contra la que valida la puerta; y un valor que no pertenece se dibuja **`(no reconocido)`**,
+>    nunca sustituido por uno plausible.
+> 5. **Regla nueva `U5.10`** (78 reglas) con **verbo nuevo** `select_matches_served_vocabulary`:
+>    el DOM no conserva rastro de la mentira, así que la comprobación viene de fuera (las opciones
+>    **son** las servidas; lo mostrado **es** lo guardado).
+> ⚠ **Verificado, no razonado**: **125 tests** (+2), `npm run build` limpio y el flujo pulsado en
+> la instancia del usuario — opciones = vocabulario servido, enseña `val_loss`, un `f1` recordado
+> sale `f1 (no reconocido)` y guardarlo devuelve `[unknown_monitor]` con razón y arreglo.
+> ⚠ **Corrección de la nota anterior**: en la primera verificación la semilla de `localStorage`
+> usaba la clave sin el prefijo `fv.ui.`, así que **esa mitad no probó nada** (la del clic en la
+> fila sí). Rehecha con la clave real: pasa. **Lección: una aserción que no puede fallar es peor
+> que ninguna** — verificar el efecto (el fichero escrito), no solo la ausencia de error.
+> **Queda abierto**: F16 sigue sin decidir (los enums `optimizer`/`scheduler` siguen copiados en
+> `Recipes.tsx`; `monitor` ya no).
 
 > **2026-07-28 — LISTAR NO ES VERIFICAR: LA REGLA U1.6 Y EL PLAN DE UN ESTUDIO.**
 > El usuario reportó que **los parámetros de un estudio no vuelven a verse una vez creado**. Se
@@ -55,7 +81,7 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    cosas: se lee **del objeto guardado**, nunca del formulario recordado (U7.3); **definición y
 >    progreso separados** en pantalla como ya lo están en disco; los valores compuestos **completos**
 >    (el rango de un eje es su lista, no su longitud) y el presupuesto **con unidad**; ausente se
->    dibuja como ausente. **77 reglas** ahora.
+>    dibuja como ausente. **77 reglas** ahora (78 desde U5.10, ver la nota de arriba).
 > 2. **Estudios lo cumple**: bloque `study-plan` (B, receta D, objetivo, semillas, presupuesto) +
 >    `study-axes` (la escalera con el rango literal y `hecho`/`en curso`/`pendiente` por eje, sacado
 >    del progreso vivo); debajo, «El progreso (lo que ha pasado)». **`channels[i]` reconoce sus

@@ -24,7 +24,16 @@ NUM_CORNERS = 4
 # `checkpoint_record` WHICH epoch that file came from. Written twice they drift,
 # and the ranking starts describing weights that are not on disk.
 
-MONITOR_HIGHER_IS_BETTER = frozenset({"val_f1"})
+# The metrics of a `val` record that can RANK (a subset: the record also carries
+# precision and recall, which nobody optimises), and which way is better. It is
+# the ONE place the direction lives: H reads it as OBJECTIVES (fv.sweeps.spec)
+# and D names one of MONITORS to choose best.pt. It used to be written twice —
+# a set {"val_f1"} here and a dict in the sweep spec — and the halves disagreed
+# about names: a recipe saying `monitor: "f1"` (the bare objective, which the UI
+# offered) found the value but not the direction, so best.pt kept the epoch with
+# the WORST f1, silently. Hence MONITORS: a monitor is 'val_' + a val metric.
+VAL_METRICS = {"f1": "max", "pos_err_px": "min", "loss": "min"}
+MONITORS = tuple(f"val_{k}" for k in VAL_METRICS)
 
 
 def monitor_key(monitor: str) -> str:
@@ -38,7 +47,8 @@ def monitor_improved(value, best, monitor: str) -> bool:
         return False
     if best is None:
         return True
-    return value > best if monitor in MONITOR_HIGHER_IS_BETTER else value < best
+    higher = VAL_METRICS.get(monitor_key(monitor)) == "max"
+    return value > best if higher else value < best
 
 
 def checkpoint_record(records: list, monitor: str) -> dict | None:

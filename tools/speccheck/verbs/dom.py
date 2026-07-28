@@ -171,6 +171,55 @@ def dom_absent_text(check: Check, ctx: Context) -> Outcome:
     return Outcome(OK, f"{len(routes)} ruta(s) sin las palabras prohibidas")
 
 
+@verb("select_matches_served_vocabulary")
+def select_matches_served_vocabulary(check: Check, ctx: Context) -> Outcome:
+    """U5.10: the control offers what the API serves, and shows what it holds.
+
+    A `<select>` whose value is not among its options displays the FIRST one and
+    says nothing — the DOM cannot even report the discrepancy afterwards. So the
+    check comes from outside: the options must BE the served vocabulary and the
+    displayed value must BE the served default. Measured (2026-07-28): Recetas
+    filled `monitor` with the sweep OBJECTIVES, so it showed 'f1' while the
+    recipe said 'val_loss' — and saving 'f1' would have kept the worst epoch.
+    """
+    page, why = browser(ctx)
+    if page is None:
+        return Outcome(NA, why)
+    from .http import _req
+    a = check.args
+    st, body = _req(ctx, "GET", str(a.get("source", "")))
+    if st != 200 or not isinstance(body, dict):
+        return Outcome(NA, f"{a.get('source')} contesto {st}: sin vocabulario que comparar")
+
+    def dig(d, path):
+        for part in str(path).split("."):
+            d = (d or {}).get(part)
+        return d
+    served = dig(body, a.get("options_path"))
+    expected = dig(body, a.get("value_path"))
+    if not isinstance(served, list) or not served:
+        return Outcome(NA, f"el API no sirve {a.get('options_path')}")
+
+    _visit(ctx, page, str(check.data.get("scope", "/")))
+    sel = str(a.get("selector", ""))
+    try:
+        page.wait_for_selector(sel, timeout=25000)
+    except Exception:
+        pass
+    if not page.locator(sel).count():
+        return Outcome(NA, f"no hay {sel} en la pantalla")
+    opts = page.eval_on_selector_all(f"{sel} option", "(els) => els.map((e) => e.value)")
+    shown = page.eval_on_selector(sel, "(el) => el.value")
+    bad = []
+    if sorted(opts) != sorted(served):
+        bad.append(f"opciones {opts} != servidas {served}")
+    if expected is not None and shown != expected:
+        bad.append(f"enseña '{shown}' y el valor es '{expected}'")
+    if bad:
+        return Outcome(VIOLATED, "; ".join(bad))
+    return Outcome(OK, f"{len(opts)} opciones servidas, y enseña '{shown}'")
+
+
 @verb("color_follows_entity")
 def color_follows_entity(check: Check, ctx: Context) -> Outcome:
     """U3.7: hide one series and the survivors keep their colour."""
