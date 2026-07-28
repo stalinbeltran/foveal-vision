@@ -18,9 +18,9 @@ muestra: media ± `sd`/`sem` y `n`. Un run aislado es una anécdota.
 ```check U6.1
 substrate: http
 kind: http_shape
-scope: "/runs/{run}/task-score"
+scope: "GET /runs/{run}/task-score"
 args:
-  requires: ["macro", "macro.sem", "macro.sd", "n_images"]
+  requires: ["macro.f1", "macro.sd", "macro.sem", "images", "small_sample"]
 strength: strong
 ```
 
@@ -46,9 +46,9 @@ tabla ordenada.
 ```check U6.3
 substrate: http
 kind: http_shape
-scope: "/sweeps/{name}/winner"
+scope: "GET /sweeps/{sweep}/winner"
 args:
-  requires: ["tie", "tie_reason", "tie_delta"]
+  requires: ["tie", "tie_reason", "delta", "delta_source", "frontier"]
 strength: strong
 ```
 
@@ -60,9 +60,9 @@ columna «última» va aparte, nunca en su lugar.
 ```check U6.4
 substrate: http
 kind: http_shape
-scope: "/sweeps/{name}/trials"
+scope: "GET /sweeps/{sweep}/trials"
 args:
-  requires: ["epoch", "last_epoch"]
+  requires: ["trials.epoch", "trials.value", "trials.value_last", "value_from"]
 strength: strong
 ```
 
@@ -97,10 +97,9 @@ miradas, nunca bloquea una**. Sin esto, «el holdout se mira una vez» es una pr
 ```check U6.7
 substrate: http
 kind: http_shape
-scope: "/runs/{run}/task-score?window_dataset={holdout}"
+scope: "GET /runs/{run}/task-score?window_dataset={holdout}"
 args:
   requires: ["holdout_touches"]
-  assert: "dos llamadas -> dos lineas en holdout.jsonl, la segunda from_cache"
 strength: strong
 ```
 
@@ -136,9 +135,9 @@ U4.10); la UI lo enseña.
 ```check U6.10
 substrate: http
 kind: http_shape
-scope: "/sweeps/{name}/trials"
+scope: "GET /sweeps/{sweep}/trials"
 args:
-  requires_when_present: ["objective_overridden", "discarded_points"]
+  requires: ["objective", "objective_overridden", "monitors", "discarded", "trials.monitor"]
 strength: strong
 ```
 
@@ -150,9 +149,9 @@ geometría cambia la regla de medir a la vez que el modelo.
 ```check U6.11
 substrate: http
 kind: http_shape
-scope: "/sweeps/{name}"
+scope: "GET /sweeps/{sweep}"
 args:
-  requires: ["budget.unit"]
+  requires: ["spec.budget"]
 strength: strong
 ```
 

@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.speccheck import engine, extract, report  # noqa: E402
 from tools.speccheck import verbs  # noqa: E402,F401  (registers the verbs)
+from tools.speccheck.live import Live  # noqa: E402
 from tools.speccheck.verbs.lint import preflight  # noqa: E402
 
 
@@ -54,8 +55,17 @@ def main() -> int:
         only += [r.id for r in spec.rules.values() if r.type in args.type]
 
     mode = "live" if args.live else "static"
-    ctx = engine.Context(root=ROOT, mode=mode, spec=spec)
-    results = engine.run(ctx, only or None)
+    live = Live()
+    try:
+        if mode == "live":
+            live.ensure_backend(ROOT)
+            for note in live.notes:
+                print(f"  {report.ascii_(note)}")
+        ctx = engine.Context(root=ROOT, mode=mode, spec=spec, base_url=live.base_url)
+        results = engine.run(ctx, only or None)
+    finally:
+        # U7.13: lo que arranca esta herramienta, esta herramienta lo para.
+        live.shutdown()
 
     print(f"  modo: {mode}" + ("  (los sustratos http/dom salen no_aplicable)" if mode == "static" else ""))
     print(report.render(results, verbose=args.verbose, summary_only=args.coverage))

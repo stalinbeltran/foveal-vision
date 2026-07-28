@@ -25,9 +25,9 @@ interpretar unos números viaja con ellos:
 ```check U4.1
 substrate: http
 kind: http_shape
-scope: "introspection:*"
+scope: "GET /runs/{run}/kernels"
 args:
-  requires: ["color_work", "branch", "region"]
+  requires: ["branch", "maps.color", "maps.label"]
 strength: strong
 ```
 
@@ -69,10 +69,11 @@ es una segunda definición de una métrica (U4.2).
 ```check U4.3
 substrate: http
 kind: http_shape
-scope: "/window-datasets/{name}/windows"
+scope: "GET /window-datasets/{window_dataset}/windows?split=val"
 args:
+  requires: ["total"]
   max_rows_param: "limit"
-strength: weak
+strength: strong
 ```
 
 **U4.4 — Polling incremental, nunca historial completo.** Las métricas se piden con `?since=N`. Las
@@ -113,9 +114,9 @@ negativa útil en un callejón — ver [5-invariantes.md](5-invariantes.md) U5.2
 ```check U4.6
 substrate: http
 kind: http_refuses
-scope: "POST /runs"
+scope: "GET /runs/no-existe-este-run"
 args:
-  body: {invalid: true}
+  expect_status: [404]
   expect_fields: ["code", "message", "hint"]
 strength: strong
 ```
@@ -154,9 +155,9 @@ corriendo en un server con GPU.
 ```check U4.9
 substrate: http
 kind: http_refuses
-scope: "GET /image?path=../../etc"
+scope: "GET /sources/..%2F..%2Fetc/samples/0/image"
 args:
-  expect_status: [403, 404]
+  expect_status: [400, 403, 404]
 strength: strong
 ```
 
@@ -169,9 +170,9 @@ no que el front lo deduzca.
 ```check U4.10
 substrate: http
 kind: http_shape
-scope: "/sweeps/{name}/trials"
+scope: "GET /sweeps/{sweep}/trials"
 args:
-  requires_when_present: ["objective_overridden", "n_seeds"]
+  requires: ["trials", "objective"]
 strength: strong
 ```
 

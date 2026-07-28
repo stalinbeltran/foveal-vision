@@ -126,10 +126,12 @@ solo dice qué falló obliga al usuario a adivinar la mitad que importa.
 
 ```check U8.8
 substrate: http
-kind: http_refuses
-scope: "POST /runs"
+kind: http_shape
+scope: "POST /networks/validate"
 args:
-  assert_hint_non_empty: true
+  body: {N: 21, c_frac: 0.8, d: 2, pen_frac: 0.1}
+  expect_json: {valid: false}
+  requires: ["problems.code", "problems.message", "problems.hint"]
 strength: strong
 ```
 

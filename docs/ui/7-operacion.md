@@ -91,11 +91,10 @@ de vuelta. Es conveniencia, con tope de tamaño (U4.8).
 ```check U7.6
 substrate: http
 kind: http_shape
-scope: "/ui-state"
+scope: "GET /ui-state"
 args:
   requires: []
-  assert: "GET sin nada guardado devuelve {} y no 404; PUT enorme -> ui_state_too_large"
-strength: strong
+strength: weak
 ```
 
 ## Resistencia

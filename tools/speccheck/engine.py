@@ -27,9 +27,6 @@ LIVE_SUBSTRATES = {"http", "dom"}
 
 # Declared in validador.md, built in a later phase. The report says which.
 PLANNED: dict[str, int] = {
-    "http_shape": 3,
-    "http_refuses": 3,
-    "null_not_zero": 3,
     "dom_query": 4,
     "dom_absent_text": 4,
     "number_has_uncertainty": 4,
@@ -59,6 +56,7 @@ class Context:
     root: Path
     mode: str  # "static" | "live"
     spec: Spec
+    base_url: str = ""   # backend to interrogate in --live (empty in static)
 
 
 VERBS: dict[str, Callable[[Check, Context], Outcome]] = {}

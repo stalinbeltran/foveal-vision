@@ -39,10 +39,9 @@ Esconder el signo esconde qué excita y qué inhibe.
 ```check U3.2
 substrate: http
 kind: http_shape
-scope: "/runs/{run}/kernels"
+scope: "GET /runs/{run}/kernels"
 args:
-  requires: ["color_work"]
-  when: {signed: true, color_work: "diverging"}
+  requires: ["maps.color", "maps.min", "maps.max", "branch"]
 strength: strong
 ```
 
@@ -51,10 +50,10 @@ strength: strong
 ```check U3.3
 substrate: http
 kind: http_shape
-scope: "/runs/{run}/feature-maps"
+scope: "POST /runs/{run}/feature-maps"
 args:
-  requires: ["color_work"]
-  when: {signed: false, color_work: "sequential"}
+  body: {index: 0, split: "val", layer: 1}
+  requires: ["maps.color"]
 strength: strong
 ```
 
@@ -78,9 +77,9 @@ salen positivos por casualidad.
 ```check U3.5
 substrate: http
 kind: http_shape
-scope: "matrixview:*"
+scope: "GET /runs/{run}/kernels"
 args:
-  requires: ["color_work", "min", "max", "mean", "truncated"]
+  requires: ["maps.color", "maps.min", "maps.max", "maps.mean", "maps.truncated"]
 strength: strong
 ```
 
@@ -170,7 +169,7 @@ U5.3.
 ```check U3.11
 substrate: http
 kind: null_not_zero
-scope: "/runs/{run}/task-score"
+scope: "GET /runs/{run}/task-score"
 args:
   fields: ["mean_iou"]
 strength: strong

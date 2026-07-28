@@ -20,12 +20,13 @@ entra un recorrido automático**. El caso medido (2026-07-26): `validate_plan` e
 mala — el hueco existía igual y se cerró en la puerta, no en el `<select>`.
 
 ```check U5.1
-substrate: mixed
-kind: catalog_match
+substrate: http
+kind: http_shape
+scope: "POST /networks/validate"
 args:
-  left: backend_error_codes
-  right: front_error_codes
-  mode: covers
+  body: {N: 20, c_frac: 0.8, d: 2, pen_frac: 0.9}
+  expect_json: {valid: false}
+  requires: ["problems.code", "problems.message", "problems.hint"]
 strength: strong
 ```
 
@@ -50,9 +51,9 @@ la última época de consuelo), `spearman` `None` cuando una serie es constante.
 ```check U5.3
 substrate: http
 kind: null_not_zero
-scope: "/sweeps/{name}/trials"
+scope: "GET /sweeps/{sweep}/winner"
 args:
-  fields: ["value"]
+  fields: ["delta", "delta_source"]
 strength: strong
 ```
 
@@ -86,10 +87,12 @@ detalle está allí, no aquí:
 
 ```check U5.5
 substrate: http
-kind: http_refuses
-scope: "POST /sweeps"
+kind: http_shape
+scope: "POST /networks/validate"
 args:
-  cases: ["objective_varies_with_space", "axis_breaks_window_size", "window_size_mismatch"]
+  body: {N: 20, c_frac: 0.8, d: 2, pen_frac: 0.1, k_center: 4}
+  expect_json: {valid: false, problems.code: "kernel_must_be_odd"}
+  requires: ["problems.hint"]
 strength: strong
 ```
 
@@ -102,10 +105,10 @@ juntos.
 ```check U5.6
 substrate: http
 kind: http_refuses
-scope: "DELETE /window-datasets/{name}"
+scope: "DELETE /window-datasets/{window_dataset}"
 args:
-  cases: ["dataset_in_use"]
-  expect_hint_names_referent: true
+  expect_status: [409]
+  expect_fields: ["code", "message", "hint"]
 strength: strong
 ```
 
@@ -131,8 +134,9 @@ substrate: http
 kind: http_refuses
 scope: "POST /runs"
 args:
-  cases: ["run_exists"]
+  body: {name: "fov-16-param", window_dataset: "synth-b16", network: "fov-16", recipe: "corta"}
   expect_status: [409]
+  expect_fields: ["code", "message", "hint"]
 strength: strong
 ```
 

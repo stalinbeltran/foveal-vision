@@ -80,10 +80,16 @@ un run).
 CRUD + **`POST /networks/validate`**: puro, síncrono, sin guardar. Devuelve las **dimensiones
 derivadas** (`center_out`, `periph_out`, `penetration`, `periph_band`, `original_size`), los
 **rangos calculados** (`kernel_range`, `stride_range`, `downsample_range` para ese `N`), el nº
-de parámetros y la traza por rama — o un 400 con qué assert falló y cómo arreglarlo
-(`center_not_even`, `penetration_too_large`, `kernel_must_be_odd`,
-`merge_sum_needs_equal_strides`…). Alimenta en vivo la pantalla Redes: **el usuario ve lo que
-`N` y las fracciones implican antes de guardar.**
+de parámetros y la traza por rama.
+
+⚠ **Corregido 2026-07-27** (lo encontró `verify_spec --live`: este documento decía otra cosa que
+el código): una geometría inválida **no** es un 400. Devuelve **200** con
+`{"valid": false, "problems": [{code, message, hint}, …]}` — `center_not_even`,
+`penetration_too_large`, `kernel_must_be_odd`, `merge_sum_needs_equal_strides`… Y es lo correcto:
+preguntar «¿vale esta geometría?» y que la respuesta sea «no, por esto» es una petición **bien
+formada con respuesta negativa**, no una petición imposible; el 400 se reserva para el cuerpo mal
+formado. Alimenta en vivo la pantalla Redes: **el usuario ve lo que `N` y las fracciones implican
+antes de guardar**, con todos los problemas a la vez en vez de con el primero que reviente.
 
 ### `/recipes` (D)
 
