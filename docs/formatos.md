@@ -218,8 +218,12 @@ rankings; su almacén son dos ficheros.
 - **`plan.json`** — el schedule, **comiteable** (es descripción, no carga — §5): `window_dataset`
   (B fijo), `base_recipe` (D), `objective`, `seeds` (sondeo/confirmación, default 3 — D-M1), y
   `axes[]` **ordenados** (orden = orden de barrido, U6): cada eje con su `range` (`"auto"` o lista
-  explícita — U5) y un `depends_on` opcional (el eje que lo desbloquea). El plan **no ejecuta**:
-  la herramienta lo lee para pre-rellenar el siguiente recorrido.
+  explícita — U5) y un `depends_on` opcional (el eje que lo desbloquea). Lleva además **`budget`**
+  (hoy `{"epochs": n}`), que `advance` pasa a cada recorrido generado — estaba en el código
+  (`POST /studies`, `driver.advance`) y no en esta lista: se añade el 2026-07-28 al especificar que
+  la pantalla debe **enseñar el plan entero** ([ui/1-estructura.md](ui/1-estructura.md) U1.6), que
+  es cuando se ve que un campo no estaba descrito en ningún sitio. El plan **no ejecuta**: la
+  herramienta lo lee para pre-rellenar el siguiente recorrido.
 - **`progress.json`** — el estado de la cadena, reescribible (temporal + `os.replace`, con
   reintento en ambos lados como el resto — §4.2): por paso, el recorrido generado, el **ganador
   confirmado** por el usuario, y qué sub-ejes desbloqueó. Reconstruye la cadena para auditar por

@@ -84,6 +84,45 @@ args:
 strength: strong
 ```
 
+**U1.6 — Un objeto enseña entera la definición con que se creó, y la enseña en su detalle.**
+Listar no es verificar: la tabla resume (nombre y dos o tres columnas), y **al seleccionar una fila
+aparece la definición completa** — todos los parámetros que ese objeto fija, con su valor literal,
+no un conteo. Un parámetro que solo existió en el formulario de creación es un parámetro que ya no
+se puede comprobar, y U1.5 pide justo lo contrario. Cómo se lee:
+
+- **Del objeto guardado, nunca del formulario recordado.** La fuente es lo que devuelve el API
+  (`GET /studies/{name}` → `plan`), no el `localStorage` del navegador: lo recordado son defaults,
+  jamás verdad ([7-operacion.md](7-operacion.md) U7.3). El payload ya lo trae; lo que se especifica
+  aquí es enseñarlo.
+- **Definición y estado se separan, y se dice cuál es cuál.** Lo comiteable (`plan.json`,
+  `spec.json`, el config de C o de D) es la **definición**: lo que el usuario pidió. Lo vivo y
+  regenerable (`progress.json`, `state`, la cola pendiente, los ganadores confirmados) es
+  **progreso**. Mezclados en un mismo bloque no se puede distinguir lo pedido de lo ocurrido; el
+  disco ya los tiene separados ([formatos.md](../formatos.md) §4.7: `plan.json` comiteable,
+  `progress.json` estado vivo) y la pantalla lo respeta.
+- **Los valores compuestos se enseñan completos**: el rango de un eje es su lista de valores (con
+  su cardinalidad al lado, no en su lugar), y el presupuesto va **con su unidad declarada**.
+- Un campo ausente se dibuja como ausente ([5-invariantes.md](5-invariantes.md) U5.3) y las
+  etiquetas son **las mismas palabras** con que el formulario lo pidió
+  ([8-lexico.md](8-lexico.md) U8.4).
+
+Caso vivo (2026-07-28, reportado por el usuario): **Estudios era la única pantalla que no lo
+cumplía**. La lista daba dataset, nº de ejes y nº de pasos; el detalle daba los pasos y los
+ganadores arrastrados — pero `objective`, `seeds`, `base_recipe`, `budget.epochs` y **el rango de
+cada eje** no volvían a aparecer en ningún sitio después de crear el estudio: vivían solo en
+`plan.json`. Recorridos sí cumple, desde su bloque `base-nn` (red base, receta base, ejes barridos,
+dims derivadas).
+
+```check U1.6
+substrate: dom
+kind: dom_query
+scope: "/studies"
+args:
+  selector: "[data-testid=studies-table] tbody tr"
+  sibling_required: "[data-testid=study-plan]"
+strength: strong
+```
+
 ## El mapa de pantallas
 
 | Grupo | Pantalla | Ruta | Dominio |
@@ -101,6 +140,11 @@ strength: strong
 
 **Cumplimiento (verificado 2026-07-27)**: las 12 rutas existen en
 [web/src/App.tsx](../../web/src/App.tsx#L114-L128) con esas etiquetas de nav.
+⚠ **U1.6 se escribe hoy (2026-07-28) sabiendo que está `violada`**: Estudios aún no enseña su plan,
+y la regla se deja con código de salida en vez de con una promesa — el mismo trato que tuvo U3.1
+cuando faltaba `validate:palette`. Al implementarla, **`study-plan` entra en el inventario de
+`data-testid`** de [7-operacion.md](7-operacion.md) U7.11: ese catálogo se casa en los dos
+sentidos, así que añadirlo antes de que exista en el código solo mueve la violación de sitio.
 ⚠ [ui.md](../ui.md) llamaba a la pantalla de estudios **«Barrido por ejes»**; la UI dice
 **«Estudios»**. Manda la UI: el nombre en pantalla es *Estudios* y el doc de diseño es
 [barrido-por-ejes.md](../barrido-por-ejes.md), que describe el **método**, no la pantalla.
@@ -139,7 +183,11 @@ polling, negativas con `hint` visible.)*
   coste/calidad)`: deriva la base del problema (`window_size` → `N`/geometría), muestra el config
   base con el **origen por campo** (`default | winner | user`), lleva la **escalera** de ejes
   ordenados y, por paso, **propone** el ganador que el usuario **confirma**. Reutiliza la tabla de
-  ranking de Recorridos.
+  ranking de Recorridos. Al **seleccionar un estudio en la tabla**, el detalle abre con su **plan
+  completo** (U1.6) antes que con el progreso: dataset B, receta base D, objetivo, semillas,
+  presupuesto **con unidad** (`epochs`), y la **escalera entera** — cada eje con su rango literal
+  (o `auto`), en orden de barrido, marcando cuál está hecho, cuál corre y cuáles quedan. Los pasos,
+  los ganadores arrastrados y la cola son **progreso**, y van debajo, separados.
 - **Runs (E)**: lista y detalle. La lista **agrupa por jerarquía de dominio B → C → D** (el árbol
   colapsa solo los niveles con un único valor tras filtrar), ofrece por fila **renombrar y borrar**,
   y expone **facetas** —B, C, D, recorrido (con «sin recorrido»), estado, monitor, búsqueda— cuyas
