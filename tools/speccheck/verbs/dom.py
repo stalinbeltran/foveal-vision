@@ -126,10 +126,16 @@ def dom_query(check: Check, ctx: Context) -> Outcome:
                 if missing:
                     bad.append(f"{route}: {missing} nodo(s) {a['selector']} sin {attr}")
             if a.get("sibling_required"):
-                # the twin may be collapsed behind a click; the contract is that
-                # the element EXISTS in the same card, so click it open first
+                # the twin may be behind a click (a collapsed panel, a row that
+                # selects an entity); the contract is that it EXISTS once opened,
+                # so click first. WAIT for it -- never sleep a fixed time: what
+                # appears after a roundtrip beats any constant, and a timeout
+                # reads exactly like a missing element (validador.md §8, 5).
                 loc.first.click()
-                page.wait_for_timeout(300)
+                try:
+                    page.wait_for_selector(str(a["sibling_required"]), timeout=15000)
+                except Exception:
+                    pass
                 if not page.locator(str(a["sibling_required"])).count():
                     bad.append(f"{route}: {a['selector']} sin {a['sibling_required']}")
             if a.get("assert_text_not_empty"):

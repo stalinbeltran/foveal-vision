@@ -135,6 +135,16 @@ def main() -> int:
                 assert page.locator("[data-testid=screen-error]").count() == 0, \
                     "una pantalla de Estudios cayó al error boundary"
                 assert len(page.inner_text("body").strip()) > 40, "página en blanco"
+                # U1.6: al clicar, la DEFINICIÓN vuelve entera — no basta con que
+                # la pantalla no reviente. El plan y su escalera de ejes, con el
+                # rango literal de cada uno; el progreso va aparte, debajo.
+                page.wait_for_selector("[data-testid=study-plan]", timeout=15000)
+                plan = page.locator("[data-testid=study-plan]").first.inner_text()
+                for label in ("dataset (B, fijo)", "receta base (D)", "objetivo",
+                              "semillas", "presupuesto"):
+                    assert label in plan, f"el plan no dice «{label}»"
+                assert page.locator("[data-testid=study-axes] tbody tr").count() >= 1, \
+                    "la escalera de ejes del plan está vacía"
         check(page, "/studies", "[data-testid=studies-table]", "07c-estudios", studies_extra)
 
         # Runs: list + detail with curves and provenance

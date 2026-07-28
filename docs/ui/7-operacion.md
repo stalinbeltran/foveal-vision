@@ -153,7 +153,8 @@ verificación en silencio (el selector expira por timeout y parece lentitud). Lo
 `sources-table`, `wds-table`, `window-grid`, `networks-table`, `validate-panel`, `zone-diagram`,
 `recipes-table`, `compat`, `sweeps-table`, `trials-table`, `sweep-curves`, `sweep-legend`,
 `band-cut`, `sweep-winner`, `winner-verdict`, `winner-table`, `monitor-mismatch`, `studies-table`,
-`study-detail`, `axis-select`, `base-nn`, `advance-btn`, `confirm-box`, `task-score`, `task-row`,
+`study-detail`, `study-plan`, `study-axes`, `axis-select`, `base-nn`, `advance-btn`, `confirm-box`,
+`task-score`, `task-row`,
 `task-split`, `task-dataset`, `task-small-sample`, `task-holdout-warn`, `task-holdout-touches`,
 `diag-summary`, `gallery`, `nine-block`, `probes`, `predict-stage`, `predict-numbers`,
 `runs-table`, `session-bar`, `screen-error`.

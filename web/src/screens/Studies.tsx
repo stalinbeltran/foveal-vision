@@ -20,6 +20,115 @@ function parseRange(text: string): any {
   }).filter((v) => v !== "");
 }
 
+// U1.6 — the definition an object was created with is re-readable in its
+// detail: listing is not verifying. Three things this block is careful about:
+// it reads the SAVED plan (GET /studies/{name}), never the remembered creation
+// form (U7.3); it stays apart from progress (plan.json is what was asked,
+// progress.json is what happened); and it prints the range of an axis as its
+// LIST, not as its length.
+
+const CHANNELS_AT = /^channels\[\d+\]$/;
+
+// a plan axis vs a concrete one: `channels[i]` is a placeholder that the
+// winning n_layers expands into channels[0..L-1] (driver §6.1), so the plan
+// row must recognise its own sub-steps.
+const axisMatches = (planAxis: string, concrete: string) =>
+  planAxis === concrete || (planAxis === "channels[i]" && CHANNELS_AT.test(concrete));
+
+const rangeText = (range: any) =>
+  range === "auto" || range == null
+    ? { text: "auto", note: "rango calculado al generar el paso" }
+    : Array.isArray(range)
+      ? { text: range.join(", "), note: `${range.length} ${range.length === 1 ? "punto" : "puntos"}` }
+      : { text: JSON.stringify(range), note: "" };
+
+// absent is drawn as absent, never as 0 nor as blank (U5.3)
+const orDash = (v: any) => (v === undefined || v === null || v === "" ? "—" : String(v));
+
+// the scalar plan fields this block names one by one. Anything else the plan
+// carries is printed too (see «otros campos»): a field added in Python must
+// not become invisible here — that is exactly how the two copies diverge.
+const NAMED_PLAN_FIELDS = ["window_dataset", "base_recipe", "objective", "seeds",
+                           "budget", "axes", "format_version"];
+
+function StudyPlan({ plan, progress }: { plan: any; progress: any }) {
+  const steps: any[] = progress?.steps ?? [];
+  const queue: any[] = progress?.queue ?? [];
+  const axes: any[] = plan?.axes ?? [];
+  const epochs = plan?.budget?.epochs;
+  const extra = Object.entries(plan ?? {}).filter(([k]) => !NAMED_PLAN_FIELDS.includes(k));
+
+  // the ladder's state per DECLARED axis, read off the live progress: what is
+  // still in the queue is pending, what produced steps is running or done.
+  const stateOf = (axis: string) => {
+    const mine = steps.filter((s) => axisMatches(axis, s.axis));
+    const pending = queue.some((q: any) => axisMatches(axis, q.axis));
+    if (!mine.length) return pending ? "pendiente" : "—";
+    if (pending || mine.some((s) => !s.confirmed)) return "en curso";
+    return "hecho";
+  };
+
+  const cell = { padding: "2px 14px 2px 0", verticalAlign: "top" as const };
+  return (
+    <div data-testid="study-plan" style={{
+      margin: "0 0 12px", padding: "8px 12px",
+      background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8,
+    }}>
+      <strong>El plan (lo que pediste)</strong>
+      <table style={{ marginTop: 6, borderCollapse: "collapse" }}>
+        <tbody>
+          <tr>
+            <td style={cell} className="sub">dataset (B, fijo)</td>
+            <td style={cell} className="mono">{orDash(plan?.window_dataset)}</td>
+            <td style={cell} className="sub">objetivo</td>
+            <td style={cell} className="mono">{orDash(plan?.objective)}</td>
+          </tr>
+          <tr>
+            <td style={cell} className="sub">receta base (D)</td>
+            <td style={cell} className="mono">{orDash(plan?.base_recipe)}</td>
+            <td style={cell} className="sub">semillas (confirmación)</td>
+            <td style={cell} className="mono">{orDash(plan?.seeds)}</td>
+          </tr>
+          <tr>
+            <td style={cell} className="sub">presupuesto</td>
+            {/* con su unidad: un número pelado no dice de qué es presupuesto */}
+            <td style={cell} className="mono" colSpan={3}>
+              {epochs == null ? "—" : `${epochs} épocas/punto`}</td>
+          </tr>
+          {extra.map(([k, v]) => (
+            <tr key={k}>
+              <td style={cell} className="sub">{k}</td>
+              <td style={cell} className="mono" colSpan={3}>{JSON.stringify(v)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="sub" style={{ margin: "8px 0 4px" }}>
+        ejes (orden = orden de barrido)
+      </div>
+      <table className="data" data-testid="study-axes">
+        <thead><tr><th>#</th><th>eje</th><th>rango</th><th>estado</th></tr></thead>
+        <tbody>
+          {axes.map((a: any, i: number) => {
+            const r = rangeText(a.range);
+            return (
+              <tr key={i}>
+                <td>{i + 1}</td>
+                <td className="mono">{a.axis}
+                  {a.depends_on ? <span className="sub"> (tras {a.depends_on})</span> : null}</td>
+                <td className="mono">{r.text}
+                  {r.note ? <span className="sub" style={{ margin: 0 }}>{"  "}({r.note})</span> : null}</td>
+                <td>{stateOf(a.axis)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {!axes.length ? <p className="sub">El plan no declara ejes.</p> : null}
+    </div>
+  );
+}
+
 export default function Studies() {
   const [list, setList] = useState<any[] | null>(null);
   const [wds, setWds] = useState<any[]>([]);
@@ -231,7 +340,12 @@ export default function Studies() {
           {sel && detail ? (
             <div style={{ marginTop: 14 }} data-testid="study-detail">
               <h4>{sel}</h4>
-              <div className="sub">
+              {/* U1.6: primero la definición (plan.json, comiteable), después
+                  el progreso (progress.json, estado vivo). Mezclados no se
+                  puede distinguir lo pedido de lo ocurrido. */}
+              <StudyPlan plan={detail.plan} progress={detail.progress} />
+              <strong>El progreso (lo que ha pasado)</strong>
+              <div className="sub" style={{ marginTop: 4 }}>
                 ganadores arrastrados:{" "}
                 <span className="mono">
                   {Object.keys(detail.winners || {}).length

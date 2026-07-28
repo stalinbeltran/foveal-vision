@@ -140,11 +140,15 @@ strength: strong
 
 **Cumplimiento (verificado 2026-07-27)**: las 12 rutas existen en
 [web/src/App.tsx](../../web/src/App.tsx#L114-L128) con esas etiquetas de nav.
-⚠ **U1.6 se escribe hoy (2026-07-28) sabiendo que está `violada`**: Estudios aún no enseña su plan,
-y la regla se deja con código de salida en vez de con una promesa — el mismo trato que tuvo U3.1
-cuando faltaba `validate:palette`. Al implementarla, **`study-plan` entra en el inventario de
-`data-testid`** de [7-operacion.md](7-operacion.md) U7.11: ese catálogo se casa en los dos
-sentidos, así que añadirlo antes de que exista en el código solo mueve la violación de sitio.
+**U1.6 (2026-07-28)**: se escribió `violada` a propósito y se implementó el mismo día en
+[web/src/screens/Studies.tsx](../../web/src/screens/Studies.tsx) — bloque `study-plan` con los
+campos escalares del plan y `study-axes` con la escalera; ambos ya en el inventario de
+[7-operacion.md](7-operacion.md) U7.11. Verificado clicando los **5 estudios** con Playwright (sin
+errores de consola) y, para los estados que ningún estudio real ejercitaba (`auto`, `channels[i]`
+expandido, un eje aún en cola), con un estudio temporal creado y **borrado** después. El bloque
+del plan **no enumera los campos que conoce y calla el resto**: lo que `plan.json` traiga y esta
+pantalla no nombre se pinta igual bajo su clave — un campo añadido en Python no puede volverse
+invisible aquí, que es exactamente cómo divergen las dos copias.
 ⚠ [ui.md](../ui.md) llamaba a la pantalla de estudios **«Barrido por ejes»**; la UI dice
 **«Estudios»**. Manda la UI: el nombre en pantalla es *Estudios* y el doc de diseño es
 [barrido-por-ejes.md](../barrido-por-ejes.md), que describe el **método**, no la pantalla.
