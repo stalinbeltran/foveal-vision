@@ -261,9 +261,17 @@ def create_app() -> FastAPI:
         # said 'val_loss', and saving 'f1' would have made best.pt keep the
         # worst epoch. Served from the same constant the gate validates against.
         from fv.metrics import MONITORS
+        names = [r["name"] for r in rstore.list()]
         return {"recipes": rstore.list(),
                 "defaults": Recipe().as_dict(),
-                "vocabulary": {"monitor": list(MONITORS)}}
+                "vocabulary": {"monitor": list(MONITORS)},
+                # Who pins each D BY NAME. A run or a sweep copied its values, so
+                # editing one never rewrites their history; a STUDY re-resolves
+                # base_recipe at every advance, so its next steps would use the
+                # new values. That is what the screen must say before replacing.
+                # A map apart, never inside the recipe: a field mixed into the
+                # object comes back on the next save as an unknown one.
+                "used_by": {n: studies_store.used_by_recipe(n) for n in names}}
 
     @app.post("/recipes")
     def save_recipe(body: dict):

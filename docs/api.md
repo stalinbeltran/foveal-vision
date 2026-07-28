@@ -96,8 +96,15 @@ antes de guardar**, con todos los problemas a la vez en vez de con el primero qu
 CRUD simple. El cuerpo es el catálogo de organizacion.md §1-D. `device`/`num_workers` **no
 están** (contrato ⑩).
 
-`GET /recipes` sirve tres cosas: `recipes` (la lista, **sin el sobre del fichero** — formatos.md
-§4.3), `defaults` (`Recipe()`, para prerrellenar) y `vocabulary`, hoy `{"monitor": [...]}`: el
+`POST /recipes` (y `POST /networks`) **crea o reemplaza, y la diferencia se pide**: sin
+`overwrite: true` un nombre existente es **409 `recipe_exists`/`network_exists`**; con él, 200. Es
+deliberado que no baste con reenviar: escribir encima sin querer y editar a propósito son actos
+distintos (U5.11). `overwrite` es una bandera de la petición y **no se guarda** en el YAML.
+
+`GET /recipes` sirve cuatro cosas: `recipes` (la lista, **sin el sobre del fichero** — formatos.md
+§4.3), `defaults` (`Recipe()`, para prerrellenar), `used_by` (**mapa aparte**, `{receta: [estudios]}`:
+quién la fija **por nombre** y por tanto re-resuelve sus valores en el próximo `advance`; un run o
+un recorrido copió los valores y no aparece aquí) y `vocabulary`, hoy `{"monitor": [...]}`: el
 vocabulario **cerrado** de un campo de D, servido desde la misma constante (`fv.metrics.MONITORS`)
 contra la que valida la puerta, para que el `<select>` no pueda ofrecer lo que guardar rechazaría
 (U4.2/U5.10). Un `monitor` fuera de esa lista se rechaza con **400 `unknown_monitor`** al guardar

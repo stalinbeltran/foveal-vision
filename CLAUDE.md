@@ -40,6 +40,28 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > verdad desconocido **sigue dando 400**), `npm run build` limpio, y el flujo pulsado con
 > Playwright **en la instancia del usuario** (clic en la fila → Guardar → 200), con **control**:
 > con el código anterior la misma fila devolvía 400. La receta temporal creada se **borró**.
+> **2026-07-28 (3) — EDITAR UNA RECETA ERA IMPOSIBLE DESDE LA UI (409 «elige otro nombre»).**
+> Reportado por el usuario al intentar cambiarle un número a `mejorada`. Los dos stores aceptan
+> `overwrite` **desde el día 1** y **ninguna pantalla lo enviaba nunca**, así que abrir una
+> definición guardada y guardarla acababa siempre en `recipe_exists` con un consejo absurdo
+> («elige otro nombre, o edita esa» — *estaba* editando esa). Lo que hay que saber:
+> 1. **Regla nueva `U5.11`** (79 reglas), el reverso explícito de U5.8: **un run no se sobrescribe;
+>    una red y una receta son fuente y se editan**. Dos acciones distintas — «Guardar» con nombre
+>    nuevo, **«Actualizar» + confirmación** con uno que ya existe — para no confundir el accidente
+>    con la intención. `overwrite` es bandera de la petición, **nunca campo del objeto** (test).
+> 2. **La confirmación dice qué NO cambia y qué SÍ**: los runs y recorridos hechos copiaron los
+>    valores; los **estudios que la fijan por nombre** re-resuelven en su próximo `advance`. Por eso
+>    `GET /recipes` sirve **`used_by`** (`{receta: [estudios]}`) — **mapa aparte**, no dentro del
+>    objeto: un campo mezclado ahí vuelve en el siguiente guardado como «desconocido» (la lección
+>    del sobre, dos notas más abajo). Verificado con `corta`, que la fijan **5 estudios**.
+> 3. **Redes tenía el mismo agujero** y el mismo arreglo (sin `used_by`: un recorrido congela
+>    `base_network_value` al crearse, así que nadie fija una C por nombre para el futuro).
+> ⚠ **Verificado, no razonado**: **127 tests** (+2), `verify_spec --live` **79 reglas, 65 ok, 0
+> violadas, 82 %**, `verify_ui.py` 12 pantallas limpias, y la edición hecha **en la pantalla** sobre
+> una receta temporal (3 → 12 épocas en disco, `overwrite` no guardado) que se **borró** después.
+> La receta `mejorada` del usuario y las versionadas **no se tocaron**: de `corta` solo se abrió la
+> confirmación —para leer los 5 estudios— y se canceló.
+
 > **2026-07-28 (2) — UN OBJETIVO NO ES UN MONITOR, Y EL `<select>` LO ENSEÑABA MAL.**
 > Descubierto al verificar lo anterior y arreglado a petición del usuario. El `<select>` de
 > `monitor` se llenaba con los **objetivos** (`f1`, `loss`, `pos_err_px`); el default de la receta

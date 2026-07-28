@@ -51,6 +51,39 @@ def test_listed_config_can_be_saved_back(world, client):
     assert bad.json()["detail"]["code"] == "unknown_recipe_fields"
 
 
+def test_config_can_be_edited_but_only_on_purpose(world, client):
+    """C and D are SOURCE (formatos.md §4.3): editing one is legitimate, unlike a
+    run (U5.8). Saving over a name is a different act from creating it, so it
+    needs `overwrite` — without it the screen's only exit was a 409 telling you
+    to pick another name, which is not what editing means."""
+    _make_named(client)
+    for path, body in (("/recipes", {"name": "quick", "epochs": 7}),
+                       ("/networks", dict(TINY_NET, name="tiny", d=3))):
+        r = client.post(path, json=dict(body))
+        assert r.status_code == 409                     # the accident is refused
+        assert r.json()["detail"]["code"].endswith("_exists")
+        r = client.post(path, json=dict(body, overwrite=True))
+        assert r.status_code == 200, r.json()           # the intent goes through
+    assert client.get("/recipes/quick").json()["epochs"] == 7
+    assert client.get("/networks/tiny").json()["d"] == 3
+    # `overwrite` is a flag of the request, never a field of the saved object
+    assert "overwrite" not in client.get("/recipes/quick").json()
+    assert "overwrite" not in client.get("/networks/tiny").json()
+
+
+def test_recipes_declare_who_pins_them_by_name(world, client):
+    # a run/sweep copies the recipe VALUES, so editing never rewrites them; a
+    # study re-resolves base_recipe at every advance, so its next steps change.
+    # The screen must be able to say so before replacing anything.
+    _make_named(client)
+    assert client.get("/recipes").json()["used_by"] == {"quick": []}
+    r = client.post("/studies", json={"name": "pin", "window_dataset": world["dataset"],
+                                      "base_recipe": "quick", "objective": "f1",
+                                      "axes": [{"axis": "lr", "range": [0.001, 0.002]}]})
+    assert r.status_code == 201, r.json()
+    assert client.get("/recipes").json()["used_by"]["quick"] == ["pin"]
+
+
 def test_recipe_monitor_vocabulary_is_served_and_enforced(world, client):
     # the screen fills its select from here; the gate validates against the same
     # constant, so the control can never offer what saving would refuse

@@ -42,6 +42,7 @@ export default function Networks() {
   const [error, setError] = useState<unknown>(null);
   const [form, setForm] = usePersistedState<any>("networks.form", EMPTY);
   const [validation, setValidation] = useState<any>(null);
+  const [confirming, setConfirming] = useState(false);
   const ready = form.N != null;   // the served defaults (or a remembered form) landed
 
   const refresh = () => api.get("/networks").then((d) => {
@@ -62,10 +63,18 @@ export default function Networks() {
     return () => clearTimeout(t);
   }, [form, ready]);
 
-  const save = async () => {
+  // C, como D, es fuente y se edita (un run no, U5.8). Sobrescribir se pide
+  // aparte: sin esto el único camino era el 409 «elige otro nombre», que no es
+  // lo que hace quien abre una red guardada para cambiarle un número.
+  const exists = list.some((n) => n.name === form.name);
+
+  const save = async (overwrite = false) => {
     setError(null);
-    try { await api.post("/networks", form); await refresh(); }
-    catch (e) { setError(e); }
+    try {
+      await api.post("/networks", overwrite ? { ...form, overwrite: true } : form);
+      setConfirming(false);
+      await refresh();
+    } catch (e) { setError(e); }
   };
 
   const num = (k: string, step = 1, help?: string) => (
@@ -137,7 +146,25 @@ export default function Networks() {
             <select value={form.pool_mode} onChange={(e) => setForm({ ...form, pool_mode: e.target.value })}>
               <option>avg</option><option>max</option>
             </select></Field>
-          <button onClick={save} disabled={!form.name || !validation?.valid}>Guardar</button>
+          {exists ? (
+            <button onClick={() => setConfirming(true)} data-testid="update-btn"
+              disabled={!form.name || !validation?.valid}>Actualizar «{form.name}»</button>
+          ) : (
+            <button onClick={() => save()}
+              disabled={!form.name || !validation?.valid}>Guardar</button>
+          )}
+          {confirming ? (
+            <div className="card" style={{ marginTop: 8 }} data-testid="overwrite-confirm">
+              <strong>Se reemplaza la definición de «{form.name}»</strong>
+              <p className="sub" style={{ marginTop: 4 }}>
+                Los runs y recorridos ya hechos <b>no cambian</b>: copiaron los valores de C al
+                crearse (`base_network_value`). Lo que cambia es lo que se entrene a partir de ahora
+                con este nombre.
+              </p>
+              <button onClick={() => save(true)}>Sí, reemplazar</button>{" "}
+              <button className="secondary" onClick={() => setConfirming(false)}>Cancelar</button>
+            </div>
+          ) : null}
         </div>
         <div className="card grow" data-testid="validate-panel">
           <h3 style={{ marginTop: 0 }}>Lo que implica (en vivo)</h3>

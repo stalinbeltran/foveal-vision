@@ -127,7 +127,8 @@ strength: strong
 ```
 
 **U5.8 — Un run no se sobrescribe jamás**, así que la UI no ofrece «reemplazar»: ofrece otro
-nombre. El 409 se enseña con la razón.
+nombre. El 409 se enseña con la razón. ⚠ Vale para **E** (un artefacto con pesos y procedencia),
+**no** para las definiciones de C y D, que son fuente y se editan — U5.11.
 
 ```check U5.8
 substrate: http
@@ -169,6 +170,26 @@ args:
   source: "GET /recipes"
   options_path: "vocabulary.monitor"
   value_path: "defaults.monitor"
+strength: strong
+```
+
+**U5.11 — Una definición (C/D) se edita; la pantalla ofrece hacerlo, y lo pide aparte.** Es el
+reverso de U5.8: un run es un artefacto y **no** se sobrescribe, pero una red y una receta son
+**fuente** (formatos.md §4.3) y cambiarles un número es trabajo normal. Abrir una guardada y
+guardar **no** puede acabar en «ya existe → elige otro nombre»: eso confunde el accidente
+(escribir encima sin querer) con la intención (editar lo que acabo de abrir). Por eso son **dos
+acciones distintas**: con un nombre nuevo, «Guardar»; con uno que ya existe, «Actualizar» y una
+confirmación que dice **qué no cambia** (los runs y recorridos hechos copiaron los valores) y
+**qué sí** (los estudios que la fijan **por nombre** — `used_by`— re-resuelven en su próximo paso).
+El `overwrite` es una bandera de la petición, **nunca un campo del objeto guardado**.
+
+```check U5.11
+substrate: dom
+kind: dom_query
+scope: "/recipes"
+args:
+  selector: "[data-testid=recipes-table] tbody tr"
+  sibling_required: "[data-testid=update-btn]"
 strength: strong
 ```
 

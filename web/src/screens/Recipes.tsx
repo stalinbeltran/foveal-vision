@@ -36,16 +36,25 @@ export default function Recipes() {
   // la que valida la puerta (U4.2): una copia aquí es la que ofrecía objetivos
   // donde van monitores
   const [vocabulary, setVocabulary] = useState<any>(null);
+  const [usedBy, setUsedBy] = useState<Record<string, string[]>>({});
+  const [confirming, setConfirming] = useState(false);
 
   const refresh = () => api.get("/recipes").then((d) => {
     setList(d.recipes);
     setDefaults(d.defaults);
     setVocabulary(d.vocabulary ?? null);
+    setUsedBy(d.used_by ?? {});
     setForm((f: any) => ({ ...d.defaults, ...f }));
   }).catch(setError);
   useEffect(() => { refresh(); }, []);
 
-  const save = async () => {
+  // Una receta es fuente (C/D se editan; un run no, U5.8). Sobrescribir es una
+  // acción distinta de crear, así que se pide aparte: el 409 «ya existe → elige
+  // otro nombre» era la única salida que ofrecía la pantalla, y editar la receta
+  // que acabas de abrir no es elegir otro nombre.
+  const exists = list.some((r) => r.name === form.name);
+
+  const save = async (overwrite = false) => {
     setError(null);
     try {
       // se envía lo que D define (los defaults que sirve el API) más el nombre:
@@ -53,7 +62,9 @@ export default function Recipes() {
       // campo retirado— que la puerta rechazaría con razón
       const body: any = { name: form.name };
       for (const k of Object.keys(defaults)) body[k] = form[k];
+      if (overwrite) body.overwrite = true;
       await api.post("/recipes", body);
+      setConfirming(false);
       await refresh();
     } catch (e) { setError(e); }
   };
@@ -108,7 +119,29 @@ export default function Recipes() {
               )}
             </Field>
           ))}
-          <button onClick={save} disabled={!form.name}>Guardar</button>
+          {exists ? (
+            <button onClick={() => setConfirming(true)} disabled={!form.name}
+              data-testid="update-btn">Actualizar «{form.name}»</button>
+          ) : (
+            <button onClick={() => save()} disabled={!form.name}>Guardar</button>
+          )}
+          {confirming ? (
+            <div className="card" style={{ marginTop: 8 }} data-testid="overwrite-confirm">
+              <strong>Se reemplaza la definición de «{form.name}»</strong>
+              <p className="sub" style={{ marginTop: 4 }}>
+                Los runs y recorridos ya hechos <b>no cambian</b>: copiaron los valores al
+                entrenar.{" "}
+                {(usedBy[form.name] ?? []).length
+                  ? <>Pero la fijan por nombre {(usedBy[form.name] ?? []).length === 1
+                      ? "el estudio" : "los estudios"}{" "}
+                    <b>{(usedBy[form.name] ?? []).join(", ")}</b>: sus próximos pasos usarán los
+                    valores nuevos.</>
+                  : <>Ningún estudio la fija por nombre.</>}
+              </p>
+              <button onClick={() => save(true)}>Sí, reemplazar</button>{" "}
+              <button className="secondary" onClick={() => setConfirming(false)}>Cancelar</button>
+            </div>
+          ) : null}
         </div>
         <div className="card grow">
           <h3 style={{ marginTop: 0 }}>Guardadas</h3>
