@@ -46,7 +46,11 @@ export default function Recipes() {
   const save = async () => {
     setError(null);
     try {
-      const body = { ...form };
+      // se envía lo que D define (los defaults que sirve el API) más el nombre:
+      // un formulario recordado puede traer restos —el sobre del fichero, un
+      // campo retirado— que la puerta rechazaría con razón
+      const body: any = { name: form.name };
+      for (const k of Object.keys(defaults)) body[k] = form[k];
       await api.post("/recipes", body);
       await refresh();
     } catch (e) { setError(e); }

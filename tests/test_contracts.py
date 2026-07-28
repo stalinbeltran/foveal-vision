@@ -164,15 +164,26 @@ def test_contract_07_import_directions():
     import ast
     from pathlib import Path
     src = Path(__file__).resolve().parents[1] / "src" / "fv"
+    # settings e ioutils son HOJAS (raices del proyecto y escritura/formato de
+    # fichero), no dominios: los puede usar cualquiera sin crear una direccion.
+    # No se concede, se comprueba — si una hoja importase un dominio, dejaria de
+    # serlo y esta linea lo diria antes que la regla de abajo.
+    leaves = {"settings", "ioutils"}
+    for leaf in leaves:
+        tree = ast.parse((src / f"{leaf}.py").read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module and \
+                    node.module.startswith("fv."):
+                raise AssertionError(f"{leaf}.py importa {node.module}: ya no es hoja")
     rules = {
         "fovea": set(), "metrics": set(), "matrixview": set(),
         "validation": {"fovea"},
         "models": {"fovea"},
-        "windows": {"datasets", "fovea", "metrics", "ioutils"},
+        "windows": {"datasets", "fovea", "metrics"},
         "inference": {"models", "fovea", "matrixview", "metrics"},
         # ⑬ fv.task cruza E×A vía F: consume los dominios de abajo y NADA de
         # arriba (ni api, ni sweeps, ni studies) — es una métrica, no una puerta
-        "task": {"datasets", "diagnostics", "inference", "ioutils", "metrics",
+        "task": {"datasets", "diagnostics", "inference", "metrics",
                  "training", "windows"},
     }
     for mod, allowed in rules.items():
@@ -186,7 +197,7 @@ def test_contract_07_import_directions():
                     dep = node.module.split(".")[1]
                     if dep == mod:
                         continue
-                    assert dep in allowed | {"settings"}, \
+                    assert dep in allowed | leaves, \
                         f"{f.name}: fv.{mod} importa fv.{dep} (no permitido)"
 
 

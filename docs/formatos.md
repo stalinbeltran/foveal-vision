@@ -157,6 +157,15 @@ medir el ahorro** (decisiones.md); reanudar el *recorrido* (re-encolar puntos) s
 versionan en git: son fuente, no artefactos**. `format_version` es del fichero y se quita al
 congelar dentro de un run.
 
+**El sobre del fichero es `format_version` + `name`, y no es del objeto** (`fv.ioutils`:
+`strip_envelope` / `with_envelope`, una definición). `name` es el nombre del fichero;
+`format_version`, el formato. Consecuencia que hay que respetar en **las tres puertas** de cada
+tienda: `list()` y `get()` sirven el objeto **sin sobre**, y `save()` lo **escribe él**, así que
+también lo **acepta y descarta** si se lo devuelven. ⚠ Motivo: la lista es lo que una pantalla
+usa para rellenar su formulario y volver a mandarlo; mientras `list()` sirvió `format_version`,
+`save()` llamaba «campo desconocido» (400) justo a lo que el API acababa de dar. Un campo del
+sobre nunca es «desconocido»; uno que no está en el objeto ni en el sobre **sí**, y se rechaza.
+
 En un YAML de red van **solo los parámetros fundamentales** (organizacion.md §1-C). Los
 derivados (`center_out`, `original_size`, `padding`…) no se escriben nunca: se calculan en
 `fv.fovea.derive_dims` — un derivado escrito es una copia que diverge.

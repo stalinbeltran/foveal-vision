@@ -30,6 +30,27 @@ def _make_named(client):
                                          "batch_size": 32}).status_code == 200
 
 
+def test_listed_config_can_be_saved_back(world, client):
+    # the screens pre-fill their form from the LIST and post it back (click a
+    # row, edit, save). So what a list serves must be the object itself: the
+    # file envelope (format_version) leaked out of /recipes and came back as an
+    # 'unknown field' — reported from the UI, invisible to a one-sided test.
+    _make_named(client)
+    for path, key in (("/recipes", "recipes"), ("/networks", "networks")):
+        listed = next(x for x in client.get(path).json()[key] if x["name"] in ("quick", "tiny"))
+        assert "format_version" not in listed
+        r = client.post(path, json=dict(listed, name=listed["name"] + "-copy"))
+        assert r.status_code == 200, r.json()
+    # and the gate still tolerates it if an old remembered form sends it anyway
+    assert client.post("/recipes", json={"name": "quick2", "epochs": 1,
+                                         "format_version": 1}).status_code == 200
+    assert client.get("/recipes/quick2").json()["epochs"] == 1
+    # a genuinely unknown field is still refused, with the reason
+    bad = client.post("/recipes", json={"name": "nope", "lr_typo": 1})
+    assert bad.status_code == 400
+    assert bad.json()["detail"]["code"] == "unknown_recipe_fields"
+
+
 def test_contract_01_http_400_before_job_and_no_run_created(world, client):
     _make_named(client)
     bad = dict(TINY_NET, N=20, c_frac=0.8, name="big")

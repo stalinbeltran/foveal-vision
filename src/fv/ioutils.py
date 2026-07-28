@@ -15,6 +15,25 @@ from pathlib import Path
 
 _DEADLINE_S = 5.0
 
+# ---------------------------------------------------------------- yaml configs
+# The envelope of a configs/*.yaml (C and D): what describes the FILE, not the
+# object. 'name' is the filename, 'format_version' is the format — neither is a
+# field of the network or of the recipe. ONE definition, read by every path of
+# every store: the leak this closes was list() handing format_version to a form
+# that POSTed it straight back, and save() calling it an unknown field.
+CONFIG_FORMAT_VERSION = 1
+CONFIG_ENVELOPE_FIELDS = ("format_version", "name")
+
+
+def strip_envelope(cfg: dict) -> dict:
+    """The object alone: what the store validates and what a run freezes."""
+    return {k: v for k, v in cfg.items() if k not in CONFIG_ENVELOPE_FIELDS}
+
+
+def with_envelope(cfg: dict) -> dict:
+    """The object as it goes to disk: the envelope is written here, not passed in."""
+    return {"format_version": CONFIG_FORMAT_VERSION, **strip_envelope(cfg)}
+
 
 def write_json_atomic(path: Path, data: dict) -> None:
     path = Path(path)

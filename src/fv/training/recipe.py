@@ -15,6 +15,7 @@ from pathlib import Path
 import yaml
 
 from fv import settings
+from fv.ioutils import strip_envelope, with_envelope
 
 
 @dataclass
@@ -52,7 +53,9 @@ class RecipeStore:
             return []
         out = []
         for f in sorted(self.root.glob("*.yaml")):
-            cfg = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+            # the envelope stays in the file: what is listed is the recipe, so a
+            # screen can send a listed row straight back to save()
+            cfg = strip_envelope(yaml.safe_load(f.read_text(encoding="utf-8")) or {})
             cfg["name"] = f.stem
             out.append(cfg)
         return out
@@ -65,9 +68,7 @@ class RecipeStore:
             raise RecipeStoreError("recipe_not_found",
                                    f"no existe la receta '{name}'",
                                    f"las recetas disponibles son: {known or '(ninguna)'}")
-        cfg = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
-        cfg.pop("name", None)
-        cfg.pop("format_version", None)
+        cfg = strip_envelope(yaml.safe_load(f.read_text(encoding="utf-8")) or {})
         bad = set(cfg) - set(Recipe().as_dict())
         if "device" in bad or "num_workers" in bad:
             raise RecipeStoreError(
@@ -87,7 +88,8 @@ class RecipeStore:
                     "execution_inside_recipe",
                     f"'{banned}' no es un campo de receta",
                     "device y num_workers son X (contrato 10): van en Entrenar, no aqui")
-        bad = set(cfg) - set(Recipe().as_dict()) - {"name"}
+        cfg = strip_envelope(cfg)   # the envelope is not an unknown field
+        bad = set(cfg) - set(Recipe().as_dict())
         if bad:
             raise RecipeStoreError("unknown_recipe_fields",
                                    f"campos desconocidos: {sorted(bad)}",
@@ -98,9 +100,8 @@ class RecipeStore:
             raise RecipeStoreError("recipe_exists",
                                    f"ya existe una receta llamada '{name}'",
                                    "elige otro nombre, o edita esa")
-        body = {"format_version": 1}
-        body.update({k: v for k, v in cfg.items() if k != "name"})
-        f.write_text(yaml.safe_dump(body, sort_keys=False), encoding="utf-8")
+        f.write_text(yaml.safe_dump(with_envelope(cfg), sort_keys=False),
+                     encoding="utf-8")
 
     def delete(self, name: str) -> None:
         f = self.root / f"{name}.yaml"

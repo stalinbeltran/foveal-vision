@@ -23,6 +23,28 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-28 — EL SOBRE DEL FICHERO SE ESCAPÓ POR LA LISTA: GUARDAR UNA RECETA DABA 400.**
+> El usuario reportó `[unknown_recipe_fields] campos desconocidos: ['format_version']` en
+> **Recetas**. Otra vez **el mismo dato en dos sitios**, y otra vez en una costura sin numerar:
+> `RecipeStore.get()` quitaba el sobre del fichero (`name`, `format_version`) y **`list()` no**;
+> la pantalla rellena su formulario con **una fila de la lista** y lo devuelve tal cual, así que
+> `save()` rechazaba como «campo desconocido» **lo que el propio API acababa de servir**. Peor:
+> el formulario se recuerda (`localStorage`), así que **un clic en cualquier fila envenenaba el
+> guardado para siempre**, también con un nombre nuevo. Arreglo en la única definición posible —
+> `fv.ioutils.strip_envelope` / `with_envelope` — aplicada a **las tres puertas** de las **dos**
+> tiendas de config (D y C: `NetworkStore.list()` filtraba igual, sin dar error todavía) y al
+> formulario, que ahora manda solo lo que D define. Documentado en formatos.md §4.3.
+> ⚠ El contrato ⑦ frenó el import: ahora `settings` e `ioutils` son **hojas comprobadas** (el test
+> verifica que no importan ningún dominio) en vez de excepciones concedidas a mano.
+> ⚠ **Verificado, no razonado**: **123 tests** (+1: la vuelta lista→guardar, y que un campo de
+> verdad desconocido **sigue dando 400**), `npm run build` limpio, y el flujo pulsado con
+> Playwright **en la instancia del usuario** (clic en la fila → Guardar → 200), con **control**:
+> con el código anterior la misma fila devolvía 400. La receta temporal creada se **borró**.
+> ⚠ **Hallazgo aparte, sin arreglar** (es otro bug): el `<select>` de `monitor` se llena con los
+> **objetivos** (`f1`, `loss`, `pos_err_px`) y el default de la receta es `val_loss`, que no está
+> en esa lista → **enseña `f1` mientras guarda `val_loss`**. El valor en disco es correcto; lo que
+> miente es la pantalla. Emparentado con F16 (que el API sirva los enums de receta).
+
 > **2026-07-28 — LISTAR NO ES VERIFICAR: LA REGLA U1.6 Y EL PLAN DE UN ESTUDIO.**
 > El usuario reportó que **los parámetros de un estudio no vuelven a verse una vez creado**. Se
 > documentó primero (a petición suya) y se implementó después. Lo que hay que saber:
