@@ -5,8 +5,10 @@
 > pinta (→ [3-representacion.md](3-representacion.md)).
 > **De dónde deriva**: [organizacion.md](../organizacion.md) §1 — **ese documento manda**. Esta
 > especificación es su proyección sobre pantallas; si divergen, el error está aquí.
-> **Cómo se hace cumplir**: prosa + revisión. **No hay mecanismo ejecutable** que detecte una
-> pantalla que mezcla dos dominios. Es el tipo que más se degrada en silencio.
+> **Cómo se hace cumplir**: **ejecutable desde 2026-07-27** (fase 4 del validador): cada pantalla
+> declara su dominio con `data-domain` y el mapa de abajo se casa contra las rutas y las
+> etiquetas reales del nav. Lo que sigue siendo humano: si el reparto de dominios es el
+> *correcto*. Ver [validador.md](validador.md).
 
 ---
 
@@ -18,11 +20,12 @@ organización**, no una decisión de diseño, y se arregla partiendo la pantalla
 una pestaña.
 
 ```check U1.1
-substrate: mixed
-kind: catalog_match
+substrate: dom
+kind: dom_query
+scope: "*"
 args:
-  left: doc_screen_labels
-  right: dom_data_domain
+  selector: "h2[data-domain]"
+  min_count: 1
 strength: strong
 ```
 
@@ -47,9 +50,9 @@ Analizar) ordenan por dependencia de dominio, no por secuencia temporal.
 ```check U1.3
 substrate: dom
 kind: dom_absent_text
-scope: "/"
+scope: "/sources"
 args:
-  words: ["Paso 1", "Paso 2", "Siguiente paso"]
+  words: ["paso 1", "paso 2", "siguiente paso"]
 strength: weak
 ```
 
@@ -77,7 +80,7 @@ kind: dom_query
 scope: "/window-datasets/:name"
 args:
   selector: "[data-testid=window-grid] canvas"
-  requires_run: false
+  min_count: 1
 strength: strong
 ```
 

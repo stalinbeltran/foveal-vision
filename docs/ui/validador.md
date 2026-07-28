@@ -200,9 +200,9 @@ medido por ella misma, no estimado.
 |---|---|---|
 | **0 ✅ (2026-07-27)** | `extract` + `engine` + los cuatro estados + informe + `spec_lint` (B1) + los **76 bloques `check`** + los verbos que no piden dependencias nuevas: `file_exists`, `json_path`, `must_match`, `no_match_outside` y **`catalog_match` con extractores de fichero** | La **cobertura real medida** (§8 bis) y los ocho documentos protegidos contra su propia deriva |
 | **1 ✅ (2026-07-27)** | B2: `css_tokens`, `palette_contrast`, `palette_cvd_delta_e` + el validador de paleta **portado** a `web/scripts/` y expuesto como `npm run validate:palette` | Cierra la deuda declarada. **Una implementación, dos entradas**: el handler de Python *ejecuta el mismo script*, no reimplementa los checks |
-| **2** | B3 + B7: `ast_query`, `no_match_outside`, `single_definition` | La regla que ya costó cuatro copias vivas (U4.2) pasa a ser mecánica |
-| **3** | B4: `http_shape`, `http_refuses` | Los `code` del backend y los que la UI conoce se casan (U5.1, U5.5) |
-| **4** | B6 + B5: anotaciones, `dom_query`, `dom_absent_text`, `catalog_match` completo | Los tipos 1, 2 y 6 dejan de ser solo prosa |
+| **2 ✅ (2026-07-27)** | B3 + B7: side-car Node con el compilador de TypeScript (`tsfacts.mjs`) + `ast_query`, `single_definition`, `settle_guard`, `error_hint_propagated` | La regla que ya costó cuatro copias vivas (U4.2) es mecánica **y volvió a cobrarse el mismo día** |
+| **3 ✅ (2026-07-27)** | B4: `http_shape`, `http_refuses`, `null_not_zero`, con fixtures resueltas del backend y **guarda de solo-lectura** | Las puertas se prueban entrando en ellas; el runner **arranca su propio backend** y lo para |
+| **4 ✅ (2026-07-27)** | B6 + B5: `data-domain` en las 12 pantallas y `data-view`+tripleta en 8 vistas; `dom_query`, `dom_absent_text`, `color_follows_entity`, `number_has_uncertainty`, `ports_free` | Los tipos 1, 2, 6 y 8 dejan de ser solo prosa. **81 % de cobertura** |
 
 ---
 
@@ -319,6 +319,51 @@ las 12 rutas. La predicción estaba razonada, no medida.
 `U8.6 (docs/ui/8-lexico.md:87): sin bloque check` y salida **2**, sin evaluar nada. Un spec
 malformado no produce un verde. El control se cobró solo, además, en vivo: un `git checkout` de mi
 parte borró los ocho bloques del fichero léxico y **el lint lo dijo en la corrida siguiente**.
+
+### Fases 2, 3 y 4, medidas (2026-07-27)
+
+```
+--live    76 reglas : 62 ok  0 violadas  5 no-verificables  9 no-aplicables   cobertura 81%
+--static  76 reglas : 30 ok  0 violadas  5 no-verificables  41 no-aplicables  cobertura 39%
+```
+
+**81 % contra el 87 % previsto en el triaje.** La diferencia son las 9 `no_aplicable` que dependen
+de un dato que hoy no existe (no hay fuente de holdout → U6.7; no hay recorrido con réplicas
+desiguales → U3.10; ningún recorrido con `monitor != objective` a mano → U6.5) o de una interacción
+que el validador no hace (seleccionar un recorrido para que aparezca su leyenda). Ninguna se finge
+verde.
+
+**Lo que cazó, por fase:**
+
+| Fase | Hallazgo | Veredicto |
+|---|---|---|
+| 2 | Los **estados** estaban escritos **cuatro veces** y ya habían divergido: `Sweeps.tsx` esperaba un estado `"failed"` que no existe y **ninguna copia conocía `interrupted`** → un run interrumpido nunca se marcaba terminal, así que su curva **se re-pedía en cada sondeo para siempre** | Real. Arreglado: una definición en `api.ts` |
+| 2 | `Recipes.tsx` llevaba su propia lista de objetivos como fallback | Real. Ahora los sirve el API |
+| 2 | El umbral de muestra pequeña, en dos sitios (`SMALL_SAMPLE=100` y un `images < 100` en el front) | Real. El veredicto **viaja con el número** |
+| 3 | api.md prometía un `400` de `/networks/validate` que el código no da (devuelve 200 + `problems[]`) | Real, de documentación. Corregido api.md |
+| 4 | El `.npz` de un dataset **borrado por un check mío** (ver abajo) | Real, causado por la herramienta. Regenerado bit-idéntico |
+
+**Y lo que se aprendió de la herramienta, que es la mitad del valor:**
+
+1. **La primera corrida mide al validador, no al sistema.** De 11 violadas en la fase 3, **10 eran
+   checks mal escritos** (leer el error en la raíz cuando FastAPI lo envuelve en `detail`; pedir
+   `tie_delta` cuando el campo es `delta`; esperar un 400 que no existe) y **1 era real**.
+2. ⚠ **Un validador puede romper lo que mide.** El bloque de U5.6 decía `DELETE
+   /window-datasets/{window_dataset}` para «provocar el 409» y **borró un dataset real**. Se
+   recuperó (la descripción está versionada; el `.npz` se regeneró con `fv-extract` y salió
+   **bit-idéntico**, mismo seed → mismos splits). Ahora **todo lo que puede escribir está bloqueado
+   por defecto** y solo pasan las llamadas que demostrablemente no mutan.
+3. **Una comprobación puede medirse a sí misma.** `ports_free` (U7.13) se evaluaba **antes** del
+   cierre, así que veía los servidores que la propia herramienta acababa de levantar y se declaraba
+   violada. Ahora se evalúa **después** del `shutdown`.
+4. **Un falso verde por familia de socket.** La comprobación de puertos era IPv4 y **vite escucha en
+   `::1`**: decía «5173 libre» con el front vivo — justo en la regla de no dejar procesos corriendo.
+5. **Nunca dormir un tiempo fijo esperando el DOM.** Con un dataset de 2,8 M de ventanas la pantalla
+   tarda más que cualquier constante que elijas, y un timeout se lee exactamente igual que un
+   elemento que falta. Se espera **al selector**. (Lo mismo hace que `verify_ui.py` falle en la
+   primera corrida tras arrancar vite: es arranque en frío, no un fallo de la UI.)
+
+**Preguntas abiertas que salieron de aquí**: F16–F19 en [decisiones.md](../decisiones.md).
 
 ## 9. Lo que este validador no puede afirmar
 

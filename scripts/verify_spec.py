@@ -31,6 +31,7 @@ from tools.speccheck.verbs.lint import preflight  # noqa: E402
 def main() -> int:
     ap = argparse.ArgumentParser(description="Valida la especificacion de docs/ui/")
     ap.add_argument("--live", action="store_true", help="incluye sustratos http/dom")
+    ap.add_argument("--no-dom", action="store_true", help="--live sin levantar el front")
     ap.add_argument("--rule", action="append", help="una regla concreta (repetible)")
     ap.add_argument("--type", type=int, action="append", help="un tipo entero (repetible)")
     ap.add_argument("--coverage", action="store_true", help="solo el cuadro (sin el detalle)")
@@ -59,13 +60,30 @@ def main() -> int:
     try:
         if mode == "live":
             live.ensure_backend(ROOT)
+            if live.base_url and not args.no_dom:
+                live.ensure_front(ROOT, live.base_url)
             for note in live.notes:
                 print(f"  {report.ascii_(note)}")
-        ctx = engine.Context(root=ROOT, mode=mode, spec=spec, base_url=live.base_url)
+        ctx = engine.Context(root=ROOT, mode=mode, spec=spec, base_url=live.base_url,
+                             front_url=live.front_url, started_ports=tuple(live.ports))
         results = engine.run(ctx, only or None)
     finally:
         # U7.13: lo que arranca esta herramienta, esta herramienta lo para.
+        from tools.speccheck.verbs.dom import close_browser
+        console = close_browser()
         live.shutdown()
+        # `ports_free` (U7.13) asks whether the tool left something listening, so
+        # it can only be answered AFTER the shutdown -- evaluated inline it was
+        # measuring its own servers and failing itself.
+        if mode == "live" and "results" in dir():
+            late = [i for i, r in enumerate(results)
+                    if any(c.kind == "ports_free" for c in spec.checks.get(r.rule.id, []))]
+            for i in late:
+                results[i] = engine.evaluate_rule(results[i].rule, ctx)
+        if console:
+            print(f"\n  ERRORES DE CONSOLA DEL NAVEGADOR ({len(console)}):")
+            for e in console[:10]:
+                print(f"    {report.ascii_(e)[:150]}")
 
     print(f"  modo: {mode}" + ("  (los sustratos http/dom salen no_aplicable)" if mode == "static" else ""))
     print(report.render(results, verbose=args.verbose, summary_only=args.coverage))

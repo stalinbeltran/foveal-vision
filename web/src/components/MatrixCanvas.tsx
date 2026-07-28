@@ -73,12 +73,13 @@ export function MatrixCanvas({ payload, scale = 8 }: { payload: MapPayload; scal
 
   return (
     <div className="thumb" style={{ width: cols * scale }}>
-      <canvas ref={ref} style={{ width: cols * scale, height: rows * scale }}
+      <canvas ref={ref} data-matrix={payload.color}
+        style={{ width: cols * scale, height: rows * scale }}
         title={`min ${payload.min.toFixed(3)} · max ${payload.max.toFixed(3)} — clic: tabla`}
         onClick={() => setShowTable((s) => !s)} />
       {payload.label ? <div className="cap">{payload.label}</div> : null}
       {showTable ? (
-        <div style={{ overflowX: "auto", maxWidth: 420 }}>
+        <div data-numbers-twin="" style={{ overflowX: "auto", maxWidth: 420 }}>
           <table className="data mono" style={{ fontSize: 10 }}>
             <tbody>
               {m.map((row, i) => (

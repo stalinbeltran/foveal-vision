@@ -27,11 +27,6 @@ LIVE_SUBSTRATES = {"http", "dom"}
 
 # Declared in validador.md, built in a later phase. The report says which.
 PLANNED: dict[str, int] = {
-    "dom_query": 4,
-    "dom_absent_text": 4,
-    "number_has_uncertainty": 4,
-    "color_follows_entity": 4,
-    "testid_inventory": 4,
     "ports_free": 4,
 }
 
@@ -57,6 +52,8 @@ class Context:
     mode: str  # "static" | "live"
     spec: Spec
     base_url: str = ""   # backend to interrogate in --live (empty in static)
+    front_url: str = ""  # vite, for the DOM substrate
+    started_ports: tuple[int, ...] = ()  # what THIS run brought up
 
 
 VERBS: dict[str, Callable[[Check, Context], Outcome]] = {}

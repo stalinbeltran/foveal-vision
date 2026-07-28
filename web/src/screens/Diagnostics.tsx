@@ -86,7 +86,7 @@ export default function Diagnostics() {
 
   return (
     <div>
-      <h2>Diagnóstico (E×B)</h2>
+      <h2 data-domain="ExB">Diagnóstico (E×B)</h2>
       <p className="sub">Una pasada sobre el split, muchas vistas. Mover el umbral relee scores
         guardados: no vuelve a correr el modelo.</p>
       <ErrorBox error={error} />
@@ -123,7 +123,9 @@ export default function Diagnostics() {
           </div>
           {evidence ? (
             <div className="card grow">
-              <h3 style={{ marginTop: 0 }}>Evidencia (V18) — cuánto del párrafo cabe en la fóvea</h3>
+              <h3 data-view="V18" data-fixes="E, split, umbral" data-varies="banda de evidencia"
+            data-measures="deteccion y posicion por separado"
+            style={{ marginTop: 0 }}>Evidencia (V18) — cuánto del párrafo cabe en la fóvea</h3>
               <table className="data">
                 <thead><tr><th>banda</th><th>esquinas</th><th>score medio</th><th>err px</th></tr></thead>
                 <tbody>
@@ -140,7 +142,8 @@ export default function Diagnostics() {
       ) : null}
       {gallery && !busy ? (
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Galería peor-primero ({gallery.total} ventanas) — clic: sondas</h3>
+          <h3 data-view="V6" data-fixes="E, split" data-varies="la ventana" data-measures="error"
+            style={{ marginTop: 0 }}>Galería peor-primero ({gallery.total} ventanas) — clic: sondas</h3>
           <div className="thumbgrid" data-testid="gallery">
             {gallery.items.map((it: any) => {
               const pix = windowsPix[it.window_idx];
@@ -160,7 +163,9 @@ export default function Diagnostics() {
       ) : null}
       {probe && !probe.loading ? (
         <div className="card" data-testid="probes">
-          <h3 style={{ marginTop: 0 }}>Sondas de la ventana #{probe.item.window_idx}</h3>
+          <h3 data-view="V3" data-fixes="E, ventana" data-varies="-"
+            data-measures="4x[p, x, y] contra el umbral"
+            style={{ marginTop: 0 }}>Sondas de la ventana #{probe.item.window_idx}</h3>
           <div className="row" style={{ marginBottom: 6 }}>
             {/* el orden de las esquinas viaja con los datos (summary.corner_order,
                 del manifest de B): estas barras se indexan POR POSICIÓN, así que
@@ -181,13 +186,14 @@ export default function Diagnostics() {
               );
             })}
           </div>
-          <h4>F0 — la entrada canal a canal (cobertura mín {probe.inputView.coverage_min.toFixed(2)})</h4>
+          <h4 data-view="F0" data-fixes="E, ventana" data-varies="el canal/zona"
+            data-measures="la entrada compuesta y su cobertura">F0 — la entrada canal a canal (cobertura mín {probe.inputView.coverage_min.toFixed(2)})</h4>
           <div className="row">
             {probe.inputView.channels.map((ch: any, i: number) => (
               <MatrixCanvas key={i} payload={ch} scale={7} />
             ))}
           </div>
-          <h4>V1 — kernels de capa 1, por rama (divergente ±0: el signo es lo que un kernel es)</h4>
+          <h4 data-view="V1" data-fixes="E" data-varies="la rama" data-measures="los pesos">V1 — kernels de capa 1, por rama (divergente ±0: el signo es lo que un kernel es)</h4>
           <div className="row">
             {(["center", "periph"] as const).map((b) => (
               <div key={b}>
@@ -200,7 +206,8 @@ export default function Diagnostics() {
               </div>
             ))}
           </div>
-          <h4>V2 — feature maps (capa 1, primeros 6 por rama)</h4>
+          <h4 data-view="V2" data-fixes="E, ventana" data-varies="capa x rama"
+            data-measures="activacion">V2 — feature maps (capa 1, primeros 6 por rama)</h4>
           <div className="row">
             {(["center", "periph"] as const).map((b) => (
               <div key={b}>

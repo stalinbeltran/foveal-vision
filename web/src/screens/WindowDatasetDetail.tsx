@@ -41,7 +41,7 @@ export default function WindowDatasetDetail() {
 
   return (
     <div>
-      <h2>{name}</h2>
+      <h2 data-domain="B">{name}</h2>
       <p className="sub">El dato crudo que se etiquetó — anillo = esquina verdadera.</p>
       <ErrorBox error={error} />
       {manifest ? (

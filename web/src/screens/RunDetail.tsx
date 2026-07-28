@@ -65,7 +65,7 @@ export default function RunDetail() {
 
   return (
     <div>
-      <h2>{name} <Badge status={detail?.status?.status} /></h2>
+      <h2 data-domain="E">{name} <Badge status={detail?.status?.status} /></h2>
       <ErrorBox error={error} />
       <div className="row">
         <div className="card grow">
@@ -109,7 +109,9 @@ export default function RunDetail() {
           </div>
         </div>
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Curvas (V14 — small multiples, eje de épocas alineado)</h3>
+          <h3 data-view="V14" data-fixes="B, C, D" data-varies="la epoca"
+            data-measures="loss y metricas de val"
+            style={{ marginTop: 0 }}>Curvas (V14 — small multiples, eje de épocas alineado)</h3>
           <LineChart title="loss" series={[
             { label: "train", points: pts((r) => r.train_loss), color: "var(--div-neg)" },
             { label: "val", points: pts((r) => r.val?.loss), color: "var(--div-pos)" }]} />

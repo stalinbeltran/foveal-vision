@@ -52,11 +52,11 @@ export default function Recipes() {
     } catch (e) { setError(e); }
   };
 
-  if (!defaults) return <h2>Recetas (D)</h2>;
+  if (!defaults) return <h2 data-domain="D">Recetas (D)</h2>;
   const fields = Object.keys(defaults);
   return (
     <div>
-      <h2>Recetas (D)</h2>
+      <h2 data-domain="D">Recetas (D)</h2>
       <p className="sub">Hiperparámetros que definen el resultado. device y num_workers NO van aquí
         (contrato ⑩): son ejecución, viven en Entrenar.</p>
       <ErrorBox error={error} />

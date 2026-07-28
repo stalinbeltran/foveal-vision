@@ -35,7 +35,7 @@ export default function WindowDatasets() {
 
   return (
     <div>
-      <h2>Datasets de ventanas (B)</h2>
+      <h2 data-domain="B">Datasets de ventanas (B)</h2>
       <p className="sub">La ventana etiquetada es la fóvea (F1b). La vista foveada NO se hornea aquí:
         se construye en el dataloader, así que toda la geometría es barrible sin re-extraer.</p>
       <ErrorBox error={error} />

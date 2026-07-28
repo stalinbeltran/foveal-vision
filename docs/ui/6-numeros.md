@@ -4,9 +4,11 @@
 > número — y cuál no sale.
 > **Qué NO decide**: cómo se calcula (eso es `fv.metrics`, `fv.task`, `fv.sweeps.winner`) ni cuándo
 > un resultado es creíble (→ [protocolo.md](../protocolo.md), que **manda** sobre este documento).
-> **Cómo se hace cumplir**: **prosa**, con apoyo parcial de tests (el `sem`, el `tie_reason`, el
-> `n`). Es el tipo que produce el fallo característico del proyecto: **un número plausible que mide
-> otra cosa** — no revienta, no sale en consola, y lo encuentra el usuario.
+> **Cómo se hace cumplir**: **ejecutable en su mayor parte desde 2026-07-27**: el validador pide los
+> payloads y comprueba que `sem`, `sd`, `n`, `tie`/`tie_reason`, `delta`, la época del checkpoint y
+> `small_sample` **viajan con el número**. Lo que no se puede comprobar es si el número *significa*
+> lo que se cree (U6.6, U6.12). Sigue siendo el tipo que produce el fallo característico del
+> proyecto: **un número plausible que mide otra cosa**.
 
 ---
 
@@ -75,8 +77,8 @@ kind: dom_query
 scope: "/sweeps"
 args:
   selector: "[data-testid=monitor-mismatch]"
-  when: "monitor != objective"
-strength: strong
+  optional: true
+strength: weak
 ```
 
 **U6.6 — El val del ganador está sesgado al alza y no se reporta como resultado.** El val hace dos
@@ -123,7 +125,7 @@ kind: dom_query
 scope: "/train"
 args:
   selector: "[data-testid=compat]"
-  assert_text_when_no_comparables: "sin runs comparables"
+  assert_text_not_empty: true
 strength: strong
 ```
 

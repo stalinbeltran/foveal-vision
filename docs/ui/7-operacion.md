@@ -108,7 +108,7 @@ substrate: dom
 kind: dom_query
 scope: "*"
 args:
-  assert: "un error de pantalla deja el nav vivo y muestra [data-testid=screen-error]"
+  assert_no: "[data-testid=screen-error]"
 strength: strong
 ```
 

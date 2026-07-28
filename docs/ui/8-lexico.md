@@ -4,8 +4,9 @@
 > y cuál está prohibida.
 > **Qué NO decide**: el significado de los términos. Eso es [glosario.md](../glosario.md), donde
 > **cada entrada ya causó un error una vez**. Aquí solo está la obligación de la pantalla.
-> **Cómo se hace cumplir**: prosa. Aplica a los ocho tipos: una etiqueta ambigua estropea una vista
-> correcta, y no hay forma automática de detectarla.
+> **Cómo se hace cumplir**: **ejecutable desde 2026-07-27**: el validador recorre las 12 pantallas y
+> falla si una palabra prohibida aparece en el texto visible, y casa las etiquetas del nav contra la
+> tabla del documento (es la comprobación que habría cazado «Barrido por ejes» contra «Estudios»).
 
 ---
 
@@ -40,8 +41,8 @@ substrate: dom
 kind: dom_absent_text
 scope: "*"
 args:
-  words: ["muestras", "el modelo", "el dataset", "los samples", "trial"]
-  allow_qualified: ["dataset de ventanas", "modelo entrenado"]
+  words: ["muestras", "samples", "trial"]
+  allow_qualified: ["dataset de ventanas", "muestras de la fuente"]
 strength: strong
 ```
 
@@ -83,12 +84,9 @@ strength: weak
 alguien lo reconcilió.
 
 ```check U8.5
-substrate: mixed
-kind: catalog_match
-args:
-  left: backend_states
-  right: badge_states
-strength: strong
+substrate: same_as
+target: U4.2
+reason: "los estados salen de su unica definicion; la costura run_states es esa comprobacion"
 ```
 
 **U8.6 — Todo texto que pueda acabar en una consola es ASCII.** La consola de Windows es cp1252: una

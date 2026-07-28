@@ -78,7 +78,8 @@ export default function Predict() {
 
   return (
     <div>
-      <h2>Predecir (F)</h2>
+      <h2 data-domain="F" data-view="V11" data-fixes="E, imagen"
+        data-varies="la etapa" data-measures="que se pierde y donde">Predecir (F)</h2>
       <p className="sub">Las tres etapas — sin la cruda, «el párrafo salió mal» no es diagnosticable.
         Los knobs van en unidades de la ventana y no reentrenan nada.</p>
       <ErrorBox error={error} />

@@ -204,7 +204,7 @@ export default function Sweeps() {
 
   return (
     <div>
-      <h2>Recorridos (H)</h2>
+      <h2 data-domain="H">Recorridos (H)</h2>
       <p className="sub">Un espacio sobre C y/o D con B fijo → muchos runs, sin intervención humana.
         Los ejes de geometría usan los rangos calculados; el estado vive en disco y se reanuda.</p>
       <ErrorBox error={error} />

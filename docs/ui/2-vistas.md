@@ -4,8 +4,11 @@
 > **Qué NO decide**: en qué pantalla vive (→ [1-estructura.md](1-estructura.md)), con qué colores
 > se dibuja (→ [3-representacion.md](3-representacion.md)), con qué salvedades se enseña el número
 > (→ [6-numeros.md](6-numeros.md)).
-> **Cómo se hace cumplir**: prosa. **Sin mecanismo ejecutable.** Una vista que miente sobre lo que
-> fija se ve perfectamente bien; es el tipo con el peor ratio daño/detectabilidad de los ocho.
+> **Cómo se hace cumplir**: **parcialmente ejecutable desde 2026-07-27**: cada vista declara su
+> tripleta en el DOM (`data-view` + `data-fixes/-varies/-measures`) y el validador comprueba que
+> **está declarada** y que el id existe en este catálogo. Que la tripleta declarada sea la
+> **cierta** sigue siendo juicio humano (U2.2), y por eso este tipo conserva el peor ratio
+> daño/detectabilidad de los ocho.
 
 ---
 
@@ -15,11 +18,13 @@
 varía C/D y mide el objetivo. Un mapa de activaciones fija E y la ventana, y varía la capa.
 
 ```check U2.1
-substrate: mixed
-kind: catalog_match
+substrate: dom
+kind: dom_query
+scope: "*"
 args:
-  left: doc_view_ids
-  right: dom_data_view
+  selector: "[data-view]"
+  optional: true
+  must_have_attr: ["data-fixes", "data-varies", "data-measures"]
 strength: strong
 ```
 
@@ -37,13 +42,9 @@ subtítulo de las curvas de un recorrido dice qué agrupa y qué banda dibuja). 
 tener que abrir este documento para saber qué está mirando.
 
 ```check U2.3
-substrate: dom
-kind: dom_query
-scope: "*"
-args:
-  selector: "[data-view]"
-  must_have_attr: ["data-fixes", "data-varies", "data-measures"]
-strength: strong
+substrate: same_as
+target: U2.1
+reason: "declarar la tripleta y declararla EN PANTALLA son el mismo atributo"
 ```
 
 **U2.4 — La vista es del proyecto, no de la pantalla.** Una vista heredada del hermano **conserva

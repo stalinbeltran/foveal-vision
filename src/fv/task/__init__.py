@@ -224,6 +224,12 @@ def task_score(run_name: str, split: str = "val", *,
     if cache_file.exists():
         payload = read_json_retrying(cache_file)
         payload["cached"] = True
+        # A field ADDED to the payload does not invalidate the cache, so an entry
+        # written before it exists comes back without it -- and a consumer that
+        # needs it would silently read "false" (formatos.md §1: ausente != cero).
+        # `small_sample` is derived from `images`, so it is filled on the way out
+        # instead of forcing a re-inference of every cached run.
+        payload.setdefault("small_sample", payload["images"] < SMALL_SAMPLE)
         # a cached look is STILL a look (F14): the free-and-invisible second
         # glance is precisely what the ledger exists to make visible
         if is_holdout_source(payload["source"], _source_meta(payload["source"])):

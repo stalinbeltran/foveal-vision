@@ -73,7 +73,7 @@ export default function Train() {
 
   return (
     <div>
-      <h2>Entrenar</h2>
+      <h2 data-domain="BxCxD">Entrenar</h2>
       <p className="sub">Tres nombres (B, C, D) y el device aparte — la rigidez es a propósito:
         es lo que hace que la procedencia se sostenga sola.</p>
       <ErrorBox error={error} />

@@ -147,7 +147,9 @@ export function SweepCurves(props: { trials: { trials: Trial[] }; curves: Record
   return (
     <div className="card" data-testid="sweep-curves">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-        <h4 style={{ margin: "0 0 6px" }}>Curvas del recorrido — val por época
+        <h4 data-view="V14" data-fixes="B y el recorrido" data-varies="la epoca x el punto"
+          data-measures="loss y metricas de val"
+          style={{ margin: "0 0 6px" }}>Curvas del recorrido — val por época
           ({visible.length}/{entities.length} visibles)</h4>
         <div className="curvemode" role="group" aria-label="modo de trazado">
           <button className={mode === "lines" ? "" : "secondary"}

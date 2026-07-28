@@ -131,7 +131,7 @@ export default function Studies() {
 
   return (
     <div>
-      <h2>Estudios OAT (I)</h2>
+      <h2 data-domain="I">Estudios OAT (I)</h2>
       <p className="sub">Un plan ordenado de ejes sobre recorridos, con B fijo. Deriva la base del
         problema, arrastra el ganador y expande sub-ejes (channels[i]) al fijar n_layers.
         Guía paso a paso; el ganador lo confirmas tú.</p>

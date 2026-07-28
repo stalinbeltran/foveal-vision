@@ -23,6 +23,45 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-07-27 — LA ESPECIFICACIÓN DE LA UI, EN OCHO TIPOS, Y UN VALIDADOR QUE LA COMPRUEBA.**
+> A petición del usuario se sintetizaron los **tipos** de especificación que rigen la UI y luego se
+> construyó lo que los hace cumplir. Lo que hay que saber:
+>
+> 1. **`docs/ui.md` es ahora un índice**; las reglas viven en **`docs/ui/`, una por tipo** (1
+>    estructura · 2 vistas · 3 representación · 4 datos · 5 invariantes · 6 números · 7 operación ·
+>    8 léxico), **76 reglas numeradas y citables** (`U4.2`, `U6.7`…). El contenido se **movió**, no
+>    se copió: dejarlo en los dos sitios era el modo de fallo que este proyecto tiene registrado.
+> 2. **`scripts\verify_spec.py` valida esa especificación y se alimenta de ella**: cada regla lleva
+> 2. **`scripts/verify_spec.py` valida esa especificación y se alimenta de ella**: cada regla lleva
+>    pegado un bloque ` ```check ` (opción **A2**: el markdown manda). Motor híbrido (**C3**): 12
+>    verbos declarativos + handlers nombrados; lo que no encaja se declara `substrate: none` **con
+>    su razón** y sale `no_verificable`, nunca `ok`. Informe **por regla en cuatro estados**; salida
+>    ≠ 0 solo con `violada`. **Diseño y lecciones: [docs/ui/validador.md](docs/ui/validador.md).**
+> 3. **Medido: 81 % de cobertura mecánica** (`--live`: 62 ok, **0 violadas**, 5 no verificables, 9
+>    no aplicables) y 39 % en estático. La cobertura **la calcula la herramienta**; no se mantiene a
+>    mano en ningún documento.
+> 4. **Lo que encontró, y estaba vivo**: los **estados de run escritos cuatro veces**, con una copia
+>    esperando un estado `failed` **que no existe** y **ninguna** conociendo `interrupted` — un run
+>    interrumpido no se marcaba terminal y **su curva se re-pedía en cada sondeo, para siempre**;
+>    una **lista de objetivos** duplicada en `Recipes.tsx`; el **umbral `n<100` en dos sitios**
+>    (ahora el veredicto `small_sample` viaja con el número); cuatro **colores literales** que eran
+>    segundas definiciones de tokens —y al quitarlos apareció que el mapa secuencial **no seguía al
+>    tema**—; y un **400 documentado en api.md que el código no daba**. Todo arreglado.
+> 5. **`npm run validate:palette` existe** (era deuda declarada desde el día 1). Una implementación,
+>    dos entradas: el validador de Python **ejecuta el mismo script**. Paleta medida: claro ΔE 9,1
+>    (protan) y suelo de visión normal 19,6; oscuro 8,4 / 19,3.
+> 6. ⚠ **Dos avisos de la herramienta sobre sí misma.** (a) Un check con `DELETE` **borró un dataset
+>    real** antes de que existiera la guarda; se recuperó y se regeneró **bit-idéntico**, y ahora
+>    todo lo que puede escribir está **bloqueado por defecto**. (b) De las 11 primeras «violadas»,
+>    **10 eran checks mal escritos**: la primera corrida de un validador mide al validador.
+> 7. **Cuatro preguntas abiertas anotadas, no decididas**: **F16–F19** en decisiones.md (si el API
+>    debe servir estados y enums de receta; qué runs se ofrecen en Diagnóstico/Predecir; el alcance
+>    del relieve del WARN de contraste; y si se anotan los componentes con `data-*` — hoy sí).
+>
+> ⚠ **Verificado, no razonado**: 122 tests en verde, `verify_spec --live` en 0 con backend y front
+> propios (arrancados y **parados**), `verify_ui.py` con las **12 pantallas sin un error de
+> consola**, `npm run build` limpio y `npm run validate:palette` en verde.
+
 > **2026-07-26 — EL PROXY DE VENTANA VALE TAMBIÉN PARA C, Y LA PERIFERIA NO ESTÁ APORTANDO.**
 > Cerradas las **Fases 3b y 4-código** de metrica-de-tarea.md; la **3 queda aplazada por decisión
 > del usuario**. Lo que hay que saber, por orden de importancia:

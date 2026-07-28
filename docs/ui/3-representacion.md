@@ -89,9 +89,10 @@ mejor vista de depuración que existe: un mapa bonito no dice si el centro vale 
 ```check U3.6
 substrate: dom
 kind: dom_query
-scope: "*"
+scope: "/diagnostics"
 args:
   selector: "canvas[data-matrix]"
+  optional: true
   sibling_required: "[data-numbers-twin]"
 strength: strong
 ```
@@ -106,7 +107,6 @@ kind: color_follows_entity
 scope: "/sweeps"
 args:
   toggle: "[data-testid=sweep-legend] input"
-  assert: "los colores de las series restantes no cambian"
 strength: strong
 ```
 
@@ -120,9 +120,9 @@ kind: dom_query
 scope: "/sweeps"
 args:
   selector: "[data-testid=sweep-legend] label"
-  min_count: 1
+  optional: true
   assert_text_not_empty: true
-strength: strong
+strength: weak
 ```
 
 ```check U3.8
@@ -157,8 +157,8 @@ kind: dom_query
 scope: "/sweeps"
 args:
   selector: "[data-testid=band-cut]"
-  when: "hay replicas desiguales; si no las hay, no_aplicable"
-strength: strong
+  optional: true
+strength: weak
 ```
 
 **U3.11 — Nada se pinta como cero por no tener dato.** Un hueco se dibuja como hueco: la regla

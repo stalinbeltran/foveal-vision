@@ -396,14 +396,21 @@ está construido)—. **El código de salida es ≠ 0 solo si hay una `violada`*
 un fallo, es el mapa de lo que sigue dependiendo de una persona. La cobertura **la calcula la
 herramienta**; no se mantiene a mano en ningún documento.
 
-> Verificado (2026-07-27, fases 0 y 1): **76 reglas**, 18 `ok`, **0 `violadas`**,
-> 5 `no_verificable`, 53 `no_aplicable` (fase 2: 11 · fase 3: 23 · fase 4: 19) → **23 % de cobertura
-> mecánica hoy**, sobre un techo previsto del 87 % cuando estén las cuatro fases.
-> `--live` **no añade nada todavía**: sus verbos son de las fases 3-4, así que esas reglas siguen
-> saliendo `no_aplicable` (corre sin error, no arranca servidores).
-> Salida ASCII, probada bajo `PYTHONIOENCODING=cp1252`. **Control**: quitar un bloque `check` hace
-> que el lint aborte nombrando la regla (`U8.6 … sin bloque check`, salida 2) — un spec malformado
-> nunca produce un verde.
+> Verificado (2026-07-27, las cuatro fases): **76 reglas**, **0 violadas**.
+> `--live` → **62 `ok`**, 5 `no_verificable`, 9 `no_aplicable` = **81 % de cobertura mecánica**
+> (64 % con comprobación fuerte). `--static` → 30 `ok`, 39 %.
+> Las 9 `no_aplicable` dependen de un dato que aún no existe (no hay fuente de holdout, ni un
+> recorrido con réplicas desiguales) y **no se fingen verdes**.
+> `--live` **arranca su propio backend y su propio front** y los para al terminar — reutilizar los
+> que ya escuchan es verificar contra un server stale (U7.10). Salida ASCII, probada bajo
+> `PYTHONIOENCODING=cp1252`. **Control**: quitar un bloque `check` hace que el lint aborte nombrando
+> la regla (`U8.6 … sin bloque check`, salida 2) — un spec malformado nunca produce un verde.
+>
+> Lo que encontró al construirlo, todo arreglado: los **estados de run escritos cuatro veces** (una
+> copia esperaba un estado `failed` inexistente y ninguna conocía `interrupted`, así que un run
+> interrumpido se re-pedía para siempre), una **lista de objetivos** duplicada en el front, el
+> **umbral de muestra pequeña en dos sitios**, y un **400 documentado en api.md que el código no
+> daba**. Detalle y las lecciones sobre la propia herramienta: [docs/ui/validador.md](docs/ui/validador.md) §8 bis.
 
 ### La paleta se valida, no se mira
 
@@ -421,7 +428,7 @@ algo FALLA.
 > visión normal 19,6, tinta 14,87:1 y 5,21:1. Oscuro — **ΔE 8,4** / 19,3, tinta 14,10:1 y 6,57:1.
 > Queda un **WARN** de contraste en claro (cuatro series por debajo de 3:1 contra el fondo), que es
 > legal **solo** porque el relieve está mandado por la especificación: leyenda con etiqueta y tabla
-> de números gemela. `scriptserify_spec.py` ejecuta **este mismo script** para las reglas U3.8 y
+> de números gemela. `scripts\verify_spec.py` ejecuta **este mismo script** para las reglas U3.8 y
 > U3.13 — una implementación, dos entradas.
 
 ## Por dónde empezar a leer

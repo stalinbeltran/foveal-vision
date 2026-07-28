@@ -30,7 +30,7 @@ export default function Sources() {
 
   return (
     <div>
-      <h2>Fuentes (A)</h2>
+      <h2 data-domain="A">Fuentes (A)</h2>
       <p className="sub">Imágenes + geometría de párrafos. Solo lectura: aquí no se elige nada de ventanas.</p>
       <ErrorBox error={error} />
       <div className="row">

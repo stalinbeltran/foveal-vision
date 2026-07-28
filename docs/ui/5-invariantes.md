@@ -121,7 +121,7 @@ substrate: dom
 kind: dom_query
 scope: "/diagnostics"
 args:
-  seed_localstorage: {"diag.run": "run-que-no-existe"}
+  seed_localstorage: {"diag.run": "run-que-no-existe-jamas"}
   assert_no: "[data-testid=screen-error]"
 strength: strong
 ```
