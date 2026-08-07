@@ -230,3 +230,10 @@ __marimo__/
 
 /web/node_modules/
 /web/.vite/
+
+# artefactos del plan de 40 h (logs y marcadores, no descripcion)
+plan-40h*.log
+plan-40h.log.*
+plan-40h.err
+plan-40h.pid
+plan-40h-watchdog.probe*
