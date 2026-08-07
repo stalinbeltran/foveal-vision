@@ -81,6 +81,10 @@ NEXT_AXIS = {
 # what each screening run set on its axis — the value a trimmed range must keep
 SCREEN_VALUE = {"depth": 4, "width": [32, 32], "kernel": 5, "none": None}
 
+# fields whose value is only valid TOGETHER with the axis: carrying them from
+# the screening winner while the axis returns to its default breaks the base
+COUPLED_TO = {"n_layers": ("channels",), "channels": ("n_layers",)}
+
 
 def trim_around(values: list, winner, keep: int = 3) -> list:
     """Keep `keep` values centred on the screening winner, never dropping it."""
@@ -252,6 +256,13 @@ def confirm(res: dict, lever: str, why: str) -> dict:
         carried = {k: v for k, v in res[lever]["config"].items()} if lever != "none" else {}
         carried.pop(axis, None)
         carried.pop("N", None); carried.pop("c_frac", None)      # derived, never carried
+        # a field COUPLED to the swept axis cannot be carried either: channels
+        # must have length n_layers, so carrying [16,16,16,16] while n_layers
+        # goes back to its default 2 makes the BASE invalid and check_run
+        # rejects it before a single point is expanded. Each point resizes
+        # channels to [16]*L on its own (barrido-por-ejes.md S6.1).
+        for coupled in COUPLED_TO.get(axis, ()):
+            carried.pop(coupled, None)
         generate_sweep(name, DATASET, axis, rng if rng != "auto" else "auto",
                        base_recipe="plan40",
                        base_recipe_value=dataclasses.asdict(
