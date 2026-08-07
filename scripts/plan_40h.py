@@ -41,7 +41,9 @@ PATIENCE = 10          # measured floor: longest no-improve streak followed by
 EPOCHS_SCREEN = 100    # cap; patience decides where each config actually stops
 DELTA = 0.0067         # 1-SE of the 5 seeds of d1000-lr-1's winning point
 SEEDS_CONFIRM = 5
-BUDGET_HOURS = 34.0    # the confirmation sweep must fit under this
+BUDGET_HOURS = 36.0    # the confirmation sweep must fit under this. Was 34 when
+                       # the user offered "unas 30 h"; they then offered 40+, so
+                       # this is the stated budget, not a number tuned to a result
 PREFIX = "p40-"
 REPORT = ROOT / "plan-40h-report.json"
 
@@ -57,12 +59,36 @@ SCREEN = [
 
 # lever -> (axis, range) for block 2, fixed in advance (docs/plan-40h.md section 3.4)
 NEXT_AXIS = {
-    "depth":  ("n_layers", [1, 2, 3, 4, 5]),
+    # [2..5], no [1..5]: el rango debe RODEAR al ganador del cribado y contener
+    # L2, que es la red actual y la referencia de toda la afirmacion. L1 (campo
+    # receptivo 3x3) esta dominado por el propio cribado. Ver docs/plan-40h.md S7
+    #
+    # El ORDEN no es el natural, y es a proposito: los puntos se entrenan en el
+    # orden de la lista, asi que si el presupuesto se queda corto lo que falta
+    # son los ultimos. Primero el ganador del cribado (4) y la referencia (2)
+    # -- los dos que responden "la profundidad gana a la red actual" -- y al
+    # final el 5, que solo afina donde esta el optimo. El ranking agrega por
+    # valor, no por orden: esto no cambia ningun resultado, solo que se pierde
+    # si algo se corta.
+    "depth":  ("n_layers", [4, 2, 3, 5]),
     "width":  ("channels", [[16, 16], [24, 24], [32, 32], [48, 48], [64, 64]]),
     "kernel": ("k_center", "auto"),
     # no lever cleared delta -> lr was never bracketed from below
     "none":   ("lr", [0.0004, 0.0006, 0.0008, 0.0011, 0.0014]),
 }
+
+
+# what each screening run set on its axis — the value a trimmed range must keep
+SCREEN_VALUE = {"depth": 4, "width": [32, 32], "kernel": 5, "none": None}
+
+
+def trim_around(values: list, winner, keep: int = 3) -> list:
+    """Keep `keep` values centred on the screening winner, never dropping it."""
+    if winner is None or winner not in values:
+        return values[:keep]
+    i = values.index(winner)
+    lo = max(0, min(i - keep // 2, len(values) - keep))
+    return values[lo:lo + keep]
 
 
 def log(msg: str) -> None:
@@ -153,6 +179,23 @@ def confirm_epochs(res: dict) -> int:
         v["best_epoch"] for v in res.values())))))
 
 
+def epochs_for(axis: str, value, epochs_cap: int, res: dict) -> int:
+    """How many epochs a point will REALLY run. `epochs_cap` is a cap, not a
+    length: patience=10 stopped the screening runs at 71, 32 and 57 of 100, and
+    the DEEPER config stopped soonest. Costing every point at the cap
+    overestimates ~2x and would spend seeds we can actually afford, so use what
+    the screening measured, interpolating between the depths we observed."""
+    if axis != "n_layers":
+        return epochs_cap
+    obs = {2: res["base"]["epochs_run"], 4: res["depth"]["epochs_run"]}
+    lo, hi = min(obs), max(obs)
+    if value <= lo:
+        return obs[lo]
+    if value >= hi:
+        return obs[hi]
+    return round(obs[lo] + (obs[hi] - obs[lo]) * (value - lo) / (hi - lo))
+
+
 def estimate_hours(axis: str, values, epochs: int, seeds: int, res: dict) -> float:
     """~35 s of dataloader per epoch (constant) + the model's own step cost."""
     from fv.models.builder import build_model
@@ -173,7 +216,8 @@ def estimate_hours(axis: str, values, epochs: int, seeds: int, res: dict) -> flo
         for _ in range(10):
             opt.zero_grad(); ((m(x) - y) ** 2).mean().backward(); opt.step()
         ms = (time.perf_counter() - t) / 10
-        total += (35.0 + ms * 988) * epochs * seeds     # 988 steps/epoch at batch 85
+        ep = epochs_for(axis, v, epochs, res)
+        total += (35.0 + ms * 988) * ep * seeds         # 988 steps/epoch at batch 85
     return total / 3600.0
 
 
@@ -192,10 +236,14 @@ def confirm(res: dict, lever: str, why: str) -> dict:
         est = estimate_hours(axis, values, epochs, seeds, res)
         log(f"  guarda 1: semillas 5 -> 3 => {est:.1f} h")
     if est > BUDGET_HOURS and len(values) > 3:
-        values = values[:3] if axis != "channels" else values[:3]
+        # recortar SIEMPRE alrededor del valor que gano el cribado. La regla
+        # original se quedaba con los 3 mas baratos, que con eje n_layers son
+        # [1,2,3] -- fuera justo el 4 que hay que confirmar. Un barrido de
+        # confirmacion que no contiene al candidato no confirma nada.
+        values = trim_around(values, SCREEN_VALUE.get(lever))
         rng = values
         est = estimate_hours(axis, values, epochs, seeds, res)
-        log(f"  guarda 2: rango recortado a {values} => {est:.1f} h")
+        log(f"  guarda 2: rango recortado alrededor del ganador -> {values} => {est:.1f} h")
 
     name = f"{PREFIX}confirm-{axis}".replace("[", "").replace("]", "")
     sstore = SweepStore()

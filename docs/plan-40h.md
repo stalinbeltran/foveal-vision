@@ -104,6 +104,36 @@ eso:
 Lo que el script borra: **solo** runs con prefijo `p40-` que él mismo creó y que no terminaron.
 Nada más.
 
+## 7. Correcciones hechas DESPUÉS de ver el cribado (2026-08-07 06:20)
+
+> Este documento dice que cambiar las reglas tras ver resultados invalida el plan. Estas tres se
+> cambiaron igual, y por eso quedan escritas aparte, con la hora, para que se juzguen: **ninguna
+> toca la regla de decisión ni la métrica** — cambian el rango y el presupuesto del bloque 2, y las
+> tres se habrían escrito igual sin mirar un solo número, si lo hubiera pensado mejor.
+
+**7.1 El recorte dejaba fuera al ganador.** La guarda §4 recortaba «a sus 3 valores más baratos»,
+que con eje `n_layers` son `[1,2,3]` — fuera precisamente el **4** que hay que confirmar. Un
+barrido de confirmación que no contiene al candidato no confirma nada. Ahora recorta **alrededor
+del ganador del cribado** (`trim_around`), que nunca lo suelta.
+
+**7.2 El coste se estimaba al tope, no a lo que se corre.** `estimate_hours` cobraba las 77 épocas
+del tope a cada punto, pero `patience=10` cortó los runs del cribado en **71, 32 y 57** de 100 —
+y **el más profundo fue el que antes paró**. Costear al tope sobreestima ~2× y gasta semillas que
+sí se podían pagar. Ahora se interpola entre las profundidades observadas (`epochs_for`).
+
+**7.3 El rango es `[4, 2, 3, 5]`, en ese orden.** `[2,3,4,5]` para que rodee al ganador **y**
+contenga L2, que es la red actual y la referencia de toda la afirmación (`[1..5]` no cabía y L1
+está dominado). El **orden** es la mitigación: los puntos se entrenan en el orden de la lista, así
+que si el presupuesto se queda corto lo que falta son los últimos. Primero el ganador (**4**) y la
+referencia (**2**) — los dos que responden *¿la profundidad gana a la red actual?* — y el **5** al
+final, que solo afina dónde está el óptimo. El ranking agrega por valor, no por orden: **esto no
+cambia ningún resultado**, solo qué se pierde si algo se corta.
+
+Y `BUDGET_HOURS` pasa de 34 a **36 h**: el 34 se fijó cuando el usuario ofrecía «unas 30 h», y
+después ofreció 40+. Es el presupuesto declarado, no un número ajustado a un resultado. Con eso,
+`[4,2,3,5] × 5 semillas` estima **34,0–34,8 h** (el micro-benchmark varía entre llamadas) y cabe
+de forma estable.
+
 ## 6. Salida
 
 `runs/../plan-40h-report.json` + log en `plan-40h.log`: las cuatro curvas del cribado, la regla
