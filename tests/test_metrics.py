@@ -51,3 +51,53 @@ def test_spearman_refuses_mismatched_series():
     from fv.metrics import spearman
     with pytest.raises(ValueError):
         spearman([1, 2, 3], [1, 2])
+
+
+# --- permutation_test ------------------------------------------------------
+# Golden numbers computed by ENUMERATION BY HAND of the small cases, so the
+# oracle is arithmetic and not a second implementation.
+
+def test_permutation_test_maximum_separation_is_the_smallest_possible_p():
+    """Two groups that do not overlap AT ALL give the extreme p: only the
+    observed split and its mirror reach |diff|, so p = 2/C(n+m,n)."""
+    from fv.metrics import permutation_test
+    r = permutation_test([10.0, 11.0, 12.0], [1.0, 2.0, 3.0])
+    assert r["arrangements"] == 20                 # C(6,3)
+    assert r["p"] == pytest.approx(2 / 20)
+    assert r["diff"] == pytest.approx(9.0)
+    assert r["exact"] is True
+
+
+def test_permutation_test_identical_groups_give_p_one():
+    """Every relabelling matches a zero difference, so nothing is separated."""
+    from fv.metrics import permutation_test
+    r = permutation_test([1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+    assert r["diff"] == pytest.approx(0.0)
+    assert r["p"] == pytest.approx(1.0)
+
+
+def test_permutation_test_is_two_sided():
+    """Swapping the groups flips the sign of the difference and NOT the p: the
+    question is «are they separated», not «which one is on top»."""
+    from fv.metrics import permutation_test
+    a, b = [0.75, 0.79, 0.77, 0.78, 0.79], [0.75, 0.76, 0.76, 0.75, 0.74]
+    ab, ba = permutation_test(a, b), permutation_test(b, a)
+    assert ab["diff"] == pytest.approx(-ba["diff"])
+    assert ab["p"] == pytest.approx(ba["p"])
+
+
+def test_permutation_test_is_none_when_undefined():
+    """One value per group has no test — None, never a p of 1, which would read
+    as «measured, and they are the same» (formatos.md §2: absent is not zero)."""
+    from fv.metrics import permutation_test
+    assert permutation_test([1.0], [2.0, 3.0]) is None
+    assert permutation_test([], [2.0, 3.0]) is None
+
+
+def test_permutation_test_refuses_instead_of_sampling():
+    """Above the exact budget it raises. Falling back to random sampling would
+    make the same name mean two different things, and the p would move between
+    runs of the same criterion."""
+    from fv.metrics import permutation_test
+    with pytest.raises(ValueError):
+        permutation_test(list(range(30)), list(range(30)))

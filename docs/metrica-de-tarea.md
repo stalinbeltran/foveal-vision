@@ -8,6 +8,12 @@
 > - **Fase 3b** — ✅ **el proxy vale TAMBIÉN para C** (§2 bis): sobre el eje `d`, Spearman agregado
 >   **+1,000**, mismo ganador, dentro de la frontera δ. **`OBJECTIVES` no cambia y §5.5 no se
 >   ejecuta.** De regalo, la media respuesta a §9.9: **la periferia no está aportando** (§2 bis.1).
+> - **§2 ter (2026-08-08)** — `n_layers=4` **llevado a la métrica de tarea** con **200 imágenes de
+>   val**: gana también por tarea (0,7796 vs 0,7572 de L2, **p = 0,032**), pero **la ganancia se
+>   encoge a la mitad y las bandas dejan de ser disjuntas**. El criterio de §5.4 sale **+0,800 <
+>   0,90** por un único intercambio entre dos puntos que la tarea **tampoco distingue** (p = 0,897)
+>   → §5.5 **sigue sin ejecutarse**, y queda anotada la reserva: **el f1 de ventana exagera el
+>   hundimiento de L5**.
 > - **Fase 3** — ⏸ aplazada: **F11 cerrada, no se regenera el dato por ahora**. Se sigue con 20
 >   imágenes de val y la métrica de tarea queda como *informe del ganador*, nunca como criterio
 >   para elegir entre puntos. §4 conserva toda la aritmética para reabrirla.
@@ -165,6 +171,88 @@ bloquea. Es información que vale antes de invertir en la comparación. Ojo: enc
 
 Detalle completo por run y por punto en `data/proxy-c-d-3b.json` (comiteado: son ~30 números, no
 carga).
+
+---
+
+## 2 ter. `n_layers=4`, medido con la métrica que manda (2026-08-08)
+
+**Por qué existe este apartado:** el plan de 40 h ([plan-40h.md](plan-40h.md)) concluyó que
+`n_layers` 2 → 4 sube el **f1 de ventana** de 0,8756 a 0,9244 con bandas disjuntas. Ventana es el
+proxy. Esta sección lleva ese veredicto a la métrica de tarea, sin reentrenar nada: son los
+**mismos 20 runs**, 5,4 s de inferencia cada uno.
+
+**Fecha:** 2026-08-08 · **Dataset:** `dirty1000-80px-16px` · **split `val` = 200 imágenes**
+(diez veces el de §2 y §2 bis: aquí el `sem` por run es **±0,023**, y el aviso de muestra pequeña
+—n < 100— **no salta**) · **Recorrido:** `p40-confirm-n_layers` · **Eje:** `n_layers` (dominio
+**C**) · 4 valores × 5 semillas · knobs de F por defecto.
+
+| `n_layers` | ventana (f1) | **tarea** (macro F1) | sem entre semillas | peor–mejor semilla |
+|---|---|---|---|---|
+| **4** | **0,9244** | **0,7796** | 0,0074 | 0,7532 – 0,7922 |
+| 3 | 0,9093 | 0,7644 | 0,0041 | 0,7553 – 0,7761 |
+| 5 | 0,8832 | 0,7654 | 0,0053 | 0,7508 – 0,7803 |
+| 2 | 0,8756 | 0,7572 | 0,0040 | 0,7489 – 0,7689 |
+
+**1. La decisión aguanta: `n_layers=4` gana también por tarea.** +0,0224 sobre L2, y la diferencia
+es más grande que reetiquetar las semillas: **p = 0,032** (permutación exacta, 252 arreglos, dos
+colas). Los otros dos pares **no** se separan: L4 vs L3 p = 0,135, L4 vs L5 p = 0,167. El ganador
+es el mismo con las dos métricas, y cae dentro de la frontera δ.
+
+**2. ⚠ Pero la ganancia se encoge a la mitad, y las bandas ya NO son disjuntas.** La amplitud de
+ventana entre L2 y L4 es 0,0488; la de tarea, **0,0224**. Y donde ventana daba bandas separadas
+(peor L4 = 0,9105 > mejor L2 = 0,8804), en tarea **se solapan**: la peor semilla de L4 (0,7532)
+cae por debajo de la mejor de L2 (0,7689). **Al citar el resultado del plan de 40 h hay que citar
+esto**: «la profundidad gana» sigue siendo cierto sobre la media, pero *una* semilla de L4 no le
+gana a *una* de L2.
+
+**3. El criterio de §5.4, aplicado sin tocarlo, dice NO: Spearman agregado +0,800 < 0,90.** Es el
+**segundo** eje de C medido y el primero que falla, así que hay que decir por qué y decirlo entero:
+
+- El fallo es **un único intercambio de vecinos**: ventana ordena L3 > L5, tarea ordena L5 > L3.
+  Con n = 4 puntos, un solo cambio adyacente hunde el Spearman de 1,000 a 0,800 — no hay valores
+  intermedios que sacar.
+- Y esos dos puntos **no están separados por nada**: 0,0010 de diferencia en tarea, con `sem` de
+  0,0041 y 0,0053, **p = 0,897**. El proxy no se equivoca de orden: **no hay orden** que acertar.
+- ⚠ **La causa mecánica sí es real y merece anotarse: el proxy de ventana exagera el hundimiento de
+  L5.** La bimodalidad de L5 (plan-40h.md: 0,8471 / 0,8581 / 0,8620 contra 0,9279 / 0,9209, una
+  amplitud de **0,081** en ventana) **casi no aparece en la tarea**: las mismas cinco semillas dan
+  0,7508 – 0,7803, amplitud **0,029**, y los dos grupos **se entrelazan** (la semilla que peor
+  arranca en ventana, 0,8471, puntúa 0,7567 en tarea — por encima de dos de las que sí arrancaron
+  en otros puntos). Una red que «no arranca» según el f1 de ventana **sigue reconstruyendo
+  párrafos casi igual de bien**.
+
+**Qué se hace con esto — nada, y la razón:** §5.5 **no se ejecuta**. Cambiar `OBJECTIVES` exige que
+el proxy ordene *mal*, no que empate dos puntos que la tarea tampoco distingue; aquí el ganador
+coincide, la dirección coincide, y el único desacuerdo está bajo el ruido de las dos métricas. Lo
+que sí cambia es **cómo se lee un empate**: con `n_layers`, dos puntos separados por menos de δ en
+ventana pueden estar separados por **menos todavía** en tarea. Se anota como reserva del proxy en
+ejes de C que muevan la profundidad, no como su refutación.
+
+**Colateral, y es una advertencia sobre el método del propio plan:** el **cribado de 1 semilla no
+habría visto nada** por tarea. `p40-screen-base` (L2) = 0,7523 y `p40-screen-depth` (L4) = 0,7532
+— **+0,0009**, frente al `sem` de ±0,023 de un run. Las dos son la semilla 1, que resulta ser la
+**peor** semilla de L4 (números idénticos a `…-0000-n_layers4_seed1`: mismo config, misma semilla,
+mismos pesos — comprobación de determinismo que sale gratis). Por ventana el cribado sí separó
+(+0,0454). Es exactamente protocolo.md: *un resultado sin N semillas es una anécdota*, y aquí la
+anécdota habría apuntado a «la profundidad no hace nada».
+
+Los otros dos resortes del cribado, por tarea y con la misma reserva de 1 semilla:
+`p40-screen-width` (`channels=[32,32]`) **0,7242** — el peor de los cuatro, coherente con que
+ventana ya lo descartara; `p40-screen-kernel` (`k_center=5`) **0,7594** — el **mejor** de los
+cuatro, cuando por ventana era el **peor** (−0,0063 contra la base). Con una semilla y ±0,023 eso
+no afirma nada, pero **k_center no queda descartado por la tarea** como lo quedó por la ventana:
+es el candidato barato si se vuelve a barrer estructura.
+
+**Reproducirlo:**
+
+```powershell
+.\.venv\Scripts\python.exe scripts\proxy_vs_task.py --sweep p40-confirm-n_layers --split val
+```
+
+Detalle por run y por punto en `data/p40-n_layers-task.json` (comiteado). Las p de permutación las
+imprime el propio script desde `fv.metrics.permutation_test` — exacta hasta C(n+m,n) ≤ 200.000, y
+**se niega** por encima en vez de pasar a muestreo en silencio: un p que cambia entre corridas no
+decide nada.
 
 ---
 

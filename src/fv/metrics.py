@@ -11,6 +11,7 @@ of the foveated geometry (contract (9) extension).
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import numpy as np
@@ -190,6 +191,49 @@ def spearman(a, b) -> float | None:
     if den == 0.0:                       # a constant series has no ranking
         return None
     return float((dx * dy).sum() / den)
+
+
+def permutation_test(a, b) -> dict | None:
+    """Is the gap between two groups of seeds bigger than a relabelling of them?
+
+    Lives here for the same reason `spearman` does: with 5 seeds per point, «is
+    this difference real?» gets answered in every write-up of this project, and
+    answering it inside a one-off script is how a number ends up defined twice.
+
+    EXACT when the number of arrangements is manageable (C(n+m, n) <= 200.000 —
+    5-vs-5 is 252), so the p-value does not move between calls: a criterion that
+    changes when you re-run it decides nothing. Above that it refuses rather than
+    silently switching to sampling — a p-value that means two different things
+    under one name is the failure mode this module exists to avoid.
+
+    The statistic is the difference of MEANS, two-sided, which is what the
+    project reports (`aggregate_seeds` ranks the mean of the seeds). It is NOT
+    paired: seed k of two different architectures shares only the RNG stream, so
+    pairing them would claim a link that does not exist.
+
+    Returns None — never a p of 1 — when either group has fewer than two values:
+    there the test is undefined (formatos.md §2: absent is not zero).
+    """
+    x = [float(v) for v in a]
+    y = [float(v) for v in b]
+    if len(x) < 2 or len(y) < 2:
+        return None
+    total = math.comb(len(x) + len(y), len(x))
+    if total > 200_000:
+        raise ValueError(f"permutation_test exacto necesita C(n+m,n) <= 200.000, "
+                         f"salen {total} con n={len(x)} y m={len(y)}")
+    obs = sum(x) / len(x) - sum(y) / len(y)
+    pool = x + y
+    pool_sum = sum(pool)
+    n, m = len(x), len(y)
+    hits = 0
+    for idx in itertools.combinations(range(len(pool)), n):
+        sx = sum(pool[i] for i in idx)
+        diff = sx / n - (pool_sum - sx) / m
+        if abs(diff) >= abs(obs) - 1e-12:      # >= : the observed split counts
+            hits += 1
+    return {"diff": obs, "p": hits / total, "arrangements": total,
+            "n": n, "m": m, "exact": True}
 
 
 def paragraph_f1(pred_boxes: list, true_boxes: list, iou_threshold: float = 0.5) -> dict:

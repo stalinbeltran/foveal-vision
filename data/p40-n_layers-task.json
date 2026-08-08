@@ -1,0 +1,373 @@
+{
+  "sweep": "p40-confirm-n_layers",
+  "split": "val",
+  "objective": "f1",
+  "direction": "max",
+  "axes": [
+    "n_layers"
+  ],
+  "domain": "C (la red: cambia la vista foveada)",
+  "measured_at": "2026-08-08T13:42:48",
+  "spearman_per_run": 0.6390977443609023,
+  "spearman_aggregated": 0.8,
+  "criterion": {
+    "spearman_pass": 0.9,
+    "min_points": 4
+  },
+  "verdict": "fail",
+  "verdict_text": "NO: el proxy NO ordena como la tarea sobre n_layers [C (la red: cambia la vista foveada)] (agregado +0.800 < 0.9). Lee el apartado 5.5 de metrica-de-tarea.md: cambiar el objetivo NO es una linea en OBJECTIVES",
+  "delta": 0.004054886216835326,
+  "delta_source": "1-SE: error est\u00e1ndar de las 5 semillas del mejor punto",
+  "frontier": [
+    "{\"n_layers\": 4}"
+  ],
+  "window_winner": {
+    "n_layers": 4
+  },
+  "suggested": {
+    "n_layers": 4
+  },
+  "task_winner": {
+    "n_layers": 4
+  },
+  "task_winner_in_frontier": true,
+  "task_winner_vs_others": [
+    {
+      "vs": {
+        "n_layers": 3
+      },
+      "diff": 0.015243650793650754,
+      "p": 0.1349206349206349,
+      "arrangements": 252
+    },
+    {
+      "vs": {
+        "n_layers": 5
+      },
+      "diff": 0.01419761904761907,
+      "p": 0.16666666666666666,
+      "arrangements": 252
+    },
+    {
+      "vs": {
+        "n_layers": 2
+      },
+      "diff": 0.022438888888888786,
+      "p": 0.031746031746031744,
+      "arrangements": 252
+    }
+  ],
+  "skipped_runs": [],
+  "per_run": [
+    {
+      "run": "p40-confirm-n_layers-0002-n_layers4_seed3",
+      "point": {
+        "n_layers": 4,
+        "seed": 3
+      },
+      "window": 0.9334864780202569,
+      "task": 0.7734047619047619,
+      "task_sem": 0.023048263927247334,
+      "images": 200,
+      "micro_f1": 0.7464635473340588
+    },
+    {
+      "run": "p40-confirm-n_layers-0003-n_layers4_seed4",
+      "point": {
+        "n_layers": 4,
+        "seed": 4
+      },
+      "window": 0.9300391558959077,
+      "task": 0.7878809523809523,
+      "task_sem": 0.02215820759475501,
+      "images": 200,
+      "micro_f1": 0.7609649122807017
+    },
+    {
+      "run": "p40-confirm-n_layers-0016-n_layers5_seed2",
+      "point": {
+        "n_layers": 5,
+        "seed": 2
+      },
+      "window": 0.9278795163685215,
+      "task": 0.7681666666666667,
+      "task_sem": 0.022403160551239747,
+      "images": 200,
+      "micro_f1": 0.7300884955752213
+    },
+    {
+      "run": "p40-confirm-n_layers-0004-n_layers4_seed5",
+      "point": {
+        "n_layers": 4,
+        "seed": 5
+      },
+      "window": 0.9272212710946508,
+      "task": 0.7914880952380952,
+      "task_sem": 0.022371381450957566,
+      "images": 200,
+      "micro_f1": 0.7636761487964989
+    },
+    {
+      "run": "p40-confirm-n_layers-0019-n_layers5_seed5",
+      "point": {
+        "n_layers": 5,
+        "seed": 5
+      },
+      "window": 0.9209138840070299,
+      "task": 0.7802857142857142,
+      "task_sem": 0.021874088723239832,
+      "images": 200,
+      "micro_f1": 0.752453653217012
+    },
+    {
+      "run": "p40-confirm-n_layers-0001-n_layers4_seed2",
+      "point": {
+        "n_layers": 4,
+        "seed": 2
+      },
+      "window": 0.9208765532622933,
+      "task": 0.7922301587301587,
+      "task_sem": 0.02122620508428218,
+      "images": 200,
+      "micro_f1": 0.7710843373493975
+    },
+    {
+      "run": "p40-confirm-n_layers-0012-n_layers3_seed3",
+      "point": {
+        "n_layers": 3,
+        "seed": 3
+      },
+      "window": 0.9155345956218766,
+      "task": 0.7760714285714286,
+      "task_sem": 0.022604268102527945,
+      "images": 200,
+      "micro_f1": 0.7530454042081949
+    },
+    {
+      "run": "p40-confirm-n_layers-0014-n_layers3_seed5",
+      "point": {
+        "n_layers": 3,
+        "seed": 5
+      },
+      "window": 0.9143729800760024,
+      "task": 0.7576190476190476,
+      "task_sem": 0.02252077491854783,
+      "images": 200,
+      "micro_f1": 0.7333333333333333
+    },
+    {
+      "run": "p40-confirm-n_layers-0010-n_layers3_seed1",
+      "point": {
+        "n_layers": 3,
+        "seed": 1
+      },
+      "window": 0.9114410853541288,
+      "task": 0.7610357142857143,
+      "task_sem": 0.02349532563429698,
+      "images": 200,
+      "micro_f1": 0.7391786903440623
+    },
+    {
+      "run": "p40-confirm-n_layers-0000-n_layers4_seed1",
+      "point": {
+        "n_layers": 4,
+        "seed": 1
+      },
+      "window": 0.9104678321183383,
+      "task": 0.7532261904761904,
+      "task_sem": 0.02335932289241475,
+      "images": 200,
+      "micro_f1": 0.7321428571428572
+    },
+    {
+      "run": "p40-confirm-n_layers-0011-n_layers3_seed2",
+      "point": {
+        "n_layers": 3,
+        "seed": 2
+      },
+      "window": 0.9093295494856332,
+      "task": 0.7553333333333333,
+      "task_sem": 0.023739621243639084,
+      "images": 200,
+      "micro_f1": 0.7319243604004448
+    },
+    {
+      "run": "p40-confirm-n_layers-0013-n_layers3_seed4",
+      "point": {
+        "n_layers": 3,
+        "seed": 4
+      },
+      "window": 0.8957617411225658,
+      "task": 0.771952380952381,
+      "task_sem": 0.02157920890261142,
+      "images": 200,
+      "micro_f1": 0.7406593406593406
+    },
+    {
+      "run": "p40-confirm-n_layers-0009-n_layers2_seed5",
+      "point": {
+        "n_layers": 2,
+        "seed": 5
+      },
+      "window": 0.8804044260614418,
+      "task": 0.7489126984126985,
+      "task_sem": 0.022808725233748085,
+      "images": 200,
+      "micro_f1": 0.7286652078774617
+    },
+    {
+      "run": "p40-confirm-n_layers-0005-n_layers2_seed1",
+      "point": {
+        "n_layers": 2,
+        "seed": 1
+      },
+      "window": 0.8788764525557853,
+      "task": 0.7522896825396826,
+      "task_sem": 0.022664680537816676,
+      "images": 200,
+      "micro_f1": 0.7204419889502763
+    },
+    {
+      "run": "p40-confirm-n_layers-0006-n_layers2_seed2",
+      "point": {
+        "n_layers": 2,
+        "seed": 2
+      },
+      "window": 0.8762470812990871,
+      "task": 0.7643015873015874,
+      "task_sem": 0.021746536785379276,
+      "images": 200,
+      "micro_f1": 0.7302631578947368
+    },
+    {
+      "run": "p40-confirm-n_layers-0007-n_layers2_seed3",
+      "point": {
+        "n_layers": 2,
+        "seed": 3
+      },
+      "window": 0.8718611919387865,
+      "task": 0.7689365079365079,
+      "task_sem": 0.023244995833906816,
+      "images": 200,
+      "micro_f1": 0.7603485838779956
+    },
+    {
+      "run": "p40-confirm-n_layers-0008-n_layers2_seed4",
+      "point": {
+        "n_layers": 2,
+        "seed": 4
+      },
+      "window": 0.8706942805021998,
+      "task": 0.7515952380952381,
+      "task_sem": 0.02274483675207952,
+      "images": 200,
+      "micro_f1": 0.724288840262582
+    },
+    {
+      "run": "p40-confirm-n_layers-0018-n_layers5_seed4",
+      "point": {
+        "n_layers": 5,
+        "seed": 4
+      },
+      "window": 0.8620144783743064,
+      "task": 0.7712896825396826,
+      "task_sem": 0.021978195318681792,
+      "images": 200,
+      "micro_f1": 0.7402597402597403
+    },
+    {
+      "run": "p40-confirm-n_layers-0017-n_layers5_seed3",
+      "point": {
+        "n_layers": 5,
+        "seed": 3
+      },
+      "window": 0.8581105956851484,
+      "task": 0.7507619047619047,
+      "task_sem": 0.022591220776891366,
+      "images": 200,
+      "micro_f1": 0.7149220489977727
+    },
+    {
+      "run": "p40-confirm-n_layers-0015-n_layers5_seed1",
+      "point": {
+        "n_layers": 5,
+        "seed": 1
+      },
+      "window": 0.8471215036258695,
+      "task": 0.7567380952380952,
+      "task_sem": 0.02270101463033909,
+      "images": 200,
+      "micro_f1": 0.7298787210584344
+    }
+  ],
+  "per_point": [
+    {
+      "point": {
+        "n_layers": 4
+      },
+      "window": 0.9244182580782894,
+      "task": 0.7796460317460318,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.004054886216835326,
+      "task_seeds": [
+        0.7734047619047619,
+        0.7878809523809523,
+        0.7914880952380952,
+        0.7922301587301587,
+        0.7532261904761904
+      ]
+    },
+    {
+      "point": {
+        "n_layers": 3
+      },
+      "window": 0.9092879903320414,
+      "task": 0.764402380952381,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.0035529857961819223,
+      "task_seeds": [
+        0.7760714285714286,
+        0.7576190476190476,
+        0.7610357142857143,
+        0.7553333333333333,
+        0.771952380952381
+      ]
+    },
+    {
+      "point": {
+        "n_layers": 5
+      },
+      "window": 0.8832079956121751,
+      "task": 0.7654484126984127,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.017027269813767253,
+      "task_seeds": [
+        0.7681666666666667,
+        0.7802857142857142,
+        0.7712896825396826,
+        0.7507619047619047,
+        0.7567380952380952
+      ]
+    },
+    {
+      "point": {
+        "n_layers": 2
+      },
+      "window": 0.8756166864714601,
+      "task": 0.757207142857143,
+      "n_seeds": 5,
+      "n_task": 5,
+      "window_sem": 0.0019010489559167616,
+      "task_seeds": [
+        0.7489126984126985,
+        0.7522896825396826,
+        0.7643015873015874,
+        0.7689365079365079,
+        0.7515952380952381
+      ]
+    }
+  ]
+}

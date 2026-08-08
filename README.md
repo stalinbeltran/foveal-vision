@@ -308,6 +308,25 @@ entrenado**, sin reentrenar nada:
 El criterio de aceptación está escrito **antes** de mirar (protocolo.md §1), como constantes del
 script: Spearman agregado ≥ 0,90 **y** el ganador por tarea dentro de la frontera δ.
 
+Cuando un punto tiene **varias semillas**, el script imprime además el ganador por tarea **contra
+cada otro punto** con una **permutación exacta** de las semillas (`fv.metrics.permutation_test`,
+dos colas): la correlación dice si las dos métricas *coinciden*, no si las diferencias de tarea son
+*reales*, y con 5 semillas esa segunda pregunta se contesta en cada informe.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\proxy_vs_task.py --sweep p40-confirm-n_layers --split val
+```
+
+> Verificado (2026-08-08) sobre los 20 runs de `p40-confirm-n_layers` (eje `n_layers`, dominio C,
+> 200 imágenes de val): `n_layers=4` gana con las dos métricas — tarea **0,7796** contra 0,7572 de
+> `n_layers=2`, **p = 0,032** (252 arreglos). El veredicto sale **NO** (Spearman agregado +0,800)
+> por un único intercambio entre dos puntos que la tarea **tampoco** distingue (p = 0,897); el
+> análisis entero está en [docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) §2 ter. 99 s la
+> primera vez, 0,1 s con la caché llena.
+>
+> La permutación es **exacta** hasta C(n+m, n) ≤ 200.000 y **se niega** por encima en vez de pasar
+> a muestreo: un p que cambia entre corridas del mismo criterio no decide nada.
+
 `--objective` re-lee **los mismos runs terminados** con otro proxy de ventana, sin tocar el spec ni
 reentrenar, para preguntar cuál sigue mejor a la tarea:
 

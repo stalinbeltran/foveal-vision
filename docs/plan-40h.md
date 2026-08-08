@@ -134,6 +134,33 @@ después ofreció 40+. Es el presupuesto declarado, no un número ajustado a un 
 `[4,2,3,5] × 5 semillas` estima **34,0–34,8 h** (el micro-benchmark varía entre llamadas) y cabe
 de forma estable.
 
+## 8. Lo que dice la MÉTRICA DE TAREA sobre este veredicto (2026-08-08)
+
+Todo lo de arriba es **f1 de ventana**, que es un proxy. Los mismos 20 runs, medidos contra los
+párrafos de la fuente (200 imágenes de val, 5,4 s por run, cero entrenamiento):
+
+| `n_layers` | ventana | **tarea** | ¿separado de L4? |
+|---|---|---|---|
+| **4** | 0,9244 | **0,7796** | — |
+| 3 | 0,9093 | 0,7644 | p = 0,135 |
+| 5 | 0,8832 | 0,7654 | p = 0,167 |
+| 2 | 0,8756 | 0,7572 | **p = 0,032** |
+
+**La conclusión del plan aguanta**: `n_layers=4` gana también por tarea, y contra L2 —que es la
+comparación que el plan hace— la diferencia sobrevive a una permutación exacta de las semillas.
+
+**Dos matices que hay que citar con ella:**
+
+1. **La ganancia se encoge a la mitad** (+0,0488 en ventana → **+0,0224** en tarea) y **las bandas
+   dejan de ser disjuntas**: la peor semilla de L4 (0,7532) queda por debajo de la mejor de L2
+   (0,7689). «Bandas disjuntas» es una propiedad del proxy, no del resultado.
+2. **El cribado de 1 semilla no habría visto nada por tarea**: base 0,7523 contra depth 0,7532, con
+   un `sem` por run de ±0,023. Que funcionara fue suerte del proxy, no del diseño del cribado.
+
+Detalle, la advertencia sobre L5 (su bimodalidad **no aparece** en la tarea) y `k_center=5` —el
+peor por ventana y el **mejor** por tarea con 1 semilla— en
+[metrica-de-tarea.md](metrica-de-tarea.md) §2 ter.
+
 ## 6. Salida
 
 `runs/../plan-40h-report.json` + log en `plan-40h.log`: las cuatro curvas del cribado, la regla

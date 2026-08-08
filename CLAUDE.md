@@ -57,10 +57,41 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    núcleos daba 34 h para el mismo recorrido que, con la máquina libre, sale en 22 h.
 > **Artefactos**: `p40-screen-{base,depth,width,kernel}` (cribado, 1 semilla) + recorrido
 > **`p40-confirm-n_layers`** (20 runs, 4 valores × 5 semillas). Receta nueva `plan40`.
-> **Lo que sigue teniendo más valor**: (a) llevar `n_layers=4` a la **métrica de tarea** —todo esto
-> es f1 de ventana, y el cuello de botella medido es de detección; (b) probar residuales para
-> desbloquear >4 capas; (c) re-barrer `lr`/`batch_size` sobre L4, porque se fijaron sobre L2 y con
-> 20 épocas — y el `lr` ganador quedó **pegado al borde izquierdo** de su rango, sin acotar.
+> **Lo que sigue teniendo más valor**: ~~(a) la métrica de tarea~~ **hecha, ver la nota de abajo**;
+> (b) probar residuales para desbloquear >4 capas; (c) re-barrer `lr`/`batch_size` sobre L4, porque
+> se fijaron sobre L2 y con 20 épocas — y el `lr` ganador quedó **pegado al borde izquierdo** de su
+> rango, sin acotar.
+
+> **2026-08-08 (2) — LA PROFUNDIDAD GANA TAMBIÉN POR TAREA, PERO LA MITAD Y SIN BANDAS DISJUNTAS.**
+> Paso (a) de la nota anterior, hecho sobre los **mismos 20 runs**, sin reentrenar nada (5,4 s de
+> inferencia por run). Detalle en [docs/metrica-de-tarea.md](docs/metrica-de-tarea.md) §2 ter y en
+> [docs/plan-40h.md](docs/plan-40h.md) §8. Lo que hay que saber:
+> 1. **`n_layers=4` gana con las dos métricas**: tarea **0,7796** contra **0,7572** de L2, y la
+>    diferencia sobrevive a una **permutación exacta** de las semillas (**p = 0,032**, 252 arreglos).
+>    L3 y L5 **no** se separan de L4 (p = 0,135 y 0,167). El split de este dataset son **200
+>    imágenes** de val, así que el aviso de muestra pequeña ya no salta (`sem` por run ±0,023).
+> 2. ⚠ **Corrige el titular de la nota anterior**: la ganancia se encoge a la mitad (+0,0488 →
+>    **+0,0224**) y **las bandas se solapan** en tarea (peor L4 = 0,7532 < mejor L2 = 0,7689).
+>    «Bandas disjuntas» era una propiedad **del proxy**, no del resultado. Cítese siempre así.
+> 3. ⚠ **El f1 de ventana EXAGERA el hundimiento de L5.** Su bimodalidad —amplitud 0,081 en
+>    ventana— es de **0,029** en tarea, y los dos grupos **se entrelazan**: una red que «no arranca»
+>    según la ventana sigue reconstruyendo párrafos casi igual de bien.
+> 4. **El criterio de §5.4 sale NO** (Spearman agregado **+0,800** < 0,90) y aun así **§5.5 no se
+>    ejecuta**: el fallo es **un solo intercambio** entre L3 y L5, dos puntos que la tarea **tampoco
+>    distingue** (0,0010 de diferencia, **p = 0,897**). No hay orden que acertar. Queda anotado como
+>    reserva del proxy en ejes de profundidad, no como su refutación.
+> 5. ⚠ **El cribado de 1 semilla no habría visto nada por tarea**: base 0,7523 vs depth 0,7532
+>    (+0,0009 contra ±0,023). Que el plan funcionara fue suerte del proxy. Y **`k_center=5`, el peor
+>    por ventana, es el mejor de los cuatro por tarea** (0,7594) — con 1 semilla no afirma nada,
+>    pero **no queda descartado**: es el candidato barato si se vuelve a barrer estructura.
+> 6. **Pieza nueva `fv.metrics.permutation_test`**: exacta hasta C(n+m,n) ≤ 200.000 y **se niega**
+>    por encima en vez de pasar a muestreo en silencio (un p que cambia entre corridas no decide
+>    nada). La imprime `proxy_vs_task.py` para todo recorrido con varias semillas — porque la
+>    correlación dice si las métricas *coinciden*, nunca si la diferencia es *real*.
+> ⚠ **Verificado, no razonado**: **132 tests** (+5), los **dos comandos del README reproducen sus
+> números documentados** (+0,737 / +0,956 y el veredicto OK de `fast-lr-s0-lr`: sin regresión), y el
+> comando nuevo ejecutado en PowerShell tal como está escrito. Detalle comiteado en
+> `data/p40-n_layers-task.json`. **Cero entrenamiento, cero artefactos borrados.**
 
 > **2026-07-28 — EL SOBRE DEL FICHERO SE ESCAPÓ POR LA LISTA: GUARDAR UNA RECETA DABA 400.**
 > El usuario reportó `[unknown_recipe_fields] campos desconocidos: ['format_version']` en

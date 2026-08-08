@@ -23,7 +23,7 @@ import argparse
 import json
 import time
 
-from fv.metrics import spearman
+from fv.metrics import permutation_test, spearman
 from fv.sweeps.runner import sweep_trials
 from fv.sweeps.spec import NETWORK_PARAMS, RECIPE_PARAMS
 from fv.sweeps.winner import suggest_winner
@@ -143,7 +143,8 @@ def main() -> int:
             continue
         groups.append({"point": g["point"], "window": g["value"],
                        "task": sum(vals) / len(vals), "n_seeds": g["n_seeds"],
-                       "n_task": len(vals), "window_sem": g.get("value_sem")})
+                       "n_task": len(vals), "window_sem": g.get("value_sem"),
+                       "task_seeds": vals})
     sp_agg = spearman([sign * g["window"] for g in groups],
                       [g["task"] for g in groups]) if len(groups) >= 2 else None
 
@@ -154,9 +155,31 @@ def main() -> int:
         print(f"{_point_str(g['point']):<24}{g['window']:>10.4f}"
               f"{g['task']:>10.4f}{g['n_seeds']:>9}")
 
+    # ---- esta diferencia, ?es mas grande que reetiquetar las semillas? ------
+    # The correlation says whether the two metrics AGREE; it says nothing about
+    # whether the task differences are real. With 5 seeds that question gets
+    # answered in every write-up, so it is answered HERE, once, by the tested
+    # definition in fv.metrics — not by eyeballing a standard error.
+    best_task = max(groups, key=lambda g: g["task"])
+    pairs = []
+    for g in groups_by_window:
+        if _point_str(g["point"]) == _point_str(best_task["point"]):
+            continue
+        r = permutation_test(best_task["task_seeds"], g["task_seeds"])
+        if r is None:
+            continue
+        pairs.append({"vs": g["point"], "diff": r["diff"], "p": r["p"],
+                      "arrangements": r["arrangements"]})
+    if pairs:
+        print(f"\nel ganador por tarea contra cada punto "
+              f"(permutacion exacta de las semillas, 2 colas):")
+        for p in pairs:
+            print(f"  {_point_str(best_task['point'])} vs {_point_str(p['vs']):<20}"
+                  f"dif {p['diff']:+.4f}   p = {p['p']:.3f}   "
+                  f"({p['arrangements']} arreglos)")
+
     # ---- el veredicto de §5.4 ---------------------------------------------
     frontier_pts = [_point_str(t["point"]) for t in w["frontier"]]
-    best_task = max(groups, key=lambda g: g["task"])
     task_winner_in_frontier = _point_str(best_task["point"]) in frontier_pts
 
     print(f"\nSpearman por run       (n={len(per_run)}): "
@@ -218,6 +241,7 @@ def main() -> int:
                    "suggested": w["suggested"]["point"],
                    "task_winner": best_task["point"],
                    "task_winner_in_frontier": task_winner_in_frontier,
+                   "task_winner_vs_others": pairs,
                    "skipped_runs": [r["run"] for r in skipped],
                    "per_run": per_run, "per_point": groups_by_window}
         with open(args.json_out, "w", encoding="utf-8") as fh:
