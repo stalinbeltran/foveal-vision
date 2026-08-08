@@ -129,3 +129,35 @@ Con la extrapolación `épocas ∝ 1/lr` desde el único punto medido, y 106 s/�
 las dos. ⚠ Y dos avisos ya medidos en esta máquina: el **throttling térmico** ralentiza ~5× en
 carga sostenida, y el **micro-benchmark de coste miente bajo carga** (plan-40h.md, punto 7: 34 h
 estimadas contra 22 h reales con la máquina libre).
+
+## 6. RESULTADO DE LA SONDA (2026-08-08 16:31) — y la regla §2 aplicada
+
+`p40-lr-L4-0000-lr0p00035_seed1`: **70 épocas**, mejor la **60**, `stopped_early: true` — **paró
+`patience`, no el tope**. 2 h 00 min, **103 s/época**. Cae la rama 1 de §2: el punto es válido
+(R1) y el recorrido se re-estima con el número medido.
+
+⚠ **La extrapolación `épocas ∝ 1/lr` era mala, y por mucho.** Predecía ~188 épocas (topando en
+150); salieron **70**. Con los dos puntos medidos —47 épocas a `lr` = 0,0014 y 70 a 0,00035— la ley
+real es **`épocas ∝ lr^-0,287`**, no `lr^-1`. Convergir con `lr` bajo cuesta **bastante menos** de
+lo que se temía. Es la razón entera por la que la sonda existía.
+
+| `lr` | épocas | h/run | × 5 semillas |
+|---|---|---|---|
+| 0,00035 | **70 (medido)** | 2,04 | 10,2 |
+| 0,0006 | ~60 | 1,75 | 8,7 |
+| 0,0009 | ~53 | 1,56 | 7,8 |
+| 0,0014 | **47 (medido)** | 1,37 | 6,9 |
+
+**Total ≈ 33,6 h**, de las que **2,0 ya están hechas** → **quedan ~31,5 h**. Está **por debajo del
+umbral de 40 h** de §2.1, así que **no se aplica ninguna guarda**: el recorrido se corre como está
+especificado, 4 valores × 5 semillas. La regla estaba escrita antes y se cumple sin tocarla.
+
+⚠ **Sensibilidad honesta**: las 5 semillas de `lr` = 0,0014 pararon entre 32 y 61 épocas (±30 %).
+Con esa dispersión el total va de **~23 h a ~44 h**, y el extremo alto **sí** cruzaría el umbral.
+No se re-planifica por eso: la regla mira la estimación central, y el recorrido es reanudable y
+parable.
+
+**Lo que la sonda insinúa sobre la pregunta** (y solo insinúa): `val_f1` del checkpoint **0,9254**,
+contra **0,9105** del mismo par red-semilla a `lr` = 0,0014. Va en la dirección de «el óptimo está
+más a la izquierda». ⚠ **Es una semilla y no decide nada** (§2.3): el cribado del plan de 40 h, con
+una semilla, se equivocó de signo en la métrica de tarea. La respuesta la dan las 5 semillas y R3.
