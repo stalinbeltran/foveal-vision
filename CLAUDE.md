@@ -23,6 +23,45 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **2026-08-08 — LA PROFUNDIDAD GANA: `n_layers=4` CONTRA LAS 2 DE HOY, SIN SOLAPAMIENTO.**
+> Plan desatendido de ~37 h (30,4 h de cómputo, 24 runs) especificado **antes** en
+> [docs/plan-40h.md](docs/plan-40h.md) y comiteado antes de que existiera un solo run (`b8545db`).
+> Lo que hay que saber:
+> 1. **`n_layers` 2 → 4 sube el f1 de ventana de 0,8756 a 0,9244**, 5 semillas cada uno, y **las
+>    bandas son disjuntas**: la peor semilla de L4 (0,9105) gana a la mejor de L2 (0,8804). `f1` y
+>    `loss` coinciden en el orden y ninguno declara empate (δ=0,0041). Cuesta 106 s/época contra 60.
+> 2. ⚠ **`n_layers` NO es un eje de capacidad, es de campo receptivo.** El **97 % de los parámetros
+>    está en la cabeza** (153.612 de 158.572); una capa más añade 4.640 (+3 %). Por eso **doblar los
+>    canales no sirve** (`ch[32,32]`: +0,0046, dentro de δ, con 2× los parámetros y **más** coste) y
+>    **agrandar el kernel tampoco** (`k_center=5`: −0,0063, peor que la base). Lo que gana es
+>    **apilar capas**, no ensancharlas.
+> 3. **El óptimo está acotado por los dos lados**: L3 = 0,9093 y L5 = 0,8832. Pero L5 **no es peor,
+>    es inestable**: sus semillas son **bimodales** — 0,8471 / 0,8581 / 0,8620 contra 0,9279 /
+>    0,9209. O arranca o no arranca, sin valores intermedios; sem 0,0170 contra 0,0041 de L4. Para
+>    pasar de 4 capas hay que cambiar **algo más que el número** (residuales, otra inicialización).
+> 4. ⚠ **El presupuesto de 20 épocas de los estudios `d1000-*` medía velocidad, no calidad.** Los 70
+>    runs tienen su mejor época ≥16, y 65 seguían mejorando entre la 15 y la 20 (caída media 0,0127
+>    de `val_loss`, **más de la mitad de la amplitud completa del eje de `lr`**). Con `patience=10`
+>    la misma base pasa de f1 0,8437 a 0,8789. **`patience` mínimo seguro = 8**: la racha más larga
+>    sin mejorar seguida de una mejora es de 6 épocas (medido sobre esos 70 runs).
+> 5. ⚠ **`patience` mete varianza por la puerta de atrás**: cada semilla para donde quiere (32–71
+>    épocas) y **la que entrena más lejos aterriza más abajo**. Las bandas de este recorrido son más
+>    anchas que las de los estudios de época fija, y no es ruido de medición, es el criterio de
+>    parada.
+> 6. **Dos bugs del propio plan, encontrados corriendo** y anotados en plan-40h.md §7: la guarda de
+>    presupuesto recortaba el rango **a los 3 valores más baratos, dejando fuera al ganador**; y
+>    arrastrar la config ganadora **menos el eje** no basta — hay que soltar también **lo acoplado**
+>    (`channels` con `n_layers`), o `check_run` rechaza la base. Es otra vez «el mismo dato en dos
+>    sitios»: la profundidad vive en `n_layers` **y** en `len(channels)`.
+> 7. ⚠ **El micro-benchmark de coste miente bajo carga**: medido con un entrenamiento ocupando los
+>    núcleos daba 34 h para el mismo recorrido que, con la máquina libre, sale en 22 h.
+> **Artefactos**: `p40-screen-{base,depth,width,kernel}` (cribado, 1 semilla) + recorrido
+> **`p40-confirm-n_layers`** (20 runs, 4 valores × 5 semillas). Receta nueva `plan40`.
+> **Lo que sigue teniendo más valor**: (a) llevar `n_layers=4` a la **métrica de tarea** —todo esto
+> es f1 de ventana, y el cuello de botella medido es de detección; (b) probar residuales para
+> desbloquear >4 capas; (c) re-barrer `lr`/`batch_size` sobre L4, porque se fijaron sobre L2 y con
+> 20 épocas — y el `lr` ganador quedó **pegado al borde izquierdo** de su rango, sin acotar.
+
 > **2026-07-28 — EL SOBRE DEL FICHERO SE ESCAPÓ POR LA LISTA: GUARDAR UNA RECETA DABA 400.**
 > El usuario reportó `[unknown_recipe_fields] campos desconocidos: ['format_version']` en
 > **Recetas**. Otra vez **el mismo dato en dos sitios**, y otra vez en una costura sin numerar:
