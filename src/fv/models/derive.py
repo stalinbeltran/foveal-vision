@@ -16,7 +16,8 @@ check_run before reserving anything (§10).
 
 from __future__ import annotations
 
-from fv.fovea import (FoveaError, check_dims, derive_dims, downsample_range,
+from fv.fovea import (FoveaError, check_dims, derive_dims, dims_of, downsample_range,
+                      is_single_region,
                       kernel_range, round_to_even)
 from fv.models.builder import NETWORK_DEFAULTS, full_config
 
@@ -24,29 +25,40 @@ from fv.models.builder import NETWORK_DEFAULTS, full_config
 # EXCEPT N (derived from W) and channels (derived from n_layers). pen_frac stays
 # fixed (D-G1); c_frac and d are the exposed tunables.
 STATIC_FIELDS = ("c_frac", "pen_frac", "d", "n_layers", "k_center", "k_periph",
-                 "s_center", "s_periph", "merge", "pool_mode", "pad_mode")
+                 "s_center", "s_periph", "merge", "pool_mode", "pad_mode",
+                 "regions")
 DEFAULT_C_FRAC = NETWORK_DEFAULTS["c_frac"]
 C_FRAC_TOLERANCE = 0.15
 
 
 def derive_geometry(window_size: int, c_frac_target: float = DEFAULT_C_FRAC,
-                    c_frac_tol: float = C_FRAC_TOLERANCE) -> tuple[int, float, str | None]:
+                    c_frac_tol: float = C_FRAC_TOLERANCE,
+                    single_region: bool = False) -> tuple[int, float, str | None]:
     """(N, c_frac_effective, reason). The smallest even N (D-G2) whose fovea is
     exactly W with a periphery of >=1. If none exists at c_frac_target, loosen
     c_frac to the value that hits W exactly (W/N), smallest N within tolerance,
-    and RETURN the reason (D-G3) — W never moves, it comes from B."""
+    and RETURN the reason (D-G3) — W never moves, it comes from B.
+
+    `single_region` (C's regions='single', plan-cnn-plana.md) drops the ">=1
+    periphery" floor, which is the whole point of the flat control: N == W with
+    c_frac=1 is then a legal base. Without this the derivation quietly loosened
+    c_frac to W/(W+2) and produced a net with a ring — a DIFFERENT control than
+    the one asked for, which is precisely the failure this project keeps paying
+    for (measured 2026-08-09: asking for the flat base yielded ws16-p1-d1-L4)."""
     W = int(window_size)
     if W < 4 or W % 2 != 0:
         raise FoveaError("window_size_must_be_even",
                          f"window_size={W} debe ser par y >= 4",
                          "reconstruye B con una ventana par: la periferia reparte simétrico")
     n_max = max(W * 4, W + 8)
-    exact = [N for N in range(W + 2, n_max + 1, 2)
-             if round_to_even(N * c_frac_target) == W and (N - W) // 2 >= 1]
+    n_min = W if single_region else W + 2
+    min_periph = 0 if single_region else 1
+    exact = [N for N in range(n_min, n_max + 1, 2)
+             if round_to_even(N * c_frac_target) == W and (N - W) // 2 >= min_periph]
     if exact:
         return min(exact), float(c_frac_target), None
-    for N in range(W + 2, n_max + 1, 2):
-        if (N - W) // 2 < 1:
+    for N in range(n_min, n_max + 1, 2):
+        if (N - W) // 2 < min_periph:
             continue
         cf = W / N  # center_out = round_to_even(N * W/N) = W exactly (W even)
         if abs(cf - c_frac_target) <= c_frac_tol:
@@ -96,7 +108,22 @@ def derive_base(window_size: int, winners: dict | None = None,
     overrides = dict(overrides or {})
     c_frac_target = (c_frac if c_frac is not None
                      else overrides.get("c_frac", DEFAULT_C_FRAC))
-    N, c_frac_eff, cfrac_reason = derive_geometry(window_size, c_frac_target)
+
+    def _asked(field, default):
+        """What the caller asked for, before any derivation: an override wins,
+        then a carried winner, then the static default."""
+        if field in overrides:
+            return overrides[field]
+        if field in winners:
+            w = winners[field]
+            return w["value"] if isinstance(w, dict) else w
+        return default
+
+    # `regions` has to be known BEFORE the geometry is derived: it decides
+    # whether a periphery of 0 is legal, and therefore which N is chosen
+    single = _asked("regions", NETWORK_DEFAULTS["regions"]) == "single"
+    N, c_frac_eff, cfrac_reason = derive_geometry(window_size, c_frac_target,
+                                                  single_region=single)
 
     cfg = {f: NETWORK_DEFAULTS[f] for f in STATIC_FIELDS}
     cfg["c_frac"] = c_frac_eff
@@ -109,9 +136,16 @@ def derive_base(window_size: int, winners: dict | None = None,
     for f, v in overrides.items():
         cfg[f] = v
         origin[f] = {"origin": "user"}
+    if c_frac is not None:
+        # asked for explicitly (the --c-frac flag): say so. It read 'default'
+        # before, so a base derived from a c_frac the user chose looked like one
+        # nobody chose — and U1.6 says an object shows the definition it was made
+        # with, not a plausible-looking substitute.
+        origin["c_frac"] = {"origin": "user"}
 
     corrections: list[dict] = []
-    dims = derive_dims(N, cfg["c_frac"], cfg["d"], cfg["pen_frac"])
+    dims = derive_dims(N, cfg["c_frac"], cfg["d"], cfg["pen_frac"],
+                       single_region=is_single_region(cfg))
     _correct(cfg, "d", downsample_range(dims.periph_out, N, max_original=2 * N), corrections)
     _correct(cfg, "k_center", kernel_range(dims.center_out), corrections)
     _correct(cfg, "k_periph", kernel_range(dims.periph_band), corrections)
@@ -119,12 +153,13 @@ def derive_base(window_size: int, winners: dict | None = None,
     config = full_config(cfg)  # fills channels=[16]*n_layers (D-C2) and N
     origin.setdefault("channels", {"origin": "default"})
 
-    problems = check_dims(config["N"], config["c_frac"], config["d"], config["pen_frac"])
+    problems = check_dims(config["N"], config["c_frac"], config["d"],
+                          config["pen_frac"], is_single_region(config))
     if problems:
         p = problems[0]
         raise FoveaError(p["code"], p["message"], p["hint"])
 
-    dims = derive_dims(config["N"], config["c_frac"], config["d"], config["pen_frac"])
+    dims = dims_of(config)
     return {
         "config": config,
         "dims": dims,

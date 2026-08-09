@@ -19,7 +19,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from fv import settings
-from fv.fovea import derive_dims
+from fv.fovea import dims_of
 from fv.ioutils import write_json_atomic
 from fv.metrics import (corner_scores, detection_counts, monitor_improved,
                         monitor_key, pos_err_px)
@@ -115,7 +115,7 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
     torch.manual_seed(recipe.seed)
     np.random.seed(recipe.seed % (2 ** 32))
 
-    dims = derive_dims(net["N"], net["c_frac"], net["d"], net["pen_frac"])
+    dims = dims_of(net)
     arrays = wstore.arrays(window_dataset)
     train_ds = FoveatedWindowDataset(arrays, dims, split=0,
                                      pool_mode=net["pool_mode"], pad_mode=net["pad_mode"])

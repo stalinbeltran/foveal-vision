@@ -62,6 +62,34 @@ def validate_plan(plan: dict) -> list[dict]:
              f"punto se mediria con una perdida distinta y lambda->0 gana por "
              f"definicion",
              "usa 'f1' o 'pos_err_px' como objetivo del estudio")
+    # The base network the study runs ON (plan-cnn-plana.md §3.1): the same plan
+    # over the foveated base and over the flat control is the paired comparison.
+    # Refused HERE, before anything is created — a bad field would otherwise
+    # surface inside `advance`, half a study later, in the job (api.md R4).
+    base_network = plan.get("base_network")
+    if base_network is not None:
+        if not isinstance(base_network, dict):
+            _bad(problems, "base_network_must_be_a_map",
+                 f"base_network={base_network!r} no es un mapa de campos de C",
+                 "da {campo: valor}, p. ej. {regions: single, d: 1}")
+        else:
+            unknown = sorted(set(base_network) - NETWORK_PARAMS)
+            if unknown:
+                _bad(problems, "unknown_base_network_field",
+                     f"base_network trae campos que no son de C: {unknown}",
+                     f"campos válidos: {sorted(NETWORK_PARAMS)}")
+            fixed = sorted(set(base_network) & WINDOW_SIZE_FIELDS)
+            if fixed:
+                _bad(problems, "base_network_breaks_window_size",
+                     f"{fixed} fija center_out, que el contrato ①a ata al "
+                     f"window_size de B: se DERIVA, no se escribe",
+                     "quita N; para mover la fracción central usa el campo "
+                     "'c_frac' del plan, que la derivación sí honra")
+    cf = plan.get("c_frac")
+    if cf is not None and not (isinstance(cf, (int, float)) and 0 < float(cf) <= 1):
+        _bad(problems, "c_frac_out_of_range", f"c_frac={cf!r} debe estar en (0, 1]",
+             "1.0 solo tiene sentido con base_network.regions='single' "
+             "(sin anillo); si no, usa algo como 0.8")
     valid_fields = NETWORK_PARAMS | RECIPE_PARAMS
     for a in axes:
         axis = a.get("axis", "")
@@ -235,10 +263,16 @@ def advance(name: str, store: StudyStore | None = None,
     sweep_name = f"{name}-s{step_i}-{safe}"
 
     seeds = int(plan.get("seeds", 3))
+    # The study's base network (plan-cnn-plana.md §3.1). A study fixes B, D and
+    # the AXES, and derived C purely from the window_size — so the SAME plan
+    # could not be run on the flat control, which is exactly the paired
+    # comparison that control exists for. These go to the same derivation the
+    # CLI's --overrides/--c-frac feed, so both entrances derive one base.
     enriched = generate_sweep(
         sweep_name, plan["window_dataset"], axis, axis_range,
         base_recipe=plan["base_recipe"], objective=plan["objective"],
         budget=budget or plan.get("budget", {}), winners=winners,
+        overrides=dict(plan.get("base_network") or {}), c_frac=plan.get("c_frac"),
         seeds=seeds, study=name, sstore=sstore)
 
     step = {"step": step_i, "axis": desc["axis"], "kind": desc["kind"],

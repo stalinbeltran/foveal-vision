@@ -47,16 +47,21 @@ def input_view_payload(model, image: np.ndarray, wx0: int, wy0: int) -> dict:
     view, coverage = build_view(image, wx0, wy0, dims,
                                 pool_mode=model.cfg["pool_mode"],
                                 pad_mode=model.cfg["pad_mode"])
-    cm = model.center_mask[0, 0].cpu().numpy()
-    pm = model.periph_mask[0, 0].cpu().numpy()
+    channels = [map_payload(view, "sequential", "vista compuesta (lo que ve la red)")]
+    # a 'single' net has NO masks — it convolves the whole input. Drawing a mask
+    # there would show a division that does not happen (the flat control's whole
+    # point), so the channel is absent, not faked with an all-ones square.
+    if not model.single:
+        channels.append(map_payload(model.center_mask[0, 0].cpu().numpy(),
+                                    "sequential", "mascara rama central"))
+        channels.append(map_payload(model.periph_mask[0, 0].cpu().numpy(),
+                                    "sequential", "mascara rama periferica"))
+    channels.append(map_payload(coverage, "sequential",
+                                "cobertura (fraccion real por celda)"))
     return {
         "dims": dims.as_dict(),
-        "channels": [
-            map_payload(view, "sequential", "vista compuesta (lo que ve la red)"),
-            map_payload(cm, "sequential", "mascara rama central"),
-            map_payload(pm, "sequential", "mascara rama periferica"),
-            map_payload(coverage, "sequential", "cobertura (fraccion real por celda)"),
-        ],
+        "regions": model.cfg["regions"],
+        "channels": channels,
         "coverage_min": float(coverage.min()),
         "coverage_mean": float(coverage.mean()),
     }

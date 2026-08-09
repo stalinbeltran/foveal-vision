@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 from fv import settings
-from fv.fovea import derive_dims
+from fv.fovea import dims_of
 from fv.inference.checkpoint import MODEL_CACHE
 from fv.metrics import (corner_evidence, corner_scores, detection_counts,
                         per_window_errors)
@@ -75,7 +75,7 @@ def diagnostics_table(run_name: str, split: str = "val",
     else:
         model = MODEL_CACHE.get(ckpt)
         net = cfg["network"]
-        dims = derive_dims(net["N"], net["c_frac"], net["d"], net["pen_frac"])
+        dims = dims_of(net)
         arrays = wstore.arrays(ds_name)
         ds = FoveatedWindowDataset(arrays, dims, split=SPLITS[split],
                                    pool_mode=net["pool_mode"],
