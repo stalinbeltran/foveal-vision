@@ -23,6 +23,40 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **⛓ 2026-08-09 — HAY UNA CADENA ARMADA DETRÁS DEL RECORRIDO VIVO. NO LA DESARMES SIN MIRAR.**
+> Cuando `p40-lr-L4` cierre, **arrancan solos** dos estudios de la **CNN plana** (`fv-plana-watchdog`,
+> tarea de usuario, cada 10 min → `scripts/plan_plana.py`). El usuario **no va a estar presente**.
+> - **Criterio escrito antes** en [docs/plan-plana.md](docs/plan-plana.md), comiteado (`7a8d213`) sin
+>   un solo run. **Solo optimiza la plana; no compara nada con la foveada** — esa decisión es del
+>   usuario, con los datos delante. Cribado 1 semilla (`plana-screen`) → confirmación 5
+>   (`plana-confirm`), rangos estrechados al ganador y **sus dos vecinos**.
+> - **La guarda**: no entrena nada mientras `sweeps/p40-lr-L4/state.json` no diga `done`, y ese
+>   estado se lee **del propio recorrido**. Probado contra el recorrido vivo: no crea nada.
+> - **Presupuesto**: estimación aritmética ~26 h, pero el ejecutor **mide el coste real en el primer
+>   punto**, rehace la proyección y **para si supera 40 h** (§2.1) en vez de quemar días callado.
+> - ⚠ Para estrechar el rango **no se lee `progress['winners']`**: viene envuelto en `{value, from}`
+>   y `winner_overrides` filtra por `NETWORK_PARAMS`, así que **`lr` (que es de D) nunca aparece
+>   ahí**. El punto crudo vive en `steps[i]['winner']`. Cazado ensayando, no razonando.
+> - Al terminar: `Unregister-ScheduledTask -TaskName "fv-plana-watchdog" -Confirm:$false`.
+>
+> **2026-08-09 — LA CNN PLANA YA SE PUEDE CONSTRUIR: `regions: single`, y F12 CERRADA.**
+> El control del §6 de protocolo.md existía como pregunta desde el día 1. **Medido antes de tocar
+> nada: poner la periferia a cero NO da una CNN plana** — `penetration = max(1, round(N·pen_frac))`
+> nunca puede ser 0, así que con `periph_out=0` la máscara periférica se vuelve **un anillo sobre el
+> borde de la propia ventana** (112/256 px con `pen_frac=0,1`; **60/256 incluso con `pen_frac=0`**).
+> Había **dos grados de libertad confundidos en uno**: si la periferia comprime (`d`) y si hay dos
+> ramas enmascaradas o una sola sobre todo el input (**ninguno**). Detalle en
+> [docs/plan-cnn-plana.md](docs/plan-cnn-plana.md), con la familia de 6 controles y qué aísla cada uno.
+> - **`build_masks` NO se toca**: en `single` no se llama. Ausente = `split`, y los nombres de módulo
+>   no se mueven → **ningún artefacto cambia de significado y los checkpoints siguen cargando**
+>   (test de identidad bit a bit + números dorados de la red que entrena ahora: 168.652 params).
+> - ⚠ `derive_geometry` tenía cableado el suelo de «≥1 de periferia»: pedir la base plana devolvía
+>   `ws16-p1-d1-L4`, una red **con anillo**, **sin que nada se negara**. Y un estudio no podía
+>   declarar sobre qué red base corre → campos nuevos `base_network` y `c_frac` en el plan.
+> - `fv.fovea.dims_of` unifica **los seis sitios** que derivaban geometría a mano.
+> ⚠ **Verificado**: **150 tests** (+18), `npm run build` limpio, y la plana entrenada, un recorrido
+> con base plana corrido y un **estudio completo** ejecutados de punta a punta.
+>
 > **⏳ 2026-08-09 — HAY UN RECORRIDO CORRIENDO: `p40-lr-L4` (~31 h, 19 puntos por hacer).**
 > Re-barrido de `lr` sobre la red **L4**, porque el valor vigente (0,0014) se fijó sobre **L2**, con
 > 20 épocas fijas que los 70 runs agotaron, y **quedó pegado al borde izquierdo de su rango**.
