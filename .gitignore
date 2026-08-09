@@ -237,3 +237,10 @@ plan-40h.log.*
 plan-40h.err
 plan-40h.pid
 plan-40h-watchdog.probe*
+
+# idem para el re-barrido de lr y para la cadena de la CNN plana: los .log ya
+# los coge `*.log` de arriba, pero los .err y las sondas de permisos no
+plan-lr-L4.err
+plan-lr-L4-watchdog.probe*
+plan-plana.err
+plan-plana-watchdog.probe*
