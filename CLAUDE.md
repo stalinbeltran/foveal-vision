@@ -23,6 +23,24 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **⏳ 2026-08-09 — HAY UN RECORRIDO CORRIENDO: `p40-lr-L4` (~31 h, 19 puntos por hacer).**
+> Re-barrido de `lr` sobre la red **L4**, porque el valor vigente (0,0014) se fijó sobre **L2**, con
+> 20 épocas fijas que los 70 runs agotaron, y **quedó pegado al borde izquierdo de su rango**.
+> **El criterio está escrito antes de mirar en [docs/plan-lr-L4.md](docs/plan-lr-L4.md)** y
+> comiteado antes de que existiera un solo run (`68df83b`). Si lees esto y sigue corriendo, **no lo
+> toques**: es reanudable y hay watchdog (`fv-lrL4-watchdog`, tarea de usuario, cada 10 min).
+> - Rango `[0,00035 · 0,0006 · 0,0009 · 0,0014]`, 5 semillas, tope **150** épocas para que pare
+>   `patience` y no el tope. Orden `[0,00035 · 0,0014 · 0,0006 · 0,0009]`: si se corta, lo que falta
+>   son los **interiores**, no los extremos, que son la pregunta.
+> - **La sonda ya midió lo que nadie había medido**: a `lr`=0,00035, `patience` salta en la **época
+>   70** (no en las ~188 que predecía `épocas ∝ 1/lr`). La ley real es **`épocas ∝ lr^-0,287`**, así
+>   que el recorrido cuesta **33,6 h** y no 56. La regla §2.1 (umbral 40 h) → **sin guardas**.
+> - **Al cerrar hay que aplicar R1–R5 del documento**, y en particular: **R3** — si vuelve a ganar
+>   el extremo izquierdo, «sigue sin acotar» es **el resultado que se publica**; y **R5** — nada se
+>   arrastra sin pasar por `scripts/proxy_vs_task.py` (la ventana exageró la ganancia al doble en
+>   `n_layers`, medido el 2026-08-08).
+> - Al terminar: `Unregister-ScheduledTask -TaskName "fv-lrL4-watchdog" -Confirm:$false`.
+
 > **2026-08-08 — LA PROFUNDIDAD GANA: `n_layers=4` CONTRA LAS 2 DE HOY, SIN SOLAPAMIENTO.**
 > Plan desatendido de ~37 h (30,4 h de cómputo, 24 runs) especificado **antes** en
 > [docs/plan-40h.md](docs/plan-40h.md) y comiteado antes de que existiera un solo run (`b8545db`).

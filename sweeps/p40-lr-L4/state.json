@@ -1,6 +1,6 @@
 {
-  "status": "stopped",
-  "updated_at": 1786224672.2672548,
-  "done": 1,
-  "total": 20
+  "status": "running",
+  "updated_at": 1786292398.0360496,
+  "total": 20,
+  "pid": 14840
 }

@@ -114,6 +114,28 @@ El equipo se apaga por falta de energía (confirmado por el usuario) y **hiberna
 - es un **recorrido**, y `run_sweep` rehace todo punto que no esté `done`/`cancelled`;
 - **relanzarlo continúa donde se quedó**, y hay watchdog (`scripts/plan_lr_L4_watchdog.ps1`).
 
+**La tarea programada** (registrada el 2026-08-09, `fv-lrL4-watchdog`): cada **10 min** + al
+iniciar sesión, `StartWhenAvailable`, sin parar con la batería, `IgnoreNew`.
+
+⚠ **Va como tarea del usuario, no como SYSTEM.** El watchdog anterior era SYSTEM; registrarla así
+**exige elevación** y esta sesión no la tiene (`Acceso denegado`). La consecuencia hay que decirla:
+una tarea de usuario **no corre hasta que el usuario inicia sesión**, así que tras un apagón el
+recorrido se reanuda **al entrar**, no al arrancar la máquina. Para el caso de uso —un equipo de
+escritorio que el usuario enciende— alcanza; si alguna vez hace falta que reanude sin nadie
+delante, hay que registrarla elevada.
+
+```powershell
+# desregistrarla al terminar el recorrido
+Unregister-ScheduledTask -TaskName "fv-lrL4-watchdog" -Confirm:$false
+```
+
+**Qué está verificado del watchdog, y qué no.** Verificado el 2026-08-09 con el recorrido **vivo**:
+(a) lo detecta y **no duplica** (`LastTaskResult 0`, ninguna línea de relanzamiento, ningún proceso
+nuevo); (b) la **sonda de permisos ejecutada desde el contexto de la tarea** —no desde una consola—
+arranca un proceso con el working dir del proyecto y escribe en su carpeta. **No verificado**: el
+relanzamiento real de un recorrido muerto, que exigiría matar el entrenamiento. La sonda existe
+precisamente porque probar `& python` no ejerce ni el cwd ni la redirección, que es donde falla.
+
 ## 5. Coste — lo que se cree hoy, y lo que lo puede tumbar
 
 Con la extrapolación `épocas ∝ 1/lr` desde el único punto medido, y 106 s/época en L4:
