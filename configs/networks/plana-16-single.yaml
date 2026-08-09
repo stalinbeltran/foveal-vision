@@ -1,0 +1,18 @@
+format_version: 1
+# Control C de docs/plan-cnn-plana.md §3: la CNN plana que solo ve la ventana.
+# Una sola rama sobre todo el input, sin enmascarar y sin periferia.
+# k_periph / s_periph / merge no aplican con regions: single (la puerta no los valida).
+regions: single
+N: 16
+c_frac: 1.0
+d: 1
+pen_frac: 0.1
+n_layers: 4
+k_center: 3
+k_periph: 3
+s_center: 1
+s_periph: 1
+channels: [16, 16, 16, 16]
+merge: concat
+pool_mode: avg
+pad_mode: edge

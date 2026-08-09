@@ -33,6 +33,30 @@ def round_to_even(x: float) -> int:
     return 2 * int(round(x / 2.0))
 
 
+# How C divides the input into branches. Lives HERE and not in the builder
+# because `fv.validation` must stay a pure, torch-free leaf (contract (7)) and
+# still needs the vocabulary to refuse an unknown value at the gate.
+REGIONS = ("split", "single")
+
+
+def is_single_region(net: dict) -> bool:
+    """Absent means 'split' — the behaviour of every artefact written before
+    this field existed (plan-cnn-plana.md §2.1)."""
+    return net.get("regions", "split") == "single"
+
+
+def dims_of(net: dict) -> "FoveaDims":
+    """Derive the geometry FROM A NETWORK CONFIG — the single place that knows
+    `regions` affects what counts as a legal geometry.
+
+    Six call sites derived dims straight from the four scalars, and each one that
+    forgot the flag would raise `no_periphery` on a perfectly legal flat control,
+    inside a training job. One definition, many readers (the failure mode this
+    project keeps paying for: the same fact represented twice)."""
+    return derive_dims(int(net["N"]), float(net["c_frac"]), int(net["d"]),
+                       float(net["pen_frac"]), single_region=is_single_region(net))
+
+
 @dataclass(frozen=True)
 class FoveaDims:
     N: int
@@ -55,11 +79,19 @@ class FoveaDims:
         }
 
 
-def check_dims(N: int, c_frac: float, d: int, pen_frac: float) -> list[dict]:
+def check_dims(N: int, c_frac: float, d: int, pen_frac: float,
+               single_region: bool = False) -> list[dict]:
     """All geometry problems of a parameter set, each with code/message/hint.
 
     Pure and cheap: called by every training gate (contract (2)) and by the
     sweep runner to discard invalid points before reserving anything.
+
+    `single_region` is C's `regions == "single"`: ONE unmasked branch over the
+    whole N x N input (the flat-CNN control of protocolo.md §6, plan-cnn-plana.md).
+    Two problems stop describing anything there and are therefore not raised:
+    `no_periphery` (there is no ring to be missing — that IS the control) and
+    `penetration_too_large` (nothing penetrates: no mask is ever built). Every
+    other problem still applies, and `build_masks` is untouched either way.
     """
     problems: list[dict] = []
 
@@ -81,21 +113,23 @@ def check_dims(N: int, c_frac: float, d: int, pen_frac: float) -> list[dict]:
     if center_out < 4:
         bad("center_too_small", f"center_out={center_out} con N={N}, c_frac={c_frac}",
             "sube c_frac o N: la fovea necesita al menos 4 px")
-    if periph_out < 1:
+    if periph_out < 1 and not single_region:
         bad("no_periphery", f"c_frac={c_frac} deja periph_out=0 con N={N}",
-            "baja c_frac: sin anillo periferico esta red es una CNN plana")
+            "baja c_frac: sin anillo periferico esta red es una CNN plana "
+            "(si eso es lo que quieres, declara regions='single')")
     if 2 * periph_out + center_out != N:
         bad("parity_broken", f"2*{periph_out}+{center_out} != {N}",
             "N y center_out deben tener la misma paridad (ambos pares)")
-    if center_out >= 4 and penetration >= center_out // 2:
+    if center_out >= 4 and penetration >= center_out // 2 and not single_region:
         bad("penetration_too_large",
             f"penetration={penetration} >= center_out//2={center_out // 2}",
             "baja pen_frac: el nucleo exclusivo del kernel central no puede desaparecer")
     return problems
 
 
-def derive_dims(N: int, c_frac: float, d: int, pen_frac: float) -> FoveaDims:
-    problems = check_dims(N, c_frac, d, pen_frac)
+def derive_dims(N: int, c_frac: float, d: int, pen_frac: float,
+                single_region: bool = False) -> FoveaDims:
+    problems = check_dims(N, c_frac, d, pen_frac, single_region)
     if problems:
         p = problems[0]
         raise FoveaError(p["code"], p["message"], p["hint"])

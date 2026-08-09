@@ -195,7 +195,10 @@ export default function Diagnostics() {
           </div>
           <h4 data-view="V1" data-fixes="E" data-varies="la rama" data-measures="los pesos">V1 — kernels de capa 1, por rama (divergente ±0: el signo es lo que un kernel es)</h4>
           <div className="row">
-            {(["center", "periph"] as const).map((b) => (
+            {/* las ramas son las que trae el payload, no una lista escrita aqui:
+                una red `regions: single` tiene UNA, y cablear ["center","periph"]
+                dibujaba una rama que no existe (el mismo dato en dos sitios) */}
+            {Object.keys(probe.kernels.branches).map((b) => (
               <div key={b}>
                 <div className="cap">{b}</div>
                 <div className="row">
@@ -209,7 +212,7 @@ export default function Diagnostics() {
           <h4 data-view="V2" data-fixes="E, ventana" data-varies="capa x rama"
             data-measures="activacion">V2 — feature maps (capa 1, primeros 6 por rama)</h4>
           <div className="row">
-            {(["center", "periph"] as const).map((b) => (
+            {Object.keys(probe.featureMaps.branches).map((b) => (
               <div key={b}>
                 <div className="cap">{b}</div>
                 <div className="row">

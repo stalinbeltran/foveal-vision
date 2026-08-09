@@ -9,22 +9,35 @@ sweep walks through.
 
 from __future__ import annotations
 
-from fv.fovea import check_dims, derive_dims
+from fv.fovea import REGIONS, check_dims, dims_of
 
 
 def check_network(net: dict) -> list[dict]:
     """Contract (2): the foveated geometry is self-consistent."""
+    regions = net.get("regions", "split")
+    if regions not in REGIONS:
+        # refuse the value BEFORE deriving anything: an unknown `regions` silently
+        # falling back to 'split' would train a foveated net while the config —
+        # and the whole comparison built on it — claims it is the flat control
+        return [{"code": "unknown_regions",
+                 "message": f"regions '{regions}' no existe",
+                 "hint": f"usa uno de {sorted(REGIONS)}: 'split' es la red foveada "
+                         f"(dos ramas enmascaradas) y 'single' la CNN plana de "
+                         f"control (una rama sobre todo el input)"}]
+    single = regions == "single"
     problems = list(check_dims(
         int(net.get("N", 0)), float(net.get("c_frac", 0.0)),
-        int(net.get("d", 1)), float(net.get("pen_frac", 0.0))))
-    for key in ("k_center", "k_periph"):
+        int(net.get("d", 1)), float(net.get("pen_frac", 0.0)), single))
+    # in 'single' there is no peripheral branch, so its kernel/stride/merge
+    # describe nothing and are not validated against a band that does not exist
+    for key in (("k_center",) if single else ("k_center", "k_periph")):
         k = int(net.get(key, 3))
         if k % 2 == 0 or k < 3:
             problems.append({
                 "code": "kernel_must_be_odd",
                 "message": f"{key}={k}: un kernel par desalinea las mascaras (padding no entero)",
                 "hint": "usa un kernel impar >= 3 (los rangos calculados solo generan impares)"})
-    if net.get("merge", "concat") == "sum" and \
+    if not single and net.get("merge", "concat") == "sum" and \
             int(net.get("s_center", 1)) != int(net.get("s_periph", 1)):
         problems.append({
             "code": "merge_sum_needs_equal_strides",
@@ -56,8 +69,8 @@ def check_network(net: dict) -> list[dict]:
                 "code": "channels_must_be_positive",
                 "message": f"channels={channels} tiene un valor < 1",
                 "hint": "cada capa necesita al menos 1 canal"})
-    if not problems:
-        dims = derive_dims(net["N"], net["c_frac"], net["d"], net["pen_frac"])
+    if not problems and not single:
+        dims = dims_of(net)
         if int(net.get("k_periph", 3)) > 2 * dims.periph_band + 1:
             problems.append({
                 "code": "kernel_exceeds_band",
@@ -77,7 +90,7 @@ def check_compatible(manifest: dict, net: dict) -> list[dict]:
     problems = check_network(net)
     if problems:
         return problems
-    dims = derive_dims(net["N"], net["c_frac"], net["d"], net["pen_frac"])
+    dims = dims_of(net)
     window_size = int(manifest.get("config", {}).get("window_size", 0))
     if dims.center_out != window_size:
         problems.append({

@@ -22,15 +22,24 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from fv.fovea import build_masks, derive_dims
+from fv.fovea import REGIONS, build_masks, dims_of, is_single_region
 
 DEFAULT_CHANNEL = 16  # D-C2: a derived net defaults to [16]*n_layers (constant 16)
+
+# REGIONS ('split' | 'single') is defined ONCE, in fv.fovea, and re-exported here
+# because that is where C's vocabulary is read from. 'split' is the foveated net
+# (two masked branches); 'single' is ONE unmasked branch over the whole N x N
+# input — the flat CNN of protocolo.md §6, built as a declared degeneration of C
+# and not as a separate architecture (F12, docs/plan-cnn-plana.md §2). The default
+# keeps every artefact already on disk meaning exactly what it meant.
+__all__ = ["REGIONS", "NETWORK_DEFAULTS", "full_config", "build_model",
+           "network_trace", "resolve_channels", "FoveatedRegionalNN"]
 
 NETWORK_DEFAULTS = {
     "N": 20, "c_frac": 0.8, "d": 2, "pen_frac": 0.1, "n_layers": 2,
     "k_center": 3, "k_periph": 3, "s_center": 1, "s_periph": 1,
     "channels": None, "merge": "concat", "pool_mode": "avg",
-    "pad_mode": "edge",
+    "pad_mode": "edge", "regions": "split",
 }
 
 
@@ -58,7 +67,8 @@ class FoveatedRegionalNN(nn.Module):
         super().__init__()
         cfg = full_config(cfg)
         self.cfg = cfg
-        dims = derive_dims(cfg["N"], cfg["c_frac"], cfg["d"], cfg["pen_frac"])
+        self.single = is_single_region(cfg)
+        dims = dims_of(cfg)
         self.dims = dims
         kc, kp = cfg["k_center"], cfg["k_periph"]
         pc, pp = kc // 2, kp // 2
@@ -68,11 +78,14 @@ class FoveatedRegionalNN(nn.Module):
         # goes on the FIRST layer only; the rest are stride 1 (D-S1), so the total
         # subsampling is `s` regardless of depth -> n_layers stays out of stride_range.
         self.center_convs = self._make_branch(channels, kc, pc, cfg["s_center"])
-        self.periph_convs = self._make_branch(channels, kp, pp, cfg["s_periph"])
-
-        cm, pm = build_masks(dims)
-        self.register_buffer("center_mask", torch.from_numpy(cm)[None, None])
-        self.register_buffer("periph_mask", torch.from_numpy(pm)[None, None])
+        # 'single': no second branch and NO MASKS AT ALL — build_masks is never
+        # called, so the geometry every other domain imports stays untouched. The
+        # module names of 'split' are unchanged, so existing checkpoints load.
+        if not self.single:
+            self.periph_convs = self._make_branch(channels, kp, pp, cfg["s_periph"])
+            cm, pm = build_masks(dims)
+            self.register_buffer("center_mask", torch.from_numpy(cm)[None, None])
+            self.register_buffer("periph_mask", torch.from_numpy(pm)[None, None])
 
         flat = self._infer_flat_features()
         self.flat_features = flat
@@ -98,27 +111,32 @@ class FoveatedRegionalNN(nn.Module):
                 x = F.relu(x)
         return x
 
-    def _branches(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _branches(self, x: torch.Tensor) -> dict:
+        """Each branch's output map, keyed by branch name. A DICT and not a pair:
+        'single' has one branch, and every reader (introspection, the trace, the
+        UI) iterates the keys it is given instead of assuming there are two."""
+        if self.single:
+            # the whole input, unmasked: the flat-CNN control
+            return {"single": self._branch_forward(self.center_convs, x)}
         # option A: mask the input, then convolve — strides act on data already
         # separated by region, and masks stay N x N.
-        c = self._branch_forward(self.center_convs, x * self.center_mask)
-        p = self._branch_forward(self.periph_convs, x * self.periph_mask)
-        return c, p
+        return {"center": self._branch_forward(self.center_convs, x * self.center_mask),
+                "periph": self._branch_forward(self.periph_convs, x * self.periph_mask)}
+
+    def _merge(self, outs: dict) -> torch.Tensor:
+        if self.single:
+            return outs["single"].flatten(1)
+        if self.cfg["merge"] == "sum":
+            return (outs["center"] + outs["periph"]).flatten(1)
+        return torch.cat([outs["center"].flatten(1), outs["periph"].flatten(1)], dim=1)
 
     def _infer_flat_features(self) -> int:
         with torch.no_grad():
             dummy = torch.zeros(1, 1, self.dims.N, self.dims.N)
-            c, p = self._branches(dummy)
-            if self.cfg["merge"] == "sum":
-                return int((c + p).flatten(1).shape[1])
-            return int(c.flatten(1).shape[1] + p.flatten(1).shape[1])
+            return int(self._merge(self._branches(dummy)).shape[1])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        c, p = self._branches(x)
-        if self.cfg["merge"] == "sum":
-            feat = (c + p).flatten(1)
-        else:
-            feat = torch.cat([c.flatten(1), p.flatten(1)], dim=1)
+        feat = self._merge(self._branches(x))
         out = self.head(F.relu(feat))
         return out.view(-1, 4, 3)
 
@@ -128,6 +146,8 @@ class FoveatedRegionalNN(nn.Module):
 
     def kernels(self) -> dict:
         # first-layer kernels: in_channels=1 per branch keeps them exact (V1).
+        if self.single:
+            return {"single": self.center_convs[0].weight.detach().cpu().numpy()[:, 0]}
         return {
             "center": self.center_convs[0].weight.detach().cpu().numpy()[:, 0],
             "periph": self.periph_convs[0].weight.detach().cpu().numpy()[:, 0],
@@ -149,6 +169,8 @@ class FoveatedRegionalNN(nn.Module):
 
     def feature_maps(self, x: torch.Tensor) -> dict:
         with torch.no_grad():
+            if self.single:
+                return {"single": self._branch_maps(self.center_convs, x)}
             return {"center": self._branch_maps(self.center_convs, x * self.center_mask),
                     "periph": self._branch_maps(self.periph_convs, x * self.periph_mask)}
 
@@ -165,11 +187,13 @@ def network_trace(cfg: dict) -> dict:
     dims = model.dims
     with torch.no_grad():
         dummy = torch.zeros(1, 1, dims.N, dims.N)
-        c, p = model._branches(dummy)
+        outs = model._branches(dummy)
     n_params = sum(int(np.prod(t.shape)) for t in model.state_dict().values())
     return {
         "dims": dims.as_dict(),
-        "branch_out": {"center": list(c.shape[2:]), "periph": list(p.shape[2:])},
+        "regions": cfg["regions"],
+        # keyed by the branches this net ACTUALLY has: 'single' brings one
+        "branch_out": {b: list(t.shape[2:]) for b, t in outs.items()},
         "flat_features": model.flat_features,
         "num_params": n_params,
     }
