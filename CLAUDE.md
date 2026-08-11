@@ -57,23 +57,37 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > ⚠ **Verificado**: **150 tests** (+18), `npm run build` limpio, y la plana entrenada, un recorrido
 > con base plana corrido y un **estudio completo** ejecutados de punta a punta.
 >
-> **⏳ 2026-08-09 — HAY UN RECORRIDO CORRIENDO: `p40-lr-L4` (~31 h, 19 puntos por hacer).**
-> Re-barrido de `lr` sobre la red **L4**, porque el valor vigente (0,0014) se fijó sobre **L2**, con
-> 20 épocas fijas que los 70 runs agotaron, y **quedó pegado al borde izquierdo de su rango**.
-> **El criterio está escrito antes de mirar en [docs/plan-lr-L4.md](docs/plan-lr-L4.md)** y
-> comiteado antes de que existiera un solo run (`68df83b`). Si lees esto y sigue corriendo, **no lo
-> toques**: es reanudable y hay watchdog (`fv-lrL4-watchdog`, tarea de usuario, cada 10 min).
-> - Rango `[0,00035 · 0,0006 · 0,0009 · 0,0014]`, 5 semillas, tope **150** épocas para que pare
->   `patience` y no el tope. Orden `[0,00035 · 0,0014 · 0,0006 · 0,0009]`: si se corta, lo que falta
->   son los **interiores**, no los extremos, que son la pregunta.
-> - **La sonda ya midió lo que nadie había medido**: a `lr`=0,00035, `patience` salta en la **época
->   70** (no en las ~188 que predecía `épocas ∝ 1/lr`). La ley real es **`épocas ∝ lr^-0,287`**, así
->   que el recorrido cuesta **33,6 h** y no 56. La regla §2.1 (umbral 40 h) → **sin guardas**.
-> - **Al cerrar hay que aplicar R1–R5 del documento**, y en particular: **R3** — si vuelve a ganar
->   el extremo izquierdo, «sigue sin acotar» es **el resultado que se publica**; y **R5** — nada se
->   arrastra sin pasar por `scripts/proxy_vs_task.py` (la ventana exageró la ganancia al doble en
->   `n_layers`, medido el 2026-08-08).
-> - Al terminar: `Unregister-ScheduledTask -TaskName "fv-lrL4-watchdog" -Confirm:$false`.
+> **2026-08-10 — EL EJE `lr` ES PLANO SOBRE L4: EL VIGENTE SE QUEDA, Y EL EJE SE CIERRA.**
+> Recorrido `p40-lr-L4` terminado (20/20, **36,9 h** de cómputo contra 33,6 estimadas). Criterio
+> escrito antes en [docs/plan-lr-L4.md](docs/plan-lr-L4.md) y comiteado sin un solo run (`68df83b`);
+> el resultado y las cinco reglas aplicadas, en su §7. Lo que hay que saber:
+> 1. **R1 ✅ el recorrido es válido**: los **20 runs** pararon por `patience` (32–71 épocas), ninguno
+>    cerca del tope de 150. El tope alto era caro y era lo correcto.
+> 2. **R3 ✅ el óptimo QUEDA ACOTADO**: gana un valor **interior** (`0,0006`, ventana 0,9293) y el
+>    extremo izquierdo `0,00035` es **el peor** de los cuatro. La anomalía que motivó todo esto —un
+>    ganador pegado al borde— **está cerrada**.
+> 3. ⚠ **R4 ❌ pero no le gana al vigente: `lr` SIGUE SIENDO 0,0014.** `0,0006` da +0,0049 de
+>    ventana con **p = 0,341** y +0,0066 de tarea con **p = 0,651**; el umbral escrito antes era
+>    p ≤ 0,05. No porque 0,0006 sea peor: porque **no hay con qué distinguirlos**.
+> 4. ⚠⚠ **HALLAZGO QUE VALE MÁS QUE EL RECORRIDO: δ y la permutación no dicen lo mismo, y δ es la
+>    optimista.** Sobre los mismos 20 números, `suggest_winner` imprime *«el mejor punto despega del
+>    resto»* (δ = 0,0020) mientras la permutación exacta da **p = 0,341**. δ es **1-SE de las
+>    semillas del mejor punto y solo de ese**: ignora la dispersión del rival (aquí el doble) y 1 SE
+>    no es una prueba de diferencia. Sirve como criterio de **empate** (protocolo.md §1.5), pero **la
+>    frase que imprime afirma más de lo que el número aguanta** — y es la que lee un estudio OAT al
+>    arrastrar un ganador. Los veredictos publicados **no se caen** (`n_layers` L4 vs L2 son 12× δ y
+>    p = 0,032), pero **todo margen cercano a δ hay que releerlo**. **Pregunta abierta, no arreglada:
+>    cambiar la regla de selección toca todos los estudios — decisión del usuario.**
+> 5. **R5: la tarea ordena al revés (0,00035 el mejor) y no distingue nada** — p = 0,817 / 0,341 /
+>    0,302. Por eso el Spearman de **−0,200** **no dice nada del proxy**: es ruido ordenando ruido.
+>    `proxy_vs_task.py` lo declara solo ahora — guarda nueva que devuelve **`no_concluyente`** cuando
+>    ningún par de tarea baja de p = 0,05, en vez de un «NO» que se leería como *el proxy falla*.
+> 6. **La conclusión**: entre 0,00035 y 0,0014 el `lr` **no mueve la aguja** (amplitud 0,0062 de
+>    ventana, 0,0096 de tarea). Con `d1000-lr-1`, que sí midió degradación **por encima**, queda una
+>    **meseta ancha**: aquel estudio encontró **el borde derecho**, no un óptimo. **El eje se cierra
+>    y no merece más cómputo.**
+> **Artefactos**: recorrido `p40-lr-L4` (20 runs), `data/p40-lr-L4-task.json`. La tarea
+> `fv-lrL4-watchdog` **ya está desregistrada**.
 
 > **2026-08-08 — LA PROFUNDIDAD GANA: `n_layers=4` CONTRA LAS 2 DE HOY, SIN SOLAPAMIENTO.**
 > Plan desatendido de ~37 h (30,4 h de cómputo, 24 runs) especificado **antes** en

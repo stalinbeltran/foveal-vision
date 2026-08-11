@@ -1,0 +1,17 @@
+{
+  "run": "p40-lr-L4-0004-lr0p00035_seed5",
+  "epochs_run": 60,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.11086281380531463,
+  "best_epoch": 50,
+  "seconds_per_epoch": 118.107,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}

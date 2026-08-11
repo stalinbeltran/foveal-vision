@@ -203,6 +203,19 @@ def main() -> int:
     elif sp_agg is None:
         verdict, code = ("NO CONCLUYENTE: una de las dos series es constante, "
                          "la correlacion no esta definida"), "inconclusive"
+    elif pairs and all(p["p"] > 0.05 for p in pairs):
+        # The window frontier can be narrow — delta is 1-SE of ONE point's seeds
+        # — while the TASK side separates nothing at all. Correlating a series
+        # that distinguishes nothing produces a number that reads like a verdict
+        # and is not one, so this has to be checked on the task side too, not
+        # only on the window's frontier below.
+        worst = min(p["p"] for p in pairs)
+        verdict, code = (f"NO CONCLUYENTE: ninguna diferencia de TAREA se separa "
+                         f"de reetiquetar las semillas (p mas bajo = {worst:.3f} "
+                         f"> 0,05 en los {len(pairs)} pares). Este eje no "
+                         f"distingue nada en la metrica que manda, asi que el "
+                         f"Spearman ordena ruido: no dice si el proxy vale"
+                         ), "inconclusive"
     elif len(w["frontier"]) == len(w["trials"]):
         verdict, code = (f"NO CONCLUYENTE: los {len(w['trials'])} puntos empatan "
                          f"dentro de delta={w['delta']:.4f}: este recorrido no "

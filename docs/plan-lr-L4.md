@@ -183,3 +183,74 @@ parable.
 contra **0,9105** del mismo par red-semilla a `lr` = 0,0014. Va en la dirección de «el óptimo está
 más a la izquierda». ⚠ **Es una semilla y no decide nada** (§2.3): el cribado del plan de 40 h, con
 una semilla, se equivocó de signo en la métrica de tarea. La respuesta la dan las 5 semillas y R3.
+
+## 7. RESULTADO (2026-08-10 22:12) — **el eje es plano; el vigente se queda**
+
+20/20 puntos, **36,9 h** de cómputo reales contra 33,6 estimadas (dentro de la banda de
+sensibilidad de §6, que iba de 23 a 44 h).
+
+| `lr` | ventana (f1) | sem | **tarea** | sem | épocas (5 semillas) |
+|---|---|---|---|---|---|
+| 0,0014 (vigente) | 0,9244 | 0,0041 | 0,7796 | 0,0074 | 32 · 35 · 51 · 58 · 61 |
+| 0,0009 | 0,9260 | 0,0010 | 0,7809 | 0,0072 | 45 · 47 · 47 · 50 · 59 |
+| **0,0006** | **0,9293** | 0,0020 | 0,7863 | 0,0101 | 49 · 53 · 55 · 58 · 67 |
+| 0,00035 | 0,9231 | 0,0016 | **0,7892** | 0,0031 | 60 · 62 · 62 · 70 · 71 |
+
+**R1 ✅ — el recorrido es válido.** Los **20 runs** pararon por `patience` (`stopped_early: true`
+en 20/20), entre 32 y 71 épocas, **ninguno cerca del tope de 150**. Ningún punto mide presupuesto.
+El tope alto era caro y era lo correcto.
+
+**R2 — ganador por ventana: `lr = 0,0006`** (0,9293), y `suggest_winner` lo declara *distinguible*
+con δ = 0,0020.
+
+**R3 ✅ — el óptimo QUEDA ACOTADO por la izquierda, y esa era la pregunta.** El ganador es
+**interior**, y el extremo izquierdo (0,00035) es **el peor de los cuatro** por ventana. Bajar el
+`lr` deja de ayudar antes de 0,00035: la anomalía que motivó todo esto —un óptimo pegado al borde—
+**está cerrada**. (Por la métrica de tarea el orden es el contrario y el ganador *sí* es el borde;
+ver R5, donde nada de eso se separa del ruido.)
+
+**R4 ❌ — pero NO le gana al vigente, así que el vigente se queda.** `0,0006` contra `0,0014`:
+**+0,0049 de ventana con p = 0,341** (permutación exacta, 252 arreglos), y **+0,0066 de tarea con
+p = 0,651**. El umbral escrito antes era **p ≤ 0,05**. **`lr` sigue siendo 0,0014** — no porque
+0,0006 sea peor, sino porque no hay con qué distinguirlos.
+
+> ⚠ **Y aquí sale un hallazgo que vale más que el recorrido: δ y la permutación no dicen lo mismo,
+> y δ es la optimista.** Sobre los **mismos 20 números**, `suggest_winner` imprime *«el mejor punto
+> despega del resto por más de δ = 0,0020: la diferencia supera la banda de ruido medida»* mientras
+> la permutación exacta da **p = 0,341**. No es un bug: δ es **1-SE de las semillas del mejor punto
+> y solo de ese**, así que (a) ignora la dispersión del punto contra el que compara —aquí `0,0014`
+> tiene un `sem` **dos veces mayor**— y (b) 1 SE es una banda de ~68 % sobre *una* media, no una
+> prueba de diferencia entre dos. La regla está escrita como criterio de **empate** (protocolo.md
+> §1.5) y para eso sirve; **la frase que imprime afirma más de lo que el número aguanta**, y esa
+> frase es la que lee un estudio OAT al arrastrar un ganador. Los veredictos ya publicados **no se
+> caen** —`n_layers` L4 vs L2 son 12× δ y p = 0,032—, pero cualquiera cuyo margen esté cerca de δ
+> hay que releerlo. **Anotado como pregunta abierta, no arreglado aquí**: cambiar la regla de
+> selección toca todos los estudios y es decisión del usuario.
+
+**R5 — la métrica de tarea: el eje no distingue nada.** El orden por tarea es **monótono al revés**
+del de ventana (0,00035 el mejor, 0,0014 el peor), pero **ninguna diferencia se separa de
+reetiquetar las semillas**: el ganador contra los otros tres da **p = 0,817 · 0,341 · 0,302**. Con
+eso, el Spearman agregado de **−0,200** **no es un hallazgo sobre el proxy**: es ruido ordenando
+ruido. `scripts/proxy_vs_task.py` ahora lo dice solo — se le añadió la guarda que declara
+**`no_concluyente`** cuando ningún par de tarea baja de p = 0,05, en vez de un «NO» que se leería
+como *el proxy falla*.
+
+### 7.1 La conclusión, en una frase
+
+**Entre 0,00035 y 0,0014, el `lr` no cambia nada medible en L4** — amplitud 0,0062 de ventana y
+0,0096 de tarea, con todos los pares por encima de p = 0,2. Junto con `d1000-lr-1`, que sí midió
+degradación **por encima** de 0,0014, el dibujo que queda es una **meseta ancha** que llega al
+menos hasta 0,00035 y se rompe hacia arriba. Aquel estudio encontró **el borde derecho de la
+meseta**, no un óptimo.
+
+**Qué se hace con esto:** nada, y eso es el resultado. `lr = 0,0014` se queda por R4; el eje queda
+**cerrado** (R3) y no merece más cómputo. Lo caro fue descubrir que es plano — pero un eje que no
+mueve la aguja es exactamente lo que hay que dejar de barrer en los estudios siguientes.
+
+**Reproducirlo:**
+
+```powershell
+.\.venv\Scripts\python.exe scripts\proxy_vs_task.py --sweep p40-lr-L4 --split val
+```
+
+Detalle por run y por punto en `data/p40-lr-L4-task.json` (comiteado).
