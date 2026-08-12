@@ -118,14 +118,18 @@ la semilla de L5 hubiera colapsado, el cribado habría coronado L4 y nadie habr�
 
 Sobre **solo las semillas que arrancan**:
 
-- **por ventana (el proxy que la cadena optimizó)**: L5 y L6 **ganan** a L4 por ~0,012, con `sem`
-  de 0,002–0,003.
-- **por tarea (la métrica que manda)**: **L4 gana** a L5 por **+0,0236** y a L6 por **+0,0184**.
+| par | ventana (el proxy que se optimizó) | tarea (la métrica que manda) |
+|---|---|---|
+| L4 vs L5 | L5 gana **+0,0121**, **p = 0,024** ✅ | L4 gana +0,0236, p = 0,079 |
+| L4 vs L6 | L6 gana +0,0115, p = 0,054 | L4 gana +0,0184, p = 0,321 |
+| L5 vs L6 | −0,0006, p = 0,914 | +0,0052, p = 0,771 |
 
-**Ninguna diferencia de tarea cruza el umbral**: L4 vs L5 da **p = 0,079** (126 arreglos) y L4 vs
-L6, **p = 0,321**. Así que **no se afirma que L4 sea mejor por tarea** — lo que se publica es que
-**el proxy y la tarea ordenan al revés** en este eje, que es exactamente la reserva anotada el
-2026-08-08 («reserva del proxy en ejes de profundidad»), ahora con un segundo caso y más nítido.
+**Y la asimetría es lo grave**: el proxy declara a L5 mejor que L4 **cruzando el umbral**
+(p = 0,024), mientras la tarea se inclina **al revés** y no llega a declararlo (p = 0,079). O sea:
+**la única diferencia estadísticamente declarable de este eje apunta en la dirección que la métrica
+que manda no respalda.** No se afirma que L4 sea mejor por tarea — se publica el **desacuerdo de
+signo**, que es exactamente la reserva anotada el 2026-08-08 («reserva del proxy en ejes de
+profundidad»), ahora con un segundo caso y mucho más nítido.
 
 ⚠ Con los colapsos **dentro**, `proxy_vs_task.py` da Spearman agregado **+1,000** y «mismo
 ganador»: la concordancia perfecta es un **artefacto de los ceros compartidos**. Quitarlos la

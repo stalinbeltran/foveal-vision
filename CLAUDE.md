@@ -40,9 +40,10 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > 2. **Es la misma firma que la foveada L5** (plan-40h §3), así que **no es de la arquitectura
 >    foveada**: es de inicialización/optimización a profundidad ≥5 con esta cabeza.
 > 3. ⚠ **Las dos métricas se contradicen EN EL SIGNO** sobre las semillas vivas: por ventana gana
->    L5/L6 (+0,012); **por tarea gana L4** (+0,0236 vs L5). Ninguna de tarea cruza el umbral
->    (p=0,079 y 0,321), así que **no se afirma que L4 sea mejor**: lo que se publica es el
->    desacuerdo. Segundo caso de la «reserva del proxy en ejes de profundidad».
+>    L5 (+0,0121, **p=0,024** — cruza el umbral); **por tarea gana L4** (+0,0236, p=0,079 — no lo
+>    cruza). **La única diferencia declarable del eje apunta donde la métrica que manda no
+>    respalda.** Se publica el desacuerdo de signo, no un ganador. Segundo caso, y más nítido, de
+>    la «reserva del proxy en ejes de profundidad».
 > 4. ⚠ **Con los colapsos dentro, `proxy_vs_task.py` da Spearman +1,000** — concordancia perfecta
 >    **por los ceros compartidos**. Quitarlos la invierte. Cuidado con correlaciones sobre mezclas.
 > 5. ⚠ **Bug del ejecutor, arreglado**: `derive_base` aplica los `overrides` **después** de los
