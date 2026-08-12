@@ -26,9 +26,11 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > **✅ 2026-08-11 — TODO PARADO. Los dos procesos cerraron; no hay nada corriendo.**
 > `p40-lr-L4` terminó 20/20 (analizado en [docs/plan-lr-L4.md](docs/plan-lr-L4.md) §7: *el eje es
 > plano, `lr`=0,0014 se queda*), y **la cadena de la CNN plana corrió sola y completa** — arrancó
-> **23 min** después de que cerrara el recorrido, 41 runs, **22,5 h**. `fv-plana-watchdog` **sigue
-> registrada** y despierta cada 10 min sin hacer nada: quítala cuando quieras
-> (`Unregister-ScheduledTask -TaskName "fv-plana-watchdog" -Confirm:$false`).
+> **23 min** después de que cerrara el recorrido, 41 runs, **22,5 h**. El watchdog
+> `fv-plana-watchdog` se **desregistró el 2026-08-12** a petición del usuario: **no queda ninguna
+> tarea programada `fv-*`** ni ningún proceso del proyecto vivo. Para rearmar la cadena (o correr
+> otra), `scripts/plan_plana_watchdog.ps1` y el registro de la tarea están en
+> [docs/plan-plana.md](docs/plan-plana.md) §5.
 >
 > **⚠ 2026-08-11 — LA PLANA: EL NÚMERO QUE SALE ES UN ARTEFACTO DE PROMEDIAR FALLOS.**
 > Resultado completo en [docs/plan-plana.md](docs/plan-plana.md) §6. Respuesta nominal
