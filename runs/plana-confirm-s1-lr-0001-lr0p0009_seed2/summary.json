@@ -1,0 +1,17 @@
+{
+  "run": "plana-confirm-s1-lr-0001-lr0p0009_seed2",
+  "epochs_run": 50,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.2000856220044873,
+  "best_epoch": 40,
+  "seconds_per_epoch": 42.358,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
