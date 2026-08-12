@@ -23,21 +23,35 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
-> **⛓ 2026-08-09 — HAY UNA CADENA ARMADA DETRÁS DEL RECORRIDO VIVO. NO LA DESARMES SIN MIRAR.**
-> Cuando `p40-lr-L4` cierre, **arrancan solos** dos estudios de la **CNN plana** (`fv-plana-watchdog`,
-> tarea de usuario, cada 10 min → `scripts/plan_plana.py`). El usuario **no va a estar presente**.
-> - **Criterio escrito antes** en [docs/plan-plana.md](docs/plan-plana.md), comiteado (`7a8d213`) sin
->   un solo run. **Solo optimiza la plana; no compara nada con la foveada** — esa decisión es del
->   usuario, con los datos delante. Cribado 1 semilla (`plana-screen`) → confirmación 5
->   (`plana-confirm`), rangos estrechados al ganador y **sus dos vecinos**.
-> - **La guarda**: no entrena nada mientras `sweeps/p40-lr-L4/state.json` no diga `done`, y ese
->   estado se lee **del propio recorrido**. Probado contra el recorrido vivo: no crea nada.
-> - **Presupuesto**: estimación aritmética ~26 h, pero el ejecutor **mide el coste real en el primer
->   punto**, rehace la proyección y **para si supera 40 h** (§2.1) en vez de quemar días callado.
-> - ⚠ Para estrechar el rango **no se lee `progress['winners']`**: viene envuelto en `{value, from}`
->   y `winner_overrides` filtra por `NETWORK_PARAMS`, así que **`lr` (que es de D) nunca aparece
->   ahí**. El punto crudo vive en `steps[i]['winner']`. Cazado ensayando, no razonando.
-> - Al terminar: `Unregister-ScheduledTask -TaskName "fv-plana-watchdog" -Confirm:$false`.
+> **✅ 2026-08-11 — TODO PARADO. Los dos procesos cerraron; no hay nada corriendo.**
+> `p40-lr-L4` terminó 20/20 (analizado en [docs/plan-lr-L4.md](docs/plan-lr-L4.md) §7: *el eje es
+> plano, `lr`=0,0014 se queda*), y **la cadena de la CNN plana corrió sola y completa** — arrancó
+> **23 min** después de que cerrara el recorrido, 41 runs, **22,5 h**. `fv-plana-watchdog` **sigue
+> registrada** y despierta cada 10 min sin hacer nada: quítala cuando quieras
+> (`Unregister-ScheduledTask -TaskName "fv-plana-watchdog" -Confirm:$false`).
+>
+> **⚠ 2026-08-11 — LA PLANA: EL NÚMERO QUE SALE ES UN ARTEFACTO DE PROMEDIAR FALLOS.**
+> Resultado completo en [docs/plan-plana.md](docs/plan-plana.md) §6. Respuesta nominal
+> `n_layers=4, lr=0,0009`, y hay que leerla con cuidado:
+> 1. **La profundidad ≥5 no es peor: NO ARRANCA.** L5 colapsa **1 de 5** semillas y L6 **2 de 5**,
+>    con f1 exactamente **0,0000** (no entrenan peor: no despegan). **Entre las que sí arrancan, L5
+>    (0,8612) y L6 (0,8606) GANAN a L4 (0,8491)**. `suggest_winner` corona L4 **por fiabilidad, no
+>    por calidad**: la media de una mezcla bimodal no mide calidad.
+> 2. **Es la misma firma que la foveada L5** (plan-40h §3), así que **no es de la arquitectura
+>    foveada**: es de inicialización/optimización a profundidad ≥5 con esta cabeza.
+> 3. ⚠ **Las dos métricas se contradicen EN EL SIGNO** sobre las semillas vivas: por ventana gana
+>    L5/L6 (+0,012); **por tarea gana L4** (+0,0236 vs L5). Ninguna de tarea cruza el umbral
+>    (p=0,079 y 0,321), así que **no se afirma que L4 sea mejor**: lo que se publica es el
+>    desacuerdo. Segundo caso de la «reserva del proxy en ejes de profundidad».
+> 4. ⚠ **Con los colapsos dentro, `proxy_vs_task.py` da Spearman +1,000** — concordancia perfecta
+>    **por los ceros compartidos**. Quitarlos la invierte. Cuidado con correlaciones sobre mezclas.
+> 5. ⚠ **Bug del ejecutor, arreglado**: `derive_base` aplica los `overrides` **después** de los
+>    `winners`, así que un campo fijado en `base_network` **anula el arrastre del estudio en
+>    silencio**. Fijar `n_layers` midió el paso de `lr` a L4 cuando el cribado había coronado L5.
+>    No cambió la respuesta final, **por suerte**. Hay guarda nueva que se niega a arrancar.
+> 6. **`lr` es plano también aquí** (0,0009 y 0,0014 empatan, δ=0,0020): misma meseta que la foveada.
+> **Lo siguiente, y es decisión del usuario**: la comparación foveada vs plana con la familia de 6
+> controles de [docs/plan-cnn-plana.md](docs/plan-cnn-plana.md) §3. Nada de eso se ha medido.
 >
 > **2026-08-09 — LA CNN PLANA YA SE PUEDE CONSTRUIR: `regions: single`, y F12 CERRADA.**
 > El control del §6 de protocolo.md existía como pregunta desde el día 1. **Medido antes de tocar

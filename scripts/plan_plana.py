@@ -46,9 +46,12 @@ EPOCHS_CAP = 150              # alto A PROPOSITO: tiene que parar `patience`
 OBJECTIVE = "f1"
 
 # la base plana: control C de plan-cnn-plana.md §3. `c_frac=1.0` + regions
-# single => N=16, periph_out=0 (base ws16-p0-d1-L4). n_layers viaja aqui solo
-# como punto de partida: el primer eje lo barre.
-BASE_NETWORK = {"regions": "single", "d": 1, "n_layers": 4}
+# single => N=16, periph_out=0.
+# ⚠ NO pongas aqui ningun campo que sea EJE. `derive_base` aplica los overrides
+# DESPUES de los winners, asi que un campo fijado aqui anula el arrastre del
+# estudio EN SILENCIO. Fijar `n_layers: 4` "como punto de partida" hizo que el
+# paso de `lr` se midiera a L4 aunque el cribado habia coronado L5 (§6.4).
+BASE_NETWORK = {"regions": "single", "d": 1}
 C_FRAC = 1.0
 
 SCREEN = "plana-screen"       # 1 semilla: descarta barato, NO concluye
@@ -235,6 +238,18 @@ def main() -> int:
     args = ap.parse_args()
 
     store, sstore, rstore = StudyStore(), SweepStore(), RunStore()
+
+    # La guarda que faltaba (§6.4): un campo fijado en BASE_NETWORK gana a los
+    # winners del estudio, asi que fijar un EJE mata el arrastre sin decir nada.
+    # Se comprueba ANTES de entrenar 41 runs, no despues de mirarlos.
+    ejes = {"n_layers", "lr"}
+    chocan = sorted(ejes & set(BASE_NETWORK))
+    if chocan:
+        log(f"NO se arranca: BASE_NETWORK fija {chocan}, que tambien son ejes. "
+            f"`derive_base` aplica los overrides DESPUES de los winners, asi que "
+            f"eso anularia el arrastre del ganador en silencio (docs/plan-plana.md "
+            f"§6.4). Quitalos de BASE_NETWORK.")
+        return 2
 
     open_, why = gate_is_open(sstore)
     if not open_ and not args.force:

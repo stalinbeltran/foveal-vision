@@ -80,3 +80,78 @@ será bastante más largo que el cómputo.
   mismo patrón, con la misma sonda de permisos, que `fv-lrL4-watchdog`. Cubre las dos formas en que
   esto ya murió antes: la sesión que cierra y se lleva al hijo, y el corte de luz.
 - **Al terminar**: `Unregister-ScheduledTask -TaskName "fv-plana-watchdog" -Confirm:$false`.
+
+---
+
+## 6. RESULTADO (2026-08-11 21:04) — **el número que sale es un artefacto de promediar fallos**
+
+La cadena corrió **sola y entera**: `p40-lr-L4` cerró el 2026-08-10 a las 22:12 y el watchdog
+arrancó el cribado **23 minutos después**, a las 22:35. **41 runs, 22,5 h** de cómputo (estimadas
+26). La proyección del presupuesto llegó a tocar **37,3 h** contra el techo de 40 — no saltó la
+guarda, pero por poco.
+
+**Respuesta nominal: `n_layers = 4`, `lr = 0,0009`. Y hay que leerla con mucho cuidado.**
+
+### 6.1 La profundidad ≥5 no es peor: NO ARRANCA
+
+| `n_layers` | media de las 5 | colapsan | **media de las que arrancan** | tarea (las que arrancan) |
+|---|---|---|---|---|
+| **4** | 0,8491 | **0/5** | 0,8491 ± 0,0029 (n=5) | **0,7755** ± 0,0076 |
+| 5 | 0,6890 | **1/5** | **0,8612** ± 0,0017 (n=4) | 0,7520 ± 0,0083 |
+| 6 | 0,5164 | **2/5** | **0,8606** ± 0,0026 (n=3) | 0,7572 ± 0,0163 |
+
+Las semillas que fallan dan **f1 exactamente 0,0000**: no entrenan peor, **no despegan**. La media
+de una mezcla bimodal no mide calidad — mide *probabilidad de arrancar × calidad de las que
+arrancan*. Por eso `suggest_winner` corona a L4: **gana por fiabilidad, no por calidad**.
+
+Es **la misma firma** que plan-40h.md §3 documentó para la foveada L5 («o arranca o no arranca,
+sin valores intermedios»). Que aparezca **también en la red plana** dice que no es de la
+arquitectura foveada: es de **inicialización/optimización a profundidad ≥5** con esta cabeza. Y
+refuerza lo que aquel plan ya concluyó: para pasar de 4 capas hay que cambiar **algo más que el
+número** (residuales, otra inicialización).
+
+⚠ En el cribado, `n_layers` **6 y 8 dieron 0,0000 con su única semilla**. Con 1 semilla este modo
+de fallo es indistinguible de «es malo». Que la cadena acabara mirando [4,5,6] fue **suerte**: si
+la semilla de L5 hubiera colapsado, el cribado habría coronado L4 y nadie habría visto nada.
+
+### 6.2 Y las dos métricas se contradicen EN EL SIGNO
+
+Sobre **solo las semillas que arrancan**:
+
+- **por ventana (el proxy que la cadena optimizó)**: L5 y L6 **ganan** a L4 por ~0,012, con `sem`
+  de 0,002–0,003.
+- **por tarea (la métrica que manda)**: **L4 gana** a L5 por **+0,0236** y a L6 por **+0,0184**.
+
+**Ninguna diferencia de tarea cruza el umbral**: L4 vs L5 da **p = 0,079** (126 arreglos) y L4 vs
+L6, **p = 0,321**. Así que **no se afirma que L4 sea mejor por tarea** — lo que se publica es que
+**el proxy y la tarea ordenan al revés** en este eje, que es exactamente la reserva anotada el
+2026-08-08 («reserva del proxy en ejes de profundidad»), ahora con un segundo caso y más nítido.
+
+⚠ Con los colapsos **dentro**, `proxy_vs_task.py` da Spearman agregado **+1,000** y «mismo
+ganador»: la concordancia perfecta es un **artefacto de los ceros compartidos**. Quitarlos la
+invierte. Una correlación calculada sobre una mezcla bimodal no dice nada del proxy.
+
+### 6.3 `lr`: plano otra vez
+
+Con L4 fijo, `0,0009` (0,8499 ± 0,0020) y `0,0014` (0,8491 ± 0,0029) son **empate técnico**
+(δ = 0,0020, la regla lo declara sola). `0,0028` ya colapsa 1 de 5. Mismo dibujo que la foveada
+(§7.1 de [plan-lr-L4.md](plan-lr-L4.md)): **una meseta ancha que se rompe hacia arriba**.
+
+### 6.4 ⚠ Un bug del ejecutor: `BASE_NETWORK` pisaba al ganador arrastrado
+
+`derive_base` aplica los `overrides` **después** de los `winners`, así que un campo fijado en
+`base_network` **anula el arrastre del estudio, en silencio**. `plan_plana.py` fijaba
+`n_layers: 4` «como punto de partida» → el paso de `lr` del cribado se midió a **L4** aunque el
+estudio había coronado **L5** (`winners` lo dice; `base_network_value` del recorrido dice 4).
+
+**No cambió la respuesta final** —la confirmación coronó L4, que es justo lo que estaba clavado—
+pero fue **suerte**. Arreglado: `BASE_NETWORK` ya no fija `n_layers`, y el ejecutor **se niega a
+arrancar** si fija un campo que además es eje. El rastro existía (`field_origin` decía `user` en
+vez de `winner`); lo que faltaba era que alguien lo mirara.
+
+### 6.5 Qué NO dice esto
+
+**Nada sobre la foveada.** No se ha comparado. Para eso está la familia de 6 controles de
+[plan-cnn-plana.md](plan-cnn-plana.md) §3, y **la decide el usuario**. Lo que este trabajo deja
+listo es la plana en un óptimo **defendible y con sus reservas escritas**: L4, `lr` en la meseta,
+y el aviso de que por encima de 4 capas el problema es de arranque, no de capacidad.
