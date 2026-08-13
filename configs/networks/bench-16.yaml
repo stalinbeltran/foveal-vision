@@ -1,0 +1,17 @@
+# Red congelada para scripts/bench_speed.py — NO tocar por razones de
+# investigacion (esa es la razon de existir de fov-16, no de esta). El
+# benchmark de velocidad de maquina solo compara si la red nunca cambia.
+format_version: 1
+N: 20
+c_frac: 0.8
+d: 2
+pen_frac: 0.1
+n_layers: 2
+k_center: 3
+k_periph: 3
+s_center: 1
+s_periph: 1
+channels: [16, 32]
+merge: concat
+pool_mode: avg
+pad_mode: edge
