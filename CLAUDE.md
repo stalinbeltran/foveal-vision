@@ -771,6 +771,10 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
   código (identificadores, docstrings) en inglés.
 - **Commits**: cada tarea terminada acaba en un commit descriptivo. Además, **cada cambio
   solicitado por el usuario, una vez completado, se cierra con su propio commit descriptivo.**
+- **Rama**: el trabajo va a la rama de desarrollo **`dev`**, y **cada cambio pedido se
+  empuja** (`git push -u origin dev`) cuando queda terminado y probado. No se trabaja
+  sobre `main` ni se le hace push directo: a `main` se llega por merge cuando el usuario
+  lo decida. Misma regla en el proyecto hermano `image-text-sample-generator`.
 - **Stack**: Python 3.12 (PyTorch no tiene wheels para 3.14) + PyTorch + FastAPI + Vite/React.
   En Windows el intérprete será `.\.venv\Scripts\python.exe`. Paquete `fv`, layout `src/`.
 - **Tests**: `.\.venv\Scripts\python -m pytest -q` desde la raíz, antes de commitear código.

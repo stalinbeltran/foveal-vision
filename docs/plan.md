@@ -6,8 +6,9 @@
 > nacieron implementados con su test en verde. Queda la **fase 8 (GPU)** y la investigación
 > (protocolo.md §6). Diferencias deliberadas respecto al plan original: sin optuna (runner
 > propio grid/random secuencial y reanudable; optuna entra si hace falta TPE/poda), sin poda
-> todavía, resize de fuentes no portado aún, matrixview copiado (no extraído a claude-libs —
-> D2 sigue abierta).
+> todavía, ~~resize de fuentes no portado aún~~ **resize portado el 2026-08-13** (`fv.datasets.resize`
+> + `fv-resize`, F13 cerrada; falta solo la ruta `POST /sources/{id}/resize` y su pantalla),
+> matrixview copiado (no extraído a claude-libs — D2 sigue abierta).
 
 Fases **verticales** (backend + front por dominio), heredando el método del hermano: cada fase
 acaba con la app arrancando, los tests pasando (`pytest -q` en verde), **sus xfails quitados**

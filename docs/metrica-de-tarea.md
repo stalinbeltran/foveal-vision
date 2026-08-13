@@ -546,6 +546,11 @@ razones.
 
 ### 4.3 El eslabón que falta: el `resize` no está portado
 
+> ✅ **YA NO FALTA (2026-08-13).** F13 cerrada: el resize se portó a `fv.datasets.resize`
+> (CLI `fv-resize`), con las dos reglas de abajo conservadas y 13 tests. Lo que sigue de esta
+> sección se conserva porque explica **por qué** esas dos reglas no son detalles. Sigue sin
+> existir la ruta `POST /sources/{id}/resize` ni su pantalla.
+
 Comprobado (2026-07-26): en `fv` **no existe** el resize de fuentes. `docs/api.md` lo lista como
 `POST /sources/{id}/resize` **previsto**, `docs/plan.md` lo dice explícitamente («resize de fuentes
 no portado aún»), y `grep -rn resize src/` solo encuentra el `img.resize` del *thumbnail* de la

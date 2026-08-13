@@ -41,6 +41,35 @@ prefijo `local/`). Para arrancar sin el generador, hay un generador sintético:
 > Verificado: 60 imágenes de 96×72 en `data\sources\synth-01`. Si el nombre ya existe, se
 > niega (exit 2): nada se sobrescribe en silencio.
 
+## Reducir una fuente (A′)
+
+El dato real se genera grande en el proyecto hermano (640×480) y se **reduce** aquí: las
+fuentes de 80×60 sobre las que están medidos los runs salieron de un resize. `fv-resize`
+lo hace, y deja escrito de dónde vino:
+
+```powershell
+.\.venv\Scripts\fv-resize.exe --source local/synth-01 --name synth-01-48 --width 48
+```
+
+> Verificado (2026-08-13): 20 imágenes a 48×36, `escala real 0.5 x 0.5`, en
+> `data/sources/synth-01-48`. Se pide **una** dimensión (`--width` **o** `--height`); la otra
+> sale de la proporción.
+
+Tres cosas que hace y conviene saber, porque cada una es un fallo silencioso evitado:
+
+- **La escala se mide de la salida, no del factor pedido**, y son dos (x e y): redondear el
+  tamaño a píxeles enteros mueve la razón real, y las dos redondean por separado. El
+  `dataset.json` guarda la medida (`scale: [sx, sy]`), que es la que se aplicó a los `quad`.
+- **Las máscaras se remuestrean con NEAREST**, nunca interpolando: interpolar una máscara de
+  etiquetas fabrica clases que no existen.
+- **La geometría se reescala entera y recursivamente** — `box` y `quad` a cualquier
+  profundidad, así que `lines[]` y `words[]` no se quedan en la resolución vieja mientras el
+  nivel de arriba parece correcto.
+
+Solo reduce (`upscale_not_allowed`, comprobado contra **todas** las muestras antes de escribir
+nada) y nunca sobrescribe un destino existente. La procedencia va en el bloque `derived`
+(formatos.md §4.6), incluida la bandera `holdout` del padre, que no se pierde por reducir.
+
 ## Construir un dataset de ventanas (B)
 
 ```powershell
