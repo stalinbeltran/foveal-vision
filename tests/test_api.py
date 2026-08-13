@@ -30,6 +30,73 @@ def _make_named(client):
                                          "batch_size": 32}).status_code == 200
 
 
+def test_listed_config_can_be_saved_back(world, client):
+    # the screens pre-fill their form from the LIST and post it back (click a
+    # row, edit, save). So what a list serves must be the object itself: the
+    # file envelope (format_version) leaked out of /recipes and came back as an
+    # 'unknown field' — reported from the UI, invisible to a one-sided test.
+    _make_named(client)
+    for path, key in (("/recipes", "recipes"), ("/networks", "networks")):
+        listed = next(x for x in client.get(path).json()[key] if x["name"] in ("quick", "tiny"))
+        assert "format_version" not in listed
+        r = client.post(path, json=dict(listed, name=listed["name"] + "-copy"))
+        assert r.status_code == 200, r.json()
+    # and the gate still tolerates it if an old remembered form sends it anyway
+    assert client.post("/recipes", json={"name": "quick2", "epochs": 1,
+                                         "format_version": 1}).status_code == 200
+    assert client.get("/recipes/quick2").json()["epochs"] == 1
+    # a genuinely unknown field is still refused, with the reason
+    bad = client.post("/recipes", json={"name": "nope", "lr_typo": 1})
+    assert bad.status_code == 400
+    assert bad.json()["detail"]["code"] == "unknown_recipe_fields"
+
+
+def test_config_can_be_edited_but_only_on_purpose(world, client):
+    """C and D are SOURCE (formatos.md §4.3): editing one is legitimate, unlike a
+    run (U5.8). Saving over a name is a different act from creating it, so it
+    needs `overwrite` — without it the screen's only exit was a 409 telling you
+    to pick another name, which is not what editing means."""
+    _make_named(client)
+    for path, body in (("/recipes", {"name": "quick", "epochs": 7}),
+                       ("/networks", dict(TINY_NET, name="tiny", d=3))):
+        r = client.post(path, json=dict(body))
+        assert r.status_code == 409                     # the accident is refused
+        assert r.json()["detail"]["code"].endswith("_exists")
+        r = client.post(path, json=dict(body, overwrite=True))
+        assert r.status_code == 200, r.json()           # the intent goes through
+    assert client.get("/recipes/quick").json()["epochs"] == 7
+    assert client.get("/networks/tiny").json()["d"] == 3
+    # `overwrite` is a flag of the request, never a field of the saved object
+    assert "overwrite" not in client.get("/recipes/quick").json()
+    assert "overwrite" not in client.get("/networks/tiny").json()
+
+
+def test_recipes_declare_who_pins_them_by_name(world, client):
+    # a run/sweep copies the recipe VALUES, so editing never rewrites them; a
+    # study re-resolves base_recipe at every advance, so its next steps change.
+    # The screen must be able to say so before replacing anything.
+    _make_named(client)
+    assert client.get("/recipes").json()["used_by"] == {"quick": []}
+    r = client.post("/studies", json={"name": "pin", "window_dataset": world["dataset"],
+                                      "base_recipe": "quick", "objective": "f1",
+                                      "axes": [{"axis": "lr", "range": [0.001, 0.002]}]})
+    assert r.status_code == 201, r.json()
+    assert client.get("/recipes").json()["used_by"]["quick"] == ["pin"]
+
+
+def test_recipe_monitor_vocabulary_is_served_and_enforced(world, client):
+    # the screen fills its select from here; the gate validates against the same
+    # constant, so the control can never offer what saving would refuse
+    from fv.metrics import MONITORS
+    d = client.get("/recipes").json()
+    assert d["vocabulary"]["monitor"] == list(MONITORS)
+    assert d["defaults"]["monitor"] in d["vocabulary"]["monitor"]
+    bad = client.post("/recipes", json={"name": "by-objective", "monitor": "f1"})
+    assert bad.status_code == 400
+    assert bad.json()["detail"]["code"] == "unknown_monitor"
+    assert all(x["name"] != "by-objective" for x in client.get("/recipes").json()["recipes"])
+
+
 def test_contract_01_http_400_before_job_and_no_run_created(world, client):
     _make_named(client)
     bad = dict(TINY_NET, N=20, c_frac=0.8, name="big")
@@ -55,6 +122,10 @@ def test_full_flow_train_diagnose_predict(world, client):
     assert d["config"]["provenance"]["network"]["name"] == "tiny"
     m = client.get("/runs/api-run/metrics?since=0").json()
     assert m["next"] == 1 and m["records"][0]["epoch"] == 1
+    # the rankable-metrics table is not a wish: every key of it is measured in a
+    # real val record, so a monitor/objective can never name something absent
+    from fv.metrics import VAL_METRICS
+    assert set(VAL_METRICS) <= set(m["records"][0]["val"])
     m2 = client.get(f"/runs/api-run/metrics?since={m['next']}").json()
     assert m2["records"] == []   # never resent
 
@@ -81,12 +152,34 @@ def test_full_flow_train_diagnose_predict(world, client):
     fm = client.post("/runs/api-run/feature-maps",
                      json={"window_dataset": world["dataset"], "index": 0}).json()
     assert set(fm["branches"]) == {"center", "periph"}
+    # a stale gallery thumb (index past the dataset) -> clean 400, not a 500 (R4)
+    oob = client.post("/runs/api-run/feature-maps",
+                      json={"window_dataset": world["dataset"], "index": 10_000_000})
+    assert oob.status_code == 400
+    assert oob.json()["detail"]["code"] == "window_index_out_of_range"
+    assert client.post("/runs/api-run/input-view",
+                       json={"window_dataset": world["dataset"], "index": 10_000_000}
+                       ).status_code == 400
 
     # predict: the three stages + knobs echoed in window units
     p = client.post("/runs/api-run/predict",
                     json={"source": world["source"], "index": 0}).json()
     assert set(p) >= {"raw", "corners", "paragraphs", "knobs", "truth"}
     assert p["knobs"]["window_size"] == 8
+
+    # the task metric (⑬): on demand, per image, with its band and its knobs
+    ts = client.get("/runs/api-run/task-score?split=val").json()
+    assert ts["images"] > 0 and ts["source"] == world["source"]
+    assert ts["macro"]["sem"] is not None and ts["checkpoint"] == "best.pt"
+    assert ts["knobs"]["window_size"] == 8 and ts["knobs"]["iou_threshold"] == 0.5
+    assert ts["cached"] is False
+    assert client.get("/runs/api-run/task-score?split=val").json()["cached"] is True
+    # a knob changes the reconstruction -> another key, another pass
+    assert client.get("/runs/api-run/task-score?split=val&threshold=0.9"
+                      ).json()["cached"] is False
+    bad = client.get("/runs/api-run/task-score?split=nope")
+    assert bad.status_code == 400
+    assert bad.json()["detail"]["code"] == "unknown_split"
 
     # dataset in use -> 409 with the list
     del409 = client.delete(f"/window-datasets/{world['dataset']}")
@@ -105,6 +198,19 @@ def test_contract_09_http_sweep_refused_before_reserving(world, client):
     assert client.get("/sweeps/bad-sweep").status_code == 404  # nothing reserved
 
 
+def test_sweep_axes_match_the_validator(world, client):
+    # the select's vocabulary is the SAME set the study/sweep validator accepts,
+    # so a dropdown can never offer (or hide) an axis the backend disagrees with
+    from fv.sweeps.spec import GEOMETRY_AUTO, NETWORK_PARAMS, RECIPE_PARAMS
+    ax = client.get("/sweeps/axes").json()
+    assert ax["network"] == sorted(NETWORK_PARAMS)
+    assert ax["recipe"] == sorted(RECIPE_PARAMS)
+    assert ax["geometry_auto"] == sorted(GEOMETRY_AUTO)
+    assert ax["channels_indexed"] == "channels[i]"
+    # not shadowed by /sweeps/{name}: 'axes' resolves to this route, not a lookup
+    assert client.get("/sweeps/axes").status_code == 200
+
+
 def test_sweep_over_http(world, client):
     _make_named(client)
     r = client.post("/sweeps", json={
@@ -118,14 +224,47 @@ def test_sweep_over_http(world, client):
     trials = client.get("/sweeps/s1/trials").json()
     assert len(trials["trials"]) == 2
     assert trials["trials"][0]["value"] is not None
-    # a sweep child cannot be deleted alone (would orphan it from its siblings)
-    assert client.delete("/runs/s1-0000").status_code == 409
+    # child run names carry the axis value, not just an index (point_run_name)
+    names = {t["run"] for t in trials["trials"]}
+    assert names == {"s1-0000-lr0p001", "s1-0001-lr0p003"}
+    one = next(iter(names))
+    # a sweep child cannot be deleted alone (would orphan it from its siblings):
+    # the reason is "belongs to sweep", NOT "is running" (the run is done/stopped)
+    child = client.delete(f"/runs/{one}")
+    assert child.status_code == 409
+    assert child.json()["detail"]["code"] == "run_belongs_to_sweep"
     # deleting the sweep cascades to its runs — the supported path, no orphan left
     d = client.delete("/sweeps/s1")
     assert d.status_code == 200
-    assert set(d.json()["runs_deleted"]) == {"s1-0000", "s1-0001"}
+    assert set(d.json()["runs_deleted"]) == names
     assert client.get("/sweeps/s1").status_code == 404
-    assert client.get("/runs/s1-0000").status_code == 404
+    assert client.get(f"/runs/{one}").status_code == 404
+
+
+def test_study_guided_flow_over_http(world, client):
+    """Contract ⑫: a study generates a sweep, runs it, the user confirms the
+    winner, the chain advances. The study guides; the winner is the user's."""
+    _make_named(client)
+    plan = {"name": "est-api", "window_dataset": world["dataset"],
+            "base_recipe": "quick", "objective": "f1", "seeds": 3,
+            "budget": {"epochs": 1}, "axes": [{"axis": "n_layers", "range": [1, 2]}]}
+    assert client.post("/studies", json=plan).status_code == 201
+    a = client.post("/studies/est-api/advance", json={})
+    assert a.status_code == 202
+    sweep = a.json()["step"]["sweep"]
+    _wait_job(client, a.json()["job"]["id"], timeout=180)
+    # advancing before confirming the winner is refused (guides, not executes)
+    assert client.post("/studies/est-api/advance", json={}).status_code == 409
+    # suggest the winner, then confirm it
+    w = client.get(f"/sweeps/{sweep}/winner", params={"delta": 1.0}).json()
+    point = w["suggested"]["point"]
+    assert client.post("/studies/est-api/confirm", json={"point": point}).status_code == 200
+    st = client.get("/studies/est-api").json()
+    assert st["done"] is True
+    assert st["winners"]["n_layers"]["from"] == "est-api/step-0"
+    # a done study refuses to advance, with the reason
+    a2 = client.post("/studies/est-api/advance", json={})
+    assert a2.status_code == 400 and a2.json()["detail"]["code"] == "study_done"
 
 
 def test_ui_state_round_trips_and_is_committable(world, client):

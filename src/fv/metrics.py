@@ -11,10 +11,60 @@ of the foveated geometry (contract (9) extension).
 
 from __future__ import annotations
 
+import itertools
+import math
+
 import numpy as np
 
 CORNER_NAMES = ("TL", "TR", "BR", "BL")
 NUM_CORNERS = 4
+
+# ---------------------------------------------------------------------------
+# Which epoch the monitor keeps. ONE definition, two readers: the training loop
+# asks `monitor_improved` when to overwrite best.pt, and the sweep ranking asks
+# `checkpoint_record` WHICH epoch that file came from. Written twice they drift,
+# and the ranking starts describing weights that are not on disk.
+
+# The metrics of a `val` record that can RANK (a subset: the record also carries
+# precision and recall, which nobody optimises), and which way is better. It is
+# the ONE place the direction lives: H reads it as OBJECTIVES (fv.sweeps.spec)
+# and D names one of MONITORS to choose best.pt. It used to be written twice —
+# a set {"val_f1"} here and a dict in the sweep spec — and the halves disagreed
+# about names: a recipe saying `monitor: "f1"` (the bare objective, which the UI
+# offered) found the value but not the direction, so best.pt kept the epoch with
+# the WORST f1, silently. Hence MONITORS: a monitor is 'val_' + a val metric.
+VAL_METRICS = {"f1": "max", "pos_err_px": "min", "loss": "min"}
+MONITORS = tuple(f"val_{k}" for k in VAL_METRICS)
+
+
+def monitor_key(monitor: str) -> str:
+    """The key inside a metrics record's `val` dict: 'val_loss' -> 'loss'."""
+    return monitor[4:] if monitor.startswith("val_") else monitor
+
+
+def monitor_improved(value, best, monitor: str) -> bool:
+    """Strictly better, so the FIRST epoch of a tie keeps the checkpoint."""
+    if value is None:
+        return False
+    if best is None:
+        return True
+    higher = VAL_METRICS.get(monitor_key(monitor)) == "max"
+    return value > best if higher else value < best
+
+
+def checkpoint_record(records: list, monitor: str) -> dict | None:
+    """The metrics record of the epoch whose weights `best.pt` holds.
+
+    None when the monitor never measured — that run has NO best.pt (the loop
+    never wrote one), so there is nothing to describe. None, never the last
+    epoch as a consolation: absent is not a fallback (formatos.md §2).
+    """
+    best, best_rec = None, None
+    for r in records:
+        v = (r.get("val") or {}).get(monitor_key(monitor))
+        if monitor_improved(v, best, monitor):
+            best, best_rec = v, r
+    return best_rec
 
 
 def corner_scores(logits: np.ndarray) -> np.ndarray:
@@ -95,6 +145,95 @@ def _iou(a: tuple, b: tuple) -> float:
     inter = iw * ih
     union = (ax1 - ax0) * (ay1 - ay0) + (bx1 - bx0) * (by1 - by0) - inter
     return inter / union if union > 0 else 0.0
+
+
+def _mean_ranks(v: np.ndarray) -> np.ndarray:
+    """Ranks 1..n with TIES SHARING THE MEAN rank — the standard convention, and
+    the one that keeps the two series comparable when only one of them has ties."""
+    order = np.argsort(v, kind="mergesort")
+    ranks = np.empty(len(v), dtype=np.float64)
+    ranks[order] = np.arange(1, len(v) + 1, dtype=np.float64)
+    s = v[order]
+    i = 0
+    while i < len(s):
+        j = i
+        while j + 1 < len(s) and s[j + 1] == s[i]:
+            j += 1
+        if j > i:
+            ranks[order[i:j + 1]] = (i + j + 2) / 2.0   # mean of ranks i+1..j+1
+        i = j + 1
+    return ranks
+
+
+def spearman(a, b) -> float | None:
+    """Rank correlation between two series (metrica-de-tarea.md §5.2).
+
+    Lives here and not in a script because this is THE site where "what each
+    number means" is defined: a Spearman computed inside a one-off script is a
+    number nobody can test, and this project has already been burnt by defining
+    a number twice.
+
+    Ties take the MEAN rank. Returns None — never 0 — when either series is
+    constant or has fewer than two points: there the correlation is undefined,
+    and 0 would read as «they do not correlate», which is a different claim
+    (formatos.md §2: absent is not zero).
+    """
+    x = np.asarray(a, dtype=np.float64)
+    y = np.asarray(b, dtype=np.float64)
+    if x.shape != y.shape or x.ndim != 1:
+        raise ValueError(f"spearman necesita dos series 1-D del mismo largo, "
+                         f"llegaron {x.shape} y {y.shape}")
+    if len(x) < 2:
+        return None
+    rx, ry = _mean_ranks(x), _mean_ranks(y)
+    dx, dy = rx - rx.mean(), ry - ry.mean()
+    den = math.sqrt(float((dx ** 2).sum()) * float((dy ** 2).sum()))
+    if den == 0.0:                       # a constant series has no ranking
+        return None
+    return float((dx * dy).sum() / den)
+
+
+def permutation_test(a, b) -> dict | None:
+    """Is the gap between two groups of seeds bigger than a relabelling of them?
+
+    Lives here for the same reason `spearman` does: with 5 seeds per point, «is
+    this difference real?» gets answered in every write-up of this project, and
+    answering it inside a one-off script is how a number ends up defined twice.
+
+    EXACT when the number of arrangements is manageable (C(n+m, n) <= 200.000 —
+    5-vs-5 is 252), so the p-value does not move between calls: a criterion that
+    changes when you re-run it decides nothing. Above that it refuses rather than
+    silently switching to sampling — a p-value that means two different things
+    under one name is the failure mode this module exists to avoid.
+
+    The statistic is the difference of MEANS, two-sided, which is what the
+    project reports (`aggregate_seeds` ranks the mean of the seeds). It is NOT
+    paired: seed k of two different architectures shares only the RNG stream, so
+    pairing them would claim a link that does not exist.
+
+    Returns None — never a p of 1 — when either group has fewer than two values:
+    there the test is undefined (formatos.md §2: absent is not zero).
+    """
+    x = [float(v) for v in a]
+    y = [float(v) for v in b]
+    if len(x) < 2 or len(y) < 2:
+        return None
+    total = math.comb(len(x) + len(y), len(x))
+    if total > 200_000:
+        raise ValueError(f"permutation_test exacto necesita C(n+m,n) <= 200.000, "
+                         f"salen {total} con n={len(x)} y m={len(y)}")
+    obs = sum(x) / len(x) - sum(y) / len(y)
+    pool = x + y
+    pool_sum = sum(pool)
+    n, m = len(x), len(y)
+    hits = 0
+    for idx in itertools.combinations(range(len(pool)), n):
+        sx = sum(pool[i] for i in idx)
+        diff = sx / n - (pool_sum - sx) / m
+        if abs(diff) >= abs(obs) - 1e-12:      # >= : the observed split counts
+            hits += 1
+    return {"diff": obs, "p": hits / total, "arrangements": total,
+            "n": n, "m": m, "exact": True}
 
 
 def paragraph_f1(pred_boxes: list, true_boxes: list, iou_threshold: float = 0.5) -> dict:

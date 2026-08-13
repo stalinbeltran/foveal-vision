@@ -52,6 +52,8 @@ de [plan.md](plan.md) que quita cada xfail:
 | ⑨ | objetivo del recorrido | spec con `objective` dependiente de un peso barrido → `objective_varies_with_space`; con objetivo de tarea → pasa; validación **sin cargar optuna** | 7 |
 | ⑩ | X fuera de D | dos runs que solo difieren en `device` tienen la misma identidad de receta | 3 |
 | ⑪ | reproducibilidad | misma semilla + misma config ⇒ mismos pesos (init **y** entrenamiento, con **control** de otra semilla que difiere) | 4 |
+| ⑬ | métrica de tarea (E×A vía F) | `task_score` puntúa contra los párrafos de **la fuente** (`manifest["source_id"]`, no las etiquetas de ventana) y el n de imágenes viaja con el número; sin la fuente → `task_needs_source` con razón y arreglo, **sin puntuar nada**. En `tests/test_task.py`, la costura completa: macro/micro salen de `paragraph_f1` sobre las MISMAS predicciones, huella cambiada → `window_dataset_changed` sin inferir, caché por knobs (un knob distinto recalcula), se puntúa `best.pt` y no `last.pt`, `mean_iou` **null** sin emparejamientos, y un «holdout» que comparte fuente → `holdout_shares_source` | (métrica de tarea) |
+| ⑫ | estudio planifica, recorrido ejecuta | `next-sweep` deriva la base (`center_out==window_size`, ①a) y la valida con `check_run` **sin reservar**; un recorrido con **base inline** (sin `base_network`, solo `base_network_value`) se prepara/corre/rankea igual que uno con red nombrada (mismo gate); el generador del siguiente eje fija el ganador y registra `field_origin` | H (barrido) |
 
 Además, del muestreo foveado (nacen con la fase 2, sin xfail largo):
 

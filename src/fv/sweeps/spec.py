@@ -13,7 +13,8 @@ from __future__ import annotations
 import itertools
 
 from fv.fovea import build_search_space
-from fv.models.builder import NETWORK_DEFAULTS, full_config
+from fv.metrics import MONITORS, VAL_METRICS
+from fv.models.builder import DEFAULT_CHANNEL, NETWORK_DEFAULTS, full_config
 from fv.training.recipe import Recipe
 from fv.validation import check_network
 
@@ -21,7 +22,16 @@ NETWORK_PARAMS = set(NETWORK_DEFAULTS)
 RECIPE_PARAMS = set(Recipe().as_dict())
 LOSS_WEIGHT_PARAMS = {"lambda_pos", "pos_weight", "smooth_l1_beta"}
 GEOMETRY_AUTO = {"k_center", "k_periph", "s_center", "s_periph", "d"}
-OBJECTIVES = {"f1": "max", "pos_err_px": "min", "loss": "min"}
+# The two fields that set center_out = round_to_even(N·c_frac). Contract ①a ties
+# center_out to B's window_size, which is fixed for the whole sweep — so varying
+# either one INDEPENDENTLY makes every point violate ①a (fovea != window). They
+# are DERIVED together from the problem (fv.models.derive), never swept: a sweep
+# that declares them must be refused HERE, with the reason, before any point is
+# reserved — not silently trained and failed deep in the job (R4, §10).
+WINDOW_SIZE_FIELDS = {"N", "c_frac"}
+# What H can rank by IS what a val record measures, with its direction: the same
+# table fv.metrics uses to choose best.pt, read from here (it was written twice).
+OBJECTIVES = dict(VAL_METRICS)
 
 
 class SweepError(ValueError):
@@ -43,6 +53,14 @@ def check_sweep(spec: dict) -> list[dict]:
         if param not in NETWORK_PARAMS | RECIPE_PARAMS:
             bad("unknown_space_param", f"'{param}' no es un campo de C ni de D",
                 f"los ejes validos son {sorted(NETWORK_PARAMS | RECIPE_PARAMS)}")
+        elif param in WINDOW_SIZE_FIELDS:
+            bad("axis_breaks_window_size",
+                f"'{param}' fija center_out (= round_to_even(N*c_frac)), que el "
+                f"contrato (1)a ata al window_size del dataset: barrerlo hace que "
+                f"cada punto tenga una fovea != la ventana etiquetada",
+                "N y c_frac se DERIVAN juntos del window_size (no se barren); para "
+                "variar el contexto periferico barre 'd', y para cambiar la fovea "
+                "usa/reconstruye un dataset con ese window_size")
     objective = spec.get("objective", "f1")
     if objective not in OBJECTIVES:
         bad("unknown_objective", f"objetivo '{objective}' no existe",
@@ -67,6 +85,14 @@ def check_sweep(spec: dict) -> list[dict]:
             bad("space_values_must_be_list",
                 f"el eje '{param}' debe ser una lista de valores o 'auto'",
                 "p. ej. {\"lr\": [0.001, 0.003]} o {\"d\": \"auto\"}")
+        elif param == "monitor":
+            # a monitor is not an objective: 'f1' names the value but not its
+            # direction, and best.pt would keep the WORST epoch without a word
+            for v in values:
+                if v not in MONITORS:
+                    bad("unknown_monitor", f"'{v}' no es un monitor",
+                        f"usa uno de {sorted(MONITORS)} (el monitor nombra la "
+                        f"metrica de val con su 'val_' delante)")
     return problems
 
 
@@ -98,6 +124,11 @@ def expand_points(spec: dict, base_network: dict) -> tuple[list[dict], list[dict
         overrides = dict(zip(names, combo))
         net = dict(base)
         net.update({k: v for k, v in overrides.items() if k in NETWORK_PARAMS})
+        # channels depends on n_layers (§6.1): sweeping depth WITHOUT sweeping
+        # channels resizes the vector to the default rule [16]*L (§3.2), so the
+        # point stays valid instead of carrying the base's stale channel length.
+        if "n_layers" in overrides and "channels" not in overrides:
+            net["channels"] = [DEFAULT_CHANNEL] * int(overrides["n_layers"])
         recipe_over = {k: v for k, v in overrides.items() if k in RECIPE_PARAMS}
         problems = check_network(net)
         if problems:

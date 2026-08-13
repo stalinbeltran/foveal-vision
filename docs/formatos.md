@@ -51,6 +51,21 @@ Cachés previstos (todos en `data/cache/`, gitignoreados): índice de offsets de
 memmapeadas de B si hace falta, tabla de diagnóstico por ventana (clave con **mtime del
 checkpoint**: un run vivo reescribe `best.pt`).
 
+**`data/cache/task/<key>.json`** (implementado): la métrica de tarea por run (contrato ⑬). Misma
+regla, clave con un trozo más: run + huella de B + split + mtime del checkpoint + **los knobs de
+F** (`threshold`, `stride`, `nms_radius`, `min_size`, `iou_threshold`). Los knobs entran porque
+cambiar uno cambia la reconstrucción entera y obliga a re-inferir — no es una incoherencia con el
+`threshold` del diagnóstico, que solo re-lee scores guardados. Es carga: se ignora
+(`/data/cache/` ya está en `.gitignore`) y borrarlo solo cuesta tiempo.
+
+**`runs/<name>/holdout.jsonl`** (implementado, F14) — **la excepción a lo anterior, y la única**:
+un JSONL **append-only** con una línea por cada vez que se ha puntuado ese run contra un **holdout**
+(`{when, window_dataset, source, split, images, f1, sem, knobs, checkpoint, from_cache}`). No es
+caché: **se versiona**, porque es descripción y no carga (§5) y porque su valor entero está en que
+sobreviva. Se escribe **también cuando el número salió de caché** — protocolo.md §3 dice que el
+holdout se mira una sola vez, y el vistazo cacheado era precisamente el que no dejaba rastro.
+Borrarlo **sí** pierde algo: es la única prueba de cuántas veces se miró. Registra, nunca bloquea.
+
 ## 4. Los artefactos
 
 ### 4.1 `data/window-datasets/<name>/` — el dataset de ventanas (B)
@@ -142,15 +157,34 @@ medir el ahorro** (decisiones.md); reanudar el *recorrido* (re-encolar puntos) s
 versionan en git: son fuente, no artefactos**. `format_version` es del fichero y se quita al
 congelar dentro de un run.
 
+**El sobre del fichero es `format_version` + `name`, y no es del objeto** (`fv.ioutils`:
+`strip_envelope` / `with_envelope`, una definición). `name` es el nombre del fichero;
+`format_version`, el formato. Consecuencia que hay que respetar en **las tres puertas** de cada
+tienda: `list()` y `get()` sirven el objeto **sin sobre**, y `save()` lo **escribe él**, así que
+también lo **acepta y descarta** si se lo devuelven. ⚠ Motivo: la lista es lo que una pantalla
+usa para rellenar su formulario y volver a mandarlo; mientras `list()` sirvió `format_version`,
+`save()` llamaba «campo desconocido» (400) justo a lo que el API acababa de dar. Un campo del
+sobre nunca es «desconocido»; uno que no está en el objeto ni en el sobre **sí**, y se rechaza.
+
 En un YAML de red van **solo los parámetros fundamentales** (organizacion.md §1-C). Los
 derivados (`center_out`, `original_size`, `padding`…) no se escriben nunca: se calculan en
 `fv.fovea.derive_dims` — un derivado escrito es una copia que diverge.
+
+**Canales por capa (D-C3).** El vector `channels` (longitud = `n_layers`) reemplaza los escalares
+`ch1/ch2`. El lector **acepta ambos** —`ch1=16, ch2=32` se lee como `channels=[16,32]`— y
+**escribe siempre `channels`** (aditivo, sin bump: §2). El default de una red **derivada** es
+`channels = [16]*n_layers` (constante 16 — D-C2); ⚠ **difiere** del `[16,32]` histórico, por eso
+el test de no-regresión del builder usa `channels=[16,32]` **explícito**, no el default.
 
 ### 4.4 `sweeps/<name>/` — el recorrido (H)
 
 - **`spec.json`** — nuestro: lo fijo (B + huella), el espacio (campos de C/D con rango o
   `"auto"` → `build_search_space`), estrategia, objetivo (+ dirección), presupuesto (y su
-  unidad: épocas o segundos), estado.
+  unidad: épocas o segundos), estado. **La red base va por nombre o inline** (D-H2): con nombre,
+  `base_network: "<red>"`; inline (recorrido generado por un estudio), `base_network: null` +
+  `base_network_value` (config C entero) + `base_label` (etiqueta sintética, separador guion) +
+  bloque `derivation { window_size, fractions, field_origin }` — la procedencia del generador
+  (contrato ③). El lector **exige** uno de los dos (nombre XOR valor): ausente ≠ cero (§1).
 - **`optuna.db`** — del motor. **La frontera importa**: los trials de optuna no son nuestros
   runs; un trial lanza un run (`{sweep}-{trial:04d}`) y guarda su nombre.
 
@@ -185,6 +219,29 @@ Mismo formato de A + bloque `derived`:
 (`upscale_not_allowed`, comprobado contra **todas** las muestras). Cuidado medido: reducir mucho
 borra la tinta aunque la geometría siga bien — mirar una derivada antes de extraer de ella.
 
+### 4.7 `studies/<name>/` — el estudio (I)
+
+El plan OAT y su progreso. **No hay motor propio**: un estudio genera recorridos (H) y lee sus
+rankings; su almacén son dos ficheros.
+
+- **`plan.json`** — el schedule, **comiteable** (es descripción, no carga — §5): `window_dataset`
+  (B fijo), `base_recipe` (D), `objective`, `seeds` (sondeo/confirmación, default 3 — D-M1), y
+  `axes[]` **ordenados** (orden = orden de barrido, U6): cada eje con su `range` (`"auto"` o lista
+  explícita — U5) y un `depends_on` opcional (el eje que lo desbloquea). Lleva además **`budget`**
+  (hoy `{"epochs": n}`), que `advance` pasa a cada recorrido generado — estaba en el código
+  (`POST /studies`, `driver.advance`) y no en esta lista: se añade el 2026-07-28 al especificar que
+  la pantalla debe **enseñar el plan entero** ([ui/1-estructura.md](ui/1-estructura.md) U1.6), que
+  es cuando se ve que un campo no estaba descrito en ningún sitio. El plan **no ejecuta**: la
+  herramienta lo lee para pre-rellenar el siguiente recorrido.
+- **`progress.json`** — el estado de la cadena, reescribible (temporal + `os.replace`, con
+  reintento en ambos lados como el resto — §4.2): por paso, el recorrido generado, el **ganador
+  confirmado** por el usuario, y qué sub-ejes desbloqueó. Reconstruye la cadena para auditar por
+  qué cada campo de una base inline valía lo que valía. La **longitud es dinámica**: no se conoce
+  hasta correr la cadena (un ganador puede expandir un eje en varios sub-pasos).
+
+Los recorridos que genera son H de primera clase (`sweeps/<name>/`), con `provenance.sweep` y un
+puntero al estudio en su spec.
+
 ## 5. Qué se versiona en git
 
 > **Se versiona la descripción, se ignora la carga.**
@@ -197,6 +254,8 @@ borra la tinta aunque la geometría siga bien — mirar una derivada antes de ex
 # config.json, metrics.jsonl, summary.json de runs → versionados
 /sweeps/*/optuna.db
 # spec.json → versionado
+/studies/*/progress.json
+# plan.json → versionado (la descripción del estudio; progress.json es estado vivo)
 ```
 
 Medido en el hermano: descripción 105 KB vs carga 38,5 MB — el 0,3 % del peso, y es el registro

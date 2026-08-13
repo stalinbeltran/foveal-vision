@@ -1,13 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { ACTIVE_STATES, api, isTerminal } from "../api";
 import { usePersistedState } from "../uiState";
 import { Badge, ErrorBox, Field, Working } from "../components/ui";
+import { SweepCurves } from "../components/SweepCurves";
+import { WinnerVerdict } from "../components/WinnerVerdict";
+import { TaskScore } from "../components/TaskScore";
 
 // H — fix B, build a space over C and/or D. Geometry axes offer the
 // CALCULATED ranges ("auto"); the (9) block is active in the form; the budget
 // declares its unit. State lives on disk: stop/resume survive restarts.
-const GEO_AXES = ["d", "k_center", "k_periph", "s_center", "s_periph"];
+//
+// The axis/objective vocabulary comes from /sweeps/axes, which serves the same
+// constants the validators use. This screen used to keep its own GEO_AXES list
+// and its own <option>s: a copy that only diverges the day someone adds an axis
+// in Python — and then the form silently cannot reach it.
 
 export default function Sweeps() {
   const [sweeps, setSweeps] = useState<any[] | null>(null);
@@ -17,6 +24,13 @@ export default function Sweeps() {
   const [error, setError] = useState<unknown>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [trials, setTrials] = useState<any>(null);
+  const [winner, setWinner] = useState<any>(null);
+  const [axesMeta, setAxesMeta] = useState<any>(null);
+  const [curves, setCurves] = useState<Record<string, any[]>>({});
+  const curvesRef = useRef<Record<string, any[]>>({});
+  // runs whose curve is final: fetched WITH a terminal status, never re-fetched
+  const settledRef = useRef<Set<string>>(new Set());
+  const [baseDims, setBaseDims] = useState<any>(null);
   const [sf, setSf] = usePersistedState("sweeps.filters", {
     window_dataset: "", base_network: "", base_recipe: "", objective: "", q: "",
   });
@@ -49,16 +63,76 @@ export default function Sweeps() {
       if (d.recipes[0])
         setForm((f: any) => f.base_recipe ? f : { ...f, base_recipe: d.recipes[0].name });
     }).catch(setError);
+    api.get("/sweeps/axes").then(setAxesMeta).catch(setError);
     return () => clearInterval(t);
   }, []);
 
+  // the geometry axes (those whose range is CALCULATED) come from the backend
+  const GEO_AXES: string[] = axesMeta?.geometry_auto ?? [];
+
+  // Poll the trials AND fan out per-run metrics on the same 3s cadence, so a
+  // running sweep animates its curve overlay. Curves live in a ref so the tick
+  // sees the previous fill without re-subscribing the effect.
+  //
+  // A run's curve is only frozen ("settled") after it has been fetched WITH its
+  // status already terminal. Caching on "terminal + we have something" was the
+  // measured bug: the copy we had was taken by the previous tick, while the run
+  // was still training, so every epoch trained between that tick and the end was
+  // dropped from the chart for good (up to a whole minute of them if the tab was
+  // backgrounded, since browsers throttle setInterval there). The loop writes the
+  // last metrics line BEFORE flipping status to done, so a fetch made once the
+  // status reads terminal always sees the complete file — one extra request per
+  // run, exactly once.
   useEffect(() => {
     if (!sel) return;
-    const load = () => api.get(`/sweeps/${sel}/trials`).then(setTrials).catch(setError);
+    let alive = true;
+    curvesRef.current = {}; setCurves({}); settledRef.current = new Set();
+    setWinner(null);
+    const load = async () => {
+      let t: any;
+      try { t = await api.get(`/sweeps/${sel}/trials`); }
+      catch (e) { if (alive) setError(e); return; }
+      if (!alive) return;
+      setTrials(t);
+      const runs = (t.trials || []).filter((r: any) => r.status);
+      await Promise.all(runs.map(async (r: any) => {
+        if (settledRef.current.has(r.run)) return;
+        try {
+          const m = await api.get(`/runs/${r.run}/metrics?since=0`);
+          curvesRef.current[r.run] = m.records;
+          if (isTerminal(r.status)) settledRef.current.add(r.run);
+        } catch { /* a run mid-write or just gone: keep what we had, retry next tick */ }
+      }));
+      if (alive) setCurves({ ...curvesRef.current });
+      // the verdict rides the same tick: δ omitted so the backend measures it
+      // from the seeds (1-SE). 404/no-scored-trials just means "not yet".
+      try {
+        const w = await api.get(`/sweeps/${sel}/winner?cost_metric=seconds_per_epoch`);
+        if (alive) setWinner(w);
+      } catch { if (alive) setWinner(null); }
+    };
     load();
-    const t = setInterval(load, 3000);
-    return () => clearInterval(t);
+    const iv = setInterval(load, 3000);
+    return () => { alive = false; clearInterval(iv); };
   }, [sel]);
+
+  // The NN of each point = base network + the "punto". The base is the part FIXED
+  // across all points, so show it once (name + resolved config + derived dims via
+  // the same validator as Redes); each row's "punto" column carries what varies.
+  const selSweep = (sweeps ?? []).find((s) => s.name === sel);
+  const baseNet = selSweep?.spec?.base_network_value ?? null;
+  const baseNetName = selSweep?.spec?.base_network ?? null;
+  // inline base (D-H2): no name — the synthetic base_label is the grouping key
+  const baseLabel = selSweep?.spec?.base_label ?? null;
+  const baseRecipeName = selSweep?.spec?.base_recipe ?? null;
+  const spaceKeys = Object.keys(selSweep?.spec?.space ?? {});
+  const baseKey = baseNet ? JSON.stringify(baseNet) : "";
+  useEffect(() => {
+    if (!baseNet) { setBaseDims(null); return; }
+    api.post("/networks/validate", baseNet)
+      .then((v) => setBaseDims(v?.trace?.dims ?? null))
+      .catch(() => setBaseDims(null));
+  }, [baseKey]);
 
   const space: any = {};
   GEO_AXES.forEach((a) => { if (form.axes[a]) space[a] = "auto"; });
@@ -66,8 +140,10 @@ export default function Sweeps() {
     space.lr = form.lr_list.split(",").map((s: string) => +s.trim()).filter((v: number) => v > 0);
   if (form.lambda_list.trim())
     space.lambda_pos = form.lambda_list.split(",").map((s: string) => +s.trim());
+  // contract (9) previewed with the SAME list the validator uses (/sweeps/axes),
+  // not a copy of it: a weight added there must light this warning up by itself
   const nineViolated = form.objective === "loss" &&
-    ["lambda_pos", "pos_weight", "smooth_l1_beta"].some((k) => k in space);
+    (axesMeta?.loss_weight_params ?? []).some((k: string) => k in space);
 
   const removeSweep = (s: any) => {
     const n = s.state?.done ?? 0;
@@ -101,16 +177,18 @@ export default function Sweeps() {
   const allSweeps = sweeps ?? [];
   const sdistinct = (path: (s: any) => any) =>
     [...new Set(allSweeps.map(path).filter((v) => v != null))].sort() as string[];
+  // group by the base's identity: its name, or the synthetic label when inline
+  const baseKeyOf = (s: any) => s.spec.base_network ?? s.spec.base_label ?? null;
   const sopts = {
     window_dataset: sdistinct((s) => s.spec.window_dataset),
-    base_network: sdistinct((s) => s.spec.base_network),
+    base_network: sdistinct(baseKeyOf),
     base_recipe: sdistinct((s) => s.spec.base_recipe),
     objective: sdistinct((s) => s.spec.objective),
   };
-  const ACTIVE = ["running", "queued"];
+  const ACTIVE = ACTIVE_STATES as readonly string[];
   const sfiltered = allSweeps.filter((s) => {
     if (sf.window_dataset && s.spec.window_dataset !== sf.window_dataset) return false;
-    if (sf.base_network && s.spec.base_network !== sf.base_network) return false;
+    if (sf.base_network && baseKeyOf(s) !== sf.base_network) return false;
     if (sf.base_recipe && s.spec.base_recipe !== sf.base_recipe) return false;
     if (sf.objective && s.spec.objective !== sf.objective) return false;
     if (sf.q && !s.name.toLowerCase().includes(sf.q.toLowerCase())) return false;
@@ -126,7 +204,7 @@ export default function Sweeps() {
 
   return (
     <div>
-      <h2>Recorridos (H)</h2>
+      <h2 data-domain="H">Recorridos (H)</h2>
       <p className="sub">Un espacio sobre C y/o D con B fijo → muchos runs, sin intervención humana.
         Los ejes de geometría usan los rangos calculados; el estado vive en disco y se reanuda.</p>
       <ErrorBox error={error} />
@@ -170,7 +248,7 @@ export default function Sweeps() {
           <Field label="objetivo">
             <select value={form.objective}
               onChange={(e) => setForm({ ...form, objective: e.target.value })}>
-              <option>f1</option><option>pos_err_px</option><option>loss</option>
+              {(axesMeta?.objectives ?? []).map((o: string) => <option key={o}>{o}</option>)}
             </select></Field>
           {nineViolated ? (
             <div className="error-box" data-testid="nine-block">
@@ -277,26 +355,105 @@ export default function Sweeps() {
           {sel && trials ? (
             <div style={{ marginTop: 14 }}>
               <h4>{sel} — ranking por {trials.objective} ({trials.direction})</h4>
+              <div data-testid="base-nn" style={{
+                margin: "0 0 12px", padding: "8px 12px",
+                background: "var(--surface-2)", border: "1px solid var(--border)",
+                borderRadius: 8,
+              }}>
+                <div>
+                  <strong>red base (C): {baseNetName ?? (baseLabel ? `${baseLabel} (inline)` : "—")}</strong>
+                  {baseRecipeName ? <span className="sub" style={{ margin: 0 }}>
+                    {"  ·  receta base (D): "}{baseRecipeName}</span> : null}
+                </div>
+                {baseNet ? (
+                  <div className="mono" style={{ marginTop: 5, color: "var(--text)" }}>
+                    {Object.entries(baseNet)
+                      .filter(([k]) => !spaceKeys.includes(k))
+                      .map(([k, v]) => `${k}=${v}`).join("   ")}
+                  </div>
+                ) : null}
+                {baseDims ? (
+                  <div className="sub" style={{ margin: "5px 0 0" }}>
+                    dims: fóvea {baseDims.center_out}px · anillo {baseDims.periph_out}px
+                    {" "}(ve {baseDims.periph_real}px reales) · penetración {baseDims.penetration}px
+                    {" "}· recorte {baseDims.original_size}px
+                  </div>
+                ) : null}
+                <div className="sub" style={{ margin: "5px 0 0" }}>
+                  ejes barridos (varían por fila, columna «punto»):{" "}
+                  <span className="mono">{spaceKeys.length ? spaceKeys.join(", ") : "—"}</span>
+                </div>
+              </div>
+              <p className="sub" style={{ margin: "0 0 8px" }}>
+                El valor es el del <strong>checkpoint que sobrevive</strong> (`best.pt`,
+                elegido por <span className="mono">{(trials.monitors || []).join(", ") || "—"}</span>),
+                no el de la última época — es el fichero que cargan Diagnóstico y
+                Predecir, y el que arrastra un estudio. La columna «época» dice de
+                dónde sale cada número.
+              </p>
+              {trials.monitor_matches_objective === false ? (
+                <div className="warn" data-testid="monitor-mismatch" style={{
+                  margin: "0 0 10px", padding: "8px 12px", borderRadius: 8,
+                  background: "var(--surface-2)", border: "1px solid var(--warn)",
+                }}>
+                  <strong>El monitor y el objetivo no coinciden.</strong>{" "}
+                  <span className="mono">{(trials.monitors || []).join(", ")}</span> elige
+                  qué época se guarda; el ranking la mide con{" "}
+                  <span className="mono">{trials.objective}</span>. Es legal, pero el
+                  ganador se elige entre checkpoints seleccionados por otro criterio:
+                  si lo que te importa es <span className="mono">{trials.objective}</span>,
+                  entrena con <span className="mono">monitor: val_{trials.objective}</span>.
+                </div>
+              ) : null}
               <table className="data" data-testid="trials-table">
                 <thead><tr><th>#</th><th>run</th><th>punto</th><th>{trials.objective}</th>
-                  <th>estado</th><th>s/época</th></tr></thead>
+                  <th>época</th><th>última</th><th>estado</th><th>s/época</th></tr></thead>
                 <tbody>
                   {trials.trials.map((t: any, i: number) => (
                     <tr key={t.trial}>
                       <td>{i + 1}</td>
                       <td><Link to={`/runs/${t.run}`}>{t.run}</Link></td>
                       <td className="mono">{JSON.stringify(t.point)}</td>
-                      <td>{t.value?.toFixed ? t.value.toFixed(4) : t.value ?? "—"}</td>
+                      <td title={t.value_reason?.message ?? ""}>
+                        {t.value?.toFixed ? t.value.toFixed(4) : t.value ?? "—"}</td>
+                      <td className="sub" style={{ margin: 0 }}>
+                        {t.epoch != null ? `${t.epoch}/${t.epochs}` : "—"}</td>
+                      <td className="sub" style={{ margin: 0 }}>
+                        {t.value_last?.toFixed ? t.value_last.toFixed(4) : "—"}</td>
                       <td><Badge status={t.status} /></td>
                       <td>{t.seconds_per_epoch ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {winner ? (
+                <div className="card" style={{ marginTop: 12 }} data-testid="sweep-winner">
+                  <h4 style={{ margin: "0 0 8px" }}>Veredicto — agregado por valor de eje
+                    (media de las semillas)</h4>
+                  <WinnerVerdict winner={winner} />
+                  {/* the task metric ONLY for the suggested point (and the best
+                      one when it is another point): measuring the 35 points of a
+                      sweep is the difference between 0,6 s and half a minute,
+                      and the ranking does not use this number anyway */}
+                  <div style={{ marginTop: 12, borderTop: "1px solid var(--border)",
+                                paddingTop: 10 }}>
+                    <TaskScore runs={winner.suggested?.runs ?? []}
+                               title="Medir la tarea del ganador sugerido" />
+                    {JSON.stringify(winner.best?.point) !==
+                      JSON.stringify(winner.suggested?.point) ? (
+                      <div style={{ marginTop: 10 }}>
+                        <TaskScore runs={winner.best?.runs ?? []}
+                                   title="…y la del mejor por objetivo" />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
               {trials.discarded?.length ? (
                 <p className="sub">{trials.discarded.length} puntos descartados por geometría
                   (con su razón en el spec) — los asserts matan esas combinaciones.</p>
               ) : null}
+              <SweepCurves key={sel} trials={trials} curves={curves} />
             </div>
           ) : null}
         </div>

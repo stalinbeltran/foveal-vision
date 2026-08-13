@@ -1,0 +1,17 @@
+{
+  "run": "d1000-batch_size-1-s0-batch_size-0000-batch_size10_seed1",
+  "epochs_run": 20,
+  "epochs_requested": 20,
+  "stopped_early": false,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.28413822894746604,
+  "best_epoch": 18,
+  "seconds_per_epoch": 108.378,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}

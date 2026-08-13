@@ -11,10 +11,27 @@ import torch
 from fv.models.builder import FoveatedRegionalNN, build_model
 
 
+class CheckpointError(ValueError):
+    def __init__(self, code: str, message: str, hint: str):
+        super().__init__(message)
+        self.code, self.message, self.hint = code, message, hint
+
+
 def load_model(ckpt_path: Path, device: str = "cpu") -> FoveatedRegionalNN:
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model = build_model(ckpt["config"]["model"])
-    model.load_state_dict(ckpt["model"])
+    try:
+        model.load_state_dict(ckpt["model"])
+    except RuntimeError as e:
+        # a checkpoint from a previous builder (e.g. the fixed two-layer conv1/
+        # conv2 before the parametric builder) no longer fits — no weight-compat
+        # code is written on purpose (D-C2 §13). Fail with the reason, never a 500.
+        raise CheckpointError(
+            "checkpoint_incompatible",
+            "este checkpoint es de un builder anterior y sus pesos ya no encajan "
+            "en la red parametrica",
+            "reentrena el run (fv-train / un recorrido): no se migra state_dict "
+            "(barrido-por-ejes.md §13)") from e
     model.to(device)
     model.eval()
     return model

@@ -7,12 +7,15 @@ Usage: .venv\\Scripts\\python scripts\\verify_ui.py
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-BASE = "http://localhost:5173"
+# 5173 por defecto; FV_UI_BASE permite verificar contra una instancia aparte
+# (útil cuando la de siempre tiene un recorrido entrenando y no se puede tocar)
+BASE = os.environ.get("FV_UI_BASE", "http://localhost:5173")
 SHOTS = Path(__file__).resolve().parents[1] / "data" / "ui-shots"
 SHOTS.mkdir(parents=True, exist_ok=True)
 
@@ -71,17 +74,78 @@ def main() -> int:
             page.wait_for_selector("[data-testid=compat]", timeout=15000)
         check(page, "/train", "text=nombre del run", "06-entrenar", train_extra)
 
-        # Recorridos: table + select rec-d -> trials ranking; (9) block live
+        # Recorridos: table + select a done sweep -> trials ranking, verdict and
+        # curve overlay; (9) block live
         def sweeps_extra(page):
-            page.click("[data-testid=sweeps-table] tbody tr:has-text('rec-d')")
+            page.click("[data-testid=sweeps-table] tbody tr:has-text('fast-lr-2-s0-lr')")
             page.wait_for_selector("[data-testid=trials-table]", timeout=15000)
+            # the ranking describes the CHECKPOINT: the epoch column says which
+            # epoch each value came from, and the monitor/objective mismatch is
+            # announced instead of left for the reader to discover
+            page.wait_for_selector("[data-testid=trials-table] th:has-text('época')", timeout=5000)
+            page.wait_for_selector("[data-testid=monitor-mismatch]", timeout=5000)
+            # the verdict: mean ± band per axis value, δ from the seeds, and the
+            # technical tie declared out loud (this sweep ties all six lr values)
+            page.wait_for_selector("[data-testid=sweep-winner]", timeout=20000)
+            page.wait_for_selector("[data-testid=winner-verdict]:has-text('Empate técnico')",
+                                   timeout=10000)
+            page.wait_for_selector("[data-testid=winner-table]", timeout=5000)
+            page.screenshot(path=str(SHOTS / "07d-recorridos-veredicto.png"), full_page=True)
+            # curves: both modes, and hide/show all
+            page.wait_for_selector("[data-testid=sweep-curves] svg", timeout=15000)
+            page.click("button:has-text('media ± banda')")
+            page.wait_for_timeout(400)
+            page.screenshot(path=str(SHOTS / "07e-recorridos-banda.png"), full_page=True)
+            page.click("button:has-text('ocultar todo')")
+            page.wait_for_timeout(200)
+            page.click("button:has-text('mostrar todo')")
+            page.click("button:has-text('líneas por run')")
             page.fill("input[placeholder='0.5, 1.0']", "0.5, 1.0")
             objetivo = page.locator("label.field", has_text="objetivo").locator("select")
             objetivo.select_option("loss")
             page.wait_for_selector("[data-testid=nine-block]", timeout=10000)
             page.screenshot(path=str(SHOTS / "07b-recorridos-contrato9.png"), full_page=True)
             objetivo.select_option("f1")
+            # the task metric of the winner: a BUTTON (it re-infers whole
+            # images), only for the suggested point — never for the 35 rows
+            page.click("button:has-text('Medir la tarea del ganador sugerido')")
+            page.wait_for_selector("[data-testid=task-row]", timeout=60000)
+            page.wait_for_selector("[data-testid=task-small-sample]", timeout=10000)
+            page.screenshot(path=str(SHOTS / "07f-recorridos-tarea.png"), full_page=True)
         check(page, "/sweeps", "[data-testid=sweeps-table]", "07-recorridos", sweeps_extra)
+
+        # Estudios (I): the OAT schedule screen renders with its plan form + list
+        def studies_extra(page):
+            # the axis is a SELECT (fed by /sweeps/axes), not free text: it must
+            # exist, offer the OAT axes, and seed a calculated range when picked
+            page.wait_for_selector("[data-testid=axis-select]", timeout=10000)
+            page.select_option("[data-testid=axis-select]", "channels[i]")
+            page.select_option("[data-testid=axis-select]", "k_center")  # geometry
+            # opening a study with an UNCONFIRMED step is the path that blanked
+            # the page (a remembered `studies.delta` written as a number reaching
+            # delta.trim()). Seed the stale value on purpose, then click every
+            # study: none may blank or trip the error boundary.
+            page.evaluate("localStorage.setItem('fv.ui.studies.delta', '0')")
+            page.reload()
+            page.wait_for_selector("[data-testid=studies-table]", timeout=15000)
+            rows = page.locator("[data-testid=studies-table] tbody tr")
+            for i in range(rows.count()):
+                rows.nth(i).click()
+                page.wait_for_timeout(1200)
+                assert page.locator("[data-testid=screen-error]").count() == 0, \
+                    "una pantalla de Estudios cayó al error boundary"
+                assert len(page.inner_text("body").strip()) > 40, "página en blanco"
+                # U1.6: al clicar, la DEFINICIÓN vuelve entera — no basta con que
+                # la pantalla no reviente. El plan y su escalera de ejes, con el
+                # rango literal de cada uno; el progreso va aparte, debajo.
+                page.wait_for_selector("[data-testid=study-plan]", timeout=15000)
+                plan = page.locator("[data-testid=study-plan]").first.inner_text()
+                for label in ("dataset (B, fijo)", "receta base (D)", "objetivo",
+                              "semillas", "presupuesto"):
+                    assert label in plan, f"el plan no dice «{label}»"
+                assert page.locator("[data-testid=study-axes] tbody tr").count() >= 1, \
+                    "la escalera de ejes del plan está vacía"
+        check(page, "/studies", "[data-testid=studies-table]", "07c-estudios", studies_extra)
 
         # Runs: list + detail with curves and provenance
         check(page, "/runs", "[data-testid=runs-table]", "08-runs")
@@ -89,10 +153,33 @@ def main() -> int:
         def run_extra(page):
             page.wait_for_selector("text=Procedencia", timeout=15000)
             page.wait_for_selector("svg[aria-label='loss']", timeout=15000)
-        check(page, "/runs/fov-run-2", "text=fov-run-2", "09-run-detalle", run_extra)
+            # the task metric block (⑬): fired by the button, with its band and
+            # the small-sample caveat visible
+            page.click("button:has-text('Medir la métrica de tarea')")
+            page.wait_for_selector("[data-testid=task-row]", timeout=60000)
+            page.wait_for_selector("[data-testid=task-small-sample]", timeout=10000)
+            # the holdout path (§6.4.1): choosing ANOTHER dataset must raise the
+            # "se toca una sola vez" caveat BEFORE anything is measured — the
+            # warning is the point, a silent second look is what it prevents
+            page.wait_for_selector("[data-testid=task-dataset]", timeout=10000)
+            page.select_option("[data-testid=task-split]", "test")
+            options = page.locator("[data-testid=task-dataset] option")
+            other = next((options.nth(i).get_attribute("value")
+                          for i in range(options.count())
+                          if options.nth(i).get_attribute("value")), None)
+            assert other, "el selector de dataset no ofrece ningun dataset"
+            page.select_option("[data-testid=task-dataset]", other)
+            page.wait_for_selector("[data-testid=task-holdout-warn]", timeout=10000)
+            page.screenshot(path=str(SHOTS / "09b-run-holdout.png"), full_page=True)
+            page.select_option("[data-testid=task-dataset]", "")
+            assert page.locator("[data-testid=task-holdout-warn]").count() == 0
+        check(page, "/runs/fov-16-param", "text=fov-16-param", "09-run-detalle", run_extra)
 
         # Diagnostico: summary + gallery -> click opens the probes (F0, V1, V2)
         def diag_extra(page):
+            # pick a run trained with the CURRENT builder — old checkpoints are
+            # intentionally incompatible (barrido §13); load fails cleanly on them
+            page.locator("select").first.select_option("fov-16-param")
             page.wait_for_selector("[data-testid=diag-summary]", timeout=30000)
             page.wait_for_selector("[data-testid=gallery] canvas", timeout=30000)
             page.click("[data-testid=gallery] .thumb")
@@ -102,6 +189,7 @@ def main() -> int:
 
         # Predecir: stage with overlays + move the threshold slider live
         def predict_extra(page):
+            page.locator("select").first.select_option("fov-16-param")
             page.wait_for_selector("[data-testid=predict-stage]", timeout=30000)
             page.wait_for_selector("[data-testid=predict-numbers]", timeout=15000)
             sliders = page.locator("input[type=range]")
@@ -117,7 +205,7 @@ def main() -> int:
         for e in real:
             print(" ", e)
         return 1
-    print(f"\nTODO OK: 11 pantallas/interacciones sin errores. Capturas en {SHOTS}")
+    print(f"\nTODO OK: 12 pantallas/interacciones sin errores. Capturas en {SHOTS}")
     return 0
 
 

@@ -1,13 +1,18 @@
 import React, { useEffect, useRef } from "react";
-import { CORNERS, CORNER_CSS } from "../api";
+import { CORNER_CSS, Corner } from "../api";
 
 // A raw labelled window (uint8 pixels) with true corners as rings and, when
 // given, predictions as dots — the error is the line between them.
+//
+// `cornerOrder` says what row i of `y` MEANS; it comes with the payload that
+// carries `y` (the dataset's manifest order). Hardcoding it here would silently
+// mis-colour every corner the day a dataset is built in another order.
 
 export function WindowCanvas(props: {
   pixels: number[][];
-  y?: number[][];              // (4,3) truth [exists, x, y] normalised
-  pred?: number[][];           // (4,2) predicted xy normalised
+  y?: number[][];              // (N,3) truth [exists, x, y] normalised
+  pred?: number[][];           // (N,2) predicted xy normalised
+  cornerOrder?: Corner[];
   scale?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -28,10 +33,18 @@ export function WindowCanvas(props: {
         ctx.fillStyle = `rgb(${v},${v},${v})`;
         ctx.fillRect(xx * s, yy * s, s, s);
       }
-    const colorOf = (i: number) =>
-      getComputedStyle(document.documentElement)
-        .getPropertyValue(CORNER_CSS[CORNERS[i]].slice(4, -1)).trim() || "#f00";
-    for (let c = 0; c < 4; c++) {
+    const order = props.cornerOrder ?? [];
+    // No colour literal, not even as a "cannot happen" marker (U3.1): an unknown
+    // corner or a missing token is a broken contract, and it says so.
+    const colorOf = (i: number) => {
+      const css = CORNER_CSS[order[i]];
+      if (!css) throw new Error(`esquina desconocida: ${order[i]} (corner_order del payload)`);
+      const v = getComputedStyle(document.documentElement)
+        .getPropertyValue(css.slice(4, -1)).trim();
+      if (!v) throw new Error(`falta el token ${css} en tokens.css`);
+      return v;
+    };
+    for (let c = 0; c < order.length; c++) {
       const t = props.y?.[c];
       const p = props.pred?.[c];
       const col = colorOf(c);

@@ -10,6 +10,7 @@ config => same weights (tested with a control).
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -18,9 +19,10 @@ import torch
 from torch.utils.data import DataLoader
 
 from fv import settings
-from fv.fovea import derive_dims
+from fv.fovea import dims_of
 from fv.ioutils import write_json_atomic
-from fv.metrics import corner_scores, detection_counts, pos_err_px
+from fv.metrics import (corner_scores, detection_counts, monitor_improved,
+                        monitor_key, pos_err_px)
 from fv.models.builder import build_model, full_config
 from fv.training.losses import corner_loss
 from fv.training.recipe import Recipe
@@ -71,7 +73,7 @@ def evaluate(model, loader, recipe: Recipe, window_size: int, device: str) -> di
 def train(run_name: str, window_dataset: str, network_name: str, network_cfg: dict,
           recipe_name: str, recipe: Recipe, device: str = "cpu",
           sweep: str | None = None, store: RunStore | None = None,
-          dataset_root: Path | None = None, progress=None) -> dict:
+          dataset_root: Path | None = None, progress=None, should_stop=None) -> dict:
     store = store or RunStore()
     wstore = WindowDatasetStore(dataset_root)
     manifest = wstore.manifest(window_dataset)
@@ -101,18 +103,19 @@ def train(run_name: str, window_dataset: str, network_name: str, network_cfg: di
 
     try:
         return _train_inner(run_name, run_dir, manifest, net, recipe, device,
-                            store, wstore, window_dataset, progress)
+                            store, wstore, window_dataset, progress, should_stop)
     except Exception:
         store.set_status(run_name, "error")
         raise
 
 
 def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
-                 device, store: RunStore, wstore, window_dataset, progress) -> dict:
+                 device, store: RunStore, wstore, window_dataset, progress,
+                 should_stop=None) -> dict:
     torch.manual_seed(recipe.seed)
     np.random.seed(recipe.seed % (2 ** 32))
 
-    dims = derive_dims(net["N"], net["c_frac"], net["d"], net["pen_frac"])
+    dims = dims_of(net)
     arrays = wstore.arrays(window_dataset)
     train_ds = FoveatedWindowDataset(arrays, dims, split=0,
                                      pool_mode=net["pool_mode"], pad_mode=net["pad_mode"])
@@ -143,7 +146,7 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
     no_improve = 0
     seconds = []
 
-    store.set_status(run_name, "running", epoch=0)
+    store.set_status(run_name, "running", epoch=0, pid=os.getpid())
     for epoch in range(1, recipe.epochs + 1):
         t0 = time.monotonic()
         model.train()
@@ -169,14 +172,12 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
         with metrics_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec) + "\n")
 
-        monitor_value = val["loss"] if recipe.monitor == "val_loss" else val.get(
-            recipe.monitor.removeprefix("val_"))
+        # the selection rule lives in fv.metrics, so the sweep ranking can ask
+        # WHICH epoch this kept without reimplementing it (and drifting)
+        monitor_value = val.get(monitor_key(recipe.monitor))
         ckpt = {"model": model.state_dict(), "config": {"model": net}, "epoch": epoch}
         torch.save(ckpt, run_dir / "last.pt")
-        improved = monitor_value is not None and (
-            best_value is None or
-            (monitor_value > best_value if recipe.monitor in ("val_f1",)
-             else monitor_value < best_value))
+        improved = monitor_improved(monitor_value, best_value, recipe.monitor)
         if improved:
             best_value, best_epoch = monitor_value, epoch
             torch.save(ckpt, run_dir / "best.pt")
@@ -184,10 +185,12 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
         else:
             no_improve += 1
 
-        store.set_status(run_name, "running", epoch=epoch)
+        store.set_status(run_name, "running", epoch=epoch, pid=os.getpid())
         if progress:
             progress(epoch, recipe.epochs, rec)
-        if store.stop_requested(run_name):
+        # cooperative stop: the run's own stop file OR the sweep asking its
+        # in-flight point to stop (should_stop) — both cut at the epoch boundary
+        if store.stop_requested(run_name) or (should_stop and should_stop()):
             cancelled = True
             break
         if recipe.patience and no_improve >= recipe.patience:

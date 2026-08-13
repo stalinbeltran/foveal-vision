@@ -42,6 +42,10 @@ def sweeps_root() -> Path:
     return project_root() / "sweeps"
 
 
+def studies_root() -> Path:
+    return project_root() / "studies"
+
+
 def cache_root() -> Path:
     return project_root() / "data" / "cache"
 

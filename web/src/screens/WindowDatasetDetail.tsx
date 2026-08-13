@@ -41,7 +41,7 @@ export default function WindowDatasetDetail() {
 
   return (
     <div>
-      <h2>{name}</h2>
+      <h2 data-domain="B">{name}</h2>
       <p className="sub">El dato crudo que se etiquetó — anillo = esquina verdadera.</p>
       <ErrorBox error={error} />
       {manifest ? (
@@ -55,7 +55,7 @@ export default function WindowDatasetDetail() {
             <dt>usado por</dt><dd>{manifest.used_by?.join(", ") || "—"}</dd>
           </dl>
           <button className="secondary" onClick={del} style={{ marginTop: 8 }}>
-            Borrar (409 si algún run lo usa)</button>
+            Borrar (409 si lo usa un run, recorrido o estudio)</button>
         </div>
       ) : <Working on />}
       <div className="card">
@@ -76,7 +76,8 @@ export default function WindowDatasetDetail() {
         <div className="thumbgrid" style={{ marginTop: 10 }} data-testid="window-grid">
           {windows.map((w) => (
             <div className="thumb" key={w.index}>
-              <WindowCanvas pixels={w.pixels} y={w.y} scale={6} />
+              <WindowCanvas pixels={w.pixels} y={w.y}
+                cornerOrder={w.corner_order} scale={6} />
               <div className="cap">#{w.index} · img {w.sample_idx} · ({w.window_xy.join(",")})</div>
             </div>
           ))}

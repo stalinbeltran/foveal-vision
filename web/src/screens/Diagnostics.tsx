@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api, CORNERS, CORNER_CSS } from "../api";
+import { api, CORNER_CSS, Corner, isTerminal } from "../api";
 import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 import { WindowCanvas } from "../components/WindowCanvas";
@@ -21,16 +21,34 @@ export default function Diagnostics() {
   const [probe, setProbe] = useState<any>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  // The run list is LIVE: a run that finishes (e.g. a sweep point) while this
+  // screen is open must appear without a reload — so poll like Runs/Sweeps/
+  // Studies (3s). Each pass also reconciles the selection, so a run deleted
+  // elsewhere is dropped from the picker instead of 404-ing on the next load.
+  const refreshRuns = () =>
     api.get("/runs").then((d) => {
-      const done = d.runs.filter((r: any) => ["done", "cancelled"].includes(r.status));
+      const done = d.runs.filter((r: any) => isTerminal(r.status));
       setRuns(done);
       setRun((cur) => (cur && done.some((r: any) => r.name === cur)) ? cur : (done[0]?.name ?? ""));
     }).catch(setError);
+  useEffect(() => {
+    refreshRuns();
+    const t = setInterval(refreshRuns, 3000);
+    return () => clearInterval(t);
   }, []);
 
+  // Gate the (heavy) per-run load on membership, not truthiness: a remembered
+  // run (localStorage diag.run) may name a run that was deleted or renamed (e.g.
+  // the axis-suffix migration turned `x-0000` into `x-0000-n_layers1`). Firing
+  // against it races the list fetch and surfaces run_not_found — and its late
+  // rejection can even clobber the corrected, valid load. This boolean (NOT
+  // `runs`) is the effect's dep, so the 3s list refresh above doesn't re-run the
+  // whole diagnostics computation on every poll — only a real membership change
+  // (the run appears, or the selection moves) re-fires it.
+  const runReady = !!run && runs.some((r) => r.name === run);
+
   useEffect(() => {
-    if (!run) return;
+    if (!runReady) return;
     setError(null); setSummary(null); setGallery(null); setProbe(null); setBusy(true);
     Promise.all([
       api.get(`/runs/${run}/diagnostics/summary?split=${split}&threshold=${threshold}`),
@@ -48,7 +66,7 @@ export default function Diagnostics() {
         setWindowsPix(pix);
       }
     }).catch(setError).finally(() => setBusy(false));
-  }, [run, split, threshold]);
+  }, [run, split, threshold, runReady]);
 
   const openProbes = async (it: any) => {
     const r = runs.find((x) => x.name === run);
@@ -68,7 +86,7 @@ export default function Diagnostics() {
 
   return (
     <div>
-      <h2>Diagnóstico (E×B)</h2>
+      <h2 data-domain="ExB">Diagnóstico (E×B)</h2>
       <p className="sub">Una pasada sobre el split, muchas vistas. Mover el umbral relee scores
         guardados: no vuelve a correr el modelo.</p>
       <ErrorBox error={error} />
@@ -105,7 +123,9 @@ export default function Diagnostics() {
           </div>
           {evidence ? (
             <div className="card grow">
-              <h3 style={{ marginTop: 0 }}>Evidencia (V18) — cuánto del párrafo cabe en la fóvea</h3>
+              <h3 data-view="V18" data-fixes="E, split, umbral" data-varies="banda de evidencia"
+            data-measures="deteccion y posicion por separado"
+            style={{ marginTop: 0 }}>Evidencia (V18) — cuánto del párrafo cabe en la fóvea</h3>
               <table className="data">
                 <thead><tr><th>banda</th><th>esquinas</th><th>score medio</th><th>err px</th></tr></thead>
                 <tbody>
@@ -120,9 +140,10 @@ export default function Diagnostics() {
           ) : null}
         </div>
       ) : null}
-      {gallery ? (
+      {gallery && !busy ? (
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Galería peor-primero ({gallery.total} ventanas) — clic: sondas</h3>
+          <h3 data-view="V6" data-fixes="E, split" data-varies="la ventana" data-measures="error"
+            style={{ marginTop: 0 }}>Galería peor-primero ({gallery.total} ventanas) — clic: sondas</h3>
           <div className="thumbgrid" data-testid="gallery">
             {gallery.items.map((it: any) => {
               const pix = windowsPix[it.window_idx];
@@ -130,7 +151,8 @@ export default function Diagnostics() {
                 <div className="thumb" key={it.row} onClick={() => openProbes(it)}
                   style={{ cursor: "pointer" }}>
                   {pix ? <WindowCanvas pixels={pix.pixels} y={it.y_true}
-                    pred={it.xy_pred} scale={6} /> : <Working on />}
+                    pred={it.xy_pred} cornerOrder={summary?.corner_order}
+                    scale={6} /> : <Working on />}
                   <div className="cap">#{it.window_idx} · err {it.err_px.filter((e: any) => e != null)
                     .map((e: number) => e.toFixed(1)).join("/") || "—"}</div>
                 </div>
@@ -141,9 +163,15 @@ export default function Diagnostics() {
       ) : null}
       {probe && !probe.loading ? (
         <div className="card" data-testid="probes">
-          <h3 style={{ marginTop: 0 }}>Sondas de la ventana #{probe.item.window_idx}</h3>
+          <h3 data-view="V3" data-fixes="E, ventana" data-varies="-"
+            data-measures="4x[p, x, y] contra el umbral"
+            style={{ marginTop: 0 }}>Sondas de la ventana #{probe.item.window_idx}</h3>
           <div className="row" style={{ marginBottom: 6 }}>
-            {CORNERS.map((c, i) => {
+            {/* el orden de las esquinas viaja con los datos (summary.corner_order,
+                del manifest de B): estas barras se indexan POR POSICIÓN, así que
+                una copia local del orden en el front las etiqueta mal en silencio
+                el día que B cambie de orden */}
+            {(summary?.corner_order ?? []).map((c: Corner, i: number) => {
               const s = probe.item.scores[i];
               return (
                 <div key={c} className="meter" style={{ width: 200 }}>
@@ -158,15 +186,19 @@ export default function Diagnostics() {
               );
             })}
           </div>
-          <h4>F0 — la entrada canal a canal (cobertura mín {probe.inputView.coverage_min.toFixed(2)})</h4>
+          <h4 data-view="F0" data-fixes="E, ventana" data-varies="el canal/zona"
+            data-measures="la entrada compuesta y su cobertura">F0 — la entrada canal a canal (cobertura mín {probe.inputView.coverage_min.toFixed(2)})</h4>
           <div className="row">
             {probe.inputView.channels.map((ch: any, i: number) => (
               <MatrixCanvas key={i} payload={ch} scale={7} />
             ))}
           </div>
-          <h4>V1 — kernels de capa 1, por rama (divergente ±0: el signo es lo que un kernel es)</h4>
+          <h4 data-view="V1" data-fixes="E" data-varies="la rama" data-measures="los pesos">V1 — kernels de capa 1, por rama (divergente ±0: el signo es lo que un kernel es)</h4>
           <div className="row">
-            {(["center", "periph"] as const).map((b) => (
+            {/* las ramas son las que trae el payload, no una lista escrita aqui:
+                una red `regions: single` tiene UNA, y cablear ["center","periph"]
+                dibujaba una rama que no existe (el mismo dato en dos sitios) */}
+            {Object.keys(probe.kernels.branches).map((b) => (
               <div key={b}>
                 <div className="cap">{b}</div>
                 <div className="row">
@@ -177,9 +209,10 @@ export default function Diagnostics() {
               </div>
             ))}
           </div>
-          <h4>V2 — feature maps (capa 1, primeros 6 por rama)</h4>
+          <h4 data-view="V2" data-fixes="E, ventana" data-varies="capa x rama"
+            data-measures="activacion">V2 — feature maps (capa 1, primeros 6 por rama)</h4>
           <div className="row">
-            {(["center", "periph"] as const).map((b) => (
+            {Object.keys(probe.featureMaps.branches).map((b) => (
               <div key={b}>
                 <div className="cap">{b}</div>
                 <div className="row">

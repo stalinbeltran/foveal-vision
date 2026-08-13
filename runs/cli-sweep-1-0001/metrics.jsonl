@@ -1,2 +1,0 @@
-{"epoch": 1, "train_loss": 1.210364360233833, "val": {"loss": 0.511301664635539, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 5.71682071685791}, "lr": 0.004, "seconds": 4.313}
-{"epoch": 2, "train_loss": 0.538598344243806, "val": {"loss": 0.3336205901578069, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 3.3414981365203857}, "lr": 0.004, "seconds": 4.375}

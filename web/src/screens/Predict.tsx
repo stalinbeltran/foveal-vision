@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { api, CORNERS, CORNER_CSS } from "../api";
+import { api, CORNER_CSS, Corner, isTerminal } from "../api";
 import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 
@@ -21,26 +21,43 @@ export default function Predict() {
   const [show, setShow] = usePersistedState("predict.show", { raw: false, corners: true, paragraphs: true, truth: true });
   const seq = useRef(0);
 
-  useEffect(() => {
+  // Lists are LIVE: a run that finishes (or a new source) while this screen is
+  // open must appear without a reload — poll like Runs/Sweeps/Studies (3s). Each
+  // pass reconciles the selection so an object deleted elsewhere is dropped from
+  // the picker instead of 404-ing on the next predict.
+  const refreshLists = () => {
     api.get("/runs").then((d) => {
-      const done = d.runs.filter((r: any) => ["done", "cancelled"].includes(r.status));
+      const done = d.runs.filter((r: any) => isTerminal(r.status));
       setRuns(done);
-      // keep a remembered run only if it still exists, else fall back to first
       setRun((cur) => (cur && done.some((r: any) => r.name === cur)) ? cur : (done[0]?.name ?? ""));
     }).catch(setError);
     api.get("/sources").then((d) => {
       setSources(d.sources);
       setSource((cur) => (cur && d.sources.some((s: any) => s.id === cur)) ? cur : (d.sources[0]?.id ?? ""));
     }).catch(setError);
+  };
+  useEffect(() => {
+    refreshLists();
+    const t = setInterval(refreshLists, 3000);
+    return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    if (!source) return;
-    api.get(`/sources/${source}`).then((m) => setCount(m.count)).catch(setError);
-  }, [source]);
+  // Gate on membership, not truthiness: a remembered run/source (localStorage
+  // predict.run / predict.source) may name an object that was deleted or
+  // renamed; firing against it races the list fetches and surfaces run_not_found.
+  // These booleans (NOT `runs`/`sources`) are the effect deps, so the 3s list
+  // refresh above doesn't re-run the model on every poll — only a real
+  // membership change does.
+  const runReady = !!run && runs.some((r) => r.name === run);
+  const sourceReady = !!source && sources.some((s) => s.id === source);
 
   useEffect(() => {
-    if (!run || !source) return;
+    if (!sourceReady) return;
+    api.get(`/sources/${source}`).then((m) => setCount(m.count)).catch(setError);
+  }, [source, sourceReady]);
+
+  useEffect(() => {
+    if (!runReady || !sourceReady) return;
     const mySeq = ++seq.current;
     setBusy(true);
     const body: any = { source, index, threshold: knobs.threshold };
@@ -54,14 +71,15 @@ export default function Predict() {
       });
     }, 250);
     return () => clearTimeout(t);
-  }, [run, source, index, knobs]);
+  }, [run, source, index, knobs, runReady, sourceReady]);
 
   const W = result?.image_size?.[0] ?? 96, H = result?.image_size?.[1] ?? 72;
   const cs = (c: string) => CORNER_CSS[c as keyof typeof CORNER_CSS];
 
   return (
     <div>
-      <h2>Predecir (F)</h2>
+      <h2 data-domain="F" data-view="V11" data-fixes="E, imagen"
+        data-varies="la etapa" data-measures="que se pierde y donde">Predecir (F)</h2>
       <p className="sub">Las tres etapas — sin la cruda, «el párrafo salió mal» no es diagnosticable.
         Los knobs van en unidades de la ventana y no reentrenan nada.</p>
       <ErrorBox error={error} />
@@ -144,7 +162,9 @@ export default function Predict() {
             </dl>
             <p className="sub">El payload devuelve los knobs con que se calculó: los sliders son
               en vivo y las respuestas llegan desordenadas.</p>
-            {CORNERS.map((c) => {
+            {/* el vocabulario de esquinas viene en la respuesta (corner_order),
+                no de una constante del front */}
+            {(result.corner_order ?? []).map((c: Corner) => {
               const n = result.corners.filter((d: any) => d.corner === c).length;
               return <div key={c}><span className={`corner-${c}`}>{c}</span>: {n} esquinas</div>;
             })}

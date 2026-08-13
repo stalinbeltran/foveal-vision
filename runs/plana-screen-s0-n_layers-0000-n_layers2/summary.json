@@ -1,0 +1,17 @@
+{
+  "run": "plana-screen-s0-n_layers-0000-n_layers2",
+  "epochs_run": 47,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.26486487944017756,
+  "best_epoch": 37,
+  "seconds_per_epoch": 27.349,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}

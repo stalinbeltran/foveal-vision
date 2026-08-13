@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 from fv import settings
-from fv.fovea import derive_dims
+from fv.fovea import dims_of
 from fv.inference.checkpoint import MODEL_CACHE
 from fv.metrics import (corner_evidence, corner_scores, detection_counts,
                         per_window_errors)
@@ -75,7 +75,7 @@ def diagnostics_table(run_name: str, split: str = "val",
     else:
         model = MODEL_CACHE.get(ckpt)
         net = cfg["network"]
-        dims = derive_dims(net["N"], net["c_frac"], net["d"], net["pen_frac"])
+        dims = dims_of(net)
         arrays = wstore.arrays(ds_name)
         ds = FoveatedWindowDataset(arrays, dims, split=SPLITS[split],
                                    pool_mode=net["pool_mode"],
@@ -100,7 +100,10 @@ def diagnostics_table(run_name: str, split: str = "val",
     err = per_window_errors(xy_pred, y_true[:, :, 1:], y_true[:, :, 0], window_size)
     return {"run": run_name, "split": split, "window_dataset": ds_name,
             "window_size": window_size, "scores": scores, "xy_pred": xy_pred,
-            "y_true": y_true, "err_px": err, "window_idx": window_idx}
+            "y_true": y_true, "err_px": err, "window_idx": window_idx,
+            # the order the score columns are IN — it travels with the data so a
+            # reader never has to know it (the UI kept its own copy of the tuple)
+            "corner_order": list(manifest["corner_order"])}
 
 
 def summary_payload(table: dict, threshold: float = 0.5) -> dict:
@@ -118,6 +121,7 @@ def summary_payload(table: dict, threshold: float = 0.5) -> dict:
     positives = int((y_true[:, :, 0] >= 0.5).sum())
     return {
         "windows": int(scores.shape[0]), "positives": positives,
+        "corner_order": table["corner_order"],
         "threshold": threshold, "detection": det,
         "pos_err_px": err_all,
         "pos_err_px_blind": err_blind,       # evidence < 0.05: paragraph outside the fovea

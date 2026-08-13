@@ -1,0 +1,11 @@
+# Estudio OAT de ejemplo (I) — un plan ordenado de ejes sobre recorridos, B fijo.
+# La base de cada paso se DERIVA del window_size de B (no se escribe a mano);
+# el ganador de un paso se arrastra al siguiente. Ver docs/barrido-por-ejes.md.
+window_dataset: synth-b16
+base_recipe: corta
+objective: f1
+seeds: 3                 # sondeo 1 + confirmacion 3 (D-M1); en CPU corta basta 1
+budget: {epochs: 1}
+axes:                     # orden = orden de barrido (U6)
+  - {axis: n_layers, range: [1, 2]}
+  - {axis: "channels[i]", range: [8, 16], depends_on: n_layers}

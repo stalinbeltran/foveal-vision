@@ -1,0 +1,101 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "lr": 0.0014,
+    "optimizer": "adam",
+    "momentum": 0.9,
+    "weight_decay": 0.0,
+    "batch_size": 85,
+    "epochs": 150,
+    "scheduler": "none",
+    "patience": 10,
+    "lambda_pos": 1.0,
+    "pos_weight": 1.0,
+    "smooth_l1_beta": 0.08,
+    "monitor": "val_loss",
+    "seed": 3
+  },
+  "network": {
+    "N": 16,
+    "c_frac": 1.0,
+    "d": 1,
+    "pen_frac": 0.1,
+    "n_layers": 5,
+    "k_center": 3,
+    "k_periph": 3,
+    "s_center": 1,
+    "s_periph": 1,
+    "channels": [
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    "merge": "concat",
+    "pool_mode": "avg",
+    "pad_mode": "edge",
+    "regions": "single"
+  },
+  "execution": {
+    "device": "cpu",
+    "num_workers": 0
+  },
+  "provenance": {
+    "window_dataset": {
+      "name": "dirty1000-80px-16px",
+      "fingerprint": "sha256:4327325b8e30267cef148e898867320fc7608b2fe88c2c36ad02481c387eb7e1"
+    },
+    "network": {
+      "name": null,
+      "value": {
+        "N": 16,
+        "c_frac": 1.0,
+        "d": 1,
+        "pen_frac": 0.1,
+        "n_layers": 5,
+        "k_center": 3,
+        "k_periph": 3,
+        "s_center": 1,
+        "s_periph": 1,
+        "channels": [
+          16,
+          16,
+          16,
+          16,
+          16
+        ],
+        "merge": "concat",
+        "pool_mode": "avg",
+        "pad_mode": "edge",
+        "regions": "single"
+      }
+    },
+    "recipe": {
+      "name": "plan40",
+      "value": {
+        "lr": 0.0014,
+        "optimizer": "adam",
+        "momentum": 0.9,
+        "weight_decay": 0.0,
+        "batch_size": 85,
+        "epochs": 150,
+        "scheduler": "none",
+        "patience": 10,
+        "lambda_pos": 1.0,
+        "pos_weight": 1.0,
+        "smooth_l1_beta": 0.08,
+        "monitor": "val_loss",
+        "seed": 3
+      }
+    },
+    "sweep": "plana-confirm-s0-n_layers",
+    "git_commit": "75c0b7e135513a9230a474df7d149474d17e4df3",
+    "environment": {
+      "python": "3.12.10",
+      "torch": "2.13.0+cpu",
+      "platform": "win32",
+      "device": "cpu"
+    }
+  }
+}

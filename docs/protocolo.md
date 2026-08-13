@@ -38,7 +38,7 @@ por ventana que el bucle calcula por época. Del hermano se hereda la estructura
 |---|---|
 | **Entrenar** (la pérdida) | La de D — tiene que ser diferenciable |
 | **Elegir `best.pt`** dentro de un run | val de ventana (barato, por época), `monitor` explícito |
-| **Rankear el recorrido** | **métrica de tarea por imagen, en val** ← el objetivo |
+| **Rankear el recorrido** | **métrica de tarea por imagen, en val** ← el objetivo. **Hoy se rankea con el proxy de ventana, medido y validado para ejes de D** (recuadro de abajo); la de tarea existe cableada (`fv.task.task_score`, `GET /runs/{name}/task-score`) y se usa para **informar del ganador**, no para elegir |
 | **Reportar** | métrica de tarea en **holdout**, una vez, del ganador |
 
 Con las cabezas de esquina (C9), la métrica de tarea se hereda tal cual del hermano: **F1 de
@@ -56,6 +56,41 @@ de rangos (Spearman) entre la métrica de ventana y la de tarea sobre ~8 runs de
 Si es alta, el proxy barato sirve para diagnóstico; si es baja, el eslabón débil es la
 recomposición de F y mejorar la red no mejora la tarea — cualquiera de las dos respuestas vale
 su coste.
+
+> **✅ HECHO (2026-07-26), para ejes de D — detalle en [metrica-de-tarea.md](metrica-de-tarea.md)
+> §2.** Sobre los 65 runs de `fast-lr-s0-lr` (13 valores de `lr` × 5 semillas): Spearman **+0,736**
+> por run y **+0,956** agregado por valor del eje, con el **mismo ganador** en las dos métricas.
+> El proxy de ventana **vale para rankear ejes de receta**, y por eso `OBJECTIVES` no cambia.
+>
+> **✅ Y TAMBIÉN PARA C (2026-07-26) — metrica-de-tarea.md §2 bis.** Se repitió sobre el eje `d`
+> (recorrido `proxy-c-d`, 6 valores × 5 semillas, 20 épocas): **Spearman agregado +1,000**, mismo
+> ganador (`d=2`) con las dos métricas y dentro de la frontera δ. El miedo concreto de esta
+> sección —que barrer la geometría invierta el orden— **no se materializa**. Reservas escritas
+> allí: el eje separa poco (amplitud 0,028, δ se come 3 de 6 puntos), n = 6, y es **un solo** eje
+> de C.
+>
+> **Hallazgo colateral que vale más que la validación**: el F1 apenas se mueve con `d`, y `d=2`
+> (4 px de periferia) gana a `d=6` (12 px) — **la periferia no está aportando de forma medible**,
+> y el coste tampoco lo explica (7,0–8,8 s/época). Es media respuesta al §6 de aquí abajo, sin
+> construir el control que F12 bloquea.
+>
+> El mismo trabajo destapó el límite que manda ahora: sd del F1 de párrafo **entre imágenes** =
+> **0,4148** sobre **20 imágenes de val** → **±0,093** por run. La métrica de tarea, hoy, es más
+> ruidosa que las diferencias que se quieren distinguir; el arreglo es el §3 de aquí abajo
+> (dimensionar el dato), no más código.
+> **⚠ Re-medido el 2026-07-26** (metrica-de-tarea.md §9.4) sobre los 20 runs ganadores de los 4
+> recorridos: la primera estimación era 0,372 y se dio por «conservadora» razonando que con modelos
+> mejores bajaría. **Sube.** La sd es máxima con modelos intermedios (el F1 por imagen es casi
+> bimodal), y aquel 0,372 se promedió sobre el recorrido `lr` entero, modelos de F1 0,10 incluidos.
+> Es un recordatorio de esta misma sección: **una estimación razonada no es una medición.**
+>
+> **✅ CABLEADA (2026-07-26).** La métrica de tarea ya no es una función que no llama nadie:
+> `fv.task.task_score(run, split)` la calcula por imagen contra la fuente (contrato ⑬), con
+> caché por knobs, y se pide desde `GET /runs/{name}/task-score`, desde el detalle de un run y
+> desde el veredicto de un recorrido (botón: cuesta inferencia de imagen completa), y desde
+> `fv-oat --task-score` / `fv-study --task-score`. **No entra en `OBJECTIVES`**: el proxy ordena
+> igual en ejes de D y cuesta cero. Todo número que sale de ahí viaja con su `sem` y su n de
+> imágenes, y con el aviso explícito cuando n < 100.
 
 ## 3. El instrumento antes que el experimento
 
@@ -77,6 +112,14 @@ Heredado (D16 del hermano), con sus tres respuestas:
 barriendo la geometría.
 
 ### Paso 0b — dimensionar el dato como variable, no como default
+
+> ⚠ **Matiz medido el 2026-07-26, antes de que nadie cuente con «el generador está al lado»:** el
+> dato real de este proyecto (`dirty-paragraphs-*`, 80×60) sale del **proyecto hermano**
+> `image-text-sample-generator` (receta `clean-paragraphs`, canvas 640×480) **y de un `resize` que
+> este repo no tiene portado**. `scripts\make_synth_source.py` genera **otro problema** (barras
+> sintéticas, `local/synth-01`), útil para probar el instrumento y no para concluir sobre la tarea.
+> Las rutas, sus costes y lo que hay que portar: [metrica-de-tarea.md](metrica-de-tarea.md) §4.2 y
+> §4.3, y las decisiones F11/F13 en [decisiones.md](decisiones.md).
 
 El dato es sintético y el generador está al lado: **el tamaño del dataset es una variable de
 investigación** (D6 del hermano), no una restricción. La lección medida: **train manda en el

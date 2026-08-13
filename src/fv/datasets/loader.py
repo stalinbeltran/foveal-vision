@@ -62,19 +62,31 @@ def _roots() -> list[tuple[str, Path]]:
     return roots
 
 
+def source_meta(root: Path) -> dict:
+    """The source's own `dataset.json`, or {} — ONE reader, several callers.
+
+    Missing or unparseable is {}, never an error: this file is written by the
+    sibling generator and a source is perfectly usable without it (the labels
+    are in labels.jsonl). What a caller must NOT do is invent a default for a
+    field it needs — an absent key is absent (formatos.md §2), and `{}.get(k)`
+    says so.
+    """
+    dj = Path(root) / "dataset.json"
+    if not dj.exists():
+        return {}
+    try:
+        return json.loads(dj.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
 def discover_sources() -> list[dict]:
     out = []
     for prefix, root in _roots():
         for d in sorted(root.iterdir()):
             if not d.is_dir() or not (d / "labels.jsonl").exists():
                 continue
-            meta = {}
-            dj = d / "dataset.json"
-            if dj.exists():
-                try:
-                    meta = json.loads(dj.read_text(encoding="utf-8"))
-                except json.JSONDecodeError:
-                    meta = {}
+            meta = source_meta(d)
             out.append({
                 "id": prefix + d.name,
                 "path": str(d),
@@ -112,6 +124,11 @@ class SourceDataset:
         self.root = resolve_source(source_id)
         self.labels_path = self.root / "labels.jsonl"
         self._offsets: list[int] | None = None
+
+    @property
+    def meta(self) -> dict:
+        """This source's `dataset.json` (same reader as discover_sources)."""
+        return source_meta(self.root)
 
     def _parse_line(self, line: str) -> Sample:
         rec = json.loads(line)

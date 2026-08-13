@@ -33,7 +33,7 @@ referencia de algoritmos y de forma, igual que él consultaba su tag `pre-redise
 | **Seguridad local** | Allowlist de raíces (403 fuera), CORS cerrado al origen del front. Crítico aquí: el API acabará en un server con GPU | api.md §6 (D4) |
 | **Método de tests** | Contratos = plan de pruebas; `xfail(strict=True)` como lista de tareas ejecutable; testear la costura, no la función; tests de dirección de imports; test de reproducibilidad con control; **nunca** testear resultados de investigación | tests.md |
 | **Protocolo experimental** | N semillas y media±sd; suelo de ruido; empates dentro de la banda; test una vez al final solo el ganador; mismo commit + misma huella; holdout fuera de B generado primero | protocolo.md |
-| **Reglas de UI** | Una pantalla un dominio; toda vista declara (fija, varía, mide); paleta validada por script, no a ojo; divergente ±0 para datos con signo; jamás doble eje; tabla de números como gemela accesible | ui.md |
+| **Reglas de UI** | Una pantalla un dominio; toda vista declara (fija, varía, mide); paleta validada por script, no a ojo; divergente ±0 para datos con signo; jamás doble eje; tabla de números como gemela accesible | ui.md → `docs/ui/` (8 tipos) |
 | **Stack y entorno** | Python 3.12 + PyTorch + FastAPI + Vite/React; Playwright disponible; consola cp1252 → CLIs en ASCII; observaciones de la máquina (hibernación, throttling) | README/CLAUDE.md |
 
 ## 2. Compatible con adaptación (el mecanismo sirve, el contenido cambia)
@@ -53,7 +53,7 @@ referencia de algoritmos y de forma, igual que él consultaba su tag `pre-redise
 | **Diagnóstico (E×B)** | Tabla por patch = **caché** (D1): recomputable, clave con mtime del checkpoint, agregados en servidor, threshold como parámetro de consulta | Igual, por ventana; los agregados concretos dependen de F1 | El patrón caché (recomputable/borrable/huella en la clave) está probado tres veces allí |
 | **Métricas** | `fv.metrics`-equivalente (`itf.metrics`): un número se define una vez, arrays puros | Igual; las métricas de tarea se definen **en píxeles de la imagen original** para sobrevivir a barrer la geometría (contrato ⑨-extensión) | Nuevo requisito por barrer C |
 | **Máscara de cobertura** | La máscara del canal de contexto: fracción real por celda, nunca binarizada, nunca blanco, se enseña junto a su canal (V19) | Igual para el relleno de la vista foveada en bordes de imagen | La lección es directamente transferible |
-| **Vistas de la UI** | Catálogo V1–V19 sobre CNN de un canal | Se hereda el catálogo con adaptaciones (ui.md §4): las vistas por rama (kernels/feature maps de centro y periferia por separado), V19 (vista de entrada canal a canal) pasa a ser **fundamental**, y las sondas de 1 canal necesitan diseño multicanal | En su P4 las sondas de 1 canal se negaron (409) sobre redes multicanal; aquí la entrada es multicanal/multirrama de serie |
+| **Vistas de la UI** | Catálogo V1–V19 sobre CNN de un canal | Se hereda el catálogo con adaptaciones ([ui/2-vistas.md](ui/2-vistas.md)): las vistas por rama (kernels/feature maps de centro y periferia por separado), V19 (vista de entrada canal a canal) pasa a ser **fundamental**, y las sondas de 1 canal necesitan diseño multicanal | En su P4 las sondas de 1 canal se negaron (409) sobre redes multicanal; aquí la entrada es multicanal/multirrama de serie |
 
 ## 3. Se descarta (no aplica a este proyecto)
 

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Badge, ErrorBox } from "../components/ui";
 import { LineChart } from "../components/LineChart";
+import { TaskScore } from "../components/TaskScore";
 
 // E detail: full provenance, execution (X) apart, live curves as SMALL
 // MULTIPLES (loss / f1 / px are three scales: never one chart, never a double
@@ -13,6 +14,7 @@ export default function RunDetail() {
   const [detail, setDetail] = useState<any>(null);
   const [error, setError] = useState<unknown>(null);
   const [records, setRecords] = useState<any[]>([]);
+  const [point, setPoint] = useState<Record<string, any> | null>(null);
   const next = useRef(0);
 
   useEffect(() => {
@@ -36,6 +38,22 @@ export default function RunDetail() {
     return () => clearInterval(t);
   }, [name]);
 
+  // A run born of a sweep IS a point of an axis; its identity is the override
+  // that distinguishes it (e.g. n_layers=2). The run config alone doesn't say
+  // WHICH field is the axis — the sweep does. Fetch its trials and pick this
+  // run's point so the axis value is always shown, never left for the user to
+  // reverse-engineer from the full network config.
+  const sweep = detail?.config?.provenance?.sweep;
+  useEffect(() => {
+    if (!sweep) { setPoint(null); return; }
+    api.get(`/sweeps/${sweep}/trials`)
+      .then((t) => {
+        const row = (t.trials || []).find((r: any) => r.run === name);
+        setPoint(row ? row.point ?? {} : {});
+      })
+      .catch(() => setPoint({}));
+  }, [sweep, name]);
+
   const stop = () => api.post(`/runs/${name}/stop`).catch(setError);
   const del = async () => {
     try { await api.del(`/runs/${name}`); nav("/runs"); } catch (e) { setError(e); }
@@ -47,7 +65,7 @@ export default function RunDetail() {
 
   return (
     <div>
-      <h2>{name} <Badge status={detail?.status?.status} /></h2>
+      <h2 data-domain="E">{name} <Badge status={detail?.status?.status} /></h2>
       <ErrorBox error={error} />
       <div className="row">
         <div className="card grow">
@@ -62,6 +80,16 @@ export default function RunDetail() {
               <dt>receta (D)</dt><dd>{prov.recipe.name} (lr={prov.recipe.value.lr},
                 λ_pos={prov.recipe.value.lambda_pos}, seed={prov.recipe.value.seed})</dd>
               <dt>recorrido</dt><dd>{prov.sweep ?? "—"}</dd>
+              {prov.sweep ? (
+                <>
+                  <dt>eje (punto)</dt>
+                  <dd className="mono">{point == null ? "…" :
+                    Object.keys(point).length === 0 ? "base (sin override)" :
+                    Object.entries(point)
+                      .map(([k, v]) => `${k} = ${JSON.stringify(v)}`)
+                      .join(" · ")}</dd>
+                </>
+              ) : null}
               <dt>commit</dt><dd className="mono">{prov.git_commit?.slice(0, 12)}</dd>
               <dt>entorno (X)</dt><dd>{prov.environment.python} · torch {prov.environment.torch} ·
                 {" "}{prov.environment.device}</dd>
@@ -81,7 +109,9 @@ export default function RunDetail() {
           </div>
         </div>
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Curvas (V14 — small multiples, eje de épocas alineado)</h3>
+          <h3 data-view="V14" data-fixes="B, C, D" data-varies="la epoca"
+            data-measures="loss y metricas de val"
+            style={{ marginTop: 0 }}>Curvas (V14 — small multiples, eje de épocas alineado)</h3>
           <LineChart title="loss" series={[
             { label: "train", points: pts((r) => r.train_loss), color: "var(--div-neg)" },
             { label: "val", points: pts((r) => r.val?.loss), color: "var(--div-pos)" }]} />
@@ -90,6 +120,19 @@ export default function RunDetail() {
           <LineChart title="val pos_err_px (px de la ventana)" series={[
             { label: "val", points: pts((r) => r.val?.pos_err_px) }]} />
         </div>
+      </div>
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Métrica de tarea (párrafo por imagen)</h3>
+        <p className="sub" style={{ marginTop: 0 }}>
+          La métrica que manda (protocolo.md §2): reconstruye los párrafos de cada
+          imagen del split elegido con <span className="mono">best.pt</span> y los
+          empareja con los de la fuente (IoU ≥ 0,5). Las curvas de arriba son la
+          métrica de <strong>ventana</strong>, que es el proxy con el que se rankea
+          — barato y, en ejes de D, ordena igual (Spearman +0,956). Eligiendo{" "}
+          <strong>otro dataset</strong> se puntúa contra un <strong>holdout</strong>
+          {" "}(metrica-de-tarea.md §6): otro B, de una fuente que este run jamás vio.
+        </p>
+        <TaskScore runs={name ? [name] : []} chooser />
       </div>
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Épocas</h3>

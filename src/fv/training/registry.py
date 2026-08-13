@@ -16,6 +16,7 @@ from pathlib import Path
 
 from fv import settings
 from fv.ioutils import read_json_retrying, read_text_retrying, write_json_atomic
+from fv.proc import pid_alive
 
 
 class RunError(ValueError):
@@ -78,6 +79,23 @@ class RunStore:
             return {"status": "unknown"}
         return read_json_retrying(p)
 
+    def reconcile(self, name: str) -> dict:
+        """Heal a stale 'running': if the training process that wrote it is gone
+        (crash / API restart / hibernation), the run would read 'running'
+        forever (the inherited trap this store exists to kill). Mark it
+        'interrupted' — the sweep runner redoes any non-(done|cancelled) point
+        on resume. Errs safe: a live or unknown owner is left be."""
+        st = self.status(name)
+        if st.get("status") != "running":
+            return st
+        pid = st.get("pid")
+        if pid is None or pid_alive(pid):
+            return st
+        self.set_status(name, "interrupted", epoch=st.get("epoch", 0),
+                        reason="el proceso que lo entrenaba ya no existe "
+                               "(caida/reinicio/hibernacion)")
+        return self.status(name)
+
     def config(self, name: str) -> dict:
         p = self.path(name) / "config.json"
         if not p.exists():
@@ -89,7 +107,12 @@ class RunStore:
         if not self.root.exists():
             return []
         out = []
-        for d in sorted(self.root.iterdir()):
+        # newest first: the run you just trained is the one you want to look at,
+        # and it keeps the default selection on a current (loadable) checkpoint
+        # instead of the alphabetically-first, possibly-stale one.
+        dirs = sorted(self.root.iterdir(),
+                      key=lambda d: d.stat().st_mtime, reverse=True)
+        for d in dirs:
             if not (d / "config.json").exists():
                 continue
             cfg = read_json_retrying(d / "config.json")

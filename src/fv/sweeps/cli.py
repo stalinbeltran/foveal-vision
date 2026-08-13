@@ -66,9 +66,11 @@ def main() -> int:
     print(f"\nestado final: {state.get('status')} "
           f"({state.get('done')}/{state.get('total')})")
     trials = sweep_trials(args.name, store)
-    print(f"ranking por {trials['objective']} ({trials['direction']}):")
+    print(f"ranking por {trials['objective']} ({trials['direction']}) "
+          f"medido en el checkpoint (best.pt, {'/'.join(trials['monitors'])}):")
     for t in trials["trials"][:10]:
-        print(f"  {t['run']}: {t['value']}  {json.dumps(t['point'])}")
+        ep = f"ep {t['epoch']}/{t['epochs']}" if t["epoch"] else "sin checkpoint"
+        print(f"  {t['run']}: {t['value']}  [{ep}]  {json.dumps(t['point'])}")
     return 0
 
 

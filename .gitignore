@@ -225,6 +225,22 @@ __marimo__/
 /data/ui-shots/
 /data/window-datasets/*/windows.npz
 /runs/*/*.pt
+/studies/*/progress.json
+# studies/*/plan.json SI va a git (la descripcion del estudio; progress.json es estado vivo)
 
 /web/node_modules/
 /web/.vite/
+
+# artefactos del plan de 40 h (logs y marcadores, no descripcion)
+plan-40h*.log
+plan-40h.log.*
+plan-40h.err
+plan-40h.pid
+plan-40h-watchdog.probe*
+
+# idem para el re-barrido de lr y para la cadena de la CNN plana: los .log ya
+# los coge `*.log` de arriba, pero los .err y las sondas de permisos no
+plan-lr-L4.err
+plan-lr-L4-watchdog.probe*
+plan-plana.err
+plan-plana-watchdog.probe*

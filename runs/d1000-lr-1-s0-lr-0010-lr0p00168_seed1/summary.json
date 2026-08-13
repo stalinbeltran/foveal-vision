@@ -1,0 +1,17 @@
+{
+  "run": "d1000-lr-1-s0-lr-0010-lr0p00168_seed1",
+  "epochs_run": 20,
+  "epochs_requested": 20,
+  "stopped_early": false,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.2093460775911808,
+  "best_epoch": 18,
+  "seconds_per_epoch": 62.473,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}

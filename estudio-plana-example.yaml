@@ -1,0 +1,12 @@
+# El MISMO plan se corre dos veces: una sobre la base foveada (sin `base_network`)
+# y otra sobre el control plano, que es esta. Comparacion pareada — plan-cnn-plana.md §3.1.
+window_dataset: wt-b16
+base_recipe: corta
+objective: f1
+seeds: 1
+budget: {epochs: 1}
+# la red base del estudio: la CNN plana de control (una rama, sin periferia)
+base_network: {regions: single, d: 1, n_layers: 4}
+c_frac: 1.0
+axes:
+  - {axis: lr, range: [0.001, 0.002]}

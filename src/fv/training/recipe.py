@@ -15,6 +15,8 @@ from pathlib import Path
 import yaml
 
 from fv import settings
+from fv.ioutils import strip_envelope, with_envelope
+from fv.metrics import MONITORS
 
 
 @dataclass
@@ -43,6 +45,19 @@ class RecipeStoreError(ValueError):
         self.code, self.message, self.hint = code, message, hint
 
 
+def _check_monitor(cfg: dict, where: str) -> None:
+    """A monitor names a val metric WITH its direction. 'f1' (the objective) is
+    not one: monitor_key finds the value but nothing knows higher is better, so
+    best.pt would keep the worst epoch and no one would be told. Refused at the
+    gate, in words, instead of a plausible number half an hour later (R4)."""
+    m = cfg.get("monitor")
+    if m is not None and m not in MONITORS:
+        raise RecipeStoreError(
+            "unknown_monitor", f"{where}: '{m}' no es un monitor",
+            f"usa uno de {sorted(MONITORS)} — el monitor nombra la metrica de "
+            f"val ('val_f1'), no el objetivo ('f1')")
+
+
 class RecipeStore:
     def __init__(self, root: Path | None = None):
         self.root = Path(root) if root else settings.recipes_root()
@@ -52,7 +67,9 @@ class RecipeStore:
             return []
         out = []
         for f in sorted(self.root.glob("*.yaml")):
-            cfg = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+            # the envelope stays in the file: what is listed is the recipe, so a
+            # screen can send a listed row straight back to save()
+            cfg = strip_envelope(yaml.safe_load(f.read_text(encoding="utf-8")) or {})
             cfg["name"] = f.stem
             out.append(cfg)
         return out
@@ -65,9 +82,7 @@ class RecipeStore:
             raise RecipeStoreError("recipe_not_found",
                                    f"no existe la receta '{name}'",
                                    f"las recetas disponibles son: {known or '(ninguna)'}")
-        cfg = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
-        cfg.pop("name", None)
-        cfg.pop("format_version", None)
+        cfg = strip_envelope(yaml.safe_load(f.read_text(encoding="utf-8")) or {})
         bad = set(cfg) - set(Recipe().as_dict())
         if "device" in bad or "num_workers" in bad:
             raise RecipeStoreError(
@@ -78,6 +93,7 @@ class RecipeStore:
             raise RecipeStoreError("unknown_recipe_fields",
                                    f"la receta '{name}' trae campos desconocidos: {sorted(bad)}",
                                    f"los validos son: {sorted(Recipe().as_dict())}")
+        _check_monitor(cfg, f"la receta '{name}'")
         return Recipe(**cfg)
 
     def save(self, name: str, cfg: dict, overwrite: bool = False) -> None:
@@ -87,20 +103,21 @@ class RecipeStore:
                     "execution_inside_recipe",
                     f"'{banned}' no es un campo de receta",
                     "device y num_workers son X (contrato 10): van en Entrenar, no aqui")
-        bad = set(cfg) - set(Recipe().as_dict()) - {"name"}
+        cfg = strip_envelope(cfg)   # the envelope is not an unknown field
+        bad = set(cfg) - set(Recipe().as_dict())
         if bad:
             raise RecipeStoreError("unknown_recipe_fields",
                                    f"campos desconocidos: {sorted(bad)}",
                                    f"los validos son: {sorted(Recipe().as_dict())}")
+        _check_monitor(cfg, f"la receta '{name}'")
         self.root.mkdir(parents=True, exist_ok=True)
         f = self.root / f"{name}.yaml"
         if f.exists() and not overwrite:
             raise RecipeStoreError("recipe_exists",
                                    f"ya existe una receta llamada '{name}'",
                                    "elige otro nombre, o edita esa")
-        body = {"format_version": 1}
-        body.update({k: v for k, v in cfg.items() if k != "name"})
-        f.write_text(yaml.safe_dump(body, sort_keys=False), encoding="utf-8")
+        f.write_text(yaml.safe_dump(with_envelope(cfg), sort_keys=False),
+                     encoding="utf-8")
 
     def delete(self, name: str) -> None:
         f = self.root / f"{name}.yaml"

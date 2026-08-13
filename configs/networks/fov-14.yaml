@@ -8,8 +8,7 @@ k_center: 3
 k_periph: 3
 s_center: 1
 s_periph: 1
-ch1: 16
-ch2: 32
+channels: [16, 32]
 merge: concat
 pool_mode: avg
 pad_mode: edge

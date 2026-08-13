@@ -7,9 +7,11 @@ import { ErrorBox, Field, Working } from "../components/ui";
 // shows the derived dims, the CALCULATED ranges and the zone diagram LIVE
 // (FG1), via POST /networks/validate. Broken asserts show with their reason.
 
-const DEFAULTS = { name: "", N: 20, c_frac: 0.8, d: 2, pen_frac: 0.1,
-  k_center: 3, k_periph: 3, s_center: 1, s_periph: 1, ch1: 16, ch2: 32,
-  merge: "concat", pool_mode: "avg", pad_mode: "edge" };
+// The C defaults are NOT written here: /networks serves them, resolved by the
+// same full_config the builder uses. The copy that used to live in this file had
+// already drifted (channels [16,16] vs the derived [16]*n_layers). Until they
+// arrive the form is empty-but-typed, so nothing renders a made-up number.
+const EMPTY = { name: "" } as any;
 
 function ZoneDiagram({ dims }: { dims: any }) {
   const N = dims.N, s = Math.min(12, Math.floor(240 / N));
@@ -25,7 +27,8 @@ function ZoneDiagram({ dims }: { dims: any }) {
     }
   return (
     <div className="zonebox">
-      <svg width={N * s} height={N * s} data-testid="zone-diagram">{cells}</svg>
+      <svg width={N * s} height={N * s} data-testid="zone-diagram"
+        data-view="FG1" data-fixes="C" data-varies="-" data-measures="la geometria derivada">{cells}</svg>
       <div className="cap" style={{ fontSize: 12, color: "var(--text-dim)" }}>
         anillo (solo periferia) · banda de penetración (ambas ramas SUMAN) · núcleo (solo centro)
       </div>
@@ -35,25 +38,43 @@ function ZoneDiagram({ dims }: { dims: any }) {
 
 export default function Networks() {
   const [list, setList] = useState<any[]>([]);
+  const [defaults, setDefaults] = useState<any>(null);
   const [error, setError] = useState<unknown>(null);
-  const [form, setForm] = usePersistedState<any>("networks.form", DEFAULTS);
+  const [form, setForm] = usePersistedState<any>("networks.form", EMPTY);
   const [validation, setValidation] = useState<any>(null);
+  const [confirming, setConfirming] = useState(false);
+  const ready = form.N != null;   // the served defaults (or a remembered form) landed
 
-  const refresh = () => api.get("/networks").then((d) => setList(d.networks)).catch(setError);
+  const refresh = () => api.get("/networks").then((d) => {
+    setList(d.networks);
+    setDefaults(d.defaults);
+    // fill only what the form does not have yet: a remembered edit wins over the
+    // defaults, and the defaults win over nothing — never over the user
+    setForm((f: any) => ({ ...d.defaults, ...f }));
+  }).catch(setError);
   useEffect(() => { refresh(); }, []);
 
   // live validation: the user sees what N and the fractions imply BEFORE saving
   useEffect(() => {
+    if (!ready) return;           // no half-form probing: it would 400 on nothing
     const t = setTimeout(() => {
       api.post("/networks/validate", form).then(setValidation).catch(setError);
     }, 250);
     return () => clearTimeout(t);
-  }, [form]);
+  }, [form, ready]);
 
-  const save = async () => {
+  // C, como D, es fuente y se edita (un run no, U5.8). Sobrescribir se pide
+  // aparte: sin esto el único camino era el 409 «elige otro nombre», que no es
+  // lo que hace quien abre una red guardada para cambiarle un número.
+  const exists = list.some((n) => n.name === form.name);
+
+  const save = async (overwrite = false) => {
     setError(null);
-    try { await api.post("/networks", form); await refresh(); }
-    catch (e) { setError(e); }
+    try {
+      await api.post("/networks", overwrite ? { ...form, overwrite: true } : form);
+      setConfirming(false);
+      await refresh();
+    } catch (e) { setError(e); }
   };
 
   const num = (k: string, step = 1, help?: string) => (
@@ -63,11 +84,26 @@ export default function Networks() {
     </Field>
   );
 
+  // n_layers drives the channel vector's length (D-C3): grow -> pad with 16
+  // (the default channel, D-C2), shrink -> truncate, so it always fits.
+  const setLayers = (L: number) => {
+    L = Math.max(1, L | 0);
+    const ch = (form.channels ?? []).slice(0, L);
+    while (ch.length < L) ch.push(16);
+    setForm({ ...form, n_layers: L, channels: ch });
+  };
+  const setChannels = (text: string) => {
+    const ch = text.split(",").map((s) => parseInt(s.trim(), 10)).filter((v) => !isNaN(v));
+    setForm({ ...form, channels: ch, n_layers: ch.length || form.n_layers });
+  };
+
   return (
     <div>
-      <h2>Redes foveadas (C)</h2>
+      <h2 data-domain="C">Redes foveadas (C)</h2>
       <p className="sub">Todo se deriva de N y las fracciones; los rangos de búsqueda se calculan, nunca se escriben.</p>
       <ErrorBox error={error} />
+      <Working on={!ready} />
+      {!ready ? null : (
       <div className="row">
         <div className="card" style={{ width: 320 }}>
           <Field label="nombre"><input value={form.name}
@@ -89,8 +125,18 @@ export default function Networks() {
             <div className="grow">{num("s_periph")}</div>
           </div>
           <div className="row">
-            <div className="grow">{num("ch1")}</div>
-            <div className="grow">{num("ch2")}</div>
+            <div className="grow">
+              <Field label="n_layers" help="capas conv por rama (D-S2: simétrico)">
+                <input type="number" step={1} min={1} value={form.n_layers}
+                  onChange={(e) => setLayers(+e.target.value)} />
+              </Field>
+            </div>
+            <div className="grow">
+              <Field label="channels (por capa)" help="lista de longitud n_layers (D-C3)">
+                <input value={(form.channels ?? []).join(", ")} placeholder="16, 32"
+                  onChange={(e) => setChannels(e.target.value)} />
+              </Field>
+            </div>
           </div>
           <Field label="merge" help="concat tolera strides distintos; sum exige iguales">
             <select value={form.merge} onChange={(e) => setForm({ ...form, merge: e.target.value })}>
@@ -100,7 +146,25 @@ export default function Networks() {
             <select value={form.pool_mode} onChange={(e) => setForm({ ...form, pool_mode: e.target.value })}>
               <option>avg</option><option>max</option>
             </select></Field>
-          <button onClick={save} disabled={!form.name || !validation?.valid}>Guardar</button>
+          {exists ? (
+            <button onClick={() => setConfirming(true)} data-testid="update-btn"
+              disabled={!form.name || !validation?.valid}>Actualizar «{form.name}»</button>
+          ) : (
+            <button onClick={() => save()}
+              disabled={!form.name || !validation?.valid}>Guardar</button>
+          )}
+          {confirming ? (
+            <div className="card" style={{ marginTop: 8 }} data-testid="overwrite-confirm">
+              <strong>Se reemplaza la definición de «{form.name}»</strong>
+              <p className="sub" style={{ marginTop: 4 }}>
+                Los runs y recorridos ya hechos <b>no cambian</b>: copiaron los valores de C al
+                crearse (`base_network_value`). Lo que cambia es lo que se entrene a partir de ahora
+                con este nombre.
+              </p>
+              <button onClick={() => save(true)}>Sí, reemplazar</button>{" "}
+              <button className="secondary" onClick={() => setConfirming(false)}>Cancelar</button>
+            </div>
+          ) : null}
         </div>
         <div className="card grow" data-testid="validate-panel">
           <h3 style={{ marginTop: 0 }}>Lo que implica (en vivo)</h3>
@@ -136,6 +200,7 @@ export default function Networks() {
           )}
         </div>
       </div>
+      )}
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Guardadas</h3>
         <table className="data" data-testid="networks-table">
@@ -143,7 +208,7 @@ export default function Networks() {
             <th>strides</th><th>merge</th><th></th></tr></thead>
           <tbody>
             {list.map((n) => (
-              <tr key={n.name} onClick={() => setForm({ ...DEFAULTS, ...n })}>
+              <tr key={n.name} onClick={() => setForm({ ...defaults, name: "", ...n })}>
                 <td>{n.name}</td><td>{n.N}</td><td>{n.c_frac}</td><td>{n.d}</td>
                 <td>{n.k_center}/{n.k_periph}</td><td>{n.s_center}/{n.s_periph}</td>
                 <td>{n.merge}</td>
