@@ -41,6 +41,33 @@ prefijo `local/`). Para arrancar sin el generador, hay un generador sintético:
 > Verificado: 60 imágenes de 96×72 en `data\sources\synth-01`. Si el nombre ya existe, se
 > niega (exit 2): nada se sobrescribe en silencio.
 
+## Traer una fuente del generador
+
+La raíz externa está desactivada (`_roots()` en [src/fv/datasets/loader.py](src/fv/datasets/loader.py),
+desde el 2026-07-21): **solo se aceptan fuentes locales**. Un dataset del generador se trae
+copiando las tres cosas que este proyecto consume — `labels.jsonl`, `images/` y `dataset.json`:
+
+```bash
+SRC=../image-text-sample-generator/data/datasets/<dataset-id>
+DST=data/sources/<nombre>
+mkdir -p "$DST" && cp -r "$SRC/images" "$SRC/masks" "$DST/" && cp "$SRC/labels.jsonl" "$SRC/dataset.json" "$DST/"
+```
+
+`masks/` va porque `fv-resize` las reduce si existen (con NEAREST); el entrenamiento no las
+usa. **`labels/` no se copia**: es el mismo contenido que `labels.jsonl` una muestra por fichero
+(SAMPLE_FORMAT.md §2), y son 31 MB de duplicado. `specs.jsonl` tampoco: es la reproducibilidad
+del generador y vive en su repo.
+
+El `dataset.json` copiado trae el `id` del generador, así que la fuente local queda con su
+procedencia: `declared_id` apunta al dataset original aunque el directorio se llame distinto.
+
+> Verificado (2026-08-13): `dirty-1000` (1000 imágenes 640×480, 234 MB) copiada y reconocida como
+> `local/dirty-1000` con `declared_id: dirty-1000-699b2e01`.
+
+**La copia grande es desechable.** Lo que se entrena es la reducida, así que el camino normal es
+copiar → reducir → borrar la copia de 640×480 (se regenera desde el generador, cuyos specs sí
+están en git). Reducida a 80 px, `dirty-1000` pasa de 234 MB a 27 MB.
+
 ## Reducir una fuente (A′)
 
 El dato real se genera grande en el proyecto hermano (640×480) y se **reduce** aquí: las
