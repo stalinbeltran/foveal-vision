@@ -1,0 +1,17 @@
+# Receta congelada para scripts/bench_speed.py — NO tocar por razones de
+# investigacion. Todo explicito (sin defaults implicitos) para que el costo
+# por epoca sea reproducible: mismo trabajo, maquina a maquina y en el tiempo.
+format_version: 1
+lr: 0.002
+optimizer: adam
+momentum: 0.9
+weight_decay: 0.0
+batch_size: 64
+epochs: 3
+scheduler: none
+patience: 0
+lambda_pos: 1.0
+pos_weight: 1.0
+smooth_l1_beta: 0.08
+monitor: val_loss
+seed: 1
