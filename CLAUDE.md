@@ -775,6 +775,15 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
   empuja** (`git push -u origin dev`) cuando queda terminado y probado. No se trabaja
   sobre `main` ni se le hace push directo: a `main` se llega por merge cuando el usuario
   lo decida. Misma regla en el proyecto hermano `image-text-sample-generator`.
+- **Servidores efímeros: lo que no está empujado, no existe.** La máquina se rehace sin
+  aviso, así que **todo cambio y toda documentación se empuja en cuanto queda terminado**,
+  no al final del encargo — y el merge a `main` pendiente es deuda visible, porque **un
+  clon limpio saca `main`** y lo que se quedó en `dev` es invisible para la máquina
+  siguiente. Medido el 2026-08-14: el droplet apareció restaurado y sin datos, y el
+  procedimiento para reconstruir la fuente del benchmark estaba empujado **solo a `dev`**
+  del generador; se dio por imposible lo que sí estaba escrito y se midió sobre la fuente
+  equivocada. Aplica igual a los artefactos que sí se versionan (reportes de
+  `benchmarks/`, manifests): commitearlos es lo único que los salva de la reconstrucción.
 - **Stack**: Python 3.12 (PyTorch no tiene wheels para 3.14) + PyTorch + FastAPI + Vite/React.
   En Windows el intérprete será `.\.venv\Scripts\python.exe`. Paquete `fv`, layout `src/`.
 - **Tests**: `.\.venv\Scripts\python -m pytest -q` desde la raíz, antes de commitear código.
