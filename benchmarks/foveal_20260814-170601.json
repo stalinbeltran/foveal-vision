@@ -1,0 +1,39 @@
+{
+  "format_version": 1,
+  "hostname": "foveal",
+  "timestamp": "20260814-170601",
+  "git_commit": "d3f0b3d3fef8aebab63021fa99f732b633a77327",
+  "hardware": {
+    "hostname": "foveal",
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "cpu_model": "DO-Regular",
+    "cpu_count_logical": 2,
+    "ram_total_gb": 3.82,
+    "gpu": null
+  },
+  "device": "cpu",
+  "load_avg_before": [
+    0.94775390625,
+    0.46435546875,
+    0.310546875
+  ],
+  "window_dataset": "bench-synth-16",
+  "network": "bench-16",
+  "recipe": "bench",
+  "repeats": 3,
+  "runs": [
+    "bench-foveal-20260814-170601-0",
+    "bench-foveal-20260814-170601-1",
+    "bench-foveal-20260814-170601-2"
+  ],
+  "seconds_per_epoch": {
+    "values": [
+      5.082,
+      4.541,
+      4.275
+    ],
+    "mean": 4.633,
+    "std": 0.336
+  }
+}
