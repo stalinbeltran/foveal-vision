@@ -53,8 +53,9 @@ export default function Sources() {
           ) : null}
           {data && data.sources.length === 0 ? (
             <p>No hay fuentes. Genera una sintética con{" "}
-              <code>python scripts/make_synth_source.py --name synth-01 --count 60</code>{" "}
-              o apunta <code>FV_DATASETS_ROOT</code> al generador.</p>
+              <code>python scripts/make_synth_source.py --name synth-01 --count 60</code>,{" "}
+              o copia un dataset del generador a <code>data/sources/</code> (la raíz externa{" "}
+              <code>FV_DATASETS_ROOT</code> está desactivada: solo se leen fuentes locales).</p>
           ) : null}
         </div>
         {sel ? (

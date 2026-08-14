@@ -30,9 +30,11 @@ cd web; npm install; cd ..
 
 ## Datos
 
-Las fuentes (A) se buscan en dos raíces: `FV_DATASETS_ROOT` (por defecto,
-`..\image-text-sample-generator\data\datasets` si existe) y `data\sources\` (locales, con
-prefijo `local/`). Para arrancar sin el generador, hay un generador sintético:
+Las fuentes (A) se buscan en **una sola raíz**: `data\sources\`, y todos los ids llevan el
+prefijo `local/`. La segunda raíz —la externa, `FV_DATASETS_ROOT`, apuntando al generador
+hermano— está **desactivada** desde el 2026-07-21 («eliminado datasets externos»): sigue en
+`settings.py` pero `_roots()` no la monta, así que un dataset del generador **se trae copiando**
+(ver abajo). Para arrancar sin el generador, hay un generador sintético:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\make_synth_source.py --name synth-01 --count 60
@@ -40,6 +42,62 @@ prefijo `local/`). Para arrancar sin el generador, hay un generador sintético:
 
 > Verificado: 60 imágenes de 96×72 en `data\sources\synth-01`. Si el nombre ya existe, se
 > niega (exit 2): nada se sobrescribe en silencio.
+
+## Traer una fuente del generador
+
+La raíz externa está desactivada (`_roots()` en [src/fv/datasets/loader.py](src/fv/datasets/loader.py),
+desde el 2026-07-21): **solo se aceptan fuentes locales**. Un dataset del generador se trae
+copiando las tres cosas que este proyecto consume — `labels.jsonl`, `images/` y `dataset.json`:
+
+```bash
+SRC=../image-text-sample-generator/data/datasets/<dataset-id>
+DST=data/sources/<nombre>
+mkdir -p "$DST" && cp -r "$SRC/images" "$SRC/masks" "$DST/" && cp "$SRC/labels.jsonl" "$SRC/dataset.json" "$DST/"
+```
+
+`masks/` va porque `fv-resize` las reduce si existen (con NEAREST); el entrenamiento no las
+usa. **`labels/` no se copia**: es el mismo contenido que `labels.jsonl` una muestra por fichero
+(SAMPLE_FORMAT.md §2), y son 31 MB de duplicado. `specs.jsonl` tampoco: es la reproducibilidad
+del generador y vive en su repo.
+
+El `dataset.json` copiado trae el `id` del generador, así que la fuente local queda con su
+procedencia: `declared_id` apunta al dataset original aunque el directorio se llame distinto.
+
+> Verificado (2026-08-13): `dirty-1000` (1000 imágenes 640×480, 234 MB) copiada y reconocida como
+> `local/dirty-1000` con `declared_id: dirty-1000-699b2e01`.
+
+**La copia grande es desechable.** Lo que se entrena es la reducida, así que el camino normal es
+copiar → reducir → borrar la copia de 640×480 (se regenera desde el generador, cuyos specs sí
+están en git). Reducida a 80 px, `dirty-1000` pasa de 234 MB a 27 MB.
+
+## Reducir una fuente (A′)
+
+El dato real se genera grande en el proyecto hermano (640×480) y se **reduce** aquí: las
+fuentes de 80×60 sobre las que están medidos los runs salieron de un resize. `fv-resize`
+lo hace, y deja escrito de dónde vino:
+
+```powershell
+.\.venv\Scripts\fv-resize.exe --source local/synth-01 --name synth-01-48 --width 48
+```
+
+> Verificado (2026-08-13): 20 imágenes a 48×36, `escala real 0.5 x 0.5`, en
+> `data/sources/synth-01-48`. Se pide **una** dimensión (`--width` **o** `--height`); la otra
+> sale de la proporción.
+
+Tres cosas que hace y conviene saber, porque cada una es un fallo silencioso evitado:
+
+- **La escala se mide de la salida, no del factor pedido**, y son dos (x e y): redondear el
+  tamaño a píxeles enteros mueve la razón real, y las dos redondean por separado. El
+  `dataset.json` guarda la medida (`scale: [sx, sy]`), que es la que se aplicó a los `quad`.
+- **Las máscaras se remuestrean con NEAREST**, nunca interpolando: interpolar una máscara de
+  etiquetas fabrica clases que no existen.
+- **La geometría se reescala entera y recursivamente** — `box` y `quad` a cualquier
+  profundidad, así que `lines[]` y `words[]` no se quedan en la resolución vieja mientras el
+  nivel de arriba parece correcto.
+
+Solo reduce (`upscale_not_allowed`, comprobado contra **todas** las muestras antes de escribir
+nada) y nunca sobrescribe un destino existente. La procedencia va en el bloque `derived`
+(formatos.md §4.6), incluida la bandera `holdout` del padre, que no se pierde por reducir.
 
 ## Construir un dataset de ventanas (B)
 
@@ -100,6 +158,98 @@ desde la UI o dejando YAMLs en `configs\networks\` y `configs\recipes\`.
 > Las negativas llegan **antes de reservar el nombre**, con razón y arreglo — verificado:
 > `[network_not_found] ... -> las redes disponibles son: fov-16` (exit 2, sin `runs\x\` a
 > medias).
+
+## Medir cuánto tarda ESTA máquina
+
+Antes de presupuestar un recorrido de 40 h conviene saber a qué velocidad va la máquina que lo
+va a correr. `scripts/bench_speed.py` lo mide en **s/época**, que es la misma métrica de coste
+que usan los estudios (`seconds_per_epoch`):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\bench_speed.py --repeats 3
+```
+
+> **Medido (2026-08-14, droplet `foveal`: 2 núcleos DO-Regular, 3,82 GB, CPU):**
+> **61,76 s/época ± 5,29** (n=3) sobre `bench-dirty1000-16`, con la máquina libre
+> (`load_avg` 0,24). Reporte en `benchmarks/foveal_20260814-010950.json`.
+>
+> ⚠ **Ese ± no es ruido, es un arranque en frío.** Las 9 épocas fueron 83,9 · 61,1 · 61,5 ·
+> 60,7 · 59,9 · 60,2 · 55,7 · 56,7 · 56,2: **la primera cuesta un 40% más** y las otras ocho
+> caen en 56–62 s. Sin ella la media es **58,99 s con sd 2,26** (3,8%) en vez de 61,76 con 8,12.
+> Para presupuestar un recorrido largo usa el régimen estacionario (~59 s/época); el ± del
+> reporte mide sobre todo la primera época, no la variabilidad de la máquina. El script
+> **no descarta** ese calentamiento, a propósito: descartarlo ahora rompería la comparación
+> con este mismo reporte.
+
+No es un estudio: no busca hiperparámetros. Corre **tres cosas congeladas** —la red
+`bench-16`, la receta `bench` (3 épocas, batch 64) y el dataset de ventanas
+`bench-dirty1000-16`— y lo único que varía entre dos reportes debería ser el hardware. Escribe
+`benchmarks/<host>_<timestamp>.json` con el resultado, el hardware y **la carga del sistema
+antes de empezar**, porque el micro-benchmark de coste miente bajo carga (CLAUDE.md, nota
+2026-08-08 punto 7) y el reporte prefiere dejarlo por escrito a fingir que no importa.
+
+**El dataset es el dato real del proyecto**: ventanas de `local/dirty-1000-80px` — las 1000
+imágenes de la receta `dirty` reducidas a 80×60. Si falta, el script **no la fabrica**: dice
+cómo traerla (copiar del generador + `fv-resize`) y se para. Fabricar una fuente de juguete
+daría un número con el mismo aspecto y otro significado.
+
+> ⚠ **Dos reportes solo se comparan si traen el mismo `window_dataset`.** Hasta el 2026-08-13
+> el benchmark medía sobre `bench-synth-16` (60 imágenes de barras sintéticas); se cambió al
+> dato real y el número se movió, así que `benchmarks/foveal_20260813-134338.json` no se
+> compara con los posteriores. La extracción (ventana 16, stride 8, seed 1) **no** cambió: el
+> dato es la única variable nueva.
+
+### El benchmark ya no es de un minuto: lánzalo desacoplado
+
+Con el dato real son **63 000 ventanas** en vez de 5280, así que una época pasó de ~4,8 s a
+~70 s y las 3 repeticiones tardan **~11 min**. A esa escala importa cómo se lanza.
+
+**Lanzarlo desde una sesión de agente y perder la sesión lo mata** (medido el 2026-08-13: murió
+en la época 2 de la primera repetición cuando terminó el proceso que lo había lanzado). Para una
+corrida larga, desacóplalo del que la lanza:
+
+```bash
+setsid nohup .venv/bin/python scripts/bench_speed.py --repeats 3 > /tmp/bench.log 2>&1 < /dev/null &
+```
+
+> Verificado: relanzado así, el proceso sobrevivió al cierre de la sesión que lo lanzó y siguió
+> midiendo. Sin `setsid` no sobrevive.
+
+**Y nadie te va a avisar de que terminó.** Desacoplar el trabajo no desacopla al vigilante: si
+lo lanzas desde algo que se cierra —un agente por Telegram, una sesión SSH, una terminal—, lo
+que armes para esperarlo se muere con ello, y entre medias no queda nada vivo que pueda mandar
+un aviso. Medido el 2026-08-14: el benchmark relanzado con `setsid` terminó bien, y los tres
+vigilantes armados para anunciarlo murieron los tres. **Comprueba el resultado tú**, que además
+es una sola pregunta al disco:
+
+```bash
+ls benchmarks/                  # el reporte solo aparece si termino entero
+tail -3 /tmp/bench.log          # y el log dice por que repeticion va
+```
+
+Un run con `status.json` en `running` y un pid que ya no existe **no** significa «va por ahí»:
+significa que lo mataron. El reporte es el único testigo de una corrida completa, porque se
+escribe entero al final.
+
+Si lo lanzas desde el coordinador de Telegram (el proyecto hermano
+`telegram-coordinator`), el aviso sí se puede desacoplar también, encadenando su
+`scripts/notify.mjs` al trabajo:
+
+```bash
+setsid sh -c 'python scripts/bench_speed.py --repeats 3 > /tmp/bench.log 2>&1;
+  node ../telegram-coordinator/scripts/notify.mjs "benchmark listo: $(ls -t benchmarks | head -1)"' &
+```
+
+**Qué deja atrás una corrida matada**, y qué hacer con cada cosa:
+
+| Artefacto | Estado | Qué hacer |
+|---|---|---|
+| `data/window-datasets/bench-dirty1000-16/` | Completo si llegó a escribir `windows.npz` | **Nada**: al relanzar, el script lo detecta y no re-extrae |
+| `runs/bench-<host>-<ts>-<i>/` a medias | `status.json` dice `running` con un **pid muerto** | **Borrarlo**: un run incompleto cuyo estado miente ensucia la pantalla de Runs |
+| `benchmarks/<host>_<ts>.json` | No existe: se escribe al final, de una vez | Nada |
+
+El dataset a medias sí se detecta: si el directorio existe pero no tiene `windows.npz`, el
+script se niega a reutilizarlo y pide borrarlo, en vez de entrenar sobre algo incompleto.
 
 ## Recorridos (sweeps) sin la UI
 
