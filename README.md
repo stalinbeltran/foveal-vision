@@ -231,6 +231,15 @@ Un run con `status.json` en `running` y un pid que ya no existe **no** significa
 significa que lo mataron. El reporte es el único testigo de una corrida completa, porque se
 escribe entero al final.
 
+Si lo lanzas desde el coordinador de Telegram (el proyecto hermano
+`telegram-coordinator`), el aviso sí se puede desacoplar también, encadenando su
+`scripts/notify.mjs` al trabajo:
+
+```bash
+setsid sh -c 'python scripts/bench_speed.py --repeats 3 > /tmp/bench.log 2>&1;
+  node ../telegram-coordinator/scripts/notify.mjs "benchmark listo: $(ls -t benchmarks | head -1)"' &
+```
+
 **Qué deja atrás una corrida matada**, y qué hacer con cada cosa:
 
 | Artefacto | Estado | Qué hacer |
