@@ -41,13 +41,20 @@ Observaciones que ordenan todo lo demás:
 
 Igual que en el proyecto hermano, **compatible tal cual**: `labels.jsonl` con imágenes y
 `blocks[].quad` de párrafos, producido por `image-text-sample-generator` (su `SAMPLE_FORMAT.md`
-manda). Solo-lectura; la raíz se apunta con una variable de entorno (`FV_DATASETS_ROOT`).
+manda).
+
+⚠ **Hoy hay UNA raíz, no dos** (código, 2026-07-21 «eliminado datasets externos»): `_roots()`
+monta solo `data/sources/`, con prefijo `local/`. La raíz externa (`FV_DATASETS_ROOT`, solo
+lectura) sigue definida en `settings.py` y comentada en `_roots()`; un dataset del generador
+entra **copiándolo** a `data/sources/` (README, «Traer una fuente del generador»). El diseño de
+abajo describe las dos raíces porque es a donde se vuelve si se reactiva — y porque la
+consecuencia práctica no cambia: **lo que venga del generador no se escribe, se deriva**.
 
 Se heredan también, porque son mecanismo probado (herencia.md §2):
 
 - **A′ — fuentes derivadas** (resize proporcional, solo reducir, geometría reescalada recursiva,
-  bloque `derived` con `from` direccionable + `scale` real medida). Van a `data/sources/`,
-  segunda raíz; A externa nunca se escribe.
+  bloque `derived` con `from` direccionable + `scale` real medida). **Implementado**
+  (`fv.datasets.resize`, CLI `fv-resize`; F13). Van a `data/sources/`; A externa nunca se escribe.
 - **El índice de offsets** (`data/cache/sources/`): mirar UNA imagen no parsea el `labels.jsonl`
   entero. Caché recomputable con fecha+tamaño del fichero en la clave.
 

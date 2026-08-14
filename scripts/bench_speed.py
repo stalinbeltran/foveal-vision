@@ -3,9 +3,24 @@ entre maquinas (o antes/despues de mover el proceso a otra maquina/droplet).
 
 No es un estudio: no busca hiperparametros optimos, corre una red y una
 receta CONGELADAS (configs/networks/bench-16.yaml, configs/recipes/bench.yaml
--- no tocar por razones de investigacion) sobre un dataset sintetico que el
-propio script genera si falta, y mide s/epoca -- la misma metrica de costo
-que ya usan los estudios (seconds_per_epoch, fv.training.loop).
+-- no tocar por razones de investigacion) sobre un dataset CONGELADO, y mide
+s/epoca -- la misma metrica de costo que ya usan los estudios
+(seconds_per_epoch, fv.training.loop).
+
+El dataset es el dato REAL del proyecto: ventanas de local/dirty-1000-80px,
+las 1000 imagenes del generador hermano reducidas a 80x60. Se midio antes
+sobre una fuente sintetica de juguete (bench-synth-16) y se cambio el
+2026-08-13 para que el benchmark mida a la maquina sobre el trabajo que de
+verdad va a hacer: la fuente sintetica son barras, no texto renderizado, y
+tenia 60 imagenes en vez de 1000.
+
+⚠ Un reporte solo es comparable con otro que traiga el MISMO `window_dataset`.
+El cambio de fuente movio el numero, asi que benchmarks/foveal_20260813-134338
+(bench-synth-16) no se compara con los posteriores. Por eso el reporte guarda
+el nombre del dataset: la comparacion se filtra, no se supone.
+
+La extraccion (ventana 16, stride 8, seed 1) NO cambio al cambiar la fuente,
+para que el dato sea la unica variable nueva.
 
 Aviso medido (CLAUDE.md, nota 2026-08-08): el micro-benchmark de costo miente
 bajo carga -- un entrenamiento ocupando los nucleos infla el numero. Por eso
@@ -23,7 +38,6 @@ import argparse
 import os
 import platform
 import socket
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -40,9 +54,9 @@ from fv.training.recipe import RecipeStore
 from fv.training.registry import RunStore, git_commit
 from fv.windows.extract import ExtractConfig, extract_windows
 
-BENCH_SOURCE_NAME = "bench-synth"
-BENCH_SOURCE_ID = "local/bench-synth"
-BENCH_DATASET = "bench-synth-16"
+BENCH_SOURCE_NAME = "dirty-1000-80px"
+BENCH_SOURCE_ID = "local/dirty-1000-80px"
+BENCH_DATASET = "bench-dirty1000-16"
 BENCH_NETWORK = "bench-16"
 BENCH_RECIPE = "bench"
 
@@ -57,11 +71,16 @@ def _ensure_dataset(root: Path) -> None:
             "borralo y reintenta: no se reutiliza en ese estado")
     src = settings.local_sources_root() / BENCH_SOURCE_NAME
     if not (src / "labels.jsonl").exists():
-        print(f"generando fuente sintetica de benchmark en {src} ...")
-        subprocess.run(
-            [sys.executable, str(root / "scripts" / "make_synth_source.py"),
-             "--name", BENCH_SOURCE_NAME, "--count", "60", "--seed", "7"],
-            check=True, cwd=root)
+        # No se fabrica: el dato del benchmark es el real, y viene del proyecto
+        # hermano. Fabricar aqui una fuente de juguete daria un numero con el
+        # mismo aspecto y otro significado, que es peor que no dar ninguno.
+        raise SystemExit(
+            f"falta la fuente {BENCH_SOURCE_ID} en {src}\n"
+            "  El benchmark mide sobre el dato real, que se genera en\n"
+            "  image-text-sample-generator (receta 'dirty', 1000 imagenes 640x480)\n"
+            "  y se trae en dos pasos -- README, 'Traer una fuente del generador':\n"
+            "    1) copiar el dataset a data/sources/dirty-1000\n"
+            f"    2) .venv/bin/fv-resize --source local/dirty-1000 --name {BENCH_SOURCE_NAME} --width 80")
     print(f"extrayendo ventanas de benchmark en {out} ...")
     cfg = ExtractConfig(source=BENCH_SOURCE_ID, window_size=16, stride=8, seed=1)
     extract_windows(cfg, out)

@@ -30,9 +30,11 @@ cd web; npm install; cd ..
 
 ## Datos
 
-Las fuentes (A) se buscan en dos raíces: `FV_DATASETS_ROOT` (por defecto,
-`..\image-text-sample-generator\data\datasets` si existe) y `data\sources\` (locales, con
-prefijo `local/`). Para arrancar sin el generador, hay un generador sintético:
+Las fuentes (A) se buscan en **una sola raíz**: `data\sources\`, y todos los ids llevan el
+prefijo `local/`. La segunda raíz —la externa, `FV_DATASETS_ROOT`, apuntando al generador
+hermano— está **desactivada** desde el 2026-07-21 («eliminado datasets externos»): sigue en
+`settings.py` pero `_roots()` no la monta, así que un dataset del generador **se trae copiando**
+(ver abajo). Para arrancar sin el generador, hay un generador sintético:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\make_synth_source.py --name synth-01 --count 60
@@ -156,6 +158,61 @@ desde la UI o dejando YAMLs en `configs\networks\` y `configs\recipes\`.
 > Las negativas llegan **antes de reservar el nombre**, con razón y arreglo — verificado:
 > `[network_not_found] ... -> las redes disponibles son: fov-16` (exit 2, sin `runs\x\` a
 > medias).
+
+## Medir cuánto tarda ESTA máquina
+
+Antes de presupuestar un recorrido de 40 h conviene saber a qué velocidad va la máquina que lo
+va a correr. `scripts/bench_speed.py` lo mide en **s/época**, que es la misma métrica de coste
+que usan los estudios (`seconds_per_epoch`):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\bench_speed.py --repeats 3
+```
+
+No es un estudio: no busca hiperparámetros. Corre **tres cosas congeladas** —la red
+`bench-16`, la receta `bench` (3 épocas, batch 64) y el dataset de ventanas
+`bench-dirty1000-16`— y lo único que varía entre dos reportes debería ser el hardware. Escribe
+`benchmarks/<host>_<timestamp>.json` con el resultado, el hardware y **la carga del sistema
+antes de empezar**, porque el micro-benchmark de coste miente bajo carga (CLAUDE.md, nota
+2026-08-08 punto 7) y el reporte prefiere dejarlo por escrito a fingir que no importa.
+
+**El dataset es el dato real del proyecto**: ventanas de `local/dirty-1000-80px` — las 1000
+imágenes de la receta `dirty` reducidas a 80×60. Si falta, el script **no la fabrica**: dice
+cómo traerla (copiar del generador + `fv-resize`) y se para. Fabricar una fuente de juguete
+daría un número con el mismo aspecto y otro significado.
+
+> ⚠ **Dos reportes solo se comparan si traen el mismo `window_dataset`.** Hasta el 2026-08-13
+> el benchmark medía sobre `bench-synth-16` (60 imágenes de barras sintéticas); se cambió al
+> dato real y el número se movió, así que `benchmarks/foveal_20260813-134338.json` no se
+> compara con los posteriores. La extracción (ventana 16, stride 8, seed 1) **no** cambió: el
+> dato es la única variable nueva.
+
+### El benchmark ya no es de un minuto: lánzalo desacoplado
+
+Con el dato real son **63 000 ventanas** en vez de 5280, así que una época pasó de ~4,8 s a
+~70 s y las 3 repeticiones tardan **~11 min**. A esa escala importa cómo se lanza.
+
+**Lanzarlo desde una sesión de agente y perder la sesión lo mata** (medido el 2026-08-13: murió
+en la época 2 de la primera repetición cuando terminó el proceso que lo había lanzado). Para una
+corrida larga, desacóplalo del que la lanza:
+
+```bash
+setsid nohup .venv/bin/python scripts/bench_speed.py --repeats 3 > /tmp/bench.log 2>&1 < /dev/null &
+```
+
+> Verificado: relanzado así, el proceso sobrevivió al cierre de la sesión que lo lanzó y siguió
+> midiendo. Sin `setsid` no sobrevive.
+
+**Qué deja atrás una corrida matada**, y qué hacer con cada cosa:
+
+| Artefacto | Estado | Qué hacer |
+|---|---|---|
+| `data/window-datasets/bench-dirty1000-16/` | Completo si llegó a escribir `windows.npz` | **Nada**: al relanzar, el script lo detecta y no re-extrae |
+| `runs/bench-<host>-<ts>-<i>/` a medias | `status.json` dice `running` con un **pid muerto** | **Borrarlo**: un run incompleto cuyo estado miente ensucia la pantalla de Runs |
+| `benchmarks/<host>_<ts>.json` | No existe: se escribe al final, de una vez | Nada |
+
+El dataset a medias sí se detecta: si el directorio existe pero no tiene `windows.npz`, el
+script se niega a reutilizarlo y pide borrarlo, en vez de entrenar sobre algo incompleto.
 
 ## Recorridos (sweeps) sin la UI
 
