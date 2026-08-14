@@ -215,6 +215,22 @@ setsid nohup .venv/bin/python scripts/bench_speed.py --repeats 3 > /tmp/bench.lo
 > Verificado: relanzado así, el proceso sobrevivió al cierre de la sesión que lo lanzó y siguió
 > midiendo. Sin `setsid` no sobrevive.
 
+**Y nadie te va a avisar de que terminó.** Desacoplar el trabajo no desacopla al vigilante: si
+lo lanzas desde algo que se cierra —un agente por Telegram, una sesión SSH, una terminal—, lo
+que armes para esperarlo se muere con ello, y entre medias no queda nada vivo que pueda mandar
+un aviso. Medido el 2026-08-14: el benchmark relanzado con `setsid` terminó bien, y los tres
+vigilantes armados para anunciarlo murieron los tres. **Comprueba el resultado tú**, que además
+es una sola pregunta al disco:
+
+```bash
+ls benchmarks/                  # el reporte solo aparece si termino entero
+tail -3 /tmp/bench.log          # y el log dice por que repeticion va
+```
+
+Un run con `status.json` en `running` y un pid que ya no existe **no** significa «va por ahí»:
+significa que lo mataron. El reporte es el único testigo de una corrida completa, porque se
+escribe entero al final.
+
 **Qué deja atrás una corrida matada**, y qué hacer con cada cosa:
 
 | Artefacto | Estado | Qué hacer |
