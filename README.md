@@ -169,6 +169,18 @@ que usan los estudios (`seconds_per_epoch`):
 .\.venv\Scripts\python.exe scripts\bench_speed.py --repeats 3
 ```
 
+> **Medido (2026-08-14, droplet `foveal`: 2 núcleos DO-Regular, 3,82 GB, CPU):**
+> **61,76 s/época ± 5,29** (n=3) sobre `bench-dirty1000-16`, con la máquina libre
+> (`load_avg` 0,24). Reporte en `benchmarks/foveal_20260814-010950.json`.
+>
+> ⚠ **Ese ± no es ruido, es un arranque en frío.** Las 9 épocas fueron 83,9 · 61,1 · 61,5 ·
+> 60,7 · 59,9 · 60,2 · 55,7 · 56,7 · 56,2: **la primera cuesta un 40% más** y las otras ocho
+> caen en 56–62 s. Sin ella la media es **58,99 s con sd 2,26** (3,8%) en vez de 61,76 con 8,12.
+> Para presupuestar un recorrido largo usa el régimen estacionario (~59 s/época); el ± del
+> reporte mide sobre todo la primera época, no la variabilidad de la máquina. El script
+> **no descarta** ese calentamiento, a propósito: descartarlo ahora rompería la comparación
+> con este mismo reporte.
+
 No es un estudio: no busca hiperparámetros. Corre **tres cosas congeladas** —la red
 `bench-16`, la receta `bench` (3 épocas, batch 64) y el dataset de ventanas
 `bench-dirty1000-16`— y lo único que varía entre dos reportes debería ser el hardware. Escribe
