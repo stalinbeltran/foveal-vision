@@ -190,22 +190,56 @@ def cmd_build(args: argparse.Namespace) -> int:
         )
 
     # 4) Extraer las ventanas: esto es lo que come el benchmark.
+    #
+    # `extract_windows` se niega a escribir si el directorio ya existe ("no se
+    # sobrescribe nunca"), y este repo trae `manifest.json` y `split.json`
+    # COMMITEADOS justo ahi. O sea que en un clon limpio el directorio siempre
+    # existe y extraer encima no termina nunca: el build moria aqui, en la
+    # unica maquina donde hace falta. Se extrae aparte y se coloca el .npz al
+    # lado de los ficheros de git.
+    #
+    # Eso ademas convierte al manifest commiteado de estorbo en COMPROBACION:
+    # trae la huella de lo que se midio antes, asi que si la recien construida
+    # no coincide, el dato no reproduce y medir sobre el daria un numero que no
+    # es comparable con los anteriores. Mejor parar que publicar eso.
     log(f"4/4 ventanas: {EXTRACCION}")
+    destino_v = npz_local().parent
+    tmp = ROOT / "data" / "window-datasets" / f".{VENTANAS}.tmp"
+    shutil.rmtree(tmp, ignore_errors=True)
     correr(
         [str(py), "-c",
          "import sys; sys.path.insert(0, 'src');"
          "from pathlib import Path;"
-         "from fv import settings;"
          "from fv.windows.extract import ExtractConfig, extract_windows;"
          f"cfg = ExtractConfig(source='local/{FUENTE}', **{EXTRACCION!r});"
-         f"out = settings.window_datasets_root() / '{VENTANAS}';"
-         "print(extract_windows(cfg, out).get('count', ''), 'ventanas en', out)"],
+         f"out = Path({str(tmp)!r});"
+         "extract_windows(cfg, out);"
+         "print('ventanas extraidas en', out)"],
         ROOT,
         "la extraccion de ventanas",
     )
+    if not (tmp / "windows.npz").exists():
+        die(f"La extraccion termino sin dejar {tmp / 'windows.npz'}.")
 
-    if not npz_local().exists():
-        die(f"La extraccion termino sin dejar {npz_local()}.")
+    referencia = destino_v / "manifest.json"
+    if referencia.exists():
+        antes = json.loads(referencia.read_text(encoding="utf-8")).get("fingerprint")
+        ahora = json.loads((tmp / "manifest.json").read_text(encoding="utf-8")).get("fingerprint")
+        if antes != ahora:
+            shutil.rmtree(tmp, ignore_errors=True)
+            die(f"El dato NO reproduce.\n"
+                f"  el manifest de git dice: {antes}\n"
+                f"  lo recien construido da: {ahora}\n"
+                "  No es comparable con las medidas anteriores: revisa el "
+                "generador antes de medir nada.")
+        log(f"    huella {antes} igual a la de git: el dato reproduce.")
+
+    destino_v.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(tmp / "windows.npz", destino_v / "windows.npz")
+    for f in ("manifest.json", "split.json"):
+        if not (destino_v / f).exists():
+            shutil.copy2(tmp / f, destino_v / f)
+    shutil.rmtree(tmp, ignore_errors=True)
 
     # La comprobacion que evita el fallo silencioso: que lo construido sea lo
     # que bench_speed.py va a buscar, y no algo con el mismo aspecto.
