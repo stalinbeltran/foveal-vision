@@ -1,0 +1,44 @@
+{
+  "format_version": 1,
+  "hostname": "bench-c-2-20260820-125052",
+  "timestamp": "20260820-125548",
+  "git_commit": "c6c61bff07f11a2a5f411546386b0df2d0a85025",
+  "hardware": {
+    "hostname": "bench-c-2-20260820-125052",
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "cpu_model": "Intel(R) Xeon(R) Platinum 8168 CPU @ 2.70GHz",
+    "cpu_count_logical": 2,
+    "ram_total_gb": 3.82,
+    "gpu": null
+  },
+  "device": "cpu",
+  "load_avg_before": [
+    1.287109375,
+    0.8408203125,
+    0.3701171875
+  ],
+  "window_dataset": "bench-dirty1000-16",
+  "network": "bench-16",
+  "recipe": "bench",
+  "repeats": 3,
+  "runs": [
+    "bench-bench-c-2-20260820-125052-20260820-125548-0",
+    "bench-bench-c-2-20260820-125052-20260820-125548-1",
+    "bench-bench-c-2-20260820-125052-20260820-125548-2"
+  ],
+  "seconds_per_epoch": {
+    "values": [
+      39.38,
+      35.348,
+      35.88
+    ],
+    "mean": 36.869,
+    "std": 1.789
+  },
+  "fleet": {
+    "size": "c-2",
+    "droplet": "bench-c-2-20260820-125052",
+    "lanzado_desde": "dev"
+  }
+}
