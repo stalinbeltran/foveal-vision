@@ -1,0 +1,14 @@
+{
+  "name": "bench",
+  "descripcion": "Mide s/epoca en droplets de distinta capacidad de vCPU: una maquina por nivel, medida y destruida. Decenas de minutos, desacoplado.",
+  "ejemplos": [
+    "--vcpus 2,4,8",
+    "--vcpus 2 --repeats 3",
+    "--reap"
+  ],
+  "command": "\"$COORD_HOME/scripts/desacoplar.sh\" sh -c 'set -a; [ -f \"$COORD_HOME/.env\" ] && . \"$COORD_HOME/.env\"; [ -f \"$HOME/.config/dev-secrets.env\" ] && . \"$HOME/.config/dev-secrets.env\"; set +a; if [ -d /mnt/bench-data ]; then BENCH_VOLUME=/mnt/bench-data; else BENCH_VOLUME=\"$HOME/bench-data\"; fi; export BENCH_VOLUME; python3 scripts/bench_fleet.py {{input}} > \"/tmp/fleet-$COORD_SESSION.log\" 2>&1; node \"$COORD_HOME/scripts/notify.mjs\" \"flota de benchmark terminada. Reportes en benchmarks/ de foveal-vision, log en /tmp/fleet-$COORD_SESSION.log\"' >/dev/null 2>&1 & echo \"Flota lanzada en su propio cgroup (sobrevive a este turno Y a un reinicio del bot). Tarda decenas de minutos. Log: /tmp/fleet-$COORD_SESSION.log -- avisara al terminar, pero el log es la fuente de verdad.\"",
+  "encargados": [
+    "echo"
+  ],
+  "timeoutMs": 60000
+}

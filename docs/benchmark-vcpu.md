@@ -98,12 +98,26 @@ python3 scripts/bench_fleet.py --vcpus 2,4,8
 
 **Tarda decenas de minutos, así que no se lanza dentro de un turno de chat.** Se
 desacopla y avisa al terminar (la regla está en el CLAUDE.md del coordinador: un
-mensaje es un proceso que muere y se lleva a su vigilante):
+mensaje es un proceso que muere y se lleva a su vigilante).
+
+Desde Telegram eso ya está hecho: el ejecutor **`bench`** lo lanza en su propio
+cgroup y avisa. Vive en este repo, en
+[`telegram/executors/bench.json`](../telegram/executors/bench.json), junto al
+script que llama; el coordinador lo descubre ahí con sólo estar el repo clonado
+—nada que copiar ni reiniciar— porque su `data/fuentes.json` escanea
+`~/src/*/telegram`. Si `foveal-vision` no está en la máquina, `bench` no aparece
+en `/executors`, que es lo correcto.
+
+```
+/use bench
+--vcpus 2,4,8
+```
+
+A mano, fuera de Telegram, es lo mismo sin el aviso:
 
 ```sh
 setsid sh -c 'cd ~/src/foveal-vision && python3 scripts/bench_fleet.py --vcpus 2,4,8 \
-  > /tmp/fleet.log 2>&1; \
-  node ~/src/telegram-coordinator/scripts/notify.mjs "flota terminada: /tmp/fleet.log"' &
+  > /tmp/fleet.log 2>&1' &
 ```
 
 El aviso es una comodidad; **la fuente de verdad son `benchmarks/vcpu_*.json` y

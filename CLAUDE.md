@@ -784,6 +784,15 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
   del generador; se dio por imposible lo que sí estaba escrito y se midió sobre la fuente
   equivocada. Aplica igual a los artefactos que sí se versionan (reportes de
   `benchmarks/`, manifests): commitearlos es lo único que los salva de la reconstrucción.
+- **Los comandos de este repo para el bot de Telegram van en `telegram/executors/*.json`.**
+  El coordinador los **descubre** ahí con sólo estar el repo clonado (su `data/fuentes.json`
+  escanea `~/src/*/telegram`): no hay que copiarlos a ninguna parte ni reiniciar nada, y
+  llegan con `git pull` **a `main`** — un clon limpio no ve lo que se quedó en `dev`. Se
+  escriben como si estuvieras dentro de este repo (el cwd ya es su raíz: nada de
+  `cd ~/src/foveal-vision &&`), con `descripcion` y `ejemplos` en el mismo fichero, y
+  `$COORD_HOME` para llamar a algo del coordinador (`notify.mjs`, `desacoplar.sh`). Hoy hay
+  uno: `bench`. El porqué está en
+  [`telegram-coordinator/docs/ejecutores-federados.md`](https://github.com/stalinbeltran/telegram-coordinator/blob/main/docs/ejecutores-federados.md).
 - **Stack**: Python 3.12 (PyTorch no tiene wheels para 3.14) + PyTorch + FastAPI + Vite/React.
   En Windows el intérprete será `.\.venv\Scripts\python.exe`. Paquete `fv`, layout `src/`.
 - **Tests**: `.\.venv\Scripts\python -m pytest -q` desde la raíz, antes de commitear código.
