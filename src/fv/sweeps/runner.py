@@ -89,8 +89,23 @@ def prepare_sweep(name: str, spec: dict, base_network: dict,
 
 
 def run_sweep(name: str, store: SweepStore | None = None,
-              run_store: RunStore | None = None, progress=None) -> dict:
-    """Start OR resume: counts finished child runs and runs the rest."""
+              run_store: RunStore | None = None, progress=None,
+              only_seed: int | None = None) -> dict:
+    """Start OR resume: counts finished child runs and runs the rest.
+
+    `only_seed` corre SOLO los puntos de esa semilla, para repartir un recorrido
+    entre varias maquinas (una por semilla) sin partirlo en varios recorridos.
+    Recorre la lista ENTERA y salta lo ajeno, asi que el indice de cada punto
+    -y con el su `point_run_name`- es el mismo que tendria corriendo aqui de
+    corrido: por eso los runs de N maquinas se juntan despues en UN solo
+    recorrido y `sweep_trials` los encuentra por su nombre, sin renombrar nada.
+
+    La semilla es el eje REPLICA, y esa es justamente la razon de repartir por
+    ella y no por el eje real: cada maquina mide TODOS los valores del eje, asi
+    que si una maquina resulta ser mas lenta o mas rara que otra, eso entra
+    igual en todos los valores que se comparan en vez de cargarselo a uno solo.
+    Repartir por valor de `lr` haria lo contrario: confundir la maquina con la
+    respuesta."""
     store = store or SweepStore()
     run_store = run_store or RunStore()
     spec = store.spec(name)
@@ -100,10 +115,22 @@ def run_sweep(name: str, store: SweepStore | None = None,
     objective = spec.get("objective", "f1")
 
     valid, _ = expand_points(spec, base_network)
+    mios = list(range(len(valid)))
+    if only_seed is not None:
+        mios = [i for i in mios if valid[i]["overrides"].get("seed") == only_seed]
+        if not mios:
+            # ruidoso: una maquina que no encuentra sus puntos y termina "bien"
+            # deja un hueco en el recorrido que solo se ve al juntar los runs
+            raise SweepError(
+                "no_points_for_seed",
+                f"el recorrido '{name}' no tiene ningun punto con seed={only_seed}",
+                f"las semillas del recorrido son "
+                f"{sorted({p['overrides'].get('seed') for p in valid})}")
     pid = os.getpid()
-    store.set_state(name, "running", total=len(valid), pid=pid)
+    store.set_state(name, "running", total=len(mios), pid=pid)
     done = 0
-    for i, point in enumerate(valid):
+    for i in mios:
+        point = valid[i]
         run_name = point_run_name(name, i, point["overrides"])
         if run_store.exists(run_name):
             st = run_store.status(run_name).get("status")
@@ -121,7 +148,7 @@ def run_sweep(name: str, store: SweepStore | None = None,
                 f.unlink() if f.is_file() else f.rmdir()
             run_store.path(run_name).rmdir()
         if store.stop_requested(name):
-            store.set_state(name, "stopped", done=done, total=len(valid))
+            store.set_state(name, "stopped", done=done, total=len(mios))
             return store.state(name)
         recipe = dataclasses.replace(base_recipe, **point["recipe_overrides"])
         # budget epochs caps the run, but it must NOT silently override a point
@@ -138,15 +165,15 @@ def run_sweep(name: str, store: SweepStore | None = None,
                   should_stop=lambda: store.stop_requested(name))
         except RunError as e:
             # declared, never silent: the point failed with its reason
-            store.set_state(name, "running", done=done, total=len(valid), pid=pid,
+            store.set_state(name, "running", done=done, total=len(mios), pid=pid,
                             last_error={"run": run_name, "code": e.code,
                                         "message": e.message})
             continue
         done += 1
-        store.set_state(name, "running", done=done, total=len(valid), pid=pid)
+        store.set_state(name, "running", done=done, total=len(mios), pid=pid)
         if progress:
-            progress(done, len(valid), run_name)
-    store.set_state(name, "done", done=done, total=len(valid))
+            progress(done, len(mios), run_name)
+    store.set_state(name, "done", done=done, total=len(mios))
     return store.state(name)
 
 
