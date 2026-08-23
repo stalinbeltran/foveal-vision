@@ -1,0 +1,18 @@
+{
+  "name": "estudio",
+  "descripcion": "Reparte un recorrido entre varias maquinas de Vast, UNA POR SEMILLA, y las destruye al terminar. Alquilar cuesta dinero; --dry-run no. El freno de emergencia es /use apagar-vast.",
+  "ejemplos": [
+    "--sweep lr-alto-L4 --dry-run",
+    "--sweep lr-alto-L4 --seeds 1,2,3",
+    "--sweep lr-alto-L4 --seeds 1,2,3,4,5 --horas-max 8"
+  ],
+  "command": "\"$COORD_HOME/scripts/desacoplar.sh\" sh -c 'set -a; [ -f \"$COORD_HOME/.env\" ] && . \"$COORD_HOME/.env\"; [ -f \"$HOME/.config/dev-secrets.env\" ] && . \"$HOME/.config/dev-secrets.env\"; set +a; .venv/bin/python scripts/estudio_flota.py {{input}} --yes > \"/tmp/estudio-$COORD_SESSION.log\" 2>&1; node \"$COORD_HOME/scripts/notify.mjs\" \"flota del estudio terminada. Informe: sweeps/*/flota.json en foveal-vision, log en /tmp/estudio-$COORD_SESSION.log. Comprueba que no queda nada vivo con /use vast (list).\"' >/dev/null 2>&1 & echo \"Flota lanzada en su propio cgroup (sobrevive a este turno Y a un reinicio del bot). Tarda HORAS y ALQUILA MAQUINAS QUE FACTURAN. Log: /tmp/estudio-$COORD_SESSION.log -- avisara al terminar, pero el log es la fuente de verdad. Si algo se corta: /use apagar-vast\"",
+  "encargados": [
+    "echo"
+  ],
+  "timeoutMs": 60000,
+  "requiere": [
+    "python3",
+    "ssh"
+  ]
+}
