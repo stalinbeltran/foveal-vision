@@ -207,3 +207,102 @@ ensancha (~29 % más de error estándar) y, sobre todo, **R4 pierde toda capacid
 significación** (§3). Esta vuelta sirve para **ver la forma del eje** y para estrenar el reparto en
 paralelo, no para mover el vigente. Si la forma resulta interesante, la confirmación se corre con
 5 semillas — que con este script cuesta 5 máquinas y el mismo reloj.
+
+## 6. RESULTADO (2026-08-23 20:37) — **el eje cae a la derecha; `lr` queda acotado por los dos lados**
+
+9/9 puntos, **139 min de reloj** (2 h 19 min) y **0,2952 $**. Los 9 runs pararon por `patience`
+(R1 ✅), entre 30 y 72 épocas, ninguno cerca del tope de 150.
+
+| `lr` | ventana (f1) | sem | min | max | épocas (3 semillas) |
+|---|---|---|---|---|---|
+| **0,0014** (vigente) | **0,9246** | 0,0003 | 0,9240 | 0,9251 | 36 · 54 · 66 |
+| 0,0020 | 0,9055 | 0,0092 | 0,8883 | 0,9200 | 30 · 65 · 70 |
+| 0,0028 | 0,8998 | 0,0080 | 0,8878 | 0,9150 | 54 · 56 · 72 |
+
+**R3 ✅ — LA PREGUNTA QUEDA CONTESTADA: el óptimo está acotado por la derecha.** El ganador es
+`0,0014` y **no** el extremo derecho, que era la condición escrita en §3. Junto con
+[plan-lr-L4.md](plan-lr-L4.md) §7 —que lo acotó por la izquierda— **`lr` sobre L4 queda ahora
+cerrado por los dos lados**, y el vigente deja de estar pegado a un borde: es el defecto que §0
+denunciaba, y se cierra.
+
+**Y la caída no es marginal: las bandas son DISJUNTAS.** Las tres semillas de `0,0014` (0,9240 –
+0,9251) están por encima de las tres de `0,0020` (0,8883 – 0,9200) *y* de las tres de `0,0028`
+(0,8878 – 0,9150). No hay solape: ninguna réplica del vigente pierde contra ninguna réplica de un
+`lr` más alto.
+
+**R4 — el contraste, y lo que NO puede decir.** Ambos valores dan `p = 0,100` contra el vigente
+con permutación exacta. Ese 0,100 **es el suelo**: con 3 contra 3 hay 20 arreglos y el p mínimo
+alcanzable es 2/20. Que se toque el suelo significa que **ninguna reetiquetación de las semillas
+produce una diferencia mayor que la observada** — es la evidencia más fuerte que este tamaño puede
+dar. Pero sigue sin cruzar el 5 %, así que, como se escribió antes de mirar, **el vigente se queda**
+por regla, no por el resultado. Aquí eso da igual: el resultado y la regla dicen lo mismo.
+
+### 6.1 El ancla desactiva el aviso de §2
+
+`lr = 0,0014` re-medido hoy da **0,9246** contra **0,9244** de julio: **+0,0002**, con un `sem` de
+0,0041 en aquella medida. O sea que el cambio de fuente documentado en §2 —huella distinta, mismo
+resumen— **no movió la medida de forma apreciable**.
+
+⚠ Con cuidado, que es una comprobación y no una demostración: dice que en **este punto** las dos
+versiones del dato dan lo mismo dentro del ruido. No prueba que los `.npz` sean idénticos, y el
+dataset conserva su nombre nuevo — la evidencia de que difieren sigue en pie. Pero quita el motivo
+para desconfiar de comparar estos números con los de julio.
+
+### 6.2 Dos cosas que no se esperaban, y que valen para planificar
+
+**a) Por encima del óptimo, `lr` más alto NO converge antes.** La ley que plan-lr-L4.md §6 midió,
+`épocas ∝ lr^-0,287`, se ajustó con dos puntos **por debajo** de 0,0014, y ahí funcionó. Extendida
+hacia arriba **falla, y de signo**: predecía ~42 y ~39 épocas para 0,0020 y 0,0028, y salieron
+medias de **55 y 61** — más que las 52 del vigente. Consecuencia práctica: **esa extrapolación sólo
+vale a la izquierda del óptimo**; usarla para presupuestar la zona alta subestima el coste.
+
+**b) Subir el `lr` no sólo empeora la media: dispara la varianza.** El `sem` pasa de **0,0003** en
+el vigente a **0,0092** y **0,0080** — treinta veces más. La peor semilla de `0,0020` (0,8883) está
+0,032 por debajo de la mejor (0,9200), mientras que las tres del vigente caben en 0,0011. Un `lr`
+alto no da un modelo un poco peor: da un modelo **impredecible**, y eso con una sola semilla no se
+ve. Es otra ilustración de *un resultado sin N semillas es una anécdota*.
+
+### 6.3 Qué costó, y qué habría costado en serie
+
+| | este recorrido | `p40-lr-L4` (julio) |
+|---|---|---|
+| runs | 9 (3 valores × 3 semillas) | 20 (4 × 5) |
+| reloj | **2 h 19 min** | 36 h 54 min |
+| máquinas | 3 alquiladas, una por semilla | 1 (el equipo del usuario) |
+| coste | 0,2952 $ | electricidad + 36 h de máquina ocupada |
+
+Las tres máquinas midieron a **36,3 · 50,5 · 53,3 s/época**. En secuencia en la más lenta, los 9
+runs habrían sido ~7 h 40 min de reloj: el reparto los deja en 2 h 19 min, que es lo que tarda la
+semilla más lenta.
+
+⚠ **El número de vCPU no predijo la velocidad.** La máquina de **16 vCPU** (semilla 1) fue la **más
+lenta** (53,3 s/época) y la de **9,3 vCPU** (semilla 2) la más rápida (36,3). Como los hilos de
+torch estaban fijados a 8 en las tres (§4), lo que quedó a la vista es la velocidad **por núcleo**,
+y ahí el catálogo varía casi 1,5×. La elección de oferta filtra hoy por número de núcleos y precio,
+que resulta ser un mal criterio para este trabajo: mirar `cpu_ghz` es la mejora obvia, y está sin
+hacer.
+
+### 6.4 La lista negra se estrenó sola
+
+A los 75 segundos del lanzamiento, la máquina **45390** aceptó el alquiler, levantó `sshd` y
+**rechazó la clave** (`Permission denied (publickey)`) a través del proxy `ssh5.vast.ai`. Quedó
+apuntada en `vast-bloqueadas.json`, se destruyó (1,2 min, 0,0011 $) y la semilla 3 se reintentó
+sola en **otra** máquina (29155), que terminó su trabajo sin incidencias.
+
+⚠ **No está comprobado que la culpa fuera de esa máquina.** El fallo apareció en una instancia
+enrutada por proxy, y podría ser una carrera entre el banner de `sshd` y la instalación de la clave
+—que le pasaría a cualquier host— en vez de un defecto del host. Las otras dos máquinas, con
+conexión directa, no lo sufrieron; con un solo caso no se puede distinguir. Queda apuntado aquí
+porque si vuelve a pasar **en máquinas distintas y siempre por proxy**, el bloqueo estaría culpando
+al host equivocado y lo que habría que arreglar es la espera. El bloqueo caduca a los 30 días, que
+es lo que acota el daño de esa duda.
+
+### 6.5 Qué NO contesta esto
+
+- **Con 3 semillas no se mueve nada del proyecto** (§3, R4). Si se quisiera *usar* este resultado
+  para algo más que cerrar la pregunta, la confirmación va con 5 semillas — que con este script son
+  5 máquinas y el **mismo** reloj.
+- **Es f1 de ventana, un proxy.** R5 (medir con `scripts/proxy_vs_task.py`) no se ha corrido: aquí
+  no se arrastra ningún ganador, así que no hacía falta. Si alguna vez se arrastra, primero eso.
+- **La zona entre 0,0014 y 0,0020 no está medida.** El eje cae, pero dónde empieza a caer
+  exactamente no se sabe. Nadie lo ha preguntado todavía.

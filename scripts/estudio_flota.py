@@ -274,10 +274,16 @@ def correr_semilla(seed: int, oferta: dict, payload: Path, sweep: str, hilos: in
             spe = transcurrido / epocas if epocas else None
             resultado["epocas"], resultado["s_por_epoca"] = epocas, (
                 round(spe, 1) if spe else None)
+            # La ultima linea del log REMOTO viaja hasta aqui a proposito: es
+            # donde `estudio_semilla.py` dice "punto 2/3 terminado: <run>", y sin
+            # traerla el vigilante solo sabe contar directorios -- se ve que algo
+            # avanza, pero no QUE punto acaba de cerrar ni con que nombre.
             ultima = salida.strip().splitlines()[-1] if salida.strip() else ""
+            eco = ultima.split("  ", 1)[-1].strip() if "punto" in ultima else ""
             log(f"[s{seed}] {transcurrido / 60:5.1f} min · {epocas} epocas · "
                 f"{campos.get('HECHOS', '?')} runs · "
-                + (f"{spe:.1f} s/epoca" if spe else "aun sin epoca") )
+                + (f"{spe:.1f} s/epoca" if spe else "aun sin epoca")
+                + (f" · {eco}" if eco else ""))
             if campos.get("RC"):
                 rc = int(campos["RC"])
                 break
@@ -304,9 +310,12 @@ def correr_semilla(seed: int, oferta: dict, payload: Path, sweep: str, hilos: in
             raise RuntimeError("no pude traerme los runs de la maquina")
         with tarfile.open(local, "r:gz") as tar:
             tar.extractall(ROOT)
-        traidos = sorted(n for n in
-                         (x.name for x in (ROOT / "runs").iterdir() if x.is_dir())
-                         if f"seed{seed}" in n)
+        # Los nombres se leen del TAR, no del directorio local: `runs/` acumula
+        # los de todos los estudios anteriores, asi que filtrarlo por "seedN"
+        # devolvia 70 runs viejos como si los acabara de traer esta maquina.
+        with tarfile.open(local, "r:gz") as tar:
+            traidos = sorted({Path(m.name).parts[1] for m in tar.getmembers()
+                              if len(Path(m.name).parts) > 1})
         resultado["runs"] = traidos
         log(f"[s{seed}] {len(traidos)} runs traidos: {', '.join(traidos)}")
         resultado["ok"] = rc == 0
