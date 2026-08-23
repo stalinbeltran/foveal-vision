@@ -90,22 +90,22 @@ def prepare_sweep(name: str, spec: dict, base_network: dict,
 
 def run_sweep(name: str, store: SweepStore | None = None,
               run_store: RunStore | None = None, progress=None,
-              only_seed: int | None = None) -> dict:
+              solo: "list[int] | None" = None) -> dict:
     """Start OR resume: counts finished child runs and runs the rest.
 
-    `only_seed` corre SOLO los puntos de esa semilla, para repartir un recorrido
-    entre varias maquinas (una por semilla) sin partirlo en varios recorridos.
-    Recorre la lista ENTERA y salta lo ajeno, asi que el indice de cada punto
-    -y con el su `point_run_name`- es el mismo que tendria corriendo aqui de
-    corrido: por eso los runs de N maquinas se juntan despues en UN solo
-    recorrido y `sweep_trials` los encuentra por su nombre, sin renombrar nada.
+    `solo` es una lista de INDICES GLOBALES de punto: corre solo esos y salta el
+    resto. Es lo que permite repartir un recorrido entre varias maquinas sin
+    partirlo en varios recorridos.
 
-    La semilla es el eje REPLICA, y esa es justamente la razon de repartir por
-    ella y no por el eje real: cada maquina mide TODOS los valores del eje, asi
-    que si una maquina resulta ser mas lenta o mas rara que otra, eso entra
-    igual en todos los valores que se comparan en vez de cargarselo a uno solo.
-    Repartir por valor de `lr` haria lo contrario: confundir la maquina con la
-    respuesta."""
+    La clave es que se recorre la lista ENTERA y se salta lo ajeno, asi que el
+    indice de cada punto -y con el su `point_run_name`- es el mismo que tendria
+    corriendo aqui de corrido. Por eso los runs de N maquinas se juntan despues
+    en UN solo recorrido y `sweep_trials` los encuentra por su nombre, sin
+    renombrar ni fusionar nada.
+
+    QUE indices van juntos es decision de quien reparte, no de aqui: este modulo
+    no sabe de maquinas. La politica -y sus consecuencias estadisticas- vive en
+    `scripts/estudio_flota.py`, que es quien las alquila."""
     store = store or SweepStore()
     run_store = run_store or RunStore()
     spec = store.spec(name)
@@ -116,16 +116,22 @@ def run_sweep(name: str, store: SweepStore | None = None,
 
     valid, _ = expand_points(spec, base_network)
     mios = list(range(len(valid)))
-    if only_seed is not None:
-        mios = [i for i in mios if valid[i]["overrides"].get("seed") == only_seed]
-        if not mios:
-            # ruidoso: una maquina que no encuentra sus puntos y termina "bien"
-            # deja un hueco en el recorrido que solo se ve al juntar los runs
+    if solo is not None:
+        fuera = [i for i in solo if not 0 <= i < len(valid)]
+        if fuera:
+            # ruidoso: un indice fuera de rango que se ignorara en silencio deja
+            # un hueco en el recorrido que solo se ve al juntar los runs y contar
             raise SweepError(
-                "no_points_for_seed",
-                f"el recorrido '{name}' no tiene ningun punto con seed={only_seed}",
-                f"las semillas del recorrido son "
-                f"{sorted({p['overrides'].get('seed') for p in valid})}")
+                "point_out_of_range",
+                f"el recorrido '{name}' tiene {len(valid)} puntos (0..{len(valid) - 1}) "
+                f"y se pidieron indices que no existen: {fuera}",
+                "el que reparte y el que corre tienen que expandir el MISMO spec")
+        mios = [i for i in mios if i in set(solo)]
+        if not mios:
+            raise SweepError(
+                "no_points_selected",
+                f"no se selecciono ningun punto de '{name}'",
+                f"el recorrido tiene {len(valid)} puntos")
     pid = os.getpid()
     store.set_state(name, "running", total=len(mios), pid=pid)
     done = 0
