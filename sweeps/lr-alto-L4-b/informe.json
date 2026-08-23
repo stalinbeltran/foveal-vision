@@ -1,0 +1,211 @@
+{
+  "recorrido": "lr-alto-L4-b",
+  "eje": "lr",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260823",
+  "delta": 0.0010692396002751335,
+  "delta_fuente": "1-SE: error estándar de las 3 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "lr": 0.0014
+      },
+      "value": 0.9226209954828642,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.9212515749685006,
+      "value_max": 0.9247281457421268,
+      "value_std": 0.0018519773131411685,
+      "value_sem": 0.0010692396002751335,
+      "runs": [
+        "lr-alto-L4-b-0001-lr0p0014_seed2",
+        "lr-alto-L4-b-0000-lr0p0014_seed1",
+        "lr-alto-L4-b-0002-lr0p0014_seed3"
+      ],
+      "seconds_per_epoch": 37.75866666666666
+    },
+    {
+      "point": {
+        "lr": 0.0028
+      },
+      "value": 0.905361076648091,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.896867073911335,
+      "value_max": 0.9149969857087131,
+      "value_std": 0.009118738289069478,
+      "value_sem": 0.005264706005864011,
+      "runs": [
+        "lr-alto-L4-b-0007-lr0p0028_seed2",
+        "lr-alto-L4-b-0006-lr0p0028_seed1",
+        "lr-alto-L4-b-0008-lr0p0028_seed3"
+      ],
+      "seconds_per_epoch": 37.67333333333334
+    },
+    {
+      "point": {
+        "lr": 0.002
+      },
+      "value": 0.8900088995441395,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.8425525570299687,
+      "value_max": 0.9193872160591654,
+      "value_std": 0.041484966856110084,
+      "value_sem": 0.023951356781697863,
+      "runs": [
+        "lr-alto-L4-b-0005-lr0p002_seed3",
+        "lr-alto-L4-b-0004-lr0p002_seed2",
+        "lr-alto-L4-b-0003-lr0p002_seed1"
+      ],
+      "seconds_per_epoch": 45.150666666666666
+    }
+  ],
+  "detalle": [
+    {
+      "run": "lr-alto-L4-b-0001-lr0p0014_seed2",
+      "punto": {
+        "lr": 0.0014,
+        "seed": 2
+      },
+      "valor": 0.9247281457421268,
+      "epocas": 66,
+      "mejor_epoca": 56,
+      "paro_patience": true,
+      "s_por_epoca": 38.681
+    },
+    {
+      "run": "lr-alto-L4-b-0000-lr0p0014_seed1",
+      "punto": {
+        "lr": 0.0014,
+        "seed": 1
+      },
+      "valor": 0.9218832657379651,
+      "epocas": 59,
+      "mejor_epoca": 49,
+      "paro_patience": true,
+      "s_por_epoca": 36.299
+    },
+    {
+      "run": "lr-alto-L4-b-0002-lr0p0014_seed3",
+      "punto": {
+        "lr": 0.0014,
+        "seed": 3
+      },
+      "valor": 0.9212515749685006,
+      "epocas": 43,
+      "mejor_epoca": 33,
+      "paro_patience": true,
+      "s_por_epoca": 38.296
+    },
+    {
+      "run": "lr-alto-L4-b-0005-lr0p002_seed3",
+      "punto": {
+        "lr": 0.002,
+        "seed": 3
+      },
+      "valor": 0.9193872160591654,
+      "epocas": 43,
+      "mejor_epoca": 33,
+      "paro_patience": true,
+      "s_por_epoca": 35.055
+    },
+    {
+      "run": "lr-alto-L4-b-0007-lr0p0028_seed2",
+      "punto": {
+        "lr": 0.0028,
+        "seed": 2
+      },
+      "valor": 0.9149969857087131,
+      "epocas": 72,
+      "mejor_epoca": 62,
+      "paro_patience": true,
+      "s_por_epoca": 36.694
+    },
+    {
+      "run": "lr-alto-L4-b-0004-lr0p002_seed2",
+      "punto": {
+        "lr": 0.002,
+        "seed": 2
+      },
+      "valor": 0.9080869255432845,
+      "epocas": 65,
+      "mejor_epoca": 55,
+      "paro_patience": true,
+      "s_por_epoca": 48.023
+    },
+    {
+      "run": "lr-alto-L4-b-0006-lr0p0028_seed1",
+      "punto": {
+        "lr": 0.0028,
+        "seed": 1
+      },
+      "valor": 0.9042191703242247,
+      "epocas": 53,
+      "mejor_epoca": 43,
+      "paro_patience": true,
+      "s_por_epoca": 38.253
+    },
+    {
+      "run": "lr-alto-L4-b-0008-lr0p0028_seed3",
+      "punto": {
+        "lr": 0.0028,
+        "seed": 3
+      },
+      "valor": 0.896867073911335,
+      "epocas": 38,
+      "mejor_epoca": 28,
+      "paro_patience": true,
+      "s_por_epoca": 38.073
+    },
+    {
+      "run": "lr-alto-L4-b-0003-lr0p002_seed1",
+      "punto": {
+        "lr": 0.002,
+        "seed": 1
+      },
+      "valor": 0.8425525570299687,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 52.374
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": 0.0028,
+      "diff": -0.01725991883477329,
+      "p": 0.1,
+      "arrangements": 20,
+      "n": 3,
+      "m": 3,
+      "exact": true
+    },
+    {
+      "valor": 0.002,
+      "diff": -0.03261209593872472,
+      "p": 0.1,
+      "arrangements": 20,
+      "n": 3,
+      "m": 3,
+      "exact": true
+    }
+  ],
+  "pendientes": [],
+  "sugerido": {
+    "lr": 0.0014
+  }
+}

@@ -197,10 +197,10 @@ class Maquinas:
     """
 
     def __init__(self, cuantas: int, repuestos: int, cpus: int, max_cpus: int,
-                 min_ram: float, max_price: float):
+                 min_ram: float, max_price: float, cpu: str = ""):
         self.pool = V.elegir_ofertas_distintas(
             cuantas + repuestos, cpus=cpus, max_cpus=max_cpus,
-            min_ram_gb=min_ram, max_price=max_price)
+            min_ram_gb=min_ram, max_price=max_price, cpu=cpu)
         self.entregadas: list = []
 
     def siguiente(self) -> "dict | None":
@@ -435,6 +435,12 @@ def main() -> int:
     ap.add_argument("--cpus", type=int, default=8, help="vCPU efectivas minimas")
     ap.add_argument("--max-cpus", type=int, default=32)
     ap.add_argument("--min-ram", type=float, default=8.0, metavar="GB")
+    ap.add_argument("--cpu", default="",
+                    help="exige esta CPU (subcadena, p.ej. 'E5-26'). MEDIDO: dentro "
+                         "de la familia Xeon E5-26xx v3/v4 el entrenamiento sale "
+                         "IDENTICO bit a bit entre maquinas, y diverge al cruzar de "
+                         "familia (hasta 0,0457 en f1). Fijarla convierte el ruido "
+                         "de maquina en cero -- ver docs/plan-lr-alto.md §7.4")
     ap.add_argument("--max-price", type=float, default=None, metavar="USD_HORA")
     ap.add_argument("--disk", type=float, default=16.0, metavar="GB")
     ap.add_argument("--hilos", type=int, default=8,
@@ -474,7 +480,7 @@ def main() -> int:
 
     tope = args.max_price or V.limite_precio()
     maquinas = Maquinas(len(lotes), args.repuestos, args.cpus, args.max_cpus,
-                        args.min_ram, tope)
+                        args.min_ram, tope, args.cpu)
     log(f"\n{len(maquinas.pool)} maquinas DISTINTAS disponibles "
         f"({len(lotes)} a usar + {len(maquinas.pool) - len(lotes)} de repuesto):")
     log("  " + V.cabecera_ofertas())
@@ -511,7 +517,7 @@ def main() -> int:
     vividas = sum(float(r.get("segundos_vivida") or 0) for r in resultados)
     reporte = {
         "recorrido": args.sweep, "dataset": dataset, "cuando": V.ahora_iso(),
-        "reparto": args.reparto, "maquinas": len(lotes),
+        "reparto": args.reparto, "maquinas": len(lotes), "cpu": args.cpu or None,
         "reloj_min": round(reloj / 60, 1), "usd": round(gasto, 4),
         "hilos": args.hilos,
         # El desglose que decide si un reparto compensa: el peaje se paga entero

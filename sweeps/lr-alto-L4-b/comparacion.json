@@ -1,0 +1,176 @@
+{
+  "a": {
+    "sweep": "lr-alto-L4",
+    "reparto": "seed",
+    "maquinas": 3,
+    "reloj_min": 139.1,
+    "usd": 0.2952,
+    "maquina_min": 392.7366666666667,
+    "trabajo_min": 381.80833333333334,
+    "peaje_min": 10.928333333333345,
+    "peaje_medido": false,
+    "epocas": 503,
+    "usd_hora_medio": 0.044890000000000006
+  },
+  "b": {
+    "sweep": "lr-alto-L4-b",
+    "reparto": "run",
+    "maquinas": 9,
+    "reloj_min": 55.4,
+    "usd": 0.3656,
+    "maquina_min": 368.4866666666667,
+    "trabajo_min": 335.49,
+    "peaje_min": 31.328333333333333,
+    "peaje_medido": true,
+    "epocas": 486,
+    "usd_hora_medio": 0.059588888888888886
+  },
+  "ganador_a": 0.0014,
+  "ganador_b": 0.0014,
+  "orden_a": [
+    "0.0014",
+    "0.002",
+    "0.0028"
+  ],
+  "orden_b": [
+    "0.0014",
+    "0.0028",
+    "0.002"
+  ],
+  "grupos_a": {
+    "0.0014": {
+      "point": {
+        "lr": 0.0014
+      },
+      "value": 0.9246208719231163,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.923998871968415,
+      "value_max": 0.9251355980588067,
+      "value_std": 0.0005759056392571244,
+      "value_sem": 0.00033249927585292426,
+      "runs": [
+        "lr-alto-L4-0000-lr0p0014_seed1",
+        "lr-alto-L4-0001-lr0p0014_seed2",
+        "lr-alto-L4-0002-lr0p0014_seed3"
+      ],
+      "seconds_per_epoch": 44.274
+    },
+    "0.002": {
+      "point": {
+        "lr": 0.002
+      },
+      "value": 0.9054520460182905,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.8882988139493716,
+      "value_max": 0.9199703985622159,
+      "value_std": 0.015999351879234423,
+      "value_sem": 0.00923723011433554,
+      "runs": [
+        "lr-alto-L4-0005-lr0p002_seed3",
+        "lr-alto-L4-0004-lr0p002_seed2",
+        "lr-alto-L4-0003-lr0p002_seed1"
+      ],
+      "seconds_per_epoch": 47.326
+    },
+    "0.0028": {
+      "point": {
+        "lr": 0.0028
+      },
+      "value": 0.8997965100335595,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.8877771379211056,
+      "value_max": 0.9149969857087131,
+      "value_std": 0.013885949492296035,
+      "value_sem": 0.008017056677330664,
+      "runs": [
+        "lr-alto-L4-0007-lr0p0028_seed2",
+        "lr-alto-L4-0006-lr0p0028_seed1",
+        "lr-alto-L4-0008-lr0p0028_seed3"
+      ],
+      "seconds_per_epoch": 47.56199999999999
+    }
+  },
+  "grupos_b": {
+    "0.0014": {
+      "point": {
+        "lr": 0.0014
+      },
+      "value": 0.9226209954828642,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.9212515749685006,
+      "value_max": 0.9247281457421268,
+      "value_std": 0.0018519773131411685,
+      "value_sem": 0.0010692396002751335,
+      "runs": [
+        "lr-alto-L4-b-0001-lr0p0014_seed2",
+        "lr-alto-L4-b-0000-lr0p0014_seed1",
+        "lr-alto-L4-b-0002-lr0p0014_seed3"
+      ],
+      "seconds_per_epoch": 37.75866666666666
+    },
+    "0.0028": {
+      "point": {
+        "lr": 0.0028
+      },
+      "value": 0.905361076648091,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.896867073911335,
+      "value_max": 0.9149969857087131,
+      "value_std": 0.009118738289069478,
+      "value_sem": 0.005264706005864011,
+      "runs": [
+        "lr-alto-L4-b-0007-lr0p0028_seed2",
+        "lr-alto-L4-b-0006-lr0p0028_seed1",
+        "lr-alto-L4-b-0008-lr0p0028_seed3"
+      ],
+      "seconds_per_epoch": 37.67333333333334
+    },
+    "0.002": {
+      "point": {
+        "lr": 0.002
+      },
+      "value": 0.8900088995441395,
+      "n_seeds": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "value_min": 0.8425525570299687,
+      "value_max": 0.9193872160591654,
+      "value_std": 0.041484966856110084,
+      "value_sem": 0.023951356781697863,
+      "runs": [
+        "lr-alto-L4-b-0005-lr0p002_seed3",
+        "lr-alto-L4-b-0004-lr0p002_seed2",
+        "lr-alto-L4-b-0003-lr0p002_seed1"
+      ],
+      "seconds_per_epoch": 45.150666666666666
+    }
+  }
+}

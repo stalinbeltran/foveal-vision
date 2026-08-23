@@ -306,3 +306,132 @@ es lo que acota el daño de esa duda.
   no se arrastra ningún ganador, así que no hacía falta. Si alguna vez se arrastra, primero eso.
 - **La zona entre 0,0014 y 0,0020 no está medida.** El eje cae, pero dónde empieza a caer
   exactamente no se sabe. Nadie lo ha preguntado todavía.
+
+## 7. SEGUNDA CORRIDA (2026-08-23 23:36) — el mismo estudio con **una máquina por run**
+
+`lr-alto-L4-b` es el **mismo recorrido, campo por campo** (comprobado al crearlo: los 15 campos
+del `spec` coinciden salvo el nombre), corrido con `--reparto run`: 9 máquinas, una por punto, en
+vez de 3, una por semilla. Se hizo para ganar reloj y para poder comparar el coste de los dos
+repartos.
+
+### 7.1 Lo que costó cada reparto
+
+| | `seed` (3 máq.) | `run` (9 máq.) | |
+|---|---:|---:|---:|
+| **reloj** | 139,1 min | **55,4 min** | **−60 %** |
+| **coste** | 0,2952 $ | 0,3656 $ | +24 % |
+| máquina-minutos facturados | 392,7 | 368,5 | −6 % |
+| · de eso, trabajo (épocas) | 381,8 | 335,5 | −12 % |
+| · de eso, **peaje** | 10,9 | 31,3 | +187 % |
+| precio medio de máquina | 0,0449 $/h | 0,0596 $/h | **+33 %** |
+
+**El reparto fino sale barato: 2,5× menos reloj por 7 céntimos más.**
+
+⚠ Pero el +24 % **no viene de donde se esperaba**, y esto es lo que había que medir. El peaje se
+triplicó, sí (3,5 min por máquina × 9 en vez de × 3) — pero en absoluto son 20 minutos de máquina,
+un 5 % del total. Los **máquina-minutos totales incluso bajaron un 6 %**. Lo que subió el coste fue
+el **precio medio de la máquina (+33 %)**: pedir 12 máquinas *distintas* en vez de 6 obliga a bajar
+más en la lista ordenada por precio, y ahí ya no están las gangas.
+
+O sea que **el coste del paralelismo fino no es el peaje, es agotar las ofertas baratas.** Escala
+distinto: el peaje crece lineal con el número de máquinas y es pequeño; el precio medio crece
+según lo profundo que haya que rascar en el catálogo, y eso depende del mercado ese día. Para
+estudios más grandes es el segundo el que hay que vigilar.
+
+### 7.2 ¿Dio la misma respuesta? Sí en lo que decide; no en lo accesorio
+
+| `lr` | corrida A (`seed`) | corrida B (`run`) | dif |
+|---|---:|---:|---:|
+| **0,0014** | 0,9246 | 0,9226 | −0,0020 |
+| 0,0020 | 0,9055 | 0,8900 | −0,0154 |
+| 0,0028 | 0,8998 | 0,9054 | +0,0056 |
+
+**El ganador es el mismo (`0,0014`) y el veredicto de §6 aguanta entero**: R3 se cumple igual (no
+gana el extremo derecho) y los dos contrastes vuelven a dar `p = 0,100`, el suelo. La conclusión
+del estudio **no depende del reparto**.
+
+⚠ **Pero el orden de los perdedores se dio la vuelta**: A dijo `0,0020 > 0,0028` y B dice
+`0,0028 > 0,0020`. Ese orden **no es un resultado**, y §6 ya avisaba de por qué: en la zona alta el
+`sem` es diez veces mayor que en el vigente. La réplica lo confirma en vez de descubrirlo.
+
+### 7.3 ⚠ Lo que la réplica NO compra: semillas
+
+Es tentador juntar las dos corridas y decir «ya tengo 6 semillas por valor», que daría 924
+arreglos y **sí** podría declarar significación al 5 %. **Sería falso.** Las dos corridas usan las
+**mismas semillas 1, 2 y 3**: el mismo flujo de números aleatorios sobre el mismo dato. No son seis
+réplicas independientes, son **tres medidas hechas dos veces**. Juntarlas para ganar potencia
+estadística sería contar cada semilla dos veces.
+
+Lo que la réplica sí compra es otra cosa, y resultó valer más.
+
+### 7.4 El hallazgo: **el resultado es idéntico bit a bit dentro de una familia de CPU, y diverge entre familias**
+
+Como las dos corridas usan las mismas semillas, cada run tiene su **gemelo exacto** en la otra:
+mismo código, mismo dato, misma semilla, **otra máquina**. Esa diferencia *es* el efecto de la
+máquina, aislado.
+
+| `lr` | semilla | A (f1) · CPU | B (f1) · CPU | dif |
+|---|---|---|---|---:|
+| 0,0014 | 2 | 0,9247 · Xeon E5-2680 v4 | 0,9247 · Xeon E5-2673 v3 | **0,0000** |
+| 0,0020 | 2 | 0,9081 · Xeon E5-2680 v4 | 0,9081 · Xeon E5-2680 v4 | **0,0000** |
+| 0,0028 | 2 | 0,9150 · Xeon E5-2680 v4 | 0,9150 · Xeon E5-2680 v4 | **0,0000** |
+| 0,0014 | 1 | 0,9251 · Xeon Silver 4108 | 0,9219 · Xeon E5-2680 v4 | −0,0033 |
+| 0,0014 | 3 | 0,9240 · EPYC 7551 | 0,9213 · Xeon E5-2680 v4 | −0,0027 |
+| 0,0020 | 3 | 0,9200 · EPYC 7551 | 0,9194 · Xeon E5-2690 v4 | −0,0006 |
+| 0,0028 | 1 | 0,8966 · Xeon Silver 4108 | 0,9042 · Xeon E5-2680 v4 | +0,0076 |
+| 0,0028 | 3 | 0,8878 · EPYC 7551 | 0,8969 · Xeon E5-2680 v4 | +0,0091 |
+| **0,0020** | **1** | **0,8883 · Xeon Silver 4108** | **0,8426 · Core i7-6700** | **−0,0457** |
+
+**La separación es perfecta: 3 de 3 pares dentro de la familia Xeon E5-26xx v3/v4 salen idénticos
+—al cuarto decimal y con el MISMO número de épocas— y 6 de 6 pares entre familias distintas
+salen diferentes.** Los tres idénticos son todos de la semilla 2, que en la corrida A cayó en un
+E5-2680 v4 y en la B en tres máquinas E5 distintas (v3 y v4, Haswell y Broadwell): microarquitectura
+distinta, **mismo juego de instrucciones vectoriales** (AVX2/FMA3), y el entrenamiento es
+reproducible bit a bit. Los que divergen son los que cruzaron a **Xeon Silver 4108** (Skylake-SP,
+con AVX-512), a **AMD EPYC** (Zen) o a **Core i7-6700**.
+
+Es la confirmación empírica del aviso que §4 dejó escrito sin poder medirlo: *«lo que no se puede
+igualar es el juego de instrucciones del procesador; dos CPU distintas pueden redondear distinto»*.
+Se puede, y aquí está el número.
+
+**Y la magnitud depende de la zona del eje**, que es lo que lo hace accionable:
+
+- En el **vigente** (`0,0014`, zona estable): la máquina mueve **≤ 0,0033**, frente a un efecto
+  medido de ~0,020–0,035. El ganador está a salvo con cualquier reparto.
+- En la **zona alta** (`lr` ≥ 0,0020, entrenamiento inestable): la máquina llega a mover **0,0457**
+  — **más que el efecto que el estudio mide**. Con `lr` alto, dos máquinas distintas dan respuestas
+  distintas, y eso explica del todo el vuelco de §7.2: no fue mala suerte de las semillas, fue el
+  cambio de CPU.
+
+### 7.5 Qué hacer con esto
+
+1. **`--reparto run` es seguro para decidir el ganador** cuando el efecto buscado es mayor que
+   ~0,005, y da 2,5× de reloj por un 24 % de coste. Para este estudio, la elección correcta.
+2. **Fijar la familia de CPU convierte el ruido de máquina en cero.** No es una mejora marginal:
+   dentro de Xeon E5 v3/v4 el resultado sale idéntico bit a bit. `--cpu` en
+   `estudio_flota.py` (y `elegir_ofertas_distintas`) hace justo eso, y es lo que hay que usar
+   cuando el efecto buscado sea pequeño o la zona sea inestable.
+3. **Nunca reportar el orden de puntos que caen dentro de ~0,01 sin fijar la CPU.** El vuelco de
+   §7.2 es exactamente ese error, y se habría publicado como resultado si no llega a haber réplica.
+
+### 7.6 ⚠ Hasta dónde llega lo medido (y dónde deja de estar comprobado)
+
+Lo comprobado son **tres pares** de runs gemelos, todos dentro de **Xeon E5-2673 v3 (Haswell) y
+E5-2680 v4 (Broadwell)**, que comparten AVX2 + FMA3. Eso es todo.
+
+**No está comprobado** que la igualdad se extienda al resto de la familia. En particular, el filtro
+`--cpu "E5-26"` es una **subcadena**, y deja pasar también **E5-26xx v2 (Ivy Bridge), que no tiene
+AVX2**: por el propio razonamiento de §7.4 —lo que manda es el juego de instrucciones vectoriales—
+una v2 debería divergir de una v3/v4, pero **no se ha medido**. Al pedir 12 máquinas con ese filtro
+el catálogo devolvió una `E5-2660 v2` entre ellas.
+
+Si hace falta la garantía de verdad, el filtro tiene que ser más estrecho (`E5-2680 v4`, por
+ejemplo) y el precio a pagar es un catálogo más pequeño. Con `E5-26` a secas, el precio medio subió
+sólo un **2 %** (0,0605 → 0,0618 $/h, medido el 2026-08-23), así que estrechar más sigue siendo
+barato.
+
+Y hay una comprobación que **este estudio no hizo y que cerraría el asunto**: correr el mismo run
+dos veces **en la misma máquina**. Si saliera idéntico, quedaría probado que la única fuente de
+divergencia es la CPU; si no, habría algo más (hilos, versión de librería, orden de reducción) y
+fijar la familia no bastaría. No se hizo, y por eso §7.4 dice «dentro de esta familia salió
+idéntico» y no «es determinista».
