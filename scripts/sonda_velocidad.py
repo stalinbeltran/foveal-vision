@@ -59,11 +59,17 @@ def main() -> int:
     ap.add_argument("--sweep", required=True)
     ap.add_argument("--punto", type=int, default=0,
                     help="indice global del punto con cuya config se mide")
-    ap.add_argument("--segundos", type=float, default=8.0,
+    ap.add_argument("--segundos", type=float, default=10.0,
                     help="cuanto medir COMO MUCHO (el corte real es --pasos)")
-    ap.add_argument("--pasos", type=int, default=12, help="pasos a cronometrar")
-    ap.add_argument("--calentamiento", type=int, default=3,
-                    help="pasos que se tiran antes de cronometrar")
+    ap.add_argument("--pasos", type=int, default=40,
+                    help="pasos a cronometrar. 40 y no 12: a ~40 ms/paso, 12 pasos "
+                         "son medio segundo de medida y la mediana de eso todavia "
+                         "se mueve con una interrupcion ajena. 40 son ~1,6 s, que "
+                         "sigue siendo 'unos segundos' y ordena mucho mejor")
+    ap.add_argument("--calentamiento", type=int, default=5,
+                    help="pasos que se tiran antes de cronometrar: la primera "
+                         "asignacion de memoria y el primer toque de cada tensor "
+                         "no son el coste de regimen")
     args = ap.parse_args()
 
     t_arranque = time.monotonic()

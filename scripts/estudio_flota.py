@@ -213,6 +213,12 @@ python3 -m venv .venv
 .venv/bin/python -c "import torch, numpy; print('torch', torch.__version__, 'numpy', numpy.__version__)"
 """
 
+# Lo que lleva gastado la flota, apuntado al DESTRUIR y no al terminar un lote.
+# Una maquina que muere por excepcion -fallo al preparar, degradacion, plazo
+# agotado- tambien factura, y antes no aparecia en el total: el reporte decia
+# menos de lo gastado, que es la direccion peligrosa del error.
+GASTO: list = []
+
 _impresion = threading.Lock()
 _registro = threading.Lock()      # bloquear_maquina lee-modifica-escribe un fichero
 _reparto = threading.Lock()
@@ -504,6 +510,10 @@ class Maquina:
             return
         self.viva = False
         vivida = time.time() - self.t0
+        with _reparto:
+            GASTO.append({"etiqueta": self.etiqueta, "machine_id": self.mid,
+                          "por_que": por_que, "minutos": round(vivida / 60, 2),
+                          "usd": round(self.precio * vivida / 3600, 5)})
         try:
             V.destruir(self.iid)
             log(f"    [{self.etiqueta}] instancia {self.iid} destruida ({por_que}). "
@@ -604,6 +614,12 @@ def preparar(oferta: dict, payload: Path, etiqueta: str, hilos: int, disco_gb: f
         if m is not None:
             m.destruir("fallo al preparar")
         else:
+            with _reparto:
+                GASTO.append({"etiqueta": etiqueta, "machine_id": oferta.get("machine_id"),
+                              "por_que": "fallo antes de estar lista",
+                              "minutos": round((time.time() - t0) / 60, 2),
+                              "usd": round(float(oferta.get("dph_total") or 0)
+                                           * (time.time() - t0) / 3600, 5)})
             try:
                 V.destruir(iid)
                 log(f"    [{etiqueta}] instancia {iid} destruida (fallo al preparar)")
@@ -1055,7 +1071,7 @@ def main() -> int:
     ap.add_argument("--umbral-velocidad", type=float, default=0.75,
                     help="se descarta la maquina que no llegue a este x la mediana "
                          "de pasos/s de la cohorte")
-    ap.add_argument("--sonda-pasos", type=int, default=12,
+    ap.add_argument("--sonda-pasos", type=int, default=40,
                     help="pasos cronometrados por la sonda de velocidad")
     ap.add_argument("--umbral-degradacion", type=float, default=1.35,
                     help="se avisa si el s/epoca reciente supera este x el inicial")
@@ -1187,11 +1203,10 @@ def main() -> int:
         resultados = [f.result() for f in futuros]
 
     reloj = time.time() - t0
-    gasto = sum(float(r.get("usd") or 0) for r in resultados)
-    if criba_informe:
-        # lo que costo cribar es parte del coste del estudio, no un extra que se
-        # olvida: son maquinas que se alquilaron, pagaron su peaje y se tiraron
-        gasto += float(criba_informe.get("usd_descartadas") or 0)
+    # TODAS las maquinas que se alquilaron, incluidas las que murieron por el
+    # camino y las que descarto la criba. Sumar solo los lotes que terminaron
+    # daria un numero mas bonito y mas bajo que la factura.
+    gasto = sum(float(g["usd"]) for g in GASTO)
     buenas = [r for r in resultados if r.get("ok")]
     peaje = sum(float(r.get("peaje_s") or 0) for r in resultados)
     trabajo = sum(float(r.get("entrenamiento_s") or 0) for r in resultados)
@@ -1202,6 +1217,8 @@ def main() -> int:
         "cpu": args.cpu or None, "reloj_min": round(reloj / 60, 1),
         "usd": round(gasto, 4), "hilos": args.hilos,
         "criba": criba_informe,
+        "gasto_por_maquina": GASTO,
+        "maquinas_alquiladas": len(GASTO),
         "git": {"activo": args.git, "commits": libro.commits,
                 "fallos_push": libro.fallos_push, "ultimo_error": libro.ultimo_error},
         # El desglose que decide si un reparto compensa: el peaje se paga entero
@@ -1218,7 +1235,14 @@ def main() -> int:
 
     log("\n" + "=" * 68)
     log(f"  {len(buenas)}/{len(lotes)} lotes completos en {reloj / 60:.1f} min de "
-        f"RELOJ. Gastado: {gasto:.4f} $   (reparto '{args.reparto}')")
+        f"RELOJ. Gastado: {gasto:.4f} $ en {len(GASTO)} maquinas alquiladas "
+        f"(reparto '{args.reparto}')")
+    otras = [g for g in GASTO if g["por_que"] != "lote terminado"]
+    if otras:
+        log(f"  De eso, {sum(g['usd'] for g in otras):.4f} $ en {len(otras)} maquinas "
+            f"que NO entrenaron hasta el final: "
+            + ", ".join(f"{g['etiqueta']} ({g['por_que']})" for g in otras[:6])
+            + (" …" if len(otras) > 6 else ""))
     log(f"  Maquina-minutos: {vividas / 60:.1f}  =  peaje {peaje / 60:.1f} "
         f"({reporte['peaje_pct']}%) + trabajo {trabajo / 60:.1f}")
     for r in resultados:
