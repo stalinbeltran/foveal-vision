@@ -7,7 +7,7 @@
 > la hora, como en [plan-40h.md](plan-40h.md) §7 y [plan-lr-alto.md](plan-lr-alto.md) §6.
 
 Fecha: 2026-08-24. Recorridos: **`bs5-L4`** (`batch_size`), **`nl5-L4`** (`n_layers`),
-**`d5-L4`** (`d`). Dataset B: el de §3, que **es nuevo y hay que decir por qué**.
+**`d5-L4`** (`d`). Dataset B: **`dirty1000-80px-16px-r20260824`**, que es nuevo y §3 dice por qué.
 
 ## 0. Qué pregunta responde, y por qué estos tres ejes y no otros
 
@@ -142,8 +142,24 @@ anteriores**, y las tres huellas conocidas de la misma cadena tampoco coinciden 
 ```
 manifest de git (2026-07-27, dirty1000-80px-16px)    : sha256:4327325b8e30…
 reconstrucción del 2026-08-23 (…-r20260823)          : sha256:13786b8649…
-reconstrucción de hoy          (…-r20260824)         : (§7, se apunta al cerrar)
+reconstrucción de hoy          (…-r20260824)         : sha256:3df67624f5…
 ```
+
+**Y esta vez la diferencia se ve en el contenido resumido, no sólo en la huella.** El
+2026-08-23 coincidían campo a campo `num_windows`, `windows_per_split` y **los cuatro
+positivos por esquina**; hoy los positivos **no** coinciden:
+
+| | TL | TR | BR | BL |
+|---|---|---|---|---|
+| 23-ago (`r20260823`) | 17.121 | 17.613 | 19.357 | 18.852 |
+| **hoy** (`r20260824`) | **17.043** | **17.564** | **19.198** | **18.575** |
+| diferencia | −78 | −49 | −159 | −277 |
+
+Es entre un 0,3 % y un 1,5 % de las esquinas positivas. `num_windows` (140.000),
+`windows_per_split` (84.000/28.000/28.000), `images.shape`, `label_window` y `corner_order`
+sí coinciden. O sea que la rejilla de ventanas es la misma y **lo que se movió son los
+bordes de los párrafos**: exactamente lo que produce rasterizar con otro binario de Chromium.
+Es la confirmación de la causa que se conjeturaba arriba, y no una sospecha nueva.
 
 Y esta vez **se sabe por qué**, que es lo que las dos veces anteriores no se pudo decir: el
 generador rasteriza con Chromium, y su propio README ya avisaba de que *«la rasterización de
