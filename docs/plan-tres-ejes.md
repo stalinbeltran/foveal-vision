@@ -319,6 +319,22 @@ Se paró la flota a los dos minutos (nada había entrenado todavía), se destruy
    El sello no se cree a nadie — si dos hebras acaban en la misma máquina, la segunda pisa
    el fichero y la primera lo nota.
 
+**Y el sello resultó ser también la puerta de entrada, lo que obligó a un segundo arreglo.**
+MEDIDO en el segundo lanzamiento (2026-08-24 17:16): sin reintentos, **3 de las 5 primeras
+máquinas fallaron el sello con `rc=255`** y acabaron en la lista negra sin haber hecho nada.
+La causa es la que plan-lr-alto §6.4 dejó apuntada como sospecha sin poder medirla: **el
+banner de `sshd` llega antes que la clave.** `esperar_ssh` comprueba el banner, que no es lo
+mismo que «SSH funciona»; el sello es el primer comando que necesita autenticarse de verdad,
+así que se come esa carrera entera. Aquella nota decía que si volvía a pasar habría que
+arreglar *la espera* y no culpar al host — y eso es lo que se hizo.
+
+La asimetría del reintento es deliberada:
+
+- **`rc != 0` es transporte**: la máquina aún no acepta la clave. Se reintenta (8 veces, 15 s)
+  y sólo entonces se declara fallo suyo.
+- **un sello que se lee y no coincide es una suplantación**: eso no mejora esperando, así que
+  falla a la primera.
+
 ⚠ **Y una suplantación NO va a la lista negra.** El host no ha hecho nada; se equivocó el
 catálogo. Bloquearlo sería castigar al inocente y, peor, ir vaciando un catálogo que ya sólo
 tiene 22 máquinas para este filtro. Es la misma regla que ya estaba escrita para la lentitud

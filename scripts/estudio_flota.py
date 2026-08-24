@@ -306,24 +306,50 @@ def soltar_destino(host: str, port: int, etiqueta: str) -> None:
             del DESTINOS[f"{host}:{port}"]
 
 
-def sellar(host: str, port: int, nonce: str, etiqueta: str) -> None:
-    """Escribe un sello en la maquina y lo vuelve a leer.
+def sellar(host: str, port: int, nonce: str, etiqueta: str,
+           intentos: int = 8, espera_s: float = 15.0) -> None:
+    """Escribe un sello en la maquina y lo vuelve a leer. REINTENTA el transporte.
 
-    Es la segunda defensa, y la que de verdad cierra el agujero: el registro de
-    destinos solo sabe lo que ESTE proceso ha repartido, asi que no puede
-    distinguir "soy el primero" de "soy el equivocado". El sello no depende de
-    creerse a nadie -- si dos hebras acaban en la misma maquina, la segunda pisa
-    el fichero y la primera lo nota al releerlo.
+    Es la segunda defensa contra la suplantacion, y la que de verdad cierra el
+    agujero: el registro de destinos solo sabe lo que ESTE proceso ha repartido,
+    asi que no puede distinguir "soy el primero" de "soy el equivocado". El sello
+    no depende de creerse a nadie -- si dos hebras acaban en la misma maquina, la
+    segunda pisa el fichero y la primera lo nota al releerlo.
+
+    ⚠ Y hace de PUERTA DE ENTRADA, que es lo que obliga a reintentar. MEDIDO el
+    2026-08-24 17:16: sin reintentos, 3 de las 5 primeras maquinas fallaron aqui
+    con rc=255 y acabaron en la lista negra sin haber hecho nada. La causa es la
+    que plan-lr-alto §6.4 dejo apuntada como sospecha sin poder medirla: **el
+    banner de sshd llega antes que la clave**. `V.esperar_ssh` comprueba el
+    banner, que NO es lo mismo que "SSH funciona"; el sello es el primer comando
+    que necesita autenticarse de verdad, asi que se come esa carrera entera.
+
+    De ahi la asimetria, que es deliberada:
+
+    - `rc != 0` es **transporte**: la maquina todavia no acepta la clave. Se
+      reintenta hasta `intentos`, y solo entonces se declara fallo suyo.
+    - un sello que se lee y **no coincide** es una suplantacion: eso no mejora
+      esperando, asi que se lanza a la primera.
     """
-    code, salida = V.ssh_capture(
-        host, port, f"set -eu\nprintf '%s' '{nonce}' > {SELLO}\ncat {SELLO}\n",
-        timeout=180)
-    leido = (salida or "").strip().splitlines()[-1].strip() if salida.strip() else ""
-    if code != 0:
-        raise RuntimeError(f"no pude poner el sello de propiedad (rc={code})")
-    if leido != nonce:
-        raise Suplantada(f"el sello de {host}:{port} dice '{leido[:40]}' y no "
-                         f"'{nonce}': hay otra hebra en esta misma maquina")
+    ultimo = ""
+    for intento in range(1, intentos + 1):
+        code, salida = V.ssh_capture(
+            host, port, f"set -eu\nprintf '%s' '{nonce}' > {SELLO}\ncat {SELLO}\n",
+            timeout=180)
+        leido = (salida or "").strip().splitlines()[-1].strip() if salida.strip() else ""
+        if code == 0:
+            if leido != nonce:
+                raise Suplantada(f"el sello de {host}:{port} dice '{leido[:40]}' y "
+                                 f"no '{nonce}': hay otra hebra en esta misma maquina")
+            if intento > 1:
+                log(f"    [{etiqueta}] SSH utilizable al intento {intento} "
+                    f"(el banner llego antes que la clave)")
+            return
+        ultimo = f"rc={code} {(salida or '').strip()[-120:]}"
+        if intento < intentos:
+            time.sleep(espera_s)
+    raise RuntimeError(f"no pude poner el sello de propiedad tras {intentos} "
+                       f"intentos en {intentos * espera_s / 60:.0f} min: {ultimo}")
 
 
 def comprobar_sello(host: str, port: int, nonce: str) -> None:
