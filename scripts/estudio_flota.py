@@ -267,37 +267,94 @@ class Suplantada(RuntimeError):
 SELLO = "/root/.duenno-estudio"
 
 
-def resolver_destino(iid: int, etiqueta: str, info: dict, intentos: int = 6,
-                     espera_s: float = 10.0) -> tuple:
-    """(host, port) que NADIE MAS tenga reclamado, releyendo a la API si hace falta.
+_censo: dict = {"cuando": 0.0, "lista": []}
 
-    Es la primera de las dos defensas y la barata: si el destino que la API da ya
-    lo tiene otro, se vuelve a preguntar -- el dato suele corregirse solo en unos
-    segundos, porque es informacion de una instancia que aun esta arrancando.
+
+def censo(max_edad_s: float = 10.0) -> list:
+    """La lista ENTERA de instancias vivas, compartida entre hebras y cacheada.
+
+    Se pregunta por la lista y no instancia a instancia porque la pregunta que
+    hay que contestar es global -- "¿este destino SSH lo tiene alguien mas?" -- y
+    contra una respuesta por instancia no se puede contestar. La cache evita que
+    19 hebras disparen 19 peticiones identicas cada pocos segundos.
     """
-    ultimo = None
+    with _destinos:
+        if time.time() - _censo["cuando"] < max_edad_s and _censo["lista"]:
+            return _censo["lista"]
+    try:
+        lista = V.instancias()
+    except Exception:                                   # noqa: BLE001
+        return _censo["lista"]
+    with _destinos:
+        _censo["cuando"], _censo["lista"] = time.time(), lista
+    return lista
+
+
+def resolver_destino(iid: int, etiqueta: str, info: dict, intentos: int = 15,
+                     espera_s: float = 20.0) -> tuple:
+    """(host, port) de ESTA instancia, comprobado contra el censo entero.
+
+    MEDIDO el 2026-08-24 17:19, y la causa no es la que parecia. Los puertos del
+    proxy de Vast se derivan del id de la instancia -- `id mod 10000 + 19999`:
+    48582181 -> 22180, 48582189 -> 22188 --, asi que dos instancias NO pueden
+    compartir puerto de verdad. Lo que pasa es que, en el primer segundo tras
+    alquilar, la API publica el puerto **desfasado en uno**: a la instancia
+    48582188 (lote c10) le dio el 22188, que es el de la 48582189 (lote c0).
+
+    La consecuencia es la que importa: el primero en preguntar se lleva un
+    destino que no es suyo, y **el que se queda fuera es el dueño legitimo**. Un
+    registro local no puede arbitrar eso, porque solo sabe lo que este proceso ha
+    repartido: no distingue "soy el primero" de "soy el equivocado". Por eso se
+    pregunta al censo, que es la vista global, y se exige lo unico que de verdad
+    identifica:
+
+    1. que la instancia aparezca en el censo con `id` == el nuestro;
+    2. que su `ssh_host:puerto` **no lo tenga ninguna otra** instancia del censo;
+    3. que el valor **se repita en dos lecturas seguidas** -- un dato que aun se
+       esta asentando cambia; uno asentado, no.
+
+    Y se ESPERA en vez de destruir. La primera version se rendia a los 60 s y
+    tiraba la instancia: en aquella corrida se comieron 8 maquinas del pozo asi,
+    la criba se quedo con 11 para 15 lotes y cuatro lotes no llegaron a correr.
+    Esperar tres minutos es mucho mas barato que volver a alquilar, y el dato se
+    asienta solo -- la instancia de repuesto de c0 dio su puerto correcto al
+    minuto.
+    """
+    anterior = None
+    ultimo = "sin datos todavia"
     for intento in range(1, intentos + 1):
-        host, port = V.ssh_destino(info)
-        if not host or not port:
-            ultimo = f"la API no da destino SSH todavia ({host!r}:{port})"
+        lista = censo()
+        mio = next((i for i in lista if str(i.get("id")) == str(iid)), None)
+        if mio is None:
+            ultimo = f"la instancia {iid} no sale en el censo todavia"
         else:
-            clave = f"{host}:{port}"
-            with _destinos:
-                duenno = DESTINOS.get(clave)
-                if duenno is None or duenno == etiqueta:
-                    DESTINOS[clave] = etiqueta
-                    return host, port
-            ultimo = (f"{clave} ya lo tiene reclamado [{duenno}]; la API esta "
-                      f"publicando el mismo destino para dos instancias")
+            host, port = V.ssh_destino(mio)
+            if not host or not port:
+                ultimo = f"la API aun no publica destino SSH ({host!r}:{port})"
+            else:
+                choca = [i for i in lista
+                         if str(i.get("id")) != str(iid)
+                         and (i.get("ssh_host"), i.get("ssh_port")) == (host, port)]
+                if choca:
+                    ultimo = (f"{host}:{port} lo publica tambien la instancia "
+                              f"{choca[0].get('id')}: el dato aun se esta asentando")
+                elif anterior != (host, port):
+                    ultimo = f"{host}:{port} es nuevo; espero a verlo dos veces"
+                    anterior = (host, port)
+                else:
+                    with _destinos:
+                        duenno = DESTINOS.get(f"{host}:{port}")
+                        if duenno in (None, etiqueta):
+                            DESTINOS[f"{host}:{port}"] = etiqueta
+                            return host, port
+                    ultimo = f"{host}:{port} lo tiene reclamado [{duenno}]"
         if intento < intentos:
-            log(f"    [{etiqueta}] {ultimo}. Repregunto a la API "
-                f"({intento}/{intentos - 1})...")
+            if intento == 1 or intento % 4 == 0:
+                log(f"    [{etiqueta}] {ultimo}. Espero ({intento}/{intentos - 1})...")
             time.sleep(espera_s)
-            try:
-                info = V.instancia(iid)
-            except Exception as exc:                    # noqa: BLE001
-                ultimo = f"no pude releer la instancia: {type(exc).__name__}: {exc}"
-    raise Suplantada(f"sin destino SSH propio tras {intentos} intentos: {ultimo}")
+            _censo["cuando"] = 0.0        # forzar relectura en la vuelta siguiente
+    raise Suplantada(f"sin destino SSH propio y estable tras "
+                     f"{intentos * espera_s / 60:.0f} min: {ultimo}")
 
 
 def soltar_destino(host: str, port: int, etiqueta: str) -> None:
@@ -1040,8 +1097,19 @@ def entrenar_lote(m: "Maquina", lote: dict, hilos: int, plazo_s: int, cada_s: in
                 rc = int(campos["RC"])
                 break
             if transcurrido > plazo_s:
+                # Una maquina que ha producido epocas FUNCIONA: agotar el plazo
+                # ahi es lentitud, no averia, y va por la puerta de la
+                # degradacion -- que no apunta en la lista negra. Es la misma
+                # regla de siempre (la lista negra es para maquinas que fallan)
+                # aplicada a la unica forma de "fallo" que no lo es. Cero epocas
+                # SI es suya: en todo el plazo no llego a entrenar nada.
+                if epocas > 0:
+                    raise Degradada(
+                        f"plazo agotado ({plazo_s / 3600:.1f} h) con {epocas} "
+                        f"epocas hechas a {spe:.0f} s/epoca: la maquina va lenta, "
+                        f"no rota. Lo terminado esta en el libro")
                 raise RuntimeError(
-                    f"plazo agotado ({plazo_s / 3600:.1f} h) con {epocas} epocas hechas")
+                    f"plazo agotado ({plazo_s / 3600:.1f} h) SIN UNA SOLA epoca")
 
         resultado["entrenamiento_s"] = round(time.time() - t_ent, 1)
         log(f"[{tag}] entrenamiento terminado (rc={rc}) en "
