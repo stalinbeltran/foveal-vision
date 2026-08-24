@@ -1,0 +1,17 @@
+{
+  "run": "bs5-L4-0023-batch_size192_seed4",
+  "epochs_run": 52,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.09140600712800567,
+  "best_epoch": 42,
+  "seconds_per_epoch": 37.425,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
