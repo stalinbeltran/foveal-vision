@@ -1,0 +1,12 @@
+{
+  "name": "estudio-progreso",
+  "descripcion": "Como van los estudios, leyendo el libro de a bordo que la flota deja en runs/ y commitea en cada sonda. No entra por SSH en ninguna maquina y no cuesta nada. Sirve tambien tras una caida: lo que diga es lo que la flota se saltara al relanzarla.",
+  "ejemplos": [
+    "--sweep bs5-L4 --sweep nl5-L4 --sweep d5-L4",
+    "--sweep bs5-L4 --tabla"
+  ],
+  "command": ".venv/bin/python scripts/estudio_progreso.py {{input}} 2>&1 | tail -c 3500",
+  "encargados": ["echo"],
+  "timeoutMs": 120000,
+  "requiere": ["python3"]
+}

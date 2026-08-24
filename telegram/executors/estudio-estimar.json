@@ -1,0 +1,12 @@
+{
+  "name": "estudio-estimar",
+  "descripcion": "Cuanto va a tardar y cuanto va a costar un estudio, ANTES de alquilar nada. No toca Vast, no gasta. Cada coeficiente del modelo esta medido y trae su procedencia.",
+  "ejemplos": [
+    "--sweep bs5-L4 --sweep nl5-L4 --sweep d5-L4",
+    "--sweep bs5-L4 --reparto run"
+  ],
+  "command": ".venv/bin/python scripts/estudio_estimar.py {{input}} 2>&1 | tail -c 3500",
+  "encargados": ["echo"],
+  "timeoutMs": 120000,
+  "requiere": ["python3"]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "estudio-informe",
+  "descripcion": "El veredicto de un recorrido terminado: la tabla, R1..R4 y el contraste contra el vigente. No re-implementa el criterio, aplica el que su documento dejo escrito antes.",
+  "ejemplos": [
+    "--sweep bs5-L4 --eje batch_size --vigente 85",
+    "--sweep nl5-L4 --eje n_layers --vigente 4",
+    "--sweep d5-L4 --eje d --vigente 2"
+  ],
+  "command": ".venv/bin/python scripts/estudio_informe.py {{input}} 2>&1 | tail -c 3500",
+  "encargados": ["echo"],
+  "timeoutMs": 180000,
+  "requiere": ["python3"]
+}
