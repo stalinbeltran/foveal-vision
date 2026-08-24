@@ -164,6 +164,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import subprocess
 import sys
@@ -219,10 +220,26 @@ python3 -m venv .venv
 # menos de lo gastado, que es la direccion peligrosa del error.
 GASTO: list = []
 
+# Que etiqueta tiene reclamado cada destino SSH. MEDIDO el 2026-08-24: la API de
+# Vast devolvio el MISMO `ssh_host:puerto` (ssh4.vast.ai:21482) para dos
+# instancias recien alquiladas -- 48581482 y 48581483 -- mientras las dos estaban
+# arrancando. Las dos hebras subieron el payload a la MISMA maquina, la segunda
+# instalacion borro el tar de la primera, y el fallo se leyo como "el payload
+# subio pero no se pudo desempaquetar": se destruyeron las dos maquinas y se
+# apunto en la lista negra a dos hosts que no habian hecho nada.
+#
+# Que se rompio de verdad no fue eso, que era ruidoso, sino lo que habria pasado
+# si la carrera hubiera salido al reves: dos LOTES entrenando en la misma maquina,
+# compartiendo `/root/bench/runs/`, peleandose por los nucleos -- y otra maquina
+# alquilada sin hacer nada y facturando. Eso no habria dado un error, habria dado
+# numeros.
+DESTINOS: dict = {}
+
 _impresion = threading.Lock()
 _registro = threading.Lock()      # bloquear_maquina lee-modifica-escribe un fichero
 _reparto = threading.Lock()
 _disco = threading.Lock()         # escribir el libro de a bordo en runs/
+_destinos = threading.Lock()
 _git = threading.Lock()
 
 
@@ -234,6 +251,91 @@ def log(msg: str = "") -> None:
 def die(msg: str) -> "NoReturn":  # type: ignore[valid-type]
     print(f"\nERROR: {msg}\n", file=sys.stderr)
     raise SystemExit(2)
+
+
+class Suplantada(RuntimeError):
+    """El destino SSH que la API dio para esta instancia lleva a OTRA.
+
+    NO se apunta en la lista negra, y es la parte que importa: la maquina no ha
+    hecho nada mal -- quien se equivoco fue el catalogo al publicar el mismo
+    `ssh_host:puerto` para dos instancias a la vez. Bloquear al host por esto
+    seria castigar al inocente y, peor, ir vaciando el catalogo por un fallo que
+    no esta en el.
+    """
+
+
+SELLO = "/root/.duenno-estudio"
+
+
+def resolver_destino(iid: int, etiqueta: str, info: dict, intentos: int = 6,
+                     espera_s: float = 10.0) -> tuple:
+    """(host, port) que NADIE MAS tenga reclamado, releyendo a la API si hace falta.
+
+    Es la primera de las dos defensas y la barata: si el destino que la API da ya
+    lo tiene otro, se vuelve a preguntar -- el dato suele corregirse solo en unos
+    segundos, porque es informacion de una instancia que aun esta arrancando.
+    """
+    ultimo = None
+    for intento in range(1, intentos + 1):
+        host, port = V.ssh_destino(info)
+        if not host or not port:
+            ultimo = f"la API no da destino SSH todavia ({host!r}:{port})"
+        else:
+            clave = f"{host}:{port}"
+            with _destinos:
+                duenno = DESTINOS.get(clave)
+                if duenno is None or duenno == etiqueta:
+                    DESTINOS[clave] = etiqueta
+                    return host, port
+            ultimo = (f"{clave} ya lo tiene reclamado [{duenno}]; la API esta "
+                      f"publicando el mismo destino para dos instancias")
+        if intento < intentos:
+            log(f"    [{etiqueta}] {ultimo}. Repregunto a la API "
+                f"({intento}/{intentos - 1})...")
+            time.sleep(espera_s)
+            try:
+                info = V.instancia(iid)
+            except Exception as exc:                    # noqa: BLE001
+                ultimo = f"no pude releer la instancia: {type(exc).__name__}: {exc}"
+    raise Suplantada(f"sin destino SSH propio tras {intentos} intentos: {ultimo}")
+
+
+def soltar_destino(host: str, port: int, etiqueta: str) -> None:
+    with _destinos:
+        if DESTINOS.get(f"{host}:{port}") == etiqueta:
+            del DESTINOS[f"{host}:{port}"]
+
+
+def sellar(host: str, port: int, nonce: str, etiqueta: str) -> None:
+    """Escribe un sello en la maquina y lo vuelve a leer.
+
+    Es la segunda defensa, y la que de verdad cierra el agujero: el registro de
+    destinos solo sabe lo que ESTE proceso ha repartido, asi que no puede
+    distinguir "soy el primero" de "soy el equivocado". El sello no depende de
+    creerse a nadie -- si dos hebras acaban en la misma maquina, la segunda pisa
+    el fichero y la primera lo nota al releerlo.
+    """
+    code, salida = V.ssh_capture(
+        host, port, f"set -eu\nprintf '%s' '{nonce}' > {SELLO}\ncat {SELLO}\n",
+        timeout=180)
+    leido = (salida or "").strip().splitlines()[-1].strip() if salida.strip() else ""
+    if code != 0:
+        raise RuntimeError(f"no pude poner el sello de propiedad (rc={code})")
+    if leido != nonce:
+        raise Suplantada(f"el sello de {host}:{port} dice '{leido[:40]}' y no "
+                         f"'{nonce}': hay otra hebra en esta misma maquina")
+
+
+def comprobar_sello(host: str, port: int, nonce: str) -> None:
+    """Vuelve a mirar el sello. Se llama JUSTO antes de arrancar el
+    entrenamiento, que es el momento en el que equivocarse deja de ser ruidoso y
+    pasa a producir numeros."""
+    code, salida = V.ssh_capture(host, port, f"cat {SELLO} 2>/dev/null || true\n",
+                                 timeout=120)
+    leido = (salida or "").strip().splitlines()[-1].strip() if salida.strip() else ""
+    if code != 0 or leido != nonce:
+        raise Suplantada(f"el sello ya no es mio antes de entrenar (leido "
+                         f"'{leido[:40]}', esperaba '{nonce}')")
 
 
 # ------------------------------------------------- el libro de a bordo (git)
@@ -488,9 +590,11 @@ def apuntar_fallo(oferta: dict, motivo: str, etiqueta: str) -> None:
 class Maquina:
     """Una instancia alquilada, ya instalada y ya medida. Sabe destruirse."""
 
-    def __init__(self, oferta: dict, iid: int, host: str, port: int, etiqueta: str):
+    def __init__(self, oferta: dict, iid: int, host: str, port: int, etiqueta: str,
+                 nonce: str = ""):
         self.oferta, self.iid, self.host, self.port = oferta, iid, host, port
         self.etiqueta = etiqueta
+        self.nonce = nonce
         self.precio = float(oferta.get("dph_total") or 0)
         self.resumen = V.resumen_maquina(oferta)
         self.t0 = time.time()
@@ -509,6 +613,7 @@ class Maquina:
         if not self.viva:
             return
         self.viva = False
+        soltar_destino(self.host, self.port, self.etiqueta)
         vivida = time.time() - self.t0
         with _reparto:
             GASTO.append({"etiqueta": self.etiqueta, "machine_id": self.mid,
@@ -548,10 +653,15 @@ def preparar(oferta: dict, payload: Path, etiqueta: str, hilos: int, disco_gb: f
         estado = (info.get("actual_status") or info.get("cur_state") or "?").lower()
         if estado != "running":
             raise RuntimeError(f"la instancia acabo en '{estado}', no arranco")
-        host, port = V.ssh_destino(info)
+        host, port = resolver_destino(iid, etiqueta, info)
         if not V.esperar_ssh(host, port):
+            soltar_destino(host, port, etiqueta)
             raise RuntimeError(f"sshd no contesto en {host}:{port}")
-        m = Maquina(oferta, iid, host, port, etiqueta)
+        # El sello va ANTES de subir nada: si esta maquina no es la nuestra, que
+        # se sepa mientras lo unico perdido sea medio minuto de arranque
+        nonce = f"{etiqueta}-{iid}-{os.getpid()}"
+        sellar(host, port, nonce, etiqueta)
+        m = Maquina(oferta, iid, host, port, etiqueta, nonce)
         m.t0 = t0
         m.tiempos["arranque_s"] = round(time.time() - t0, 1)
         log(f"[{etiqueta}] SSH listo en {host}:{port} "
@@ -639,6 +749,11 @@ def preparar_con_reintentos(pool: Maquinas, payload: Path, etiqueta: str, hilos:
             return None
         try:
             return preparar(oferta, payload, etiqueta, hilos, disco_gb, *sonda)
+        except Suplantada as exc:
+            # NO se apunta: el host no ha hecho nada, se equivoco el catalogo al
+            # publicar el mismo destino SSH para dos instancias a la vez
+            log(f"[{etiqueta}] destino SSH suplantado (intento {intento}/{intentos}): "
+                f"{exc}. Se coge OTRA maquina y el host NO va a la lista negra.")
         except Exception as exc:                        # noqa: BLE001
             motivo = f"{type(exc).__name__}: {exc}"[:200]
             log(f"[{etiqueta}] FALLO preparando (intento {intento}/{intentos}): {motivo}")
@@ -816,6 +931,9 @@ def entrenar_lote(m: "Maquina", lote: dict, hilos: int, plazo_s: int, cada_s: in
     nombres = [point_run_name(sweep, i, lote["valid"][i]["overrides"])
                for i in lote["puntos"]]
     try:
+        # el momento en que equivocarse deja de ser ruidoso y pasa a dar numeros
+        if m.nonce:
+            comprobar_sello(m.host, m.port, m.nonce)
         # Desacoplado (`setsid`) a proposito: si la sesion de SSH se corta -y en
         # una maquina alquilada se corta- el entrenamiento sigue, y el vigilante
         # de abajo lo vuelve a encontrar. El codigo de salida se deja en un
@@ -992,6 +1110,12 @@ def lote_con_reintentos(lote: dict, pool: Maquinas, payload: Path,
             if r["ok"] or r.get("runs"):
                 return r
             ultimo = r
+        except Suplantada as exc:
+            log(f"[{tag}] la maquina reservada resulto no ser la mia: {exc}. "
+                f"NO va a la lista negra; se coge otra.")
+            ultimo = {"lote": tag, "sweep": lote["sweep"], "puntos": activo["puntos"],
+                      "ok": False, "error": f"suplantada: {exc}",
+                      "machine_id": m.mid, "intento": intento, "suplantada": True}
         except Degradada as exc:
             # NO se apunta en la lista negra: la maquina funciona, tiene compania
             log(f"[{tag}] ABANDONADA por lentitud (intento {intento}/{intentos}): {exc}")

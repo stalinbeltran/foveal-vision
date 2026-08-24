@@ -280,6 +280,56 @@ el reparto compra. Se prefiere un lote lento y homogéneo a uno rápido y partid
 ⚠ Una máquina degradada **no** se apunta en la lista negra. Un inquilino ajeno se va; un host
 roto no. Bloquear por lentitud vaciaría el catálogo sin arreglar nada.
 
+### 4.2 bis ⚠ El primer lanzamiento se abortó: la API dio el mismo SSH a dos máquinas
+
+**Medido el 2026-08-24 17:12.** La flota arrancó, alquiló 19 máquinas, y en el log apareció
+esto:
+
+```
+17:12:00  [c7] SSH listo en ssh4.vast.ai:21482 (0.7 min), subiendo 2.5 MB
+17:12:00  [c6] SSH listo en ssh4.vast.ai:21482 (0.7 min), subiendo 2.5 MB
+```
+
+**El mismo `ssh_host:puerto` para dos instancias distintas** (48581482 y 48581483), publicado
+por la API de Vast mientras las dos arrancaban. Las dos hebras subieron el payload a la
+**misma** máquina; la instalación de una borró el `payload.tar.gz` de la otra
+(`INSTALL` hace `rm -f`), y el fallo se leyó como *«el payload subió pero no se pudo
+desempaquetar»*. Se destruyeron las dos máquinas y **se apuntó en la lista negra a dos hosts
+que no habían hecho nada** (27568 y 137844, desbloqueados después).
+
+**Lo que se rompió de verdad no es eso.** Ese camino fue ruidoso y se detuvo solo. El
+peligro está en la carrera que sale al revés: si las dos instalaciones hubieran terminado,
+**dos lotes habrían entrenado en la misma máquina**, compartiendo `/root/bench/runs/`,
+peleándose por los núcleos —lo que además corrompe el `s/época` que la §4.2 vigila— y con
+otra máquina alquilada sin hacer nada y facturando. Eso no habría dado un error: **habría
+dado números.**
+
+Se paró la flota a los dos minutos (nada había entrenado todavía), se destruyó todo
+—verificado: *«No hay ninguna instancia viva»*— y costó **0,05 $**.
+
+**La corrección, en dos capas, porque una no basta:**
+
+1. **Registro de destinos.** Ningún destino SSH puede estar reclamado por dos lotes. Si la
+   API da uno ya reclamado, se le vuelve a preguntar (el dato se corrige solo en segundos,
+   porque describe una instancia que aún está arrancando). Es la defensa barata.
+2. **Un sello en la máquina.** Antes de subir nada se escribe un nonce en
+   `/root/.duenno-estudio` y se relee; y se **vuelve a comprobar justo antes de arrancar el
+   entrenamiento**. Esta es la que cierra el agujero: el registro sólo sabe lo que este
+   proceso ha repartido, así que no distingue *«soy el primero»* de *«soy el equivocado»*.
+   El sello no se cree a nadie — si dos hebras acaban en la misma máquina, la segunda pisa
+   el fichero y la primera lo nota.
+
+⚠ **Y una suplantación NO va a la lista negra.** El host no ha hecho nada; se equivocó el
+catálogo. Bloquearlo sería castigar al inocente y, peor, ir vaciando un catálogo que ya sólo
+tiene 22 máquinas para este filtro. Es la misma regla que ya estaba escrita para la lentitud
+sobrevenida, aplicada a un caso nuevo.
+
+**La lección general, indexada por la acción que la dispara y no por su primera víctima:**
+*al identificar una máquina alquilada por lo que dice el catálogo, comprobarlo contra la
+propia máquina antes de darle trabajo.* El identificador que un proveedor publica sobre un
+recurso que todavía está arrancando puede ser de otro, y el síntoma no es un error: es un
+resultado.
+
 ### 4.3 El libro de a bordo: cada época, en git
 
 Con `--git`, en cada sonda (`--cada 60`, y las épocas duran 40-60 s: en la práctica **una
