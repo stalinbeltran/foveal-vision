@@ -1,0 +1,390 @@
+{
+  "recorrido": "nl5-L4",
+  "eje": "n_layers",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.002182431543539775,
+  "delta_fuente": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "n_layers": 4
+      },
+      "value": 0.9340627672774753,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.929590235396687,
+      "value_max": 0.9415945078828439,
+      "value_std": 0.0048800652875947296,
+      "value_sem": 0.002182431543539775,
+      "runs": [
+        "nl5-L4-0003-n_layers4_seed4",
+        "nl5-L4-0004-n_layers4_seed5",
+        "nl5-L4-0001-n_layers4_seed2",
+        "nl5-L4-0000-n_layers4_seed1",
+        "nl5-L4-0002-n_layers4_seed3"
+      ],
+      "seconds_per_epoch": 46.3312
+    },
+    {
+      "point": {
+        "n_layers": 3
+      },
+      "value": 0.9245532306031023,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9180339193810231,
+      "value_max": 0.9313019199613939,
+      "value_std": 0.005760542923571388,
+      "value_sem": 0.0025761931128821997,
+      "runs": [
+        "nl5-L4-0005-n_layers3_seed1",
+        "nl5-L4-0007-n_layers3_seed3",
+        "nl5-L4-0006-n_layers3_seed2",
+        "nl5-L4-0009-n_layers3_seed5",
+        "nl5-L4-0008-n_layers3_seed4"
+      ],
+      "seconds_per_epoch": 39.9208
+    },
+    {
+      "point": {
+        "n_layers": 5
+      },
+      "value": 0.9135687795998061,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.8585163334425872,
+      "value_max": 0.9414639182353144,
+      "value_std": 0.03272097426908133,
+      "value_sem": 0.014633264551137467,
+      "runs": [
+        "nl5-L4-0011-n_layers5_seed2",
+        "nl5-L4-0014-n_layers5_seed5",
+        "nl5-L4-0013-n_layers5_seed4",
+        "nl5-L4-0010-n_layers5_seed1",
+        "nl5-L4-0012-n_layers5_seed3"
+      ],
+      "seconds_per_epoch": 52.295399999999994
+    },
+    {
+      "point": {
+        "n_layers": 2
+      },
+      "value": 0.9066057922655579,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9007977800901839,
+      "value_max": 0.9119185152271251,
+      "value_std": 0.004052825956020111,
+      "value_sem": 0.001812478867727308,
+      "runs": [
+        "nl5-L4-0018-n_layers2_seed4",
+        "nl5-L4-0017-n_layers2_seed3",
+        "nl5-L4-0016-n_layers2_seed2",
+        "nl5-L4-0019-n_layers2_seed5",
+        "nl5-L4-0015-n_layers2_seed1"
+      ],
+      "seconds_per_epoch": 31.865199999999998
+    }
+  ],
+  "detalle": [
+    {
+      "run": "nl5-L4-0003-n_layers4_seed4",
+      "punto": {
+        "n_layers": 4,
+        "seed": 4
+      },
+      "valor": 0.9415945078828439,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 48.646
+    },
+    {
+      "run": "nl5-L4-0011-n_layers5_seed2",
+      "punto": {
+        "n_layers": 5,
+        "seed": 2
+      },
+      "valor": 0.9414639182353144,
+      "epocas": 54,
+      "mejor_epoca": 44,
+      "paro_patience": true,
+      "s_por_epoca": 46.643
+    },
+    {
+      "run": "nl5-L4-0004-n_layers4_seed5",
+      "punto": {
+        "n_layers": 4,
+        "seed": 5
+      },
+      "valor": 0.9360301679808022,
+      "epocas": 70,
+      "mejor_epoca": 60,
+      "paro_patience": true,
+      "s_por_epoca": 48.909
+    },
+    {
+      "run": "nl5-L4-0001-n_layers4_seed2",
+      "punto": {
+        "n_layers": 4,
+        "seed": 2
+      },
+      "valor": 0.93255579853518,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 40.38
+    },
+    {
+      "run": "nl5-L4-0014-n_layers5_seed5",
+      "punto": {
+        "n_layers": 5,
+        "seed": 5
+      },
+      "valor": 0.9323768401727128,
+      "epocas": 48,
+      "mejor_epoca": 38,
+      "paro_patience": true,
+      "s_por_epoca": 56.909
+    },
+    {
+      "run": "nl5-L4-0005-n_layers3_seed1",
+      "punto": {
+        "n_layers": 3,
+        "seed": 1
+      },
+      "valor": 0.9313019199613939,
+      "epocas": 52,
+      "mejor_epoca": 42,
+      "paro_patience": true,
+      "s_por_epoca": 37.234
+    },
+    {
+      "run": "nl5-L4-0000-n_layers4_seed1",
+      "punto": {
+        "n_layers": 4,
+        "seed": 1
+      },
+      "valor": 0.9305431265918633,
+      "epocas": 54,
+      "mejor_epoca": 44,
+      "paro_patience": true,
+      "s_por_epoca": 42.884
+    },
+    {
+      "run": "nl5-L4-0007-n_layers3_seed3",
+      "punto": {
+        "n_layers": 3,
+        "seed": 3
+      },
+      "valor": 0.9296311702717693,
+      "epocas": 54,
+      "mejor_epoca": 44,
+      "paro_patience": true,
+      "s_por_epoca": 41.95
+    },
+    {
+      "run": "nl5-L4-0002-n_layers4_seed3",
+      "punto": {
+        "n_layers": 4,
+        "seed": 3
+      },
+      "valor": 0.929590235396687,
+      "epocas": 48,
+      "mejor_epoca": 38,
+      "paro_patience": true,
+      "s_por_epoca": 50.837
+    },
+    {
+      "run": "nl5-L4-0013-n_layers5_seed4",
+      "punto": {
+        "n_layers": 5,
+        "seed": 4
+      },
+      "valor": 0.924267969583319,
+      "epocas": 59,
+      "mejor_epoca": 49,
+      "paro_patience": true,
+      "s_por_epoca": 54.168
+    },
+    {
+      "run": "nl5-L4-0006-n_layers3_seed2",
+      "punto": {
+        "n_layers": 3,
+        "seed": 2
+      },
+      "valor": 0.923451974646514,
+      "epocas": 34,
+      "mejor_epoca": 24,
+      "paro_patience": true,
+      "s_por_epoca": 36.044
+    },
+    {
+      "run": "nl5-L4-0009-n_layers3_seed5",
+      "punto": {
+        "n_layers": 3,
+        "seed": 5
+      },
+      "valor": 0.9203471687548119,
+      "epocas": 51,
+      "mejor_epoca": 41,
+      "paro_patience": true,
+      "s_por_epoca": 43.207
+    },
+    {
+      "run": "nl5-L4-0008-n_layers3_seed4",
+      "punto": {
+        "n_layers": 3,
+        "seed": 4
+      },
+      "valor": 0.9180339193810231,
+      "epocas": 52,
+      "mejor_epoca": 42,
+      "paro_patience": true,
+      "s_por_epoca": 41.169
+    },
+    {
+      "run": "nl5-L4-0018-n_layers2_seed4",
+      "punto": {
+        "n_layers": 2,
+        "seed": 4
+      },
+      "valor": 0.9119185152271251,
+      "epocas": 62,
+      "mejor_epoca": 52,
+      "paro_patience": true,
+      "s_por_epoca": 34.458
+    },
+    {
+      "run": "nl5-L4-0010-n_layers5_seed1",
+      "punto": {
+        "n_layers": 5,
+        "seed": 1
+      },
+      "valor": 0.9112188365650968,
+      "epocas": 36,
+      "mejor_epoca": 26,
+      "paro_patience": true,
+      "s_por_epoca": 47.184
+    },
+    {
+      "run": "nl5-L4-0017-n_layers2_seed3",
+      "punto": {
+        "n_layers": 2,
+        "seed": 3
+      },
+      "valor": 0.9082359546618943,
+      "epocas": 67,
+      "mejor_epoca": 57,
+      "paro_patience": true,
+      "s_por_epoca": 34.741
+    },
+    {
+      "run": "nl5-L4-0016-n_layers2_seed2",
+      "punto": {
+        "n_layers": 2,
+        "seed": 2
+      },
+      "valor": 0.9065085493656923,
+      "epocas": 39,
+      "mejor_epoca": 29,
+      "paro_patience": true,
+      "s_por_epoca": 29.714
+    },
+    {
+      "run": "nl5-L4-0019-n_layers2_seed5",
+      "punto": {
+        "n_layers": 2,
+        "seed": 5
+      },
+      "valor": 0.9055681619828939,
+      "epocas": 67,
+      "mejor_epoca": 57,
+      "paro_patience": true,
+      "s_por_epoca": 31.927
+    },
+    {
+      "run": "nl5-L4-0015-n_layers2_seed1",
+      "punto": {
+        "n_layers": 2,
+        "seed": 1
+      },
+      "valor": 0.9007977800901839,
+      "epocas": 61,
+      "mejor_epoca": 51,
+      "paro_patience": true,
+      "s_por_epoca": 28.486
+    },
+    {
+      "run": "nl5-L4-0012-n_layers5_seed3",
+      "punto": {
+        "n_layers": 5,
+        "seed": 3
+      },
+      "valor": 0.8585163334425872,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 56.573
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": 3,
+      "diff": -0.009509536674372931,
+      "p": 0.03968253968253968,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": 5,
+      "diff": -0.02049398767766919,
+      "p": 0.16666666666666666,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": 2,
+      "diff": -0.02745697501191735,
+      "p": 0.007936507936507936,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    }
+  ],
+  "pendientes": [],
+  "sugerido": {
+    "n_layers": 4
+  }
+}

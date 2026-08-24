@@ -1,0 +1,485 @@
+{
+  "recorrido": "bs5-L4",
+  "eje": "batch_size",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.004014146456080121,
+  "delta_fuente": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "batch_size": 192
+      },
+      "value": 0.9350869231782779,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9196689386562805,
+      "value_max": 0.9428226779252111,
+      "value_std": 0.008975904347435025,
+      "value_sem": 0.004014146456080121,
+      "runs": [
+        "bs5-L4-0022-batch_size192_seed3",
+        "bs5-L4-0020-batch_size192_seed1",
+        "bs5-L4-0021-batch_size192_seed2",
+        "bs5-L4-0023-batch_size192_seed4",
+        "bs5-L4-0024-batch_size192_seed5"
+      ],
+      "seconds_per_epoch": 35.2858
+    },
+    {
+      "point": {
+        "batch_size": 85
+      },
+      "value": 0.9340627672774753,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.929590235396687,
+      "value_max": 0.9415945078828439,
+      "value_std": 0.0048800652875947296,
+      "value_sem": 0.002182431543539775,
+      "runs": [
+        "bs5-L4-0003-batch_size85_seed4",
+        "bs5-L4-0004-batch_size85_seed5",
+        "bs5-L4-0001-batch_size85_seed2",
+        "bs5-L4-0000-batch_size85_seed1",
+        "bs5-L4-0002-batch_size85_seed3"
+      ],
+      "seconds_per_epoch": 38.056599999999996
+    },
+    {
+      "point": {
+        "batch_size": 128
+      },
+      "value": 0.9317254458828741,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9211618257261411,
+      "value_max": 0.9419057130066462,
+      "value_std": 0.0092370746172673,
+      "value_sem": 0.004130945351489506,
+      "runs": [
+        "bs5-L4-0012-batch_size128_seed3",
+        "bs5-L4-0011-batch_size128_seed2",
+        "bs5-L4-0013-batch_size128_seed4",
+        "bs5-L4-0014-batch_size128_seed5",
+        "bs5-L4-0010-batch_size128_seed1"
+      ],
+      "seconds_per_epoch": 35.9522
+    },
+    {
+      "point": {
+        "batch_size": 57
+      },
+      "value": 0.9301982182886332,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9268723064915674,
+      "value_max": 0.9330543933054394,
+      "value_std": 0.00274464805772959,
+      "value_sem": 0.001227443926279226,
+      "runs": [
+        "bs5-L4-0006-batch_size57_seed2",
+        "bs5-L4-0007-batch_size57_seed3",
+        "bs5-L4-0008-batch_size57_seed4",
+        "bs5-L4-0009-batch_size57_seed5",
+        "bs5-L4-0005-batch_size57_seed1"
+      ],
+      "seconds_per_epoch": 40.067
+    },
+    {
+      "point": {
+        "batch_size": 38
+      },
+      "value": 0.9197366785441495,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9149239709106092,
+      "value_max": 0.9306536799506139,
+      "value_std": 0.006385483887094687,
+      "value_sem": 0.002855675208154662,
+      "runs": [
+        "bs5-L4-0015-batch_size38_seed1",
+        "bs5-L4-0016-batch_size38_seed2",
+        "bs5-L4-0019-batch_size38_seed5",
+        "bs5-L4-0018-batch_size38_seed4",
+        "bs5-L4-0017-batch_size38_seed3"
+      ],
+      "seconds_per_epoch": 45.9014
+    }
+  ],
+  "detalle": [
+    {
+      "run": "bs5-L4-0022-batch_size192_seed3",
+      "punto": {
+        "batch_size": 192,
+        "seed": 3
+      },
+      "valor": 0.9428226779252111,
+      "epocas": 66,
+      "mejor_epoca": 56,
+      "paro_patience": true,
+      "s_por_epoca": 37.652
+    },
+    {
+      "run": "bs5-L4-0012-batch_size128_seed3",
+      "punto": {
+        "batch_size": 128,
+        "seed": 3
+      },
+      "valor": 0.9419057130066462,
+      "epocas": 56,
+      "mejor_epoca": 46,
+      "paro_patience": true,
+      "s_por_epoca": 40.011
+    },
+    {
+      "run": "bs5-L4-0003-batch_size85_seed4",
+      "punto": {
+        "batch_size": 85,
+        "seed": 4
+      },
+      "valor": 0.9415945078828439,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 38.056
+    },
+    {
+      "run": "bs5-L4-0020-batch_size192_seed1",
+      "punto": {
+        "batch_size": 192,
+        "seed": 1
+      },
+      "valor": 0.9387670808522355,
+      "epocas": 61,
+      "mejor_epoca": 51,
+      "paro_patience": true,
+      "s_por_epoca": 31.378
+    },
+    {
+      "run": "bs5-L4-0021-batch_size192_seed2",
+      "punto": {
+        "batch_size": 192,
+        "seed": 2
+      },
+      "valor": 0.938344827586207,
+      "epocas": 65,
+      "mejor_epoca": 55,
+      "paro_patience": true,
+      "s_por_epoca": 34.126
+    },
+    {
+      "run": "bs5-L4-0011-batch_size128_seed2",
+      "punto": {
+        "batch_size": 128,
+        "seed": 2
+      },
+      "valor": 0.9383127015499846,
+      "epocas": 42,
+      "mejor_epoca": 32,
+      "paro_patience": true,
+      "s_por_epoca": 34.754
+    },
+    {
+      "run": "bs5-L4-0004-batch_size85_seed5",
+      "punto": {
+        "batch_size": 85,
+        "seed": 5
+      },
+      "valor": 0.9360301679808022,
+      "epocas": 70,
+      "mejor_epoca": 60,
+      "paro_patience": true,
+      "s_por_epoca": 39.716
+    },
+    {
+      "run": "bs5-L4-0023-batch_size192_seed4",
+      "punto": {
+        "batch_size": 192,
+        "seed": 4
+      },
+      "valor": 0.9358310908714551,
+      "epocas": 52,
+      "mejor_epoca": 42,
+      "paro_patience": true,
+      "s_por_epoca": 37.425
+    },
+    {
+      "run": "bs5-L4-0013-batch_size128_seed4",
+      "punto": {
+        "batch_size": 128,
+        "seed": 4
+      },
+      "valor": 0.9342551079776857,
+      "epocas": 39,
+      "mejor_epoca": 29,
+      "paro_patience": true,
+      "s_por_epoca": 38.974
+    },
+    {
+      "run": "bs5-L4-0006-batch_size57_seed2",
+      "punto": {
+        "batch_size": 57,
+        "seed": 2
+      },
+      "valor": 0.9330543933054394,
+      "epocas": 42,
+      "mejor_epoca": 32,
+      "paro_patience": true,
+      "s_por_epoca": 37.284
+    },
+    {
+      "run": "bs5-L4-0001-batch_size85_seed2",
+      "punto": {
+        "batch_size": 85,
+        "seed": 2
+      },
+      "valor": 0.93255579853518,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 38.181
+    },
+    {
+      "run": "bs5-L4-0007-batch_size57_seed3",
+      "punto": {
+        "batch_size": 57,
+        "seed": 3
+      },
+      "valor": 0.9323873121869785,
+      "epocas": 32,
+      "mejor_epoca": 22,
+      "paro_patience": true,
+      "s_por_epoca": 45.092
+    },
+    {
+      "run": "bs5-L4-0008-batch_size57_seed4",
+      "punto": {
+        "batch_size": 57,
+        "seed": 4
+      },
+      "valor": 0.9308621407746772,
+      "epocas": 34,
+      "mejor_epoca": 24,
+      "paro_patience": true,
+      "s_por_epoca": 41.353
+    },
+    {
+      "run": "bs5-L4-0015-batch_size38_seed1",
+      "punto": {
+        "batch_size": 38,
+        "seed": 1
+      },
+      "valor": 0.9306536799506139,
+      "epocas": 61,
+      "mejor_epoca": 51,
+      "paro_patience": true,
+      "s_por_epoca": 40.686
+    },
+    {
+      "run": "bs5-L4-0000-batch_size85_seed1",
+      "punto": {
+        "batch_size": 85,
+        "seed": 1
+      },
+      "valor": 0.9305431265918633,
+      "epocas": 54,
+      "mejor_epoca": 44,
+      "paro_patience": true,
+      "s_por_epoca": 32.122
+    },
+    {
+      "run": "bs5-L4-0002-batch_size85_seed3",
+      "punto": {
+        "batch_size": 85,
+        "seed": 3
+      },
+      "valor": 0.929590235396687,
+      "epocas": 48,
+      "mejor_epoca": 38,
+      "paro_patience": true,
+      "s_por_epoca": 42.208
+    },
+    {
+      "run": "bs5-L4-0009-batch_size57_seed5",
+      "punto": {
+        "batch_size": 57,
+        "seed": 5
+      },
+      "valor": 0.9278149386845039,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 42.076
+    },
+    {
+      "run": "bs5-L4-0005-batch_size57_seed1",
+      "punto": {
+        "batch_size": 57,
+        "seed": 1
+      },
+      "valor": 0.9268723064915674,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 34.53
+    },
+    {
+      "run": "bs5-L4-0014-batch_size128_seed5",
+      "punto": {
+        "batch_size": 128,
+        "seed": 5
+      },
+      "valor": 0.9229918811539126,
+      "epocas": 70,
+      "mejor_epoca": 60,
+      "paro_patience": true,
+      "s_por_epoca": 37.332
+    },
+    {
+      "run": "bs5-L4-0010-batch_size128_seed1",
+      "punto": {
+        "batch_size": 128,
+        "seed": 1
+      },
+      "valor": 0.9211618257261411,
+      "epocas": 57,
+      "mejor_epoca": 47,
+      "paro_patience": true,
+      "s_por_epoca": 28.69
+    },
+    {
+      "run": "bs5-L4-0016-batch_size38_seed2",
+      "punto": {
+        "batch_size": 38,
+        "seed": 2
+      },
+      "valor": 0.9198500842416532,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 43.52
+    },
+    {
+      "run": "bs5-L4-0024-batch_size192_seed5",
+      "punto": {
+        "batch_size": 192,
+        "seed": 5
+      },
+      "valor": 0.9196689386562805,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 35.848
+    },
+    {
+      "run": "bs5-L4-0019-batch_size38_seed5",
+      "punto": {
+        "batch_size": 38,
+        "seed": 5
+      },
+      "valor": 0.9174680041508128,
+      "epocas": 77,
+      "mejor_epoca": 67,
+      "paro_patience": true,
+      "s_por_epoca": 50.975
+    },
+    {
+      "run": "bs5-L4-0018-batch_size38_seed4",
+      "punto": {
+        "batch_size": 38,
+        "seed": 4
+      },
+      "valor": 0.9157876534670586,
+      "epocas": 34,
+      "mejor_epoca": 24,
+      "paro_patience": true,
+      "s_por_epoca": 46.963
+    },
+    {
+      "run": "bs5-L4-0017-batch_size38_seed3",
+      "punto": {
+        "batch_size": 38,
+        "seed": 3
+      },
+      "valor": 0.9149239709106092,
+      "epocas": 32,
+      "mejor_epoca": 22,
+      "paro_patience": true,
+      "s_por_epoca": 47.363
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": 192,
+      "diff": 0.0010241559008026258,
+      "p": 0.8571428571428571,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": 128,
+      "diff": -0.0023373213946011884,
+      "p": 0.6111111111111112,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": 57,
+      "diff": -0.0038645489888420315,
+      "p": 0.1746031746031746,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": 38,
+      "diff": -0.014326088733325748,
+      "p": 0.023809523809523808,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    }
+  ],
+  "pendientes": [],
+  "sugerido": {
+    "batch_size": 192
+  }
+}
