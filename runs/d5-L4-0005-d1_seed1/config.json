@@ -1,0 +1,99 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "lr": 0.0014,
+    "optimizer": "adam",
+    "momentum": 0.9,
+    "weight_decay": 0.0,
+    "batch_size": 85,
+    "epochs": 150,
+    "scheduler": "none",
+    "patience": 10,
+    "lambda_pos": 1.0,
+    "pos_weight": 1.0,
+    "smooth_l1_beta": 0.08,
+    "monitor": "val_loss",
+    "seed": 1
+  },
+  "network": {
+    "N": 20,
+    "c_frac": 0.8,
+    "d": 1,
+    "pen_frac": 0.1,
+    "n_layers": 4,
+    "k_center": 3,
+    "k_periph": 3,
+    "s_center": 1,
+    "s_periph": 1,
+    "channels": [
+      16,
+      16,
+      16,
+      16
+    ],
+    "merge": "concat",
+    "pool_mode": "avg",
+    "pad_mode": "edge",
+    "regions": "split"
+  },
+  "execution": {
+    "device": "cpu",
+    "num_workers": 0
+  },
+  "provenance": {
+    "window_dataset": {
+      "name": "dirty1000-80px-16px-r20260824",
+      "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+    },
+    "network": {
+      "name": null,
+      "value": {
+        "N": 20,
+        "c_frac": 0.8,
+        "d": 1,
+        "pen_frac": 0.1,
+        "n_layers": 4,
+        "k_center": 3,
+        "k_periph": 3,
+        "s_center": 1,
+        "s_periph": 1,
+        "channels": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "merge": "concat",
+        "pool_mode": "avg",
+        "pad_mode": "edge",
+        "regions": "split"
+      }
+    },
+    "recipe": {
+      "name": "plan40",
+      "value": {
+        "lr": 0.0014,
+        "optimizer": "adam",
+        "momentum": 0.9,
+        "weight_decay": 0.0,
+        "batch_size": 85,
+        "epochs": 150,
+        "scheduler": "none",
+        "patience": 10,
+        "lambda_pos": 1.0,
+        "pos_weight": 1.0,
+        "smooth_l1_beta": 0.08,
+        "monitor": "val_loss",
+        "seed": 1
+      }
+    },
+    "sweep": "d5-L4",
+    "git_commit": "unknown: not a git repository",
+    "environment": {
+      "python": "3.12.3",
+      "torch": "2.13.0+cpu",
+      "platform": "linux",
+      "device": "cpu"
+    }
+  }
+}
