@@ -1,0 +1,17 @@
+{
+  "run": "bs-alto-fov-0007-batch_size1536_seed2",
+  "epochs_run": 130,
+  "epochs_requested": 300,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.10464418569410389,
+  "best_epoch": 120,
+  "seconds_per_epoch": 64.881,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
