@@ -131,3 +131,81 @@ Sin medir todavía en esta máquina. Referencia: la foveada L4 va a **106 s/épo
 **30 runs**, comparable al recorrido que corre ahora (~33 h). **No se lanza nada hasta que
 `p40-lr-L4` cierre**, y el coste se mide con la máquina libre — el micro-benchmark bajo carga ya
 mintió una vez (34 h estimadas contra 22 h reales, plan-40h.md §7).
+
+---
+
+## 6. Los parámetros óptimos DE la plana — criterio escrito antes (2026-08-25)
+
+> Añadido antes de que exista un solo run de esta parte. §1–§5 fijaron *qué red* es el control;
+> esto fija *con qué hiperparámetros* se la entrena, que es un paso previo obligatorio: comparar
+> la foveada afinada contra una plana sin afinar mediría el afinado, no la arquitectura.
+
+### 6.1 La red: `plana-24-single`, y por qué esos números
+
+La comparación exige dos cosas a la vez, y ninguna es negociable:
+
+1. **La misma entrada — la misma información, no el mismo tensor.** La foveada tiene un tensor
+   de 20×20, pero el área **original** que cubre es **24×24**: la periferia comprime ×2. MEDIDO:
+   `dims_of(...).original_size == 24`. Así que la plana es `N=24`, `c_frac=16/24` (para que
+   `center_out` siga siendo la ventana de 16, contrato ①a) y `d=1`.
+2. **Aproximadamente los mismos parámetros.** Con `channels=[16]×4` la plana sale a **117.724**
+   contra **167.852** de la foveada: **0,70×**. No es un detalle: la cabeza es el 92 % del modelo,
+   y una rama sobre 24×24 da 9.216 *features* planas contra las 12.800 de dos ramas sobre 20×20.
+   Ensanchando a **22 canales**: **165.430, o sea 0,99×**. MEDIDO.
+
+O sea que ésta es la red que funde los controles **B** y **D** de §3 en una sola: misma área *y*
+mismos parámetros. Se hace así porque son las dos objeciones que se le pueden poner al resultado
+—«vio menos» y «tenía menos cabeza»— y separarlas costaría dos estudios enteros.
+
+⚠ **`d` no se barre, y es el único eje del estudio foveado que no se replica.** Con
+`regions=single`, subir `d` agranda el **área original** (`d=2` → 32×32, medido), así que dejaría
+de ser «la misma entrada» y rompería justo la premisa. Se dice aquí para que la ausencia no se lea
+como un olvido.
+
+⚠ **Un arreglo que hizo falta para que el eje `n_layers` midiera lo que dice.** `expand_points`
+reescribía los canales a `[16]×L` al mover la profundidad, así que sobre una base de `[22]×4`
+habría movido **anchura y profundidad a la vez**, sin decirlo. Ahora conserva el ancho uniforme de
+la base. Para las bases `[16]×L` —todos los recorridos anteriores— el ancho uniforme *es* 16, así
+que **no cambia nada de lo ya medido** (163 tests en verde).
+
+### 6.2 Dos fases, y qué puede decir cada una
+
+**Fase 1 — tanteo (2 semillas, rangos anchos).** Su único trabajo es **acotar**. Un óptimo no se
+hereda al cambiar de arquitectura: es literalmente el motivo por el que existió
+[plan-lr-L4.md](plan-lr-L4.md), que tuvo que rebarrer `lr` al cambiar de L2 a L4. Partir de los
+rangos de la foveada sería suponer la respuesta.
+
+| eje | rango del tanteo | span | por qué |
+|---|---|---|---|
+| `lr` | 0,00035 · 0,0007 · 0,0014 · 0,0028 · 0,0056 | **16×** | el óptimo de la foveada (0,0014) queda en el centro, como ancla, no como predicción |
+| `batch_size` | 24 · 43 · 85 · 170 · 340 | **14×** | igual; y cubre los dos vecindarios que los estudios viejos señalaron (25 y 85) |
+
+⚠ **Con 2 semillas la permutación exacta da 2 arreglos: el tanteo NO puede declarar ningún
+ganador, y no lo intenta.** Es la misma regla que [plan-40h.md](plan-40h.md) §2 escribió para su
+cribado. Lo que sí distingue —y basta para acotar— es una zona donde el entrenamiento converge de
+otra donde diverge o se arrastra.
+
+⚠ **`n_layers` no entra en el tanteo, a propósito.** No hay nada que acotar: el rango natural es
+discreto y pequeño, y el estudio foveado ya lo dejó cerrado por los dos lados en `[2..5]`. Se
+barrerá directamente en la fase 2 con ese mismo rango, que es además lo que hace comparables los
+dos estudios.
+
+**Fase 2 — final (5 semillas, rangos acotados por la fase 1).** Mismas reglas R1–R6 de
+[plan-tres-ejes.md](plan-tres-ejes.md) §5, mismo reparto —**una máquina por recorrido × semilla**—
+y mismo tope de 150 épocas con `patience` decidiendo. Los rangos de la fase 2 se pasan por la línea
+de órdenes **a propósito**: así la decisión que se toma al ver el tanteo queda escrita en el
+comando y aquí, en vez de escondida en una constante.
+
+### 6.3 Coste
+
+Tanteo: 20 runs, **una máquina por punto**, ~1 h de reloj y **0,96–1,22 $** estimados. Se reparte
+por punto y no por semilla porque un tanteo lento no sirve de tanteo: por semilla serían 3-4 h.
+
+⚠ El reparto por punto es aceptable **aquí** porque el tanteo no decide nada (§6.2) y porque
+`--cpu 'E5-26'` fija la familia, con lo que el ruido de máquina es cero
+([plan-lr-alto.md](plan-lr-alto.md) §7.4, ahora confirmado con 5 pares idénticos bit a bit en
+[plan-tres-ejes.md](plan-tres-ejes.md) §7). La fase 2, que sí decide, vuelve al reparto por semilla.
+
+**MEDIDO antes de lanzar**: la plana va a **125 ms/paso** contra 113 de la foveada en el droplet de
+control (2 vCPU) — **1,11× más lenta**, que es lo que cuesta una rama sobre 24×24 con 22 canales
+frente a dos sobre 20×20 con 16.

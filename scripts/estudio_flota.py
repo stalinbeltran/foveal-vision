@@ -640,9 +640,29 @@ class Maquinas:
 
     def __init__(self, cuantas: int, repuestos: int, cpus: int, max_cpus: int,
                  min_ram: float, max_price: float, cpu: str = ""):
-        self.pool = V.elegir_ofertas_distintas(
-            cuantas + repuestos, cpus=cpus, max_cpus=max_cpus,
+        # Nunca alquilar una maquina que YA estoy usando. Sin esto, dos flotas a
+        # la vez -- un estudio corriendo y otro que se lanza -- eligen ambas por
+        # precio, o sea que eligen las MISMAS ofertas, y la segunda se encuentra
+        # la maquina ocupada. El sintoma seria un fallo de alquiler apuntado en
+        # la lista negra contra un host que estaba perfectamente: la cuarta
+        # variante del mismo error de atribucion en este estudio.
+        try:
+            en_uso = {int(i["machine_id"]) for i in V.instancias()
+                      if i.get("machine_id") is not None}
+        except Exception:                               # noqa: BLE001
+            en_uso = set()
+        margen = len(en_uso)
+        ofertas = V.elegir_ofertas_distintas(
+            cuantas + repuestos + margen, cpus=cpus, max_cpus=max_cpus,
             min_ram_gb=min_ram, max_price=max_price, cpu=cpu)
+        self.pool = [o for o in ofertas if int(o.get("machine_id", -1)) not in en_uso]
+        if en_uso:
+            log(f"  ({len(ofertas) - len(self.pool)} ofertas saltadas por estar YA "
+                f"alquiladas por mi: {sorted(en_uso)})")
+        if len(self.pool) < cuantas:
+            die(f"tras descartar las {len(en_uso)} maquinas que ya tengo alquiladas "
+                f"quedan {len(self.pool)} y hacen falta {cuantas}.\n"
+                f"  O esperas a que termine la otra flota, o aflojas --cpu/--cpus.")
         self.entregadas: list = []
 
     def siguiente(self) -> "dict | None":

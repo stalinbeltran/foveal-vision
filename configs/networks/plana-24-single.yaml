@@ -1,0 +1,37 @@
+format_version: 1
+# Control B/D de docs/plan-cnn-plana.md §3, fundidos en una sola red: la CNN
+# "tipica" contra la que se compara la foveada.
+#
+# Dos condiciones a la vez, y por eso los numeros son estos y no otros:
+#
+# 1. MISMA ENTRADA. La foveada (N=20, c_frac=0,8, d=2) tiene un tensor de 20x20,
+#    pero el area ORIGINAL que cubre es 24x24 -- la periferia comprime x2
+#    (`dims_of(...).original_size == 24`, comprobado). Asi que "todo lo que le
+#    llega a la foveada" son 24 px de lado, no 20: N=24, c_frac=16/24 para que
+#    center_out siga siendo la ventana de 16 (contrato ①a), y d=1 para no
+#    comprimir nada.
+# 2. MISMOS PARAMETROS. Con channels=[16]x4 esta red sale a 117.724 parametros,
+#    0,70x de los 167.852 de la foveada -- la cabeza es el 92 % del modelo y una
+#    sola rama sobre 24x24 da menos features planas (9.216) que dos ramas sobre
+#    20x20 (12.800). Ensanchando a 22 canales: 165.430, o sea 0,99x. MEDIDO.
+#
+# regions: single => UNA rama sobre todo el input, sin enmascarar y sin
+# periferia. k_periph / s_periph / merge no aplican (la puerta no los valida).
+#
+# ⚠ `d` NO se barre en esta red, y no es un olvido: con regions=single, subir `d`
+# agranda el AREA ORIGINAL (d=2 -> 32x32, medido), asi que dejaria de ser "la
+# misma entrada" y rompe justo la premisa de la comparacion.
+regions: single
+N: 24
+c_frac: 0.6666666666666666
+d: 1
+pen_frac: 0.1
+n_layers: 4
+k_center: 3
+k_periph: 3
+s_center: 1
+s_periph: 1
+channels: [22, 22, 22, 22]
+merge: concat
+pool_mode: avg
+pad_mode: edge

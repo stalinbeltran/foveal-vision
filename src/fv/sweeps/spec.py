@@ -125,10 +125,23 @@ def expand_points(spec: dict, base_network: dict) -> tuple[list[dict], list[dict
         net = dict(base)
         net.update({k: v for k, v in overrides.items() if k in NETWORK_PARAMS})
         # channels depends on n_layers (§6.1): sweeping depth WITHOUT sweeping
-        # channels resizes the vector to the default rule [16]*L (§3.2), so the
-        # point stays valid instead of carrying the base's stale channel length.
+        # channels resizes the vector, so the point stays valid instead of
+        # carrying the base's stale channel length.
+        #
+        # QUE anchura, y por que no siempre la del default: si la base declara un
+        # ancho UNIFORME propio, se conserva ese. Poner [16]*L de oficio sobre una
+        # base de, por ejemplo, [22,22,22,22] movería la ANCHURA al barrer la
+        # PROFUNDIDAD -- dos cosas a la vez en un eje que dice medir una, y sin
+        # decirlo. Es el fallo silencioso que el proyecto persigue: el eje mediría
+        # otra cosa y la tabla saldría igual de creíble.
+        # Para una base con [16]*L -- todos los recorridos anteriores a esto -- el
+        # ancho uniforme ES 16, así que el comportamiento no cambia en nada ya
+        # medido.
         if "n_layers" in overrides and "channels" not in overrides:
-            net["channels"] = [DEFAULT_CHANNEL] * int(overrides["n_layers"])
+            base_ch = list(base.get("channels") or [])
+            ancho = (int(base_ch[0]) if base_ch and len(set(base_ch)) == 1
+                     else DEFAULT_CHANNEL)
+            net["channels"] = [ancho] * int(overrides["n_layers"])
         recipe_over = {k: v for k, v in overrides.items() if k in RECIPE_PARAMS}
         problems = check_network(net)
         if problems:
