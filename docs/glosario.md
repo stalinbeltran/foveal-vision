@@ -37,7 +37,8 @@ Regla: cuando una palabra tiene dos significados, **en prosa y en la UI se cuali
 
 - **La ventana etiquetada de B == lo que la cabeza de C predice** (contrato ①a). Dos
   declaraciones independientes que deben cuadrar; el validador es quien lo sabe.
-- **`periph_real = periph_out · d`** — «cuánto ve la periferia» no es un parámetro: es el
+- **`border_px`** — «cuánto ve el borde» SÍ es un parámetro desde 2026-08-25, y se declara en px
+  reales. Antes era `periph_real = periph_out · d`, el
   **producto** de dos buscables. Escribirlo como si fuera un parámetro propio es la trampa que
   instructionsNewNN.md §2 desmontó (antes era un 4 fijo).
 
@@ -49,11 +50,15 @@ Regla: cuando una palabra tiene dos significados, **en prosa y en la UI se cuali
 | **exists / score** | `p(hay una esquina de este tipo en la ventana)`; score = `sigmoid(exists)` |
 | **esquina ciega** | Esquina con `corner_evidence` < 0,05: su párrafo cae fuera de la ventana etiquetada. No significa que no se detecte; significa que su **posición** no es deducible de esos píxeles. Es la población que la periferia foveada existe para arreglar (medido en el hermano: 2,30→1,14 px) |
 | **entrada compuesta** | El tensor N×N que consume la red: centro a resolución completa + anillo periférico reducido |
-| **ventana original** | El recorte `original_size × original_size` de la imagen del que se construye la entrada compuesta. `original_size = center_out + 2·periph_out·d` |
-| **centro / fóvea** | Los `center_out × center_out` px centrales, sin reducir |
-| **anillo periférico** | El marco de `periph_out` px de la entrada compuesta; procede de `periph_real = periph_out·d` px reales reducidos ÷d |
+| **ventana original** | El recorte `original_size × original_size` de la imagen del que se construye la entrada compuesta. `original_size = fovea_px + 2·border_px` |
+| **fóvea** (`fovea_px`) | Los `fovea_px × fovea_px` px centrales, sin reducir. **Es la ventana etiquetada de B** (contrato ①a) |
+| **borde difuso** (`border_px`) | Los px reales de contexto alrededor de la fóvea, por lado. Ocupan `border_px / border_reduce` **celdas** en la entrada compuesta |
+| **`border_reduce`** | Cuántos px reales caben en una celda de borde. Es el *método* de reducción, no una longitud. Antes se llamaba `d` **y también movía el área** |
+| **solape** (`overlap_fovea_px`, `overlap_border_px`) | Cuánto de cada región ve *también* la otra rama. Dos números independientes; antes sólo existía el primero (como `pen_frac`) y nunca podía ser 0 |
 | **penetración** | Las `penetration` filas/columnas donde el kernel periférico entra en el centro. **Contributiva**: ambas ramas se suman ahí |
-| **banda periférica** (`periph_band`) | `periph_out + penetration`: la banda útil del kernel externo, la que acota su rango |
+| **banda periférica** (`periph_band`) | `border_cells + overlap_fovea_px`: la banda útil del kernel externo, la que acota su rango |
+| **banda central** (`center_band`) | `fovea_px + 2·overlap_border_cells`: lo que ve la rama de la fóvea, y lo que acota `k_center` |
+| **`N`** | El lado de la entrada compuesta. **Derivado**, no un parámetro: `fovea_px + 2·border_cells` |
 | **rama** | Cada uno de los dos caminos convolucionales (central / periférico), con kernels y strides propios |
 | **máscara de rama** | La que delimita dónde contribuye cada rama sobre la entrada N×N. Se aplica **antes** de convolucionar (opción A, decidida) |
 | **muestreo excluyente vs solape contributivo** | El armado de la entrada es excluyente (cada píxel un origen); el procesamiento es contributivo (las ramas se suman en la penetración). No se contradicen — instructionsNewNN.md §8 |

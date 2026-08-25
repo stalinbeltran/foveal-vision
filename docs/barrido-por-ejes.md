@@ -15,7 +15,8 @@
 ## 0. Qué es esto y por qué
 
 El flujo real de trabajo hasta hoy ha sido **manual y lento**: para probar una variante de red el
-usuario escribe a mano una definición C completa (~14 campos: `N, c_frac, d, pen_frac, n_layers,
+usuario escribe a mano una definición C completa (~14 campos: `fovea_px, border_px,
+border_reduce, overlap_fovea_px, overlap_border_px, n_layers,
 k_center, k_periph, s_center, s_periph, channels, merge, pool_mode, pad_mode`), la nombra, lanza
 un recorrido de un solo eje, mira el ranking, y repite. La evidencia está en
 [sweeps/](../sweeps/): `dirty-80px-fast_kcenter`, `_kperiph_1`, `_s_center_1`, `_s_periph_1`,
@@ -172,9 +173,10 @@ Tabla de defaults (valores actuales de `NETWORK_DEFAULTS`, salvo `N`):
 
 | Campo | Default estático | Nota |
 |---|---|---|
-| `c_frac` | 0.8 | fija junto con `window_size` la geometría; ver §5 |
-| `pen_frac` | 0.1 | penetración |
-| `d` | 2 | **validar contra `downsample_range`**; si inválido, caer al máximo válido con razón (§10) |
+| `border_px` | 4 | el borde difuso, en px reales; **validar contra `border_range`** |
+| `border_reduce` | 2 | px reales por celda de borde; **debe dividir a `border_px`** (`reduce_range`) |
+| `overlap_fovea_px` | 2 | px de fóvea que ve también la rama del borde |
+| `overlap_border_px` | 0 | px de borde que ve también la rama de la fóvea |
 | `n_layers` | 2 | preserva el modelo actual |
 | `k_center`, `k_periph` | 3 | kernels mínimos válidos |
 | `s_center`, `s_periph` | 1 | sin submuestreo por stride |
@@ -199,29 +201,29 @@ de ahí la geometría se calcula.
 ### 5.1 Entradas
 
 - `window_size` `W`: del manifest del dataset B seleccionado.
-- Fracciones de forma con default estático (§4): `c_frac`, `pen_frac`, `d`.
-  - **[DECIDIDO D-G1]** El derivador **expone `d` y `c_frac`**; `pen_frac` queda **fijo** (0.1).
-    (OAT igual puede barrer cualquiera como eje de rango explícito — F5.)
+- Geometría del borde con default estático (§4): `border_px`, `border_reduce`, los dos solapes.
+  - **[D-G1, REEMPLAZADA 2026-08-25]** Decía «el derivador expone `d` y `c_frac`; `pen_frac` queda
+    fijo». Ya no aplica: la geometría se declara en px y **el knob expuesto es `border_px`**
+    (bandera `--border-px`, campo `border_px` del plan). Los cuatro campos son ejes de primera
+    clase y cualquiera puede fijarse por `overrides`.
 - El **eje a barrer** + su **rango** (`"auto"` o lista explícita, U5).
 - **Ganadores arrastrados** (§7): valores ya fijados de ejes decididos en pasos previos.
 
 ### 5.2 Algoritmo (determinista, sin números mágicos)
 
-1. **Requisito previo:** `W` par (lo exige `round_to_even` en
-   [`derive_dims`](../src/fv/fovea/__init__.py#L97-L111)). Si `W` impar, rechazar con razón+arreglo.
-2. **Geometría:** con `c_frac` default, `N` es el par tal que
-   `round_to_even(N * c_frac) == W` y `(N - W)/2 = periph_out ≥ 1`. Derivar `dims` con
-   `derive_dims(N, c_frac, d, pen_frac)`.
-   **[DECIDIDO D-G2]** Si varios `N` cumplen, elegir **el `N` más pequeño** (determinista y el más
-   barato en cómputo).
-   **[DECIDIDO D-G3]** Si **ningún `N` par** cumple ①a con el `c_frac` default (y `periph_out ≥ 1`),
-   **aflojar `c_frac`** dentro de una tolerancia hasta que exista `N`, y **registrar el `c_frac`
-   efectivo con su razón** (como el paso 4; nunca a ciegas). `W` no se toca — viene de B.
+1. **Requisito previo:** `W` par. Si `W` impar, rechazar con razón+arreglo.
+2. **Geometría:** `fovea_px = W`, **directamente**. `N` se deriva
+   (`fovea_px + 2·border_px/border_reduce`). No hay búsqueda.
+   **[D-G2 y D-G3, OBSOLETAS 2026-08-25]** Decían «si varios `N` cumplen, elegir el más pequeño» y
+   «si ningún `N` par cumple ①a, aflojar `c_frac` dentro de una tolerancia y registrar la razón».
+   Las dos existían porque la fóvea estaba repartida entre `N` y `c_frac` y había que *buscarla*.
+   Con la fóvea declarada no hay nada que buscar ni que aflojar: `fovea_px = W` siempre.
+   La búsqueda vieja sobrevive sólo como `legacy_border_px`, para leer planes escritos antes.
 3. **Tunables:** rellenar todos los campos NO barridos con los defaults estáticos (§4), aplicando
    sobre ellos los **ganadores arrastrados** (§7).
-4. **Validar `d` y kernels contra la geometría derivada:** un default estático puede ser inválido
-   para este `W` (p. ej. `d=2` desborda `downsample_range`, `k_periph=3` excede la banda). Cae al
-   valor válido más cercano **con su razón** (§10), nunca a ciegas.
+4. **Validar la geometría del borde y los kernels contra lo derivado:** un default estático puede
+   ser inválido para este `W` (`border_reduce=2` no divide un `border_px` impar, `k_periph=3`
+   excede la banda). Cae al valor válido más cercano **con su razón** (§10), nunca a ciegas.
 5. **Fijar el espacio:** `space = { <eje>: <rango> }`, con `<rango>` = `"auto"` (rango calculado
    desde `dims`) o la lista explícita del usuario.
 6. **Validar la base** con `check_run(manifest, base)` ANTES de escribir la receta. Si hay
@@ -276,8 +278,8 @@ axes:                                          # orden = orden de barrido
     depends_on: n_layers                       # desbloqueado por el ganador anterior
   - axis: k_center
     range: auto
-  - axis: d
-    range: [1, 2, 3]                           # d=1 ⇒ control ~plano (§11.3)
+  - axis: border_px
+    range: [2, 4, 8]                           # cuanto contexto ve la red (§11.3)
 ```
 
 ### 6.3 Sensibilidad al orden
@@ -385,7 +387,8 @@ inline (U4) hay que permitir **pasar el config directamente** en vez de un nombr
   "base_network_value": { /* config C completo derivado */ },
   "derivation": {                        // §5, §7.2 — cómo se llegó a esta base
     "window_size": 16,
-    "fractions": { "c_frac": 0.8, "pen_frac": 0.1, "d": 2 },
+    "geometry": { "fovea_px": 16, "border_px": 4, "border_reduce": 2,
+                  "overlap_fovea_px": 2, "overlap_border_px": 0 },
     "field_origin": {                    // por campo: default | winner | user
       "n_layers": { "origin": "winner", "from": "estudio-01/paso-1" },
       "k_center": { "origin": "default" },
@@ -414,7 +417,7 @@ y el espacio barre un peso de la pérdida, se rechaza. El generador no lo elude:
 |---|---|---|---|
 | Builder paramétrico (`n_layers`, canales) | **C** | `src/fv/models/builder.py`, `configs/networks/*` | — |
 | Rango auto de `n_layers`/canales | **G** | `src/fv/fovea/__init__.py` | (calculado, no a mano) |
-| Derivador de base desde `window_size` | **G/C** | nuevo módulo (p. ej. `src/fv/models/derive.py`) | ①a (`center_out==window_size`) |
+| Derivador de base desde `window_size` | **G/C** | nuevo módulo (p. ej. `src/fv/models/derive.py`) | ①a (`fovea_px==window_size`) |
 | Base inline en el recorrido | **H** | `src/fv/sweeps/spec.py`, `runner.py`, `api/app.py` | ③ (nombre/valor), ⑧ (B fijo), ⑨ |
 | Generador de receta (P1) | **H** | nuevo (p. ej. `src/fv/sweeps/generate.py` + CLI `fv-oat`) | — |
 | Schedule OAT (plan) | **dominio nuevo `studies/` (I)** | plan comiteable, guía al recorrido | ⑫ (I ↔ H) |
@@ -427,7 +430,10 @@ Estudio (`studies/`)`** (§1-I) y su frontera con H, el contrato **⑫**. El for
 [formatos.md](formatos.md) §4.7 (`plan.json`/`progress.json`) y §4.3 (`channels`).
 
 **Relación con decisiones abiertas existentes** ([decisiones.md](decisiones.md)):
-- **F5** (¿`c_frac`/`pen_frac` barribles?): OAT los alcanza como ejes con **rango explícito**, un
+- **F5** (¿la geometría del borde es barrible?): **cerrada por la reparametrización de
+  2026-08-25** — `border_px`, `border_reduce` y los dos solapes son ejes de primera clase, con
+  rango calculado (`"auto"`) o explícito. Lo que decía antes: OAT los alcanza como ejes con
+  **rango explícito**, un
   eje a la vez, con descarte declarado — encaja con la recomendación de F5 («en grid aparte»).
 - **§9 de instructionsNewNN.md / D-C1** (rango auto de canales, Optuna): **aplazable**, porque U5
   da rangos explícitos.
@@ -442,7 +448,7 @@ El mayor riesgo de un generador es **materializar un artefacto inválido**. Regl
 
 1. **La base derivada pasa `check_run(manifest, base)`** (compatibilidad ①/② + medibilidad) ANTES
    de escribir la receta. Si falla, `code/message/hint`, sin crear nada.
-2. **Un default estático inválido para este `W`** (p. ej. `d`, `k_periph`) **cae al valor válido
+2. **Un default estático inválido para este `W`** (p. ej. `border_reduce`, `k_periph`) **cae al valor válido
    más cercano con su razón** — nunca a ciegas (§5.2 paso 4).
 3. **Cada punto expandido** (base + valor del eje) pasa `check_network`; los geométricamente
    inválidos van a `discarded` **con su razón** — mecanismo que ya existe
@@ -495,8 +501,9 @@ efectivo lo dan las **imágenes**, no las ventanas (protocolo.md). Un dataset ch
 ### 11.3 El control plano debe ser alcanzable
 
 La pregunta que justifica toda la red (protocolo.md §6: ¿fóvea+periferia gana a una CNN plana de
-coste equivalente?) **no se mide sola**. Debe ser un eje del schedule: p. ej. `d ∈ {1, 2, 3}`
-(con `d=1` ≈ periferia sin submuestreo) o un toggle de periferia. Si el schedule nunca lo escanea,
+coste equivalente?) **no se mide sola**. Debe ser un eje del schedule: p. ej.
+`border_px ∈ {0, 2, 4, 8}` (con `border_px=0` + `regions: single` = la CNN plana). Desde
+2026-08-25 eso es un eje literal, no un apaño. Si el schedule nunca lo escanea,
 se optimiza la fóvea sin comprobar que la fóvea sirve.
 
 ---
@@ -509,8 +516,8 @@ se optimiza la fóvea sin comprobar que la fóvea sirve.
   (misma forma, mismo `num_params`) al actual — prueba de no-regresión. Y `n_layers=3` construye y
   hace forward con salida `(-1, 4, 3)`.
 - **Derivador:** para un `window_size` dado, `derive_dims` del config derivado cumple
-  `center_out == window_size` (contrato ①a). `W` impar se rechaza con razón.
-- **Default inválido:** un `W` que invalida `d=2` produce una base con `d` corregido y **razón
+  `fovea_px == window_size` (contrato ①a). `W` impar se rechaza con razón.
+- **Default inválido:** un `W` que invalida `border_reduce=2` produce una base corregida y **razón
   registrada**, no un descarte total.
 - **Generador:** la receta generada, pasada por `check_sweep`/`prepare_sweep`, produce puntos
   válidos y descartes con razón; el bloque ⑨ se dispara si el objetivo es `loss` y el eje es un
@@ -535,9 +542,9 @@ cuerpo. Lo no listado aquí se sigue preguntando; no se inventa.
 | D-C1 | Rango **auto** de canales (Optuna, §9) | **Aplazado** (U5 da rangos explícitos) |
 | D-C2 | Vector de canales **por defecto** para `L` | **Constante `16`** en todas las capas (`[16]*L`). ⚠ Cambia el default de hoy (`[16,32]`); ver nota de no-regresión abajo |
 | D-C3 | Forma del campo de canales en el config | **Lista explícita `channels: [...]`**; lee `ch1/ch2` viejo, escribe `channels` |
-| D-G1 | Qué fracciones expone el derivador | **Exponer `d` y `c_frac`; `pen_frac` fijo** (0.1) |
-| D-G2 | Desempate si varios `N` cumplen ①a | **El `N` más pequeño** (determinista, el más barato) |
-| D-G3 | **(nuevo)** Ningún `N` par factible para ese `W` | **Aflojar `c_frac`** dentro de tolerancia hasta que exista `N`, **registrando el `c_frac` efectivo con su razón** (nunca a ciegas). `W` no se toca (viene de B) |
+| D-G1 | Qué expone el derivador | ~~Exponer `d` y `c_frac`; `pen_frac` fijo~~ → **REEMPLAZADA (2026-08-25)**: el knob es `border_px`, y los cuatro campos del borde son ejes |
+| D-G2 | Desempate si varios `N` cumplen ①a | ~~El `N` más pequeño~~ → **OBSOLETA (2026-08-25)**: `N` es derivado, no hay desempate |
+| D-G3 | Ningún `N` par factible para ese `W` | ~~Aflojar `c_frac` dentro de tolerancia~~ → **OBSOLETA (2026-08-25)**: `fovea_px = W` directamente, no hay `N` que buscar ni `c_frac` que aflojar. Sobrevive como `legacy_border_px` para leer planes viejos |
 | D-H1 | Schedule: objeto nuevo o metadatos | **Objeto de primera clase comiteable, dominio nuevo (`studies/`), NO ejecutor** — describe orden y dependencias, guía paso a paso |
 | D-H2 | Forma exacta de la base inline en el spec | **Forma completa, separador guion**: `base_network=null` + `base_label:"ws16-p2-d2-L2"` + bloque `derivation{window_size, fractions, field_origin}` |
 | D-W1 | Regla de «ganador» coste/calidad | **Sugerida, el usuario confirma.** La herramienta propone «el más barato cuya calidad ≥ best−`δ`» (con `δ` y métrica de coste a la vista); el usuario aprieta el gatillo antes de arrastrar |

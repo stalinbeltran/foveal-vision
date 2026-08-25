@@ -119,7 +119,7 @@ strength: weak
 ```
 
 **U8.8 — Una negativa se escribe como razón + arreglo, en ese orden**, y en segunda persona del
-plural impersonal («no se puede…», «barre `d`, o usa un dataset con esa ventana»). Un mensaje que
+plural impersonal («no se puede…», «barre `border_px`, o usa un dataset con esa ventana»). Un mensaje que
 solo dice qué falló obliga al usuario a adivinar la mitad que importa.
 
 ```check U8.8
@@ -127,7 +127,7 @@ substrate: http
 kind: http_shape
 scope: "POST /networks/validate"
 args:
-  body: {N: 21, c_frac: 0.8, d: 2, pen_frac: 0.1}
+  body: {fovea_px: 15, border_px: 4, border_reduce: 2, overlap_fovea_px: 2}
   expect_json: {valid: false}
   requires: ["problems.code", "problems.message", "problems.hint"]
 strength: strong

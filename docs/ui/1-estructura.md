@@ -165,8 +165,8 @@ polling, negativas con `hint` visible.)*
   previa al azar en la tarjeta y detalle paginado con el recorte y su etiqueta — **sin necesitar un
   run**. Es donde se decide la ventana etiquetada, y donde nace el contrato ①.
 - **Redes (C)** — la pantalla más importante de este proyecto y la más distinta del hermano. Al
-  editar `N`, `c_frac`, `d`, `pen_frac`:
-  - enseña **en vivo** las dimensiones derivadas (`center_out`, `periph_out`, `penetration`,
+  editar `fovea_px`, `border_px`, `border_reduce` y los dos solapes:
+  - enseña **en vivo** las dimensiones derivadas (`N`, `border_cells`, `center_band`,
     `original_size`) — ver U5.5;
   - enseña los **rangos calculados** de `k_center`/`k_periph`/`s_center`/`s_periph`/`d` para ese
     `N` — son los mismos que un recorrido usará con `"auto"`;

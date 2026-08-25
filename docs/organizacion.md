@@ -70,12 +70,16 @@ párrafos hoy, líneas y palabras después), `split{train,val,test}` y `seed`.
 completas y las etiquetas por ventana; la vista foveada NO se hornea en B — se construye en el
 dataloader**, con la geometría que declare C. Consecuencias:
 
-- **Toda la geometría foveada (`N`, `c_frac`, `d`, `pen_frac`) es barrible sin reconstruir B.**
-  Cambiar `d` es una línea de config de C, no una re-extracción. Es exactamente lo que un
-  recorrido de configuraciones necesita.
+- **Toda la geometría foveada es barrible sin reconstruir B** salvo la fóvea, que ES la ventana
+  etiquetada. Ensanchar el borde difuso es una línea de config de C, no una re-extracción. Es
+  exactamente lo que un recorrido de configuraciones necesita.
 - B declara en su manifest **qué ofrece**: tamaño de imagen, `has_images`, márgenes disponibles.
-  C declara **qué necesita**: `original_size = center_out + 2·periph_out·d`. El validador casa
-  ambos (contrato ①).
+  C declara **qué necesita**: `original_size = fovea_px + 2·border_px`. El validador casa ambos
+  (contrato ①).
+- ⚠ **El manifest NO acota el borde, y debería tenerse en cuenta al planificar**: un `border_px`
+  que se sale de la imagen no falla, se rellena con `pad_mode: edge`. La máscara de cobertura de
+  `build_view` es lo que mide cuánto de ese borde es relleno y no contexto
+  (instructionsNewNN.md §2.2).
 - El coste del camino perezoso está medido en el hermano (P4.2): construir la vista por ítem es
   viable **solo vectorizado** (~0,1–0,2 ms/ventana); un doble bucle Python lo hace 48× más lento.
   El presupuesto de `images` también: se rechaza por encima de un umbral (1 GB) con la razón, no
@@ -92,11 +96,12 @@ Produce `windows.npz` (arrays paralelos + `images`) y `manifest.json` con `finge
 deriva):
 
 ```yaml
-# configs/networks/<name>.yaml
-N: 20            # lado de la entrada compuesta
-c_frac: 0.8      # fracción del centro
-d: 2             # downsampling de la periferia
-pen_frac: 0.1    # penetración hacia el centro
+# configs/networks/<name>.yaml  (format_version: 2 — geometría en px reales)
+fovea_px: 16          # la fóvea. ES la ventana etiquetada de B (contrato ①a)
+border_px: 4          # borde difuso por lado, en px REALES de la imagen
+border_reduce: 2      # px reales que caben en una celda de borde (antes `d`)
+overlap_fovea_px: 2   # px de FÓVEA que ve también la rama del borde (antes `pen_frac`)
+overlap_border_px: 0  # px de BORDE que ve también la rama de la fóvea (nuevo)
 n_layers: 2      # capas conv por rama (honrado por el builder paramétrico — D-C3/D-S2)
 k_center: 3      # kernel de la rama central   (impar; rango calculado)
 k_periph: 3      # kernel de la rama periférica
@@ -114,9 +119,14 @@ código de referencia, y el avg-pool global **destruye la posición** que la cab
 cabeza consume el `feat` fusionado aplanado (con `merge: concat`, la dimensión aplanada la
 calcula un tensor dummy, como el `_infer_flat_features` del hermano).
 
-- **Los derivados no se escriben**: `center_out`, `periph_out`, `penetration`, `periph_band`,
-  `periph_real`, `original_size` y `padding = k // 2` **se calculan** en `fv.fovea.derive_dims`
-  y se validan (contrato ②). Un derivado escrito a mano es una copia que diverge.
+- **Los derivados no se escriben**: `N`, `border_cells`, `center_band`, `periph_band`,
+  `original_size` y `padding = k // 2` **se calculan** en `fv.fovea.derive_dims` y se validan
+  (contrato ②). Un derivado escrito a mano es una copia que diverge. **`N` es de los derivados
+  desde 2026-08-25**: antes se escribía, y era la mitad de la definición de la fóvea.
+- **La ortografía vieja (`N`, `c_frac`, `d`, `pen_frac`) se LEE y no se escribe**, como `ch1/ch2`
+  con `channels`. La traduce `fv.fovea.normalize_geometry`, en un solo sitio, y una config que
+  trae **las dos** se rechaza (`geometry_double_spec`) en vez de resolverse por precedencia — es
+  «el mismo dato en dos sitios» (§3).
 - **Los rangos de búsqueda también son funciones** (`kernel_range`, `stride_range`,
   `downsample_range`, `build_search_space`) y viven en `fv.fovea`, no en el runner del
   recorrido: H los consume, no los define.
@@ -173,7 +183,7 @@ petición de parada, cooperativa a fin de época). Formato en [formatos.md](form
 parámetros para hallar los apropiados. Un recorrido es *un espacio explorado con B fijo*, y —
 **a diferencia del hermano, y por diseño desde el día 0** (allí fue la decisión D22 que quedó
 abierta)— **el espacio puede cubrir C además de D**: barrer `k_center`, `s_center`, `d` o
-`c_frac` es exactamente el caso de uso central (instructionsNewNN.md §3).
+`border_px` es exactamente el caso de uso central (instructionsNewNN.md §3).
 
 Lo define:
 
@@ -182,7 +192,7 @@ Lo define:
   `fv.fovea.build_search_space`**, no se escriben a mano; el runner **valida cada punto** con el
   mismo validador de las demás puertas y descarta los geométricamente inválidos **antes** de
   reservar nombre (los asserts de instructionsNewNN.md §2 hacen que muchas combinaciones de
-  `c_frac`/`pen_frac` no existan).
+  `border_px`/`overlap_*` no existan).
 - **La estrategia**: `grid` para la geometría (espacio pequeño y discreto por construcción);
   `random`/TPE (optuna) para lo continuo (`lr`, canales, dropout). Optuna es el **motor**, no la
   organización: un trial **no** es un run — lanza uno y guarda su nombre.
@@ -224,7 +234,7 @@ Lo define (detalle en barrido-por-ejes.md §6; formato en formatos.md §4.7):
 - **Los ejes, ordenados** (orden = orden de barrido, U6): cada uno con su rango (`"auto"` o lista
   explícita, U5) y un `depends_on` opcional. La longitud del estudio es **dinámica**: un ganador
   puede desbloquear sub-ejes (fijar `n_layers=3` crea `channels[0..2]`).
-- **La base de cada paso se deriva del problema** (dominio G): `window_size` de B → `N`/geometría,
+- **La base de cada paso se deriva del problema** (dominio G): `window_size` de B → la fóvea,
   sin escribir dimensiones a mano; sobre ella se aplican los **ganadores arrastrados** de los
   pasos previos (carry-forward).
 - **El ganador lo sugiere la herramienta y lo confirma el usuario** (regla coste/calidad con `δ`,
@@ -254,7 +264,8 @@ El módulo que todos comparten y nadie duplica — `src/fv/fovea/`:
 
 | Función | Qué |
 |---|---|
-| `derive_dims(N, c_frac, d, pen_frac)` | `center_out`, `periph_out`, `penetration`, `periph_band`, `periph_real`, `original_size` + los asserts (contrato ②) |
+| `normalize_geometry(cfg)` | Las cinco longitudes canónicas, desde la ortografía que traiga el config (o el rechazo, si trae dos) |
+| `derive_dims(geom)` | `N`, `border_cells`, `center_band`, `periph_band`, `original_size` + los asserts (contrato ②) |
 | `build_foveated_input(img, ...)` | La entrada compuesta N×N (muestreo **excluyente**) — instructionsNewNN.md §5 |
 | `build_masks(N, ...)` | Máscaras **contributivas** de las dos ramas (se suman en la penetración) — §6 |
 | `kernel_range`, `stride_range`, `downsample_range`, `build_search_space` | Los rangos como funciones — §3 |
@@ -283,7 +294,7 @@ Dos mitades, como el ①a/①b del hermano:
   cambiar la vista; la cabeza de C responde por esa ventana. Si B y C declaran tamaños de
   ventana distintos, se rechaza con `window_size_mismatch` antes de reservar nombre.
 - **①b — la vista que C pide es computable con lo que B guarda.** C necesita
-  `original_size = center_out + 2·periph_out·d` píxeles alrededor del centro de la ventana; B
+  `original_size = fovea_px + 2·border_px` píxeles alrededor del centro de la ventana; B
   declara `has_images` y el tamaño de sus imágenes. Si no alcanza (imagen más pequeña que
   `original_size`, o B sin `images`), se rechaza con la razón (`view_needs_images`,
   `original_size_exceeds_image`) — **nunca se rellena**: formatos.md §2.
@@ -298,14 +309,16 @@ entra un recorrido.
 Los asserts de instructionsNewNN.md §2 son un contrato, no comentarios:
 
 ```python
-center_out % 2 == 0                # el anillo reparte simétrico
-2 * periph_out + center_out == N
-penetration < center_out // 2      # el núcleo no desaparece
+fovea_px % 2 == 0                       # el borde reparte simétrico
+border_px % border_reduce == 0          # el borde cae en celdas enteras
+overlap_border_px % border_reduce == 0  # el solape de fuera, también
+overlap_fovea_px < fovea_px // 2        # el núcleo de la fóvea no desaparece
+overlap_border_px < border_px           # el borde exclusivo tampoco
 k impar; padding = k // 2          # un kernel par desalinea máscaras
 ```
 
 Viven en `fv.fovea.derive_dims` y el validador los ejecuta en **todas** las puertas — incluido
-el runner de H, porque un espacio sobre `c_frac`/`pen_frac` genera puntos inválidos y hay que
+el runner de H, porque un espacio sobre `border_px`/`overlap_*` genera puntos inválidos y hay que
 descartarlos con la razón, no reventar dentro del job. `POST /networks/validate` los expone
 síncronos a la UI (con la traza de dimensiones derivadas).
 
@@ -383,7 +396,7 @@ reanudar dentro de un run es diseño aplazado (formatos.md §4.2.2) hasta que se
 ### ⑫ I ↔ H — el estudio planifica, el recorrido ejecuta
 
 Un estudio (I) **describe** el orden de ejes con dependencias y **no ejecuta**. Por cada paso:
-deriva la base del problema (`window_size` de B → `N`/geometría, dominio G), fija los **ganadores
+deriva la base del problema (`window_size` de B → la fóvea, dominio G), fija los **ganadores
 arrastrados** de los pasos previos, y **genera un recorrido H** (base inline) que corre con toda
 la maquinaria de H sin cambios. El **generador no es una puerta más laxa**: valida la base con
 `check_run` y cada punto con `check_network`, igual que H, **antes** de reservar nada. El

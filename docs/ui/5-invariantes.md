@@ -24,7 +24,7 @@ substrate: http
 kind: http_shape
 scope: "POST /networks/validate"
 args:
-  body: {N: 20, c_frac: 0.8, d: 2, pen_frac: 0.9}
+  body: {fovea_px: 16, border_px: 4, border_reduce: 2, overlap_fovea_px: 9}
   expect_json: {valid: false}
   requires: ["problems.code", "problems.message", "problems.hint"]
 strength: strong
@@ -57,8 +57,8 @@ args:
 strength: strong
 ```
 
-**U5.4 — Los derivados se piden, no se escriben.** Redes muestra `center_out`, `periph_out`,
-`penetration`, `original_size` y los rangos calculados **en vivo desde el servidor**
+**U5.4 — Los derivados se piden, no se escriben.** Redes muestra `N`, `border_cells`,
+`center_band`, `original_size` y los rangos calculados **en vivo desde el servidor**
 (`POST /networks/validate`, contrato ②) antes de guardar. Un derivado calculado en el front es una
 copia que diverge (U4.2); un derivado escrito a mano en un YAML, también.
 
@@ -67,7 +67,7 @@ substrate: fs
 kind: no_match_outside
 scope: "web/src/**/*.{ts,tsx}"
 args:
-  pattern: "center_out\\s*=|round_to_even|periph_out\\s*="
+  pattern: "border_cells\\s*=|round_to_even|center_band\\s*=|original_size\\s*="
   allow: []
 strength: strong
 ```
@@ -80,7 +80,8 @@ detalle está allí, no aquí:
 | Entrenar, Recorridos, Estudios | B y C incompatibles (`window_size_mismatch`, `view_needs_images`, `original_size_exceeds_image`) **antes de reservar nombre** | ① |
 | Redes | asserts de geometría con su razón (`penetration_too_large`, `kernel_must_be_odd`, `merge_sum_needs_equal_strides`) | ② |
 | Recorridos, Estudios | objetivo que depende de lo que se barre (`objective_varies_with_space`, `objective_depends_on_geometry`) | ⑨ |
-| Recorridos, Estudios | `N` y `c_frac` **no son ejes** (`axis_breaks_window_size`) — se rechaza con el arreglo: barre `d`, o usa otro B | ①a |
+| Recorridos, Estudios | `fovea_px` **no es eje** (`axis_breaks_window_size`) — se rechaza con el arreglo: barre `border_px`, o usa otro B | ①a |
+| Recorridos, Estudios | la geometría anterior a 2026-08-25 (`N`, `c_frac`, `pen_frac`, `d`) **no es eje** (`axis_renamed`) — se rechaza nombrando su reemplazo, nunca se reinterpreta | ② |
 | Recetas | `device`/`num_workers` **no están** en la receta | ⑩ |
 | Estudios | el ganador se **sugiere**; lo confirma el usuario | ⑫ / D-W1 |
 | Métrica de tarea | `task_needs_source`, `holdout_shares_source`, `window_dataset_changed` | ⑬ / ⑧ |
@@ -90,7 +91,7 @@ substrate: http
 kind: http_shape
 scope: "POST /networks/validate"
 args:
-  body: {N: 20, c_frac: 0.8, d: 2, pen_frac: 0.1, k_center: 4}
+  body: {fovea_px: 16, border_px: 4, border_reduce: 2, overlap_fovea_px: 2, k_center: 4}
   expect_json: {valid: false, problems.code: "kernel_must_be_odd"}
   requires: ["problems.hint"]
 strength: strong

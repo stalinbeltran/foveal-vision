@@ -78,7 +78,7 @@ un run).
 ### `/networks` (C)
 
 CRUD + **`POST /networks/validate`**: puro, síncrono, sin guardar. Devuelve las **dimensiones
-derivadas** (`center_out`, `periph_out`, `penetration`, `periph_band`, `original_size`), los
+derivadas** (`N`, `border_cells`, `center_band`, `periph_band`, `original_size`), los
 **rangos calculados** (`kernel_range`, `stride_range`, `downsample_range` para ese `N`), el nº
 de parámetros y la traza por rama.
 
@@ -214,7 +214,8 @@ DELETE /studies/{name}           borra el plan; 409 si un recorrido hijo corre (
 - **`next-sweep` no reserva nada**: devuelve el spec para que el usuario lo revise y lance con
   `POST /sweeps` (base inline). La derivación (`window_size` → `N`/geometría) pasa por `check_run`;
   si el default estático es inválido para ese `W` cae al válido con su razón, y si ningún `N` es
-  factible **afloja `c_frac` con la razón registrada** (D-G3) o devuelve 400.
+  factible **cae al valor válido más próximo con la razón registrada** en `corrections` (§5.2),
+  o devuelve 400. La fóvea nunca se ajusta: viene del `window_size` de B (contrato ①a).
 - **El ganador lo propone el servidor, lo confirma el cliente**: `GET /studies/{name}` incluye,
   por paso terminado, la sugerencia coste/calidad (`δ`, métrica de coste) y los candidatos de la
   **frontera** con sus N semillas — pero no arrastra nada hasta el `confirm`.

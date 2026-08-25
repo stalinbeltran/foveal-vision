@@ -129,8 +129,10 @@ primer experimento ya está fijado: **¿la fóvea + periferia gana a una CNN pla
 equivalente?** — control y tratamiento sobre el mismo B, N semillas, criterio escrito antes de
 mirar (el análogo del P4 del hermano, que es la evidencia de que hay algo que ganar).
 
-> ⚠ Ese control **no se puede construir hoy**: sin periferia (`periph_out = 0`) la geometría se
-> rechaza con `no_periphery` ([fv/fovea/\_\_init\_\_.py](../src/fv/fovea/__init__.py)), así que
-> lo más cerca que se llega es `d=1`, que sigue siendo dos ramas enmascaradas con banda de
-> penetración. Hace falta decidir qué es exactamente «la CNN plana equivalente» y cómo se
-> construye — no está especificado en ninguna parte.
+> ✅ **RESUELTO (2026-08-09)**: el control se construye con `regions: single` — una sola rama sin
+> enmascarar sobre toda la entrada. La familia de 6 controles que aísla cada grado de libertad
+> está en [plan-cnn-plana.md](plan-cnn-plana.md) §3. Desde la reparametrización de 2026-08-25 se
+> declara aún más directo: `border_px: 0` es literalmente «sin borde», y `border_reduce: 1` con
+> `border_px` igual al de la foveada es «la misma área, sin comprimir».
+>
+> ⚠ Lo que sigue **sin medir** es la comparación en sí: la familia de 6 no se ha corrido.

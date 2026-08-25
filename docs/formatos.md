@@ -167,7 +167,7 @@ usa para rellenar su formulario y volver a mandarlo; mientras `list()` sirvió `
 sobre nunca es «desconocido»; uno que no está en el objeto ni en el sobre **sí**, y se rechaza.
 
 En un YAML de red van **solo los parámetros fundamentales** (organizacion.md §1-C). Los
-derivados (`center_out`, `original_size`, `padding`…) no se escriben nunca: se calculan en
+derivados (`N`, `border_cells`, `original_size`, `padding`…) no se escriben nunca: se calculan en
 `fv.fovea.derive_dims` — un derivado escrito es una copia que diverge.
 
 **Canales por capa (D-C3).** El vector `channels` (longitud = `n_layers`) reemplaza los escalares

@@ -42,7 +42,7 @@ de [plan.md](plan.md) que quita cada xfail:
 | | Contrato | El test afirma | Lo quita |
 |---|---|---|---|
 | ① | ventana etiquetada / vista computable | `check_run` con mismatch → `window_size_mismatch` / `view_needs_images` / `original_size_exceeds_image`, **antes de reservar el nombre**; y por HTTP → 400 sin job ni run creados | 3 (validador), 4 (HTTP) |
-| ② | geometría consistente | `derive_dims` con `c_frac`/`pen_frac` inválidos → error con razón (`center_not_even`, `penetration_too_large`, `kernel_must_be_odd`, `merge_sum_needs_equal_strides`); **control**: una config válida pasa | 2 |
+| ② | geometría consistente | `derive_dims` con longitudes inválidas → error con razón (`fovea_must_be_even`, `border_not_divisible`, `penetration_too_large`, `overlap_border_too_large`, `kernel_must_be_odd`, `merge_sum_needs_equal_strides`); **control**: una config válida pasa. Y la reparametrización de 2026-08-25 **no mueve un peso**: un checkpoint de la ortografía vieja carga `strict=True` en la nueva y da la misma salida (168.652 params) | 2 |
 | ②b | rangos calculados | `kernel_range`/`stride_range`/`build_search_space` reproducen los ejemplos numéricos de instructionsNewNN.md §3 (N=20 → k_center [3,5,7], s_center [1,2], s_periph [1]) | 2 |
 | ③ | procedencia | el run registra red/receta **por nombre y valor** + huella de B; `DELETE` de un B en uso → 409 con la lista (**control**: uno libre → 204) | 4 (y 2 el DELETE) |
 | ④ | checkpoint autodescriptivo | `load_model(ckpt)` reconstruye la red foveada sin YAML, geometría incluida | 4 |
@@ -53,7 +53,7 @@ de [plan.md](plan.md) que quita cada xfail:
 | ⑩ | X fuera de D | dos runs que solo difieren en `device` tienen la misma identidad de receta | 3 |
 | ⑪ | reproducibilidad | misma semilla + misma config ⇒ mismos pesos (init **y** entrenamiento, con **control** de otra semilla que difiere) | 4 |
 | ⑬ | métrica de tarea (E×A vía F) | `task_score` puntúa contra los párrafos de **la fuente** (`manifest["source_id"]`, no las etiquetas de ventana) y el n de imágenes viaja con el número; sin la fuente → `task_needs_source` con razón y arreglo, **sin puntuar nada**. En `tests/test_task.py`, la costura completa: macro/micro salen de `paragraph_f1` sobre las MISMAS predicciones, huella cambiada → `window_dataset_changed` sin inferir, caché por knobs (un knob distinto recalcula), se puntúa `best.pt` y no `last.pt`, `mean_iou` **null** sin emparejamientos, y un «holdout» que comparte fuente → `holdout_shares_source` | (métrica de tarea) |
-| ⑫ | estudio planifica, recorrido ejecuta | `next-sweep` deriva la base (`center_out==window_size`, ①a) y la valida con `check_run` **sin reservar**; un recorrido con **base inline** (sin `base_network`, solo `base_network_value`) se prepara/corre/rankea igual que uno con red nombrada (mismo gate); el generador del siguiente eje fija el ganador y registra `field_origin` | H (barrido) |
+| ⑫ | estudio planifica, recorrido ejecuta | `next-sweep` deriva la base (`fovea_px==window_size`, ①a) y la valida con `check_run` **sin reservar**; un recorrido con **base inline** (sin `base_network`, solo `base_network_value`) se prepara/corre/rankea igual que uno con red nombrada (mismo gate); el generador del siguiente eje fija el ganador y registra `field_origin` | H (barrido) |
 
 Además, del muestreo foveado (nacen con la fase 2, sin xfail largo):
 

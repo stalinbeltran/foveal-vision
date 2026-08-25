@@ -56,7 +56,7 @@ args:
       min_markers: 2
     - name: network_fields
       owner: "web/src/screens/Networks.tsx"
-      markers: ["c_frac", "pen_frac", "k_center", "s_periph"]
+      markers: ["border_px", "border_reduce", "k_center", "s_periph"]
       min_markers: 3
     - name: run_states
       owner: "web/src/api.ts"

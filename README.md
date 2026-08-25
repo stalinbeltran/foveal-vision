@@ -107,8 +107,8 @@ nada) y nunca sobrescribe un destino existente. La procedencia va en el bloque `
 
 > Verificado: 5280 ventanas de 60 imágenes, splits 3696/792/792, positivos ~430 por esquina.
 > `window_size` es **la ventana etiquetada = la fóvea de la red** (F1b). B guarda las imágenes
-> completas: la vista foveada se construye en el dataloader, así que la geometría (`N`, `d`,
-> `c_frac`…) se barre **sin re-extraer**.
+> completas: la vista foveada se construye en el dataloader, así que la geometría del borde
+> (`border_px`, `border_reduce`, los solapes) se barre **sin re-extraer**.
 >
 > Sobre una fuente grande se niega antes de escribir nada — verificado contra la fuente real
 > del generador (20 000 × 640×480): `[images_budget_exceeded] guardar las imagenes costaria
@@ -151,7 +151,8 @@ desde la UI o dejando YAMLs en `configs\networks\` y `configs\recipes\`.
 .\.venv\Scripts\fv-train.exe --name cli-run-1 --window-dataset synth-b16 --network fov-16 --recipe corta --device cpu
 ```
 
-> Verificado (red `fov-16`: N=20, c_frac=0.8, d=2; receta `corta`: 3 épocas): ~4 s/época,
+> Verificado (red `fov-16`: fóvea 16 px, borde 4 px, `border_reduce` 2 → entrada 20×20; receta
+> `corta`: 3 épocas): ~4 s/época,
 > `val_loss` 0.38→0.30, f1 0.22 en la época 3. **Y bit-idéntico al mismo run lanzado por el
 > API** (misma semilla ⇒ mismos números hasta el último decimal): dos puertas, un resultado.
 >
@@ -492,20 +493,27 @@ reentrenar, para preguntar cuál sigue mejor a la tarea:
 
 ### Qué ejes se pueden barrer
 
-Cualquier campo de la **red (C)** o de la **receta (D)** es un eje válido — **excepto `N` y
-`c_frac`**. Esos dos fijan `center_out = round_to_even(N·c_frac)`, que el contrato ①a ata al
-`window_size` del dataset (fijo en todo el recorrido): barrerlos daría una fóvea distinta de la
-ventana etiquetada en cada punto, así que se **rechazan en las dos puertas** (recorrido y estudio)
-con razón y arreglo — para variar el contexto periférico barre `d`, y para cambiar la fóvea usa un
-dataset con esa ventana. Para comprobar que **todos** los ejes corren de punta a punta:
+Cualquier campo de la **red (C)** o de la **receta (D)** es un eje válido — **excepto
+`fovea_px`**. La fóvea es la ventana etiquetada, que el contrato ①a ata al `window_size` del
+dataset (fijo en todo el recorrido): barrerla daría una fóvea distinta de la ventana en cada
+punto, así que se **rechaza en las dos puertas** (recorrido y estudio) con razón y arreglo — para
+variar el contexto barre `border_px`, y para cambiar la fóvea usa un dataset con esa ventana.
+
+La geometría anterior a 2026-08-25 (`N`, `c_frac`, `pen_frac`, `d`) se rechaza también, con
+`axis_renamed` y nombrando su reemplazo. `d` es el caso que importa: **cambió de significado**
+(antes agrandaba el contexto, hoy sólo comprime un borde de tamaño fijo), así que un spec viejo
+re-lanzado tal cual **para**, en vez de entrenar otras redes en silencio.
+
+Para comprobar que **todos** los ejes corren de punta a punta:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\verify_axes.py --dataset synth-b16
 ```
 
-> Verificado (2026-07-24): **26/26 ejes** (11 de red + 13 de receta + `N`/`c_frac` rehusados),
-> 0 fallos. Corre un recorrido real por eje (`generate_sweep` + `run_sweep`), entrena sus puntos
-> en un store temporal y comprueba que se miden. Ejes de red: `d, pen_frac, n_layers, k_center,
+> Corre un recorrido real por eje (`generate_sweep` + `run_sweep`), entrena sus puntos en un
+> store temporal y comprueba que se miden, y comprueba además los rechazos (`fovea_px` y las
+> cuatro grafías viejas, en las dos puertas). Ejes de red: `border_px, border_reduce,
+> overlap_fovea_px, overlap_border_px, n_layers, k_center,
 > k_periph, s_center, s_periph, channels, merge, pool_mode, pad_mode`. Ejes de receta: `lr,
 > optimizer, momentum, weight_decay, batch_size, epochs, scheduler, patience, lambda_pos,
 > pos_weight, smooth_l1_beta, monitor, seed`.
@@ -519,7 +527,7 @@ dataset con esa ventana. Para comprobar que **todos** los ejes corren de punta a
 > Verificado (2026-07-26): **107 passed** en ~43 s — un test por contrato (organizacion.md §2,
 > con el ⑫ estudio↔recorrido y el nuevo **⑬ métrica de tarea**), el builder paramétrico
 > (no-regresión `n_layers=2`), el derivador de base, el generador OAT, el arrastre del ganador, el
-> rechazo de `N`/`c_frac` como ejes, que el budget no colapsa el eje `epochs`, las costuras de
+> rechazo de `fovea_px` como eje, que el budget no colapsa el eje `epochs`, las costuras de
 > `task_score` (`tests/test_task.py`: caché por knobs, `best.pt` y no `last.pt`, `mean_iou` null,
 > holdout que comparte fuente) y el flujo completo por HTTP.
 
