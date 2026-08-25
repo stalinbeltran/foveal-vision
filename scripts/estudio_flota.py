@@ -264,6 +264,26 @@ class Suplantada(RuntimeError):
     """
 
 
+class SelloInalcanzable(RuntimeError):
+    """La maquina levanto sshd pero nunca acepto la clave.
+
+    NO se apunta en la lista negra, y la decision no es mia: plan-lr-alto §6.4 la
+    dejo escrita como condicion. Alli se bloqueo a la maquina 45390 por esto
+    mismo (`Permission denied (publickey)` a traves del proxy) con el aviso de
+    que *"no esta comprobado que la culpa fuera de esa maquina... si vuelve a
+    pasar EN MAQUINAS DISTINTAS Y SIEMPRE POR PROXY, el bloqueo estaria culpando
+    al host equivocado y lo que habria que arreglar es la espera"*.
+
+    MEDIDO el 2026-08-25: paso en **5 maquinas distintas** en un solo lanzamiento,
+    todas enrutadas por `sshN.vast.ai`, todas tras un banner de sshd que SI
+    contesto. La condicion se ha cumplido, asi que se arregla la espera (12 x 20 s
+    en vez de 8 x 15) y se deja de culpar al host. Una maquina asi se pierde para
+    ESTE lanzamiento -- el pozo no la vuelve a entregar -- pero no se arrastra a
+    los siguientes, que con un catalogo de ~26 maquinas es la diferencia entre
+    poder correr manana y no poder.
+    """
+
+
 SELLO = "/root/.duenno-estudio"
 
 
@@ -364,7 +384,7 @@ def soltar_destino(host: str, port: int, etiqueta: str) -> None:
 
 
 def sellar(host: str, port: int, nonce: str, etiqueta: str,
-           intentos: int = 8, espera_s: float = 15.0) -> None:
+           intentos: int = 12, espera_s: float = 20.0) -> None:
     """Escribe un sello en la maquina y lo vuelve a leer. REINTENTA el transporte.
 
     Es la segunda defensa contra la suplantacion, y la que de verdad cierra el
@@ -405,8 +425,9 @@ def sellar(host: str, port: int, nonce: str, etiqueta: str,
         ultimo = f"rc={code} {(salida or '').strip()[-120:]}"
         if intento < intentos:
             time.sleep(espera_s)
-    raise RuntimeError(f"no pude poner el sello de propiedad tras {intentos} "
-                       f"intentos en {intentos * espera_s / 60:.0f} min: {ultimo}")
+    raise SelloInalcanzable(
+        f"SSH no llego a aceptar la clave en {host}:{port} tras {intentos} "
+        f"intentos ({intentos * espera_s / 60:.0f} min): {ultimo}")
 
 
 def comprobar_sello(host: str, port: int, nonce: str) -> None:
@@ -761,7 +782,12 @@ def preparar(oferta: dict, payload: Path, etiqueta: str, hilos: int, disco_gb: f
             soltar_destino(host, port, etiqueta)
             raise RuntimeError(f"sshd no contesto en {host}:{port}")
         # El sello va ANTES de subir nada: si esta maquina no es la nuestra, que
-        # se sepa mientras lo unico perdido sea medio minuto de arranque
+        # se sepa mientras lo unico perdido sea medio minuto de arranque.
+        # El destino se dice ANTES de sellar y no despues: cuando el sello falla,
+        # el log tiene que decir CON QUE MAQUINA se estaba hablando -- si no, el
+        # unico caso que hay que diagnosticar es justo el que no deja rastro.
+        log(f"[{etiqueta}] SSH en {host}:{port} "
+            f"({(time.time() - t0) / 60:.1f} min), sellando...")
         nonce = f"{etiqueta}-{iid}-{os.getpid()}"
         sellar(host, port, nonce, etiqueta)
         m = Maquina(oferta, iid, host, port, etiqueta, nonce)
@@ -852,10 +878,10 @@ def preparar_con_reintentos(pool: Maquinas, payload: Path, etiqueta: str, hilos:
             return None
         try:
             return preparar(oferta, payload, etiqueta, hilos, disco_gb, *sonda)
-        except Suplantada as exc:
-            # NO se apunta: el host no ha hecho nada, se equivoco el catalogo al
-            # publicar el mismo destino SSH para dos instancias a la vez
-            log(f"[{etiqueta}] destino SSH suplantado (intento {intento}/{intentos}): "
+        except (Suplantada, SelloInalcanzable) as exc:
+            # NO se apunta: ni el catalogo publicando dos veces el mismo destino
+            # ni un sshd que tarda en aceptar la clave son culpa del host
+            log(f"[{etiqueta}] no utilizable (intento {intento}/{intentos}): "
                 f"{exc}. Se coge OTRA maquina y el host NO va a la lista negra.")
         except Exception as exc:                        # noqa: BLE001
             motivo = f"{type(exc).__name__}: {exc}"[:200]
