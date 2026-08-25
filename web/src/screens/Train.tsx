@@ -42,7 +42,7 @@ export default function Train() {
     if (!net || !wd) { setCompat(null); return; }
     api.post("/networks/validate", net).then((v) => {
       if (!v.valid) { setCompat("la red no es válida (mira Redes)"); return; }
-      const fovea = v.trace.dims.center_out;
+      const fovea = v.trace.dims.fovea_px;
       const win = wd.config.window_size;
       setCompat(fovea === win
         ? `✓ casan: fóvea ${fovea}px == ventana ${win}px`

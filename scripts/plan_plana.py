@@ -45,14 +45,14 @@ RECIPE = "plan40"
 EPOCHS_CAP = 150              # alto A PROPOSITO: tiene que parar `patience`
 OBJECTIVE = "f1"
 
-# la base plana: control C de plan-cnn-plana.md §3. `c_frac=1.0` + regions
-# single => N=16, periph_out=0.
+# la base plana: control C de plan-cnn-plana.md §3. `border_px=0` + regions
+# single => entrada 16x16, sin anillo.
 # ⚠ NO pongas aqui ningun campo que sea EJE. `derive_base` aplica los overrides
 # DESPUES de los winners, asi que un campo fijado aqui anula el arrastre del
 # estudio EN SILENCIO. Fijar `n_layers: 4` "como punto de partida" hizo que el
 # paso de `lr` se midiera a L4 aunque el cribado habia coronado L5 (§6.4).
-BASE_NETWORK = {"regions": "single", "d": 1}
-C_FRAC = 1.0
+BASE_NETWORK = {"regions": "single", "border_reduce": 1}
+BORDER_PX = 0
 
 SCREEN = "plana-screen"       # 1 semilla: descarta barato, NO concluye
 CONFIRM = "plana-confirm"     # 5 semillas: lo unico que entra en una tabla
@@ -109,7 +109,7 @@ def _plan(name: str, axes: list[dict], seeds: int) -> dict:
         "seeds": seeds, "budget": {"epochs": EPOCHS_CAP},
         # la red base del estudio: la plana. Sin esto el estudio derivaria la
         # foveada del window_size y estaria optimizando la red equivocada.
-        "base_network": dict(BASE_NETWORK), "c_frac": C_FRAC,
+        "base_network": dict(BASE_NETWORK), "border_px": BORDER_PX,
         "axes": axes,
     }
 

@@ -1,12 +1,15 @@
-format_version: 1
+format_version: 2
 # Control C de docs/plan-cnn-plana.md §3: la CNN plana que solo ve la ventana.
 # Una sola rama sobre todo el input, sin enmascarar y sin periferia.
 # k_periph / s_periph / merge no aplican con regions: single (la puerta no los valida).
 regions: single
-N: 16
-c_frac: 1.0
-d: 1
-pen_frac: 0.1
+# geometria en px reales (reparametrizacion 2026-08-25);
+# antes: N=16, c_frac=1.0, d=1, pen_frac=0.1 — misma red, bit a bit
+fovea_px: 16
+border_px: 0
+border_reduce: 1
+overlap_fovea_px: 2
+overlap_border_px: 0
 n_layers: 4
 k_center: 3
 k_periph: 3

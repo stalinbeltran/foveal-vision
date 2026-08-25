@@ -6,7 +6,8 @@ axis silently broken.
 
 Runs in a throwaway store (temp dirs), on a small ws16 dataset, 1 epoch, a few
 points per axis. f1 values are smoke (1 epoch); what we assert is that each axis
-trains at least one point and that N/c_frac are REFUSED at both gates.
+trains at least one point and that the fovea (and the old spelling)
+are REFUSED at both gates.
 
     .\.venv\Scripts\python scripts\verify_axes.py [--dataset synth-b16]
 
@@ -32,8 +33,10 @@ from fv.training.registry import RunStore
 # valid value so BOTH branches are exercised. Geometry axes use "auto": the
 # range is calculated by fv.fovea, never hand-written (the project principle).
 NETWORK_AXES = [
-    ("d", "auto", 2),
-    ("pen_frac", [0.1, 0.15], 0),
+    ("border_px", "auto", 2),
+    ("border_reduce", "auto", 2),
+    ("overlap_fovea_px", "auto", 2),
+    ("overlap_border_px", "auto", 2),
     ("n_layers", [1, 2, 3], 0),
     ("k_center", "auto", 2),
     ("k_periph", "auto", 2),
@@ -84,16 +87,19 @@ def _run_axis(axis, rng, cap, dataset, ss, rs):
 
 
 def _assert_refusals(dataset):
-    """N and c_frac must be refused at BOTH gates (sweep and study), not run."""
+    """The fovea must be refused at BOTH gates (sweep and study), not run — and
+    so must the pre-2026-08-25 spelling, by name and with its replacement."""
     out = []
-    for axis in ("N", "c_frac"):
+    checks = [("fovea_px", "axis_breaks_window_size")]
+    checks += [(a, "axis_renamed") for a in ("N", "c_frac", "pen_frac", "d")]
+    for axis, want in checks:
         spec = {"space": {axis: [8, 10, 12]}, "strategy": "grid", "objective": "f1"}
         codes = {p["code"] for p in check_sweep(spec)}
         plan = {"window_dataset": dataset, "base_recipe": "corta", "objective": "f1",
                 "seeds": 1, "budget": {"epochs": 1},
                 "axes": [{"axis": axis, "range": [8, 10, 12]}]}
         pcodes = {p["code"] for p in validate_plan(plan)}
-        ok = "axis_breaks_window_size" in codes and "axis_breaks_window_size" in pcodes
+        ok = want in codes and want in pcodes
         out.append({"axis": axis, "ok": ok,
                     "detail": f"check_sweep={sorted(codes)} validate_plan={sorted(pcodes)}"})
     return out

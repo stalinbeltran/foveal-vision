@@ -22,7 +22,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from fv.fovea import REGIONS, build_masks, dims_of, is_single_region
+from fv.fovea import (GEOMETRY_FIELDS, REGIONS, build_masks, dims_of,
+                      is_single_region, normalize_geometry)
 
 DEFAULT_CHANNEL = 16  # D-C2: a derived net defaults to [16]*n_layers (constant 16)
 
@@ -35,8 +36,14 @@ DEFAULT_CHANNEL = 16  # D-C2: a derived net defaults to [16]*n_layers (constant 
 __all__ = ["REGIONS", "NETWORK_DEFAULTS", "full_config", "build_model",
            "network_trace", "resolve_channels", "FoveatedRegionalNN"]
 
+# The geometry is stated in REAL PIXELS (fv.fovea): the fovea and the border are
+# independent lengths, and `border_reduce` is the reduction method's factor. The
+# defaults reproduce EXACTLY the pre-2026-08-25 base (N=20, c_frac=0.8, d=2,
+# pen_frac=0.1): fovea 16 px, border 2 cells of 2 px = 4 px, 2 px of overlap.
 NETWORK_DEFAULTS = {
-    "N": 20, "c_frac": 0.8, "d": 2, "pen_frac": 0.1, "n_layers": 2,
+    "fovea_px": 16, "border_px": 4, "border_reduce": 2,
+    "overlap_fovea_px": 2, "overlap_border_px": 0,
+    "n_layers": 2,
     "k_center": 3, "k_periph": 3, "s_center": 1, "s_periph": 1,
     "channels": None, "merge": "concat", "pool_mode": "avg",
     "pad_mode": "edge", "regions": "split",
@@ -56,8 +63,22 @@ def resolve_channels(cfg: dict, n_layers: int) -> list[int]:
 
 
 def full_config(cfg: dict) -> dict:
+    """Every field C needs, with defaults filled in — and the geometry in the
+    canonical spelling whatever spelling `cfg` arrived in.
+
+    The normalisation happens BEFORE the defaults are applied, and that order is
+    the whole point: a legacy config carries N/c_frac/pen_frac, which are not
+    keys of NETWORK_DEFAULTS any more, so applying the defaults first would drop
+    its geometry and silently substitute the default one. Same fact, two places,
+    resolved by precedence instead of detection — the failure this project keeps
+    paying for. `fv.fovea.normalize_geometry` refuses ambiguity instead.
+    """
     out = dict(NETWORK_DEFAULTS)
-    out.update({k: v for k, v in cfg.items() if k in NETWORK_DEFAULTS})
+    geom = normalize_geometry(cfg)
+    rest = {k: v for k, v in cfg.items()
+            if k in NETWORK_DEFAULTS and k not in GEOMETRY_FIELDS}
+    out.update(rest)
+    out.update(geom)
     out["channels"] = resolve_channels(cfg, out["n_layers"])  # always a list
     return out
 

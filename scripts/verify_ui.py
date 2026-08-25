@@ -58,7 +58,7 @@ def main() -> int:
         # Redes: live validation panel + a broken assert shows its reason
         def networks_extra(page):
             page.wait_for_selector("[data-testid=zone-diagram]", timeout=15000)
-            pen = page.locator("label.field", has_text="pen_frac").locator("input")
+            pen = page.locator("label.field", has_text="overlap_fovea_px").locator("input")
             pen.fill("0.45")
             page.wait_for_selector("text=penetration_too_large", timeout=10000)
             page.screenshot(path=str(SHOTS / "04b-redes-assert.png"), full_page=True)

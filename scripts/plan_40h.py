@@ -255,7 +255,7 @@ def confirm(res: dict, lever: str, why: str) -> dict:
         # the winning screening config is the base, minus the axis being swept
         carried = {k: v for k, v in res[lever]["config"].items()} if lever != "none" else {}
         carried.pop(axis, None)
-        carried.pop("N", None); carried.pop("c_frac", None)      # derived, never carried
+        carried.pop("fovea_px", None)          # taken from B, never carried
         # a field COUPLED to the swept axis cannot be carried either: channels
         # must have length n_layers, so carrying [16,16,16,16] while n_layers
         # goes back to its default 2 makes the BASE invalid and check_run

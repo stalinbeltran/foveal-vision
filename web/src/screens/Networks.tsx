@@ -3,9 +3,11 @@ import { api } from "../api";
 import { usePersistedState } from "../uiState";
 import { ErrorBox, Field, Working } from "../components/ui";
 
-// C — the most important screen of this project: editing N and the fractions
-// shows the derived dims, the CALCULATED ranges and the zone diagram LIVE
-// (FG1), via POST /networks/validate. Broken asserts show with their reason.
+// C — the most important screen of this project: editing the geometry (real px:
+// fovea, border, how the border is reduced, and how much of each region the two
+// branches share) shows the derived dims, the CALCULATED ranges and the zone
+// diagram LIVE (FG1), via POST /networks/validate. `N` is DERIVED and shown as
+// such: it is not a field anybody types (reparameterisation 2026-08-25).
 
 // The C defaults are NOT written here: /networks serves them, resolved by the
 // same full_config the builder uses. The copy that used to live in this file had
@@ -16,10 +18,13 @@ const EMPTY = { name: "" } as any;
 function ZoneDiagram({ dims }: { dims: any }) {
   const N = dims.N, s = Math.min(12, Math.floor(240 / N));
   const cells = [];
-  const po = dims.periph_out, pen = dims.penetration;
+  // the two overlaps are independent: the border branch reaches `pen` cells INTO
+  // the fovea, the fovea branch reaches `ob` cells OUT over the border
+  const po = dims.border_cells, pen = dims.overlap_fovea_px;
+  const ob = dims.overlap_border_cells ?? 0;
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
-      const ring = x < po || y < po || x >= N - po || y >= N - po;
+      const ring = (x < po - ob || y < po - ob || x >= N - po + ob || y >= N - po + ob);
       const core = x >= po + pen && y >= po + pen && x < N - po - pen && y < N - po - pen;
       const color = ring ? "var(--corner-bl)" : core ? "var(--corner-tr)" : "var(--warn)";
       cells.push(<rect key={`${x}-${y}`} x={x * s} y={y * s} width={s - 1} height={s - 1}
@@ -43,7 +48,7 @@ export default function Networks() {
   const [form, setForm] = usePersistedState<any>("networks.form", EMPTY);
   const [validation, setValidation] = useState<any>(null);
   const [confirming, setConfirming] = useState(false);
-  const ready = form.N != null;   // the served defaults (or a remembered form) landed
+  const ready = form.fovea_px != null;  // the served defaults (or a remembered form) landed
 
   const refresh = () => api.get("/networks").then((d) => {
     setList(d.networks);
@@ -100,7 +105,7 @@ export default function Networks() {
   return (
     <div>
       <h2 data-domain="C">Redes foveadas (C)</h2>
-      <p className="sub">Todo se deriva de N y las fracciones; los rangos de búsqueda se calculan, nunca se escriben.</p>
+      <p className="sub">La geometría se declara en px reales: la fóvea es la ventana etiquetada y el borde es independiente de cómo se reduce. N se deriva; los rangos de búsqueda se calculan, nunca se escriben.</p>
       <ErrorBox error={error} />
       <Working on={!ready} />
       {!ready ? null : (
@@ -109,12 +114,16 @@ export default function Networks() {
           <Field label="nombre"><input value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <div className="row">
-            <div className="grow">{num("N", 2, "lado de la entrada compuesta (par)")}</div>
-            <div className="grow">{num("c_frac", 0.01, "fracción de la fóvea")}</div>
+            <div className="grow">{num("fovea_px", 2, "fóvea en px = ventana etiquetada de B")}</div>
+            <div className="grow">{num("border_px", 1, "borde difuso en px reales, por lado")}</div>
           </div>
           <div className="row">
-            <div className="grow">{num("d", 1, "downsample de la periferia")}</div>
-            <div className="grow">{num("pen_frac", 0.01, "penetración")}</div>
+            <div className="grow">{num("border_reduce", 1, "px reales por celda de borde")}</div>
+            <div className="grow">{num("overlap_fovea_px", 1, "px de fóvea que ve también la rama del borde")}</div>
+          </div>
+          <div className="row">
+            <div className="grow">{num("overlap_border_px", 1, "px de borde que ve también la rama de la fóvea")}</div>
+            <div className="grow" />
           </div>
           <div className="row">
             <div className="grow">{num("k_center", 2, "kernel impar")}</div>
@@ -172,9 +181,11 @@ export default function Networks() {
             <div className="row">
               <div>
                 <dl className="kv">
-                  <dt>fóvea (ventana etiquetada)</dt><dd>{validation.trace.dims.center_out}px</dd>
-                  <dt>anillo</dt><dd>{validation.trace.dims.periph_out}px (ve {validation.trace.dims.periph_real}px reales)</dd>
-                  <dt>penetración</dt><dd>{validation.trace.dims.penetration}px</dd>
+                  <dt>fóvea (ventana etiquetada)</dt><dd>{validation.trace.dims.fovea_px}px</dd>
+                  <dt>borde difuso</dt><dd>{validation.trace.dims.border_px}px reales en {validation.trace.dims.border_cells} celdas ({validation.trace.dims.border_reduce}px/celda)</dd>
+                  <dt>solape sobre la fóvea</dt><dd>{validation.trace.dims.overlap_fovea_px}px</dd>
+                  <dt>solape sobre el borde</dt><dd>{validation.trace.dims.overlap_border_px}px</dd>
+                  <dt>entrada compuesta (N, derivada)</dt><dd>{validation.trace.dims.N}×{validation.trace.dims.N}</dd>
                   <dt>recorte original</dt><dd>{validation.trace.dims.original_size}px</dd>
                   <dt>salida ramas</dt><dd>c {validation.trace.branch_out.center.join("×")} · p {validation.trace.branch_out.periph.join("×")}</dd>
                   <dt>parámetros</dt><dd>{validation.trace.num_params.toLocaleString()}</dd>
@@ -204,12 +215,12 @@ export default function Networks() {
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Guardadas</h3>
         <table className="data" data-testid="networks-table">
-          <thead><tr><th>nombre</th><th>N</th><th>c_frac</th><th>d</th><th>kernels</th>
+          <thead><tr><th>nombre</th><th>fóvea</th><th>borde</th><th>px/celda</th><th>kernels</th>
             <th>strides</th><th>merge</th><th></th></tr></thead>
           <tbody>
             {list.map((n) => (
               <tr key={n.name} onClick={() => setForm({ ...defaults, name: "", ...n })}>
-                <td>{n.name}</td><td>{n.N}</td><td>{n.c_frac}</td><td>{n.d}</td>
+                <td>{n.name}</td><td>{n.fovea_px}px</td><td>{n.border_px}px</td><td>{n.border_reduce}</td>
                 <td>{n.k_center}/{n.k_periph}</td><td>{n.s_center}/{n.s_periph}</td>
                 <td>{n.merge}</td>
                 <td><button className="secondary" onClick={(ev) => {

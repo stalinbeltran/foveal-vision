@@ -21,14 +21,30 @@ from fv.validation import check_network
 NETWORK_PARAMS = set(NETWORK_DEFAULTS)
 RECIPE_PARAMS = set(Recipe().as_dict())
 LOSS_WEIGHT_PARAMS = {"lambda_pos", "pos_weight", "smooth_l1_beta"}
-GEOMETRY_AUTO = {"k_center", "k_periph", "s_center", "s_periph", "d"}
-# The two fields that set center_out = round_to_even(N·c_frac). Contract ①a ties
-# center_out to B's window_size, which is fixed for the whole sweep — so varying
-# either one INDEPENDENTLY makes every point violate ①a (fovea != window). They
-# are DERIVED together from the problem (fv.models.derive), never swept: a sweep
-# that declares them must be refused HERE, with the reason, before any point is
-# reserved — not silently trained and failed deep in the job (R4, §10).
-WINDOW_SIZE_FIELDS = {"N", "c_frac"}
+GEOMETRY_AUTO = {"k_center", "k_periph", "s_center", "s_periph",
+                 "border_px", "border_reduce", "overlap_fovea_px", "overlap_border_px"}
+# The fovea IS the labelled window (contract ①a), and B's window_size is fixed for
+# the whole sweep — so a sweep that varies it makes EVERY point violate ①a. It is
+# taken from the problem (fv.models.derive), never swept: refused HERE, with the
+# reason, before any point is reserved — not silently trained and failed deep in
+# the job (R4, §10). The border is NOT here: since the 2026-08-25
+# reparameterisation it is an independent length and a first-class axis.
+WINDOW_SIZE_FIELDS = {"fovea_px"}
+# Spellings that no longer mean what they used to. Refused as axes with the
+# reason, never re-interpreted: `d` used to grow the context (border = cells*d)
+# and now only says how coarsely a border of fixed size is condensed, so an old
+# spec re-run verbatim would train DIFFERENT networks in silence.
+RENAMED_AXES = {
+    "N": ("fovea_px/border_px", "N se DERIVA (fovea_px + 2*border_px/border_reduce): "
+          "barre 'border_px' para cambiar cuanto contexto ve la red"),
+    "c_frac": ("fovea_px/border_px", "c_frac se DERIVA de la fovea y el borde: "
+               "barre 'border_px'"),
+    "pen_frac": ("overlap_fovea_px", "el solape se declara en px de fovea, no como "
+                 "fraccion de N"),
+    "d": ("border_reduce", "'d' cambio de significado: hoy el borde es 'border_px' "
+          "y 'border_reduce' solo dice cuantos px caben en una celda. Para barrer "
+          "cuanto contexto ve la red, barre 'border_px'"),
+}
 # What H can rank by IS what a val record measures, with its direction: the same
 # table fv.metrics uses to choose best.pt, read from here (it was written twice).
 OBJECTIVES = dict(VAL_METRICS)
@@ -50,16 +66,22 @@ def check_sweep(spec: dict) -> list[dict]:
     if not space:
         bad("empty_space", "el espacio esta vacio", "declara al menos un eje")
     for param in space:
-        if param not in NETWORK_PARAMS | RECIPE_PARAMS:
+        if param in RENAMED_AXES:
+            new_name, why = RENAMED_AXES[param]
+            bad("axis_renamed",
+                f"'{param}' ya no es un eje: la geometria se reparametrizo "
+                f"(2026-08-25) y ahora se declara en px reales",
+                f"usa {new_name}. {why}")
+        elif param not in NETWORK_PARAMS | RECIPE_PARAMS:
             bad("unknown_space_param", f"'{param}' no es un campo de C ni de D",
                 f"los ejes validos son {sorted(NETWORK_PARAMS | RECIPE_PARAMS)}")
         elif param in WINDOW_SIZE_FIELDS:
             bad("axis_breaks_window_size",
-                f"'{param}' fija center_out (= round_to_even(N*c_frac)), que el "
-                f"contrato (1)a ata al window_size del dataset: barrerlo hace que "
-                f"cada punto tenga una fovea != la ventana etiquetada",
-                "N y c_frac se DERIVAN juntos del window_size (no se barren); para "
-                "variar el contexto periferico barre 'd', y para cambiar la fovea "
+                f"'{param}' es la fovea, que el contrato (1)a ata al window_size "
+                f"del dataset: barrerlo hace que cada punto tenga una fovea != la "
+                f"ventana etiquetada",
+                "la fovea se TOMA del window_size (no se barre); para variar el "
+                "contexto barre 'border_px', y para cambiar la fovea "
                 "usa/reconstruye un dataset con ese window_size")
     objective = spec.get("objective", "f1")
     if objective not in OBJECTIVES:
@@ -100,7 +122,7 @@ def expand_points(spec: dict, base_network: dict) -> tuple[list[dict], list[dict
     """-> (valid points, discarded points with reasons). A point is
     {network: {...}, recipe_overrides: {...}}."""
     base = full_config(base_network)
-    ss = build_search_space(base["N"], base["c_frac"], base["pen_frac"])
+    ss = build_search_space(base, n_layers=int(base["n_layers"]))
     space: dict[str, list] = {}
     for param, values in spec.get("space", {}).items():
         if values == "auto":

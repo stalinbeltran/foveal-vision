@@ -11,7 +11,7 @@ def _spec(world, points=0, epochs=1):
         "base_network": "tiny", "base_network_value": TINY_NET,
         "base_recipe": "quick",
         "base_recipe_value": {"epochs": epochs, "batch_size": 32, "lr": 1e-3},
-        "space": {"d": [1, 2], "lr": [0.001, 0.003]},
+        "space": {"border_px": [2, 4], "lr": [0.001, 0.003]},
         "strategy": "grid", "objective": "f1",
         "budget": {"points": points, "epochs": epochs},
     }
@@ -19,8 +19,8 @@ def _spec(world, points=0, epochs=1):
 
 def test_expand_discards_invalid_geometry_with_reason(world):
     from fv.sweeps.spec import expand_points
-    spec = {"space": {"pen_frac": [0.1, 0.45]}, "strategy": "grid"}
-    valid, discarded = expand_points(spec, TINY_NET)
+    spec = {"space": {"overlap_fovea_px": [1, 4]}, "strategy": "grid"}
+    valid, discarded = expand_points(spec, TINY_NET)   # fovea 8 -> 4 >= 8//2
     assert len(valid) == 1 and len(discarded) == 1
     assert discarded[0]["problems"][0]["code"] == "penetration_too_large"
 
@@ -30,7 +30,7 @@ def test_auto_ranges_come_from_fovea(world):
     from fv.sweeps.spec import expand_points
     spec = {"space": {"k_center": "auto"}, "strategy": "grid"}
     valid, _ = expand_points(spec, TINY_NET)
-    ss = build_search_space(TINY_NET["N"], TINY_NET["c_frac"], TINY_NET["pen_frac"])
+    ss = build_search_space(TINY_NET)
     assert [p["overrides"]["k_center"] for p in valid] == ss["k_center"]
 
 
@@ -204,12 +204,12 @@ def test_no_valid_points_error_carries_each_reason(world):
     from fv.sweeps.store import SweepStore
     store = SweepStore()
     spec = _spec(world)
-    spec["space"] = {"pen_frac": [0.45, 0.5]}  # both exceed the periphery band
+    spec["space"] = {"overlap_fovea_px": [4, 5]}  # both eat the fovea's core
     with pytest.raises(SweepError) as e:
         prepare_sweep("bad-axis", spec, TINY_NET, store)
     assert e.value.code == "no_valid_points"
-    assert "pen_frac=0.45" in e.value.hint and "pen_frac=0.5" in e.value.hint
-    assert "penetration" in e.value.hint          # the concrete geometric reason
+    assert "overlap_fovea_px=4" in e.value.hint and "overlap_fovea_px=5" in e.value.hint
+    assert "fovea_px//2" in e.value.hint          # the concrete geometric reason
     assert not store.exists("bad-axis")            # nothing reserved on failure
 
 
@@ -232,24 +232,44 @@ def test_sweeping_epochs_is_not_collapsed_by_the_budget(world):
     assert got == [1, 2]                     # the axis varied, not collapsed
 
 
-def test_sweeping_N_or_c_frac_is_refused_before_reserving(world):
-    # ①a ties center_out=round_to_even(N*c_frac) to the dataset window_size, so
-    # N/c_frac cannot be axes: check_sweep must refuse WITH the reason, up front,
-    # instead of letting every point fail window_size_mismatch deep in the job
-    # (the bug behind test2-s0-N ending 'done 0/3' with no visible cause).
+def test_sweeping_the_fovea_is_refused_before_reserving(world):
+    # ①a ties the fovea to the dataset window_size, so it cannot be an axis:
+    # check_sweep must refuse WITH the reason, up front, instead of letting every
+    # point fail window_size_mismatch deep in the job (the bug behind test2-s0-N
+    # ending 'done 0/3' with no visible cause).
     from fv.sweeps.runner import prepare_sweep
     from fv.sweeps.spec import SweepError, check_sweep
     from fv.sweeps.store import SweepStore
-    for axis in ("N", "c_frac"):
+    spec = _spec(world)
+    spec["space"] = {"fovea_px": [8, 10, 12]}
+    problems = check_sweep(spec)
+    assert any(p["code"] == "axis_breaks_window_size" for p in problems)
+    store = SweepStore()
+    with pytest.raises(SweepError) as e:
+        prepare_sweep("bad-fovea", spec, TINY_NET, store)
+    assert e.value.code == "axis_breaks_window_size"
+    assert not store.exists("bad-fovea")           # nothing reserved on refusal
+
+
+def test_the_old_geometry_axes_are_refused_by_NAME_not_reinterpreted(world):
+    """The reparameterisation renamed the geometry AND changed what `d` means.
+    An old spec re-run verbatim must stop with the reason, never train a
+    different network in silence — that is the whole point of the rename."""
+    from fv.sweeps.runner import prepare_sweep
+    from fv.sweeps.spec import SweepError, check_sweep
+    from fv.sweeps.store import SweepStore
+    for axis, wanted in (("N", "border_px"), ("c_frac", "border_px"),
+                         ("pen_frac", "overlap_fovea_px"), ("d", "border_reduce")):
         spec = _spec(world)
-        spec["space"] = {axis: [8, 10, 12]}
+        spec["space"] = {axis: [1, 2]}
         problems = check_sweep(spec)
-        assert any(p["code"] == "axis_breaks_window_size" for p in problems)
+        assert any(p["code"] == "axis_renamed" for p in problems), axis
+        assert any(wanted in p["hint"] for p in problems), axis
         store = SweepStore()
         with pytest.raises(SweepError) as e:
-            prepare_sweep(f"bad-{axis}", spec, TINY_NET, store)
-        assert e.value.code == "axis_breaks_window_size"
-        assert not store.exists(f"bad-{axis}")     # nothing reserved on refusal
+            prepare_sweep(f"old-{axis}", spec, TINY_NET, store)
+        assert e.value.code == "axis_renamed"
+        assert not store.exists(f"old-{axis}")
 
 
 def test_pid_alive():

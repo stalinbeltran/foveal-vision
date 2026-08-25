@@ -10,7 +10,7 @@ def test_contract_01_window_size_mismatch_is_refused_before_reserving(world):
     from fv.validation import check_run
     from fv.windows.store import WindowDatasetStore
     manifest = WindowDatasetStore().manifest(world["dataset"])
-    bad = dict(TINY_NET, N=20, c_frac=0.8)  # fovea 16 vs window 8
+    bad = dict(TINY_NET, fovea_px=16)  # fovea 16 vs window 8
     problems = check_run(manifest, bad)
     assert any(p["code"] == "window_size_mismatch" for p in problems)
     # control: the matching net passes compatibility
@@ -100,7 +100,7 @@ def test_contract_03_provenance_carries_name_value_and_fingerprint(world):
     cfg = store.config("prov-run")
     prov = cfg["provenance"]
     assert prov["network"]["name"] == "tiny-net"
-    assert prov["network"]["value"]["N"] == TINY_NET["N"]
+    assert prov["network"]["value"]["fovea_px"] == TINY_NET["fovea_px"]
     assert prov["recipe"]["name"] == "tiny-recipe"
     assert prov["window_dataset"]["fingerprint"].startswith("sha256:")
     assert prov["environment"]["device"] == "cpu"
@@ -122,8 +122,10 @@ def test_parametric_builder_no_regression_for_two_layers():
     """D-C2/D-C3/§12: with channels=[16,32] EXPLICIT (not the new default) the
     parametric builder reproduces the shape and param count of the old fixed
     two-layer net (captured before the change: 317612 params, flat 25600)."""
+    from fv.fovea import dims_of
     from fv.models.builder import network_trace
-    cfg = {"N": 20, "c_frac": 0.8, "d": 2, "pen_frac": 0.1, "n_layers": 2,
+    cfg = {"fovea_px": 16, "border_px": 4, "border_reduce": 2,
+           "overlap_fovea_px": 2, "overlap_border_px": 0, "n_layers": 2,
            "k_center": 3, "k_periph": 3, "s_center": 1, "s_periph": 1,
            "channels": [16, 32], "merge": "concat", "pool_mode": "avg",
            "pad_mode": "edge"}
@@ -145,12 +147,14 @@ def test_parametric_builder_default_channels_are_constant_sixteen():
 def test_parametric_builder_three_layers_builds_and_forwards():
     """§12: n_layers=3 constructs and forwards with the corner-head shape."""
     import torch
+    from fv.fovea import dims_of
     from fv.models.builder import build_model
     cfg = dict(TINY_NET); cfg.pop("ch1"); cfg.pop("ch2")
     cfg.update(n_layers=3, channels=[4, 8, 8])
     model = build_model(cfg)
     assert len(model.center_convs) == 3 and len(model.periph_convs) == 3
-    out = model(torch.zeros(1, 1, cfg["N"], cfg["N"]))
+    n = dims_of(cfg).N
+    out = model(torch.zeros(1, 1, n, n))
     assert out.shape == (1, 4, 3)
 
 
@@ -182,7 +186,7 @@ def test_contract_04_checkpoint_rebuilds_the_net_without_yaml(world):
     train("ckpt-run", world["dataset"], "n", TINY_NET, "r",
           Recipe(epochs=1, batch_size=32), store=store)
     model = load_model(store.path("ckpt-run") / "best.pt")
-    assert model.dims.center_out == 8       # geometry included
+    assert model.dims.fovea_px == 8         # geometry included
     out = model(torch.zeros(1, 1, 12, 12))
     assert out.shape == (1, 4, 3)
 
@@ -192,13 +196,13 @@ def test_contract_05_dataloader_and_inference_build_the_same_view(world):
     views are bit-identical for the same window."""
     import fv.inference.predict as predict_mod
     import fv.windows.dataset as dataset_mod
-    from fv.fovea import build_view, derive_dims
+    from fv.fovea import build_view, dims_of
     assert dataset_mod.build_view is predict_mod.build_view is build_view
 
     from fv.windows.store import WindowDatasetStore
     from fv.windows.dataset import FoveatedWindowDataset
     arrays = WindowDatasetStore().arrays(world["dataset"])
-    dims = derive_dims(**{k: TINY_NET[k] for k in ("N", "c_frac", "d", "pen_frac")})
+    dims = dims_of(TINY_NET)
     ds = FoveatedWindowDataset(arrays, dims, split=0)
     x, _y = ds[0]
     img = arrays["images"][ds.image_row[0]]
@@ -511,3 +515,52 @@ def test_no_validation_split_refuses_to_train(world):
         train("x", "no-val", "n", TINY_NET, "r", Recipe(epochs=1), store=store)
     assert e.value.code == "no_validation_split"
     assert not store.exists("x")   # the name was NOT reserved
+
+def test_the_reparameterisation_does_not_move_a_single_weight():
+    """2026-08-25: stating the geometry in real px must be a RENAME, not a
+    change. Module names are untouched, so a checkpoint trained under the old
+    spelling loads strict into a net built from the new one, and both forward
+    bit-identically. The param count is the documented golden number of the L4
+    base that was training when this landed (168652)."""
+    import io
+    import torch
+    from fv.models.builder import build_model, full_config
+    legacy = {"N": 20, "c_frac": 0.8, "d": 2, "pen_frac": 0.1, "n_layers": 4,
+              "channels": [16, 16, 16, 16]}
+    canon = {"fovea_px": 16, "border_px": 4, "border_reduce": 2,
+             "overlap_fovea_px": 2, "overlap_border_px": 0, "n_layers": 4,
+             "channels": [16, 16, 16, 16]}
+    torch.manual_seed(0); a = build_model(full_config(legacy))
+    torch.manual_seed(0); b = build_model(full_config(canon))
+    assert {k: tuple(v.shape) for k, v in a.state_dict().items()}         == {k: tuple(v.shape) for k, v in b.state_dict().items()}
+    assert sum(v.numel() for v in a.state_dict().values()) == 168652
+    buf = io.BytesIO(); torch.save(a.state_dict(), buf); buf.seek(0)
+    b.load_state_dict(torch.load(buf, weights_only=True), strict=True)
+    x = torch.randn(2, 1, 20, 20)
+    with torch.no_grad():
+        assert torch.equal(a(x), b(x))
+
+
+def test_every_run_on_disk_still_resolves_its_geometry():
+    """The migration's other half: 478 runs were written with the old spelling
+    and their provenance is the only record of the net that made them. A reader
+    that cannot read them turns history into noise."""
+    import json
+    import pathlib as _pl
+    from fv.fovea import dims_of
+    runs = _pl.Path("runs")
+    if not runs.exists():
+        pytest.skip("sin runs en disco (artefactos ignorados por git)")
+    seen = 0
+    for r in sorted(runs.iterdir()):
+        cfg_path = r / "config.json"
+        if not cfg_path.exists():
+            continue
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        net = (cfg.get("provenance", {}).get("network", {}).get("value")
+               or cfg.get("network"))
+        if not net:
+            continue
+        dims_of(net)          # raises if the old spelling stopped being readable
+        seen += 1
+    assert seen > 0

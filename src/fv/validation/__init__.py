@@ -9,7 +9,7 @@ sweep walks through.
 
 from __future__ import annotations
 
-from fv.fovea import REGIONS, check_dims, dims_of
+from fv.fovea import FoveaError, REGIONS, check_dims, dims_of, normalize_geometry
 
 
 def check_network(net: dict) -> list[dict]:
@@ -25,9 +25,14 @@ def check_network(net: dict) -> list[dict]:
                          f"(dos ramas enmascaradas) y 'single' la CNN plana de "
                          f"control (una rama sobre todo el input)"}]
     single = regions == "single"
-    problems = list(check_dims(
-        int(net.get("N", 0)), float(net.get("c_frac", 0.0)),
-        int(net.get("d", 1)), float(net.get("pen_frac", 0.0)), single))
+    # the geometry may arrive in either spelling; normalising here means the gate
+    # refuses an ambiguous config (both spellings, or a bare `d`) with its reason
+    # instead of guessing which half of it to believe
+    try:
+        geom = normalize_geometry(net)
+    except FoveaError as e:
+        return [e.as_dict()]
+    problems = list(check_dims(geom, single))
     # in 'single' there is no peripheral branch, so its kernel/stride/merge
     # describe nothing and are not validated against a band that does not exist
     for key in (("k_center",) if single else ("k_center", "k_periph")):
@@ -92,15 +97,14 @@ def check_compatible(manifest: dict, net: dict) -> list[dict]:
         return problems
     dims = dims_of(net)
     window_size = int(manifest.get("config", {}).get("window_size", 0))
-    if dims.center_out != window_size:
+    if dims.fovea_px != window_size:
         problems.append({
             "code": "window_size_mismatch",
-            "message": f"la fovea de la red es {dims.center_out}px "
-                       f"(N={net['N']}, c_frac={net['c_frac']}) y el dataset etiqueta "
-                       f"ventanas de {window_size}px",
-            "hint": f"elige un dataset con window_size {dims.center_out}, o una red "
-                    f"cuya fovea sea {window_size} (p. ej. N={window_size + 2 * dims.periph_out}, "
-                    f"c_frac={window_size}/{window_size + 2 * dims.periph_out})"})
+            "message": f"la fovea de la red es {dims.fovea_px}px y el dataset "
+                       f"etiqueta ventanas de {window_size}px",
+            "hint": f"elige un dataset con window_size {dims.fovea_px}, o pon "
+                    f"fovea_px={window_size} en la red (el borde no cambia: sigue "
+                    f"siendo border_px={dims.border_px})"})
     if not manifest.get("has_images", False):
         problems.append({
             "code": "view_needs_images",

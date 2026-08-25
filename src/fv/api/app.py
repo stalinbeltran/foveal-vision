@@ -19,7 +19,8 @@ from fv import settings
 from fv.api.jobs import JobQueue
 from fv.ioutils import read_json_retrying, write_json_atomic
 from fv.datasets.loader import SourceDataset, SourceError, discover_sources
-from fv.fovea import FoveaError, build_search_space, check_dims, derive_dims
+from fv.fovea import (FoveaError, build_search_space, check_dims, derive_dims,
+                      normalize_geometry)
 from fv.inference.checkpoint import MODEL_CACHE, CheckpointError
 from fv.inference.introspect import (feature_maps_payload, input_view_payload,
                                      kernels_payload)
@@ -220,8 +221,11 @@ def create_app() -> FastAPI:
     @app.post("/networks")
     def save_network(body: dict):
         name = body.get("name", "")
-        cfg = full_config(body)
-        problems = check_dims(cfg["N"], cfg["c_frac"], cfg["d"], cfg["pen_frac"])
+        try:
+            cfg = full_config(body)
+        except FoveaError as e:
+            raise HTTPException(400, e.as_dict())
+        problems = check_dims(normalize_geometry(cfg))
         if problems:
             p = problems[0]
             raise HTTPException(400, p)
@@ -230,14 +234,17 @@ def create_app() -> FastAPI:
 
     @app.post("/networks/validate")
     def validate_network(body: dict):
-        cfg = full_config(body)
         from fv.validation import check_network
+        try:
+            cfg = full_config(body)
+        except FoveaError as e:
+            return {"valid": False, "problems": [e.as_dict()]}
         problems = check_network(cfg)
         if problems:
             return {"valid": False, "problems": problems}
         trace = network_trace(cfg)
         dims = trace["dims"]
-        space = build_search_space(cfg["N"], cfg["c_frac"], cfg["pen_frac"])
+        space = build_search_space(cfg, n_layers=int(cfg["n_layers"]))
         return {"valid": True, "trace": trace,
                 "ranges": {k: v for k, v in space.items() if not k.startswith("_")}}
 
@@ -576,7 +583,7 @@ def create_app() -> FastAPI:
             device=body.get("device", "cpu"), seed=body.get("seed", 1),
             seeds=body.get("seeds", 1),
             winners=body.get("winners"), overrides=body.get("overrides"),
-            c_frac=body.get("c_frac"), study=body.get("study"), sstore=sstore)
+            border_px=body.get("border_px"), study=body.get("study"), sstore=sstore)
 
         def work(is_cancelled):
             return run_sweep(name, sstore, runs)

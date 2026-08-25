@@ -2,11 +2,24 @@
 
 Pure arrays and arithmetic: this module must never import anything from fv.
 
-Everything derives from the fundamental parameters (instructionsNewNN.md):
-    N        side of the composite input the NN consumes
-    c_frac   fraction of the input occupied by the centre (fovea)
-    d        downsampling factor of the periphery
-    pen_frac penetration fraction of the peripheral kernel into the centre
+Everything derives from five fundamental parameters, ALL OF THEM IN REAL PIXELS
+of the source image (2026-08-25 reparameterisation). The fovea and the border
+are stated independently, and HOW the border is reduced is a separate knob, so a
+future reduction method can replace it without touching either definition:
+
+    fovea_px           fovea side. It IS the labelled window of B (contract (1)a)
+    border_px          blurry border thickness, per side, around the fovea
+    border_reduce      real px of border condensed into ONE cell of the input
+    overlap_fovea_px   px OF THE FOVEA the border branch also sees
+    overlap_border_px  px OF THE BORDER the fovea branch also sees
+
+`N` (the side of the composite input the NN consumes) is DERIVED from those, not
+written by hand: N = fovea_px + 2*(border_px // border_reduce). The old spelling
+(N, c_frac, d, pen_frac) is still READ from artefacts written before this change
+and mapped to the canonical five — read old, write new, the same rule `channels`
+follows for ch1/ch2. A config carrying both spellings is REFUSED, never
+reconciled by precedence: that is "the same fact in two places", the failure mode
+this project keeps paying for.
 """
 
 from __future__ import annotations
@@ -38,115 +51,261 @@ def round_to_even(x: float) -> int:
 # still needs the vocabulary to refuse an unknown value at the gate.
 REGIONS = ("split", "single")
 
+# The canonical geometry, in real pixels. `border_reduce` is the only one that
+# is not a length: it is the current reduction METHOD's factor, kept apart from
+# the two lengths on purpose (that separation is the point of this spelling).
+GEOMETRY_FIELDS = ("fovea_px", "border_px", "border_reduce",
+                   "overlap_fovea_px", "overlap_border_px")
+
+# The pre-2026-08-25 spelling. Accepted on read, never written. `d` is listed
+# here but handled apart: it was renamed to `border_reduce` because its MEANING
+# changed — see `normalize_geometry`.
+LEGACY_GEOMETRY_FIELDS = ("N", "c_frac", "pen_frac", "d")
+
 
 def is_single_region(net: dict) -> bool:
     """Absent means 'split' — the behaviour of every artefact written before
-    this field existed (plan-cnn-plana.md §2.1)."""
+    this field existed (plan-cnn-plana.md 2.1)."""
     return net.get("regions", "split") == "single"
+
+
+# ---------------------------------------------------------------------------
+# Normalisation: one spelling in, the canonical five out.
+
+def _from_legacy(cfg: dict) -> dict:
+    """(N, c_frac, d, pen_frac) -> the canonical five, EXACTLY.
+
+    Bit-identical by construction: every derived number below is what the old
+    derive_dims computed from the old four, so a migrated config builds the same
+    network, loads the same checkpoint and produces the same view.
+    """
+    N = int(cfg["N"])
+    c_frac = float(cfg["c_frac"])
+    reduce_ = int(cfg.get("d", 2))
+    pen_frac = float(cfg.get("pen_frac", 0.1))
+    fovea_px = round_to_even(N * c_frac)
+    border_cells = (N - fovea_px) // 2
+    return {
+        "fovea_px": fovea_px,
+        "border_px": border_cells * reduce_,
+        "border_reduce": reduce_,
+        # the fovea is sampled 1:1, so its px and its cells are the same number
+        "overlap_fovea_px": max(1, round(N * pen_frac)),
+        # the old masks never grew the centre outwards: it saw zero border
+        "overlap_border_px": 0,
+    }
+
+
+def normalize_geometry(cfg: dict) -> dict:
+    """The canonical five, from whichever spelling `cfg` uses.
+
+    Refuses a config that mixes both, and refuses a bare `d` without the rest of
+    the old spelling: `d` used to mean "how much context", and it now means "how
+    coarsely a border OF FIXED SIZE is condensed". Silently honouring it would
+    build a different network from the one the caller has in mind, which is
+    exactly the class of failure R4 exists to prevent.
+    """
+    new = [f for f in GEOMETRY_FIELDS if f in cfg and f != "border_reduce"]
+    old = [f for f in LEGACY_GEOMETRY_FIELDS if f in cfg and f != "d"]
+    if new and old:
+        raise FoveaError(
+            "geometry_double_spec",
+            f"la config mezcla la geometria nueva {sorted(new)} con la vieja {sorted(old)}",
+            "deja solo fovea_px/border_px/border_reduce/overlap_*_px: "
+            "N, c_frac, pen_frac y d se derivan de esos")
+    if old:
+        if "N" not in cfg or "c_frac" not in cfg:
+            raise FoveaError(
+                "legacy_geometry_incomplete",
+                f"geometria vieja incompleta: {sorted(old)} sin N y c_frac",
+                "escribe la geometria nueva: fovea_px, border_px, border_reduce")
+        return _from_legacy(cfg)
+    if "d" in cfg and "border_reduce" not in cfg:
+        raise FoveaError(
+            "d_renamed",
+            "'d' cambio de significado y ahora se llama 'border_reduce'",
+            "antes 'd' agrandaba el contexto (borde = periph_out*d); hoy el borde "
+            "es border_px y border_reduce solo dice cuantos px caben en una celda. "
+            "Para barrer cuanto contexto ve la red, barre 'border_px'")
+    out = {}
+    for f in GEOMETRY_FIELDS:
+        if f in cfg and cfg[f] is not None:
+            out[f] = int(cfg[f])
+    return out
 
 
 def dims_of(net: dict) -> "FoveaDims":
     """Derive the geometry FROM A NETWORK CONFIG — the single place that knows
-    `regions` affects what counts as a legal geometry.
+    `regions` affects what counts as a legal geometry, and the single place that
+    knows how to read the old spelling.
 
     Six call sites derived dims straight from the four scalars, and each one that
     forgot the flag would raise `no_periphery` on a perfectly legal flat control,
     inside a training job. One definition, many readers (the failure mode this
     project keeps paying for: the same fact represented twice)."""
-    return derive_dims(int(net["N"]), float(net["c_frac"]), int(net["d"]),
-                       float(net["pen_frac"]), single_region=is_single_region(net))
+    return derive_dims(normalize_geometry(net), single_region=is_single_region(net))
 
 
 @dataclass(frozen=True)
 class FoveaDims:
-    N: int
-    c_frac: float
-    d: int
-    pen_frac: float
-    center_out: int      # fovea side in the composite input == the labelled window (F1b)
-    periph_out: int      # ring thickness in the composite input
-    penetration: int     # rows/cols shared by both branches
-    periph_band: int     # periph_out + penetration: useful band of the outer kernel
-    periph_real: int     # periph_out * d: real pixels the ring condenses per side
-    original_size: int   # center_out + 2*periph_real: original crop the view needs
+    """The geometry, resolved. The canonical five are STORED; everything else is
+    a derived view of them, computed once and here — never a second definition.
+    """
+    # --- canonical, real px of the source image
+    fovea_px: int
+    border_px: int
+    border_reduce: int
+    overlap_fovea_px: int
+    overlap_border_px: int
+    # --- derived, cells of the composite input
+    border_cells: int          # border_px // border_reduce
+    N: int                     # fovea_px + 2*border_cells: the input the NN sees
+    overlap_border_cells: int  # overlap_border_px // border_reduce
+    center_band: int           # cells the centre branch's mask covers, per side
+    periph_band: int           # cells the border branch's mask covers, per side
+    original_size: int         # fovea_px + 2*border_px: the real crop the view needs
+
+    # --- the pre-reparameterisation names, kept because several domains read
+    # them. Derived properties, so there is still ONE definition of each fact.
+    @property
+    def center_out(self) -> int:
+        return self.fovea_px
+
+    @property
+    def periph_out(self) -> int:
+        return self.border_cells
+
+    @property
+    def periph_real(self) -> int:
+        return self.border_px
+
+    @property
+    def penetration(self) -> int:
+        return self.overlap_fovea_px
+
+    @property
+    def d(self) -> int:
+        return self.border_reduce
+
+    @property
+    def c_frac(self) -> float:
+        return self.fovea_px / self.N
 
     def as_dict(self) -> dict:
         return {
-            "N": self.N, "c_frac": self.c_frac, "d": self.d, "pen_frac": self.pen_frac,
+            "fovea_px": self.fovea_px, "border_px": self.border_px,
+            "border_reduce": self.border_reduce,
+            "overlap_fovea_px": self.overlap_fovea_px,
+            "overlap_border_px": self.overlap_border_px,
+            "border_cells": self.border_cells, "N": self.N,
+            "overlap_border_cells": self.overlap_border_cells,
+            "center_band": self.center_band, "periph_band": self.periph_band,
+            "original_size": self.original_size,
+            # derived, for readers that still speak the old names
             "center_out": self.center_out, "periph_out": self.periph_out,
-            "penetration": self.penetration, "periph_band": self.periph_band,
-            "periph_real": self.periph_real, "original_size": self.original_size,
+            "periph_real": self.periph_real, "penetration": self.penetration,
+            "c_frac": self.c_frac,
         }
 
 
-def check_dims(N: int, c_frac: float, d: int, pen_frac: float,
-               single_region: bool = False) -> list[dict]:
+def check_dims(geom: dict, single_region: bool = False) -> list[dict]:
     """All geometry problems of a parameter set, each with code/message/hint.
 
     Pure and cheap: called by every training gate (contract (2)) and by the
     sweep runner to discard invalid points before reserving anything.
 
     `single_region` is C's `regions == "single"`: ONE unmasked branch over the
-    whole N x N input (the flat-CNN control of protocolo.md §6, plan-cnn-plana.md).
-    Two problems stop describing anything there and are therefore not raised:
-    `no_periphery` (there is no ring to be missing — that IS the control) and
-    `penetration_too_large` (nothing penetrates: no mask is ever built). Every
-    other problem still applies, and `build_masks` is untouched either way.
+    whole N x N input (the flat-CNN control of protocolo.md 6, plan-cnn-plana.md).
+    Three problems stop describing anything there and are therefore not raised:
+    `no_border` (there is no border to be missing — that IS the control) and the
+    two overlap problems (nothing overlaps: no mask is ever built). Every other
+    problem still applies, and `build_masks` is untouched either way.
     """
     problems: list[dict] = []
 
     def bad(code: str, message: str, hint: str) -> None:
         problems.append({"code": code, "message": message, "hint": hint})
 
-    if N < 8 or N % 2 != 0:
-        bad("n_must_be_even", f"N={N} debe ser par y >= 8",
-            "elige un N par (la periferia reparte simetrico)")
+    fovea = int(geom.get("fovea_px", 0))
+    border = int(geom.get("border_px", 0))
+    reduce_ = int(geom.get("border_reduce", 1))
+    ov_f = int(geom.get("overlap_fovea_px", 0))
+    ov_b = int(geom.get("overlap_border_px", 0))
+
+    if fovea < 4 or fovea % 2 != 0:
+        bad("fovea_must_be_even", f"fovea_px={fovea} debe ser par y >= 4",
+            "la fovea es la ventana etiquetada de B: reconstruye B con una ventana par")
         return problems
-    if d < 1:
-        bad("downsample_must_be_positive", f"d={d} debe ser >= 1", "usa d >= 1")
+    if reduce_ < 1:
+        bad("reduce_must_be_positive", f"border_reduce={reduce_} debe ser >= 1",
+            "usa border_reduce >= 1: es cuantos px reales caben en una celda de borde")
+        return problems
+    if border < 0:
+        bad("border_negative", f"border_px={border} no puede ser negativo",
+            "usa border_px >= 0 (0 es la CNN plana: declara regions='single')")
+        return problems
+    if border % reduce_ != 0:
+        lo = border - border % reduce_
+        bad("border_not_divisible",
+            f"border_px={border} no es multiplo de border_reduce={reduce_}",
+            f"usa un borde multiplo de {reduce_} (p. ej. {lo} o {lo + reduce_}), "
+            f"o cambia border_reduce")
         return problems
 
-    center_out = round_to_even(N * c_frac)
-    periph_out = (N - center_out) // 2
-    penetration = max(1, round(N * pen_frac))
-
-    if center_out < 4:
-        bad("center_too_small", f"center_out={center_out} con N={N}, c_frac={c_frac}",
-            "sube c_frac o N: la fovea necesita al menos 4 px")
-    if periph_out < 1 and not single_region:
-        bad("no_periphery", f"c_frac={c_frac} deja periph_out=0 con N={N}",
-            "baja c_frac: sin anillo periferico esta red es una CNN plana "
+    border_cells = border // reduce_
+    if border_cells < 1 and not single_region:
+        bad("no_border", f"border_px={border} deja el anillo en 0 celdas",
+            "sube border_px: sin borde esta red es una CNN plana "
             "(si eso es lo que quieres, declara regions='single')")
-    if 2 * periph_out + center_out != N:
-        bad("parity_broken", f"2*{periph_out}+{center_out} != {N}",
-            "N y center_out deben tener la misma paridad (ambos pares)")
-    if center_out >= 4 and penetration >= center_out // 2 and not single_region:
+
+    if ov_f < 0 or ov_b < 0:
+        bad("overlap_negative", f"solapes negativos: fovea={ov_f}, borde={ov_b}",
+            "los solapes son px >= 0")
+        return problems
+    # the fovea is sampled 1:1, so its overlap needs no divisibility rule
+    if ov_f >= fovea // 2 and not single_region:
         bad("penetration_too_large",
-            f"penetration={penetration} >= center_out//2={center_out // 2}",
-            "baja pen_frac: el nucleo exclusivo del kernel central no puede desaparecer")
+            f"overlap_fovea_px={ov_f} >= fovea_px//2={fovea // 2}",
+            "baja overlap_fovea_px: el nucleo exclusivo del kernel central no "
+            "puede desaparecer")
+    if ov_b % reduce_ != 0:
+        bad("overlap_border_not_divisible",
+            f"overlap_border_px={ov_b} no es multiplo de border_reduce={reduce_}",
+            f"el solape cae en celdas de borde: usa un multiplo de {reduce_}")
+    elif border_cells >= 1 and ov_b >= border and not single_region:
+        bad("overlap_border_too_large",
+            f"overlap_border_px={ov_b} >= border_px={border}",
+            "baja overlap_border_px: el borde exclusivo del kernel periferico no "
+            "puede desaparecer (es el espejo de penetration_too_large)")
     return problems
 
 
-def derive_dims(N: int, c_frac: float, d: int, pen_frac: float,
-                single_region: bool = False) -> FoveaDims:
-    problems = check_dims(N, c_frac, d, pen_frac, single_region)
+def derive_dims(geom: dict, single_region: bool = False) -> FoveaDims:
+    problems = check_dims(geom, single_region)
     if problems:
         p = problems[0]
         raise FoveaError(p["code"], p["message"], p["hint"])
-    center_out = round_to_even(N * c_frac)
-    periph_out = (N - center_out) // 2
-    penetration = max(1, round(N * pen_frac))
+    fovea = int(geom["fovea_px"])
+    border = int(geom.get("border_px", 0))
+    reduce_ = int(geom.get("border_reduce", 1))
+    ov_f = int(geom.get("overlap_fovea_px", 0))
+    ov_b = int(geom.get("overlap_border_px", 0))
+    border_cells = border // reduce_
+    ov_b_cells = ov_b // reduce_
     return FoveaDims(
-        N=N, c_frac=c_frac, d=d, pen_frac=pen_frac,
-        center_out=center_out, periph_out=periph_out, penetration=penetration,
-        periph_band=periph_out + penetration,
-        periph_real=periph_out * d,
-        original_size=center_out + 2 * periph_out * d,
+        fovea_px=fovea, border_px=border, border_reduce=reduce_,
+        overlap_fovea_px=ov_f, overlap_border_px=ov_b,
+        border_cells=border_cells,
+        N=fovea + 2 * border_cells,
+        overlap_border_cells=ov_b_cells,
+        center_band=fovea + 2 * ov_b_cells,
+        periph_band=border_cells + ov_f,
+        original_size=fovea + 2 * border,
     )
 
 
 # ---------------------------------------------------------------------------
-# Search ranges as FUNCTIONS of the region (instructionsNewNN.md §3) — never
+# Search ranges as FUNCTIONS of the region (instructionsNewNN.md 3) — never
 # constants. H consumes these; it does not define them.
 
 def kernel_range(region_size: int) -> list[int]:
@@ -164,30 +323,71 @@ def stride_range(region_size: int, n_layers: int = 2) -> list[int]:
     return list(range(1, s_max + 1))
 
 
-def downsample_range(periph_out: int, N: int, max_original: int | None = None) -> list[int]:
-    """d such that the ring reduces to >=1px and the original crop stays bounded."""
-    d_min, d_max = 1, 8
-    if max_original:
-        while (periph_out * d_max * 2 + (N - 2 * periph_out)) > max_original and d_max > 1:
-            d_max -= 1
-    return list(range(d_min, d_max + 1))
+def reduce_range(border_px: int) -> list[int]:
+    """The reduction factors a border of this size admits: its divisors.
+
+    The border is a LENGTH now, so `border_reduce` no longer changes how much
+    context the net sees — only how coarsely it is condensed. That is why the
+    old `max_original` cap is gone from here: the real crop is
+    fovea_px + 2*border_px and does not move with the reduction.
+    """
+    if border_px <= 0:
+        return [1]
+    return [r for r in range(1, border_px + 1) if border_px % r == 0]
 
 
-def build_search_space(N: int, c_frac: float = 0.8, pen_frac: float = 0.1,
-                       n_layers: int = 2, max_original: int | None = None) -> dict:
-    center_out = round_to_even(N * c_frac)
-    periph_out = (N - center_out) // 2
-    penetration = max(1, round(N * pen_frac))
-    periph_band = periph_out + penetration
+def border_range(fovea_px: int, border_reduce: int = 1,
+                 max_original: int | None = None) -> list[int]:
+    """Border widths (px) that keep the real crop bounded, on the cell grid.
+
+    `max_original` is the largest real crop worth sampling; it defaults to
+    3*fovea_px (a border as wide as the fovea, on each side). It is a SEARCH
+    bound, not a law of the geometry: the hard limit is the image, and only B
+    knows how big that is.
+    """
+    r = max(1, int(border_reduce))
+    cap = int(max_original) if max_original else 3 * int(fovea_px)
+    b_max = max(0, (cap - int(fovea_px)) // 2)
+    return [b for b in range(r, b_max + 1, r)]
+
+
+def overlap_fovea_range(fovea_px: int) -> list[int]:
+    """How far the border branch may reach into the fovea: 0 .. fovea/2 - 1.
+
+    0 is legal and NEW: it makes the two branches disjoint, which is the control
+    for the contributive-overlap choice of instructionsNewNN.md 7. The old
+    spelling could not express it (`penetration = max(1, ...)` had a floor of 1).
+    """
+    return list(range(0, max(1, int(fovea_px) // 2)))
+
+
+def overlap_border_range(border_px: int, border_reduce: int = 1) -> list[int]:
+    """How far the fovea branch may reach into the border: 0 .. border - reduce.
+
+    Capped one cell short of the whole border by the mirror of
+    penetration_too_large — the border branch keeps an exclusive part. With a
+    narrow border there are few legal values; widening the range means widening
+    `border_px`, which is the point of stating the two independently.
+    """
+    r = max(1, int(border_reduce))
+    return [b for b in range(0, max(0, int(border_px) - r) + 1, r)]
+
+
+def build_search_space(geom: dict, n_layers: int = 2,
+                       max_original: int | None = None) -> dict:
+    dims = derive_dims(normalize_geometry(geom))
     return {
-        "k_center": kernel_range(center_out),
-        "k_periph": kernel_range(periph_band),
-        "s_center": stride_range(center_out, n_layers),
-        "s_periph": stride_range(periph_band, n_layers),
-        "d": downsample_range(periph_out, N, max_original=max_original or 2 * N),
-        "_center_out": center_out,
-        "_periph_out": periph_out,
-        "_penetration": penetration,
+        "k_center": kernel_range(dims.center_band),
+        "k_periph": kernel_range(dims.periph_band),
+        "s_center": stride_range(dims.center_band, n_layers),
+        "s_periph": stride_range(dims.periph_band, n_layers),
+        "border_px": border_range(dims.fovea_px, dims.border_reduce, max_original),
+        "border_reduce": reduce_range(dims.border_px),
+        "overlap_fovea_px": overlap_fovea_range(dims.fovea_px),
+        "overlap_border_px": overlap_border_range(dims.border_px, dims.border_reduce),
+        "_fovea_px": dims.fovea_px,
+        "_border_cells": dims.border_cells,
+        "_N": dims.N,
     }
 
 
@@ -195,24 +395,24 @@ def build_search_space(N: int, c_frac: float = 0.8, pen_frac: float = 0.1,
 # The composite view. EXCLUSIVE sampling: every composite pixel has exactly one
 # origin (centre OR ring). The centre is copied untouched; ring cells average
 # (or max) anisotropic blocks of the original crop:
-#   - both coords in the ring  -> d x d block
-#   - ring row, centre col     -> d x 1 block (co-registered with the fovea col)
+#   - both coords in the ring  -> r x r block
+#   - ring row, centre col     -> r x 1 block (co-registered with the fovea col)
 #   - centre row, centre col   -> 1 x 1 (exact copy)
-# This reproduces the coordinate table of instructionsNewNN.md §4 and keeps the
+# This reproduces the coordinate table of instructionsNewNN.md 4 and keeps the
 # fovea bit-identical to the direct crop (tested).
 
 def _axis_edges(dims: FoveaDims) -> np.ndarray:
     """Start offset in the original crop for each of the N composite cells (+ end)."""
-    m, c, d, N = dims.periph_real, dims.center_out, dims.d, dims.N
-    po = dims.periph_out
+    m, c, r, N = dims.border_px, dims.fovea_px, dims.border_reduce, dims.N
+    po = dims.border_cells
     edges = []
     for k in range(N):
         if k < po:
-            edges.append(k * d)
+            edges.append(k * r)
         elif k < po + c:
             edges.append(m + (k - po))
         else:
-            edges.append(m + c + (k - po - c) * d)
+            edges.append(m + c + (k - po - c) * r)
     edges.append(dims.original_size)
     return np.asarray(edges, dtype=np.int64)
 
@@ -253,16 +453,17 @@ def build_view(image: np.ndarray, wx0: int, wy0: int, dims: FoveaDims,
     """Composite view + coverage mask for the labelled window at (wx0, wy0).
 
     image: full grayscale image (H, W) uint8/float. The labelled window is the
-    fovea: center_out x center_out at (wx0, wy0). Returns (view (N,N) float32
+    fovea: fovea_px x fovea_px at (wx0, wy0). Returns (view (N,N) float32
     in [0,1], coverage (N,N) float32 fraction of real pixels per cell).
 
     Padding beyond the image border: 'edge' replicates the border row/col
     (decision C10: never plain zeros — zero means "no ink" and teaches a false
     rule); the coverage mask carries the real fraction per cell for debugging
-    (F0 view), it is NOT fed to the net in v1.
+    (F0 view), it is NOT fed to the net in v1. It is also the honest way to see
+    how much of a WIDE border is replicated padding rather than context.
     """
     H, W = image.shape
-    m = dims.periph_real
+    m = dims.border_px
     x0, y0 = wx0 - m, wy0 - m
     s = dims.original_size
     pad_l = max(0, -x0)
@@ -294,17 +495,24 @@ def build_view(image: np.ndarray, wx0: int, wy0: int, dims: FoveaDims,
 
 
 # ---------------------------------------------------------------------------
-# Branch masks. CONTRIBUTIVE overlap: in the penetration band both masks are 1
-# and both branches contribute (they are applied to the INPUT, option A —
-# masking after convolution was rejected, instructionsNewNN.md §7).
+# Branch masks. CONTRIBUTIVE overlap: where both masks are 1 both branches
+# contribute (they are applied to the INPUT, option A — masking after
+# convolution was rejected, instructionsNewNN.md 7).
+#
+# The two overlaps are INDEPENDENT and both are barrible:
+#   overlap_fovea_px   grows the BORDER branch inwards, over the fovea
+#   overlap_border_px  grows the FOVEA branch outwards, over the border
+# Before the reparameterisation only the first existed (and never below 1 px),
+# so "how much of each region is shared" could not be asked as a question.
 
 def build_masks(dims: FoveaDims) -> tuple[np.ndarray, np.ndarray]:
-    N, po, pen = dims.N, dims.periph_out, dims.penetration
+    N, po = dims.N, dims.border_cells
+    pen, ob = dims.overlap_fovea_px, dims.overlap_border_cells
     center_mask = np.zeros((N, N), dtype=np.float32)
     periph_mask = np.zeros((N, N), dtype=np.float32)
-    lo, hi = po, N - po
+    lo, hi = po - ob, N - po + ob                  # the fovea branch, grown outwards
     center_mask[lo:hi, lo:hi] = 1.0
-    inner_lo, inner_hi = po + pen, N - po - pen
+    inner_lo, inner_hi = po + pen, N - po - pen    # the fovea, shrunk inwards
     periph_mask[:, :] = 1.0
     periph_mask[inner_lo:inner_hi, inner_lo:inner_hi] = 0.0
     return center_mask, periph_mask

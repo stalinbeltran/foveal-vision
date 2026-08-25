@@ -74,8 +74,14 @@ export default function RunDetail() {
             <dl className="kv">
               <dt>dataset (B)</dt><dd>{prov.window_dataset.name}
                 <span className="mono"> · {prov.window_dataset.fingerprint.slice(7, 17)}</span></dd>
-              <dt>red (C)</dt><dd>{prov.network.name} (N={prov.network.value.N},
-                c_frac={prov.network.value.c_frac}, d={prov.network.value.d},
+              {/* the run was made with whatever spelling was current then; U1.6
+                  says show the definition it was MADE with, so a pre-2026-08-25
+                  run keeps showing N/c_frac/d and a newer one shows px */}
+              <dt>red (C)</dt><dd>{prov.network.name} ({prov.network.value.fovea_px != null
+                ? `fóvea=${prov.network.value.fovea_px}px, borde=${prov.network.value.border_px}px`
+                  + `, px/celda=${prov.network.value.border_reduce}`
+                : `N=${prov.network.value.N}, c_frac=${prov.network.value.c_frac}`
+                  + `, d=${prov.network.value.d}`},
                 k={prov.network.value.k_center}/{prov.network.value.k_periph})</dd>
               <dt>receta (D)</dt><dd>{prov.recipe.name} (lr={prov.recipe.value.lr},
                 λ_pos={prov.recipe.value.lambda_pos}, seed={prov.recipe.value.seed})</dd>

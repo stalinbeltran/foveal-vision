@@ -7,10 +7,11 @@ La "cnn tipica" contra la que se compara la foveada tiene que cumplir DOS cosas 
 la vez, y ninguna es negociable si la comparacion va a significar algo:
 
 1. **La misma entrada.** No el mismo tensor: la misma INFORMACION. La foveada
-   (N=20, c_frac=0,8, d=2) tiene un tensor de 20x20, pero el area original que
-   cubre es **24x24** -- la periferia comprime x2. MEDIDO:
-   `dims_of(...).original_size == 24`. Asi que la plana es N=24 con c_frac=16/24
-   (para que `center_out` siga siendo la ventana de 16, contrato ①a) y d=1.
+   (fovea 16px + borde 4px comprimido x2) tiene un tensor de 20x20, pero el area
+   original que cubre es **24x24**. MEDIDO: `dims_of(...).original_size == 24`.
+   Asi que la plana lleva el MISMO borde de 4px sin comprimir
+   (border_px=4, border_reduce=1 => 24x24 de entrada) y la fovea sigue siendo la
+   ventana de 16 (contrato ①a).
 2. **Aproximadamente los mismos parametros.** Con channels=[16]x4 la plana sale a
    117.724 contra 167.852 de la foveada: **0,70x**. La cabeza es el 92 % del
    modelo, y una rama sobre 24x24 da 9.216 features planas contra las 12.800 de
@@ -61,8 +62,9 @@ from fv.sweeps.store import SweepStore              # noqa: E402
 RECIPE = "plan40"
 EPOCHS_CAP = 150           # alto A PROPOSITO: `patience` tiene que ser quien pare
 OBJECTIVE = "f1"
-C_FRAC = 16 / 24           # center_out = 16 con N = 24 (contrato ①a)
-BASE = {"regions": "single", "d": 1, "n_layers": 4, "channels": [22] * 4}
+BORDER_PX = 4              # los mismos 4 px de contexto, sin comprimir
+BASE = {"regions": "single", "border_reduce": 1, "n_layers": 4,
+        "channels": [22] * 4}
 
 # Rangos del TANTEO: anchos y log-espaciados, centrados en el optimo de la
 # FOVEADA -- que aqui es solo un punto de partida razonable, no una prediccion.
@@ -91,7 +93,7 @@ def crear(nombre: str, dataset: str, axis: str, rango: list, seeds: int,
     try:
         e = generate_sweep(nombre, dataset, axis, rango, base_recipe=RECIPE,
                            objective=OBJECTIVE, budget={"epochs": EPOCHS_CAP},
-                           seeds=seeds, overrides=BASE, c_frac=C_FRAC,
+                           seeds=seeds, overrides=BASE, border_px=BORDER_PX,
                            device="cpu", sstore=store)
     except SweepError as ex:
         print(f"NO se pudo crear '{nombre}': [{ex.code}] {ex.message} -> {ex.hint}",

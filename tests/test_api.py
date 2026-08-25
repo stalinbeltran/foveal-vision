@@ -58,14 +58,14 @@ def test_config_can_be_edited_but_only_on_purpose(world, client):
     to pick another name, which is not what editing means."""
     _make_named(client)
     for path, body in (("/recipes", {"name": "quick", "epochs": 7}),
-                       ("/networks", dict(TINY_NET, name="tiny", d=3))):
+                       ("/networks", dict(TINY_NET, name="tiny", border_reduce=4))):
         r = client.post(path, json=dict(body))
         assert r.status_code == 409                     # the accident is refused
         assert r.json()["detail"]["code"].endswith("_exists")
         r = client.post(path, json=dict(body, overwrite=True))
         assert r.status_code == 200, r.json()           # the intent goes through
     assert client.get("/recipes/quick").json()["epochs"] == 7
-    assert client.get("/networks/tiny").json()["d"] == 3
+    assert client.get("/networks/tiny").json()["border_reduce"] == 4
     # `overwrite` is a flag of the request, never a field of the saved object
     assert "overwrite" not in client.get("/recipes/quick").json()
     assert "overwrite" not in client.get("/networks/tiny").json()
@@ -99,7 +99,7 @@ def test_recipe_monitor_vocabulary_is_served_and_enforced(world, client):
 
 def test_contract_01_http_400_before_job_and_no_run_created(world, client):
     _make_named(client)
-    bad = dict(TINY_NET, N=20, c_frac=0.8, name="big")
+    bad = dict(TINY_NET, fovea_px=16, name="big")  # fovea 16 vs window 8
     client.post("/networks", json=bad)
     r = client.post("/runs", json={"name": "never", "window_dataset": world["dataset"],
                                    "network": "big", "recipe": "quick"})
@@ -288,9 +288,9 @@ def test_ui_state_rejects_oversized_blob(world, client):
 
 def test_network_validate_returns_dims_and_ranges(world, client):
     r = client.post("/networks/validate", json=TINY_NET).json()
-    assert r["valid"] and r["trace"]["dims"]["center_out"] == 8
+    assert r["valid"] and r["trace"]["dims"]["fovea_px"] == 8
     assert r["ranges"]["k_center"]
     bad = client.post("/networks/validate",
-                      json=dict(TINY_NET, pen_frac=0.45)).json()
+                      json=dict(TINY_NET, overlap_fovea_px=4)).json()
     assert not bad["valid"]
     assert bad["problems"][0]["code"] == "penetration_too_large"

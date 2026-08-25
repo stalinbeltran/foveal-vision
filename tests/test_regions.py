@@ -16,8 +16,9 @@ from fv.models.builder import build_model, full_config, network_trace
 from fv.validation import check_network, check_run
 
 # the L4 winner of plan-40h, which the p40-lr-L4 sweep is training right now
-L4 = {"N": 20, "c_frac": 0.8, "d": 2, "pen_frac": 0.1, "n_layers": 4,
-      "channels": [16, 16, 16, 16]}
+# (it WAS N=20, c_frac=0.8, d=2, pen_frac=0.1 before the 2026-08-25 spelling)
+L4 = {"fovea_px": 16, "border_px": 4, "border_reduce": 2, "overlap_fovea_px": 2,
+      "overlap_border_px": 0, "n_layers": 4, "channels": [16, 16, 16, 16]}
 WS = 16  # window_size of dirty1000-80px-16px
 
 MANIFEST = {"config": {"window_size": WS}, "has_images": True,
@@ -28,7 +29,8 @@ def _forward(cfg: dict, seed: int = 7) -> torch.Tensor:
     torch.manual_seed(seed)
     model = build_model(cfg)
     torch.manual_seed(seed + 1)
-    x = torch.randn(3, 1, cfg["N"], cfg["N"])
+    n = dims_of(cfg).N
+    x = torch.randn(3, 1, n, n)
     with torch.no_grad():
         return model(x)
 
@@ -78,17 +80,19 @@ def test_build_masks_is_untouched_by_this_feature():
 
 # ---------------------------------------------------------------- the control
 
-def test_no_periphery_is_refused_for_split_and_allowed_for_single():
-    flat = {"N": WS, "c_frac": 1.0, "d": 1, "pen_frac": 0.1}
-    codes = [p["code"] for p in check_dims(WS, 1.0, 1, 0.1)]
-    assert "no_periphery" in codes
-    assert check_dims(WS, 1.0, 1, 0.1, single_region=True) == []
-    assert [p["code"] for p in check_network(flat)] == ["no_periphery"]
+def test_no_border_is_refused_for_split_and_allowed_for_single():
+    flat = {"fovea_px": WS, "border_px": 0, "border_reduce": 1,
+            "overlap_fovea_px": 2, "overlap_border_px": 0}
+    geom = {"fovea_px": WS, "border_px": 0, "border_reduce": 1}
+    codes = [p["code"] for p in check_dims(geom)]
+    assert "no_border" in codes
+    assert check_dims(geom, single_region=True) == []
+    assert [p["code"] for p in check_network(flat)] == ["no_border"]
     assert check_network(dict(flat, regions="single")) == []
 
 
 def test_single_has_one_unmasked_branch():
-    cfg = full_config(dict(L4, N=WS, c_frac=1.0, d=1, regions="single"))
+    cfg = full_config(dict(L4, border_px=0, border_reduce=1, regions="single"))
     model = build_model(cfg)
     assert model.single
     keys = set(model.state_dict())
@@ -110,7 +114,7 @@ def test_an_unknown_regions_is_refused_at_the_gate():
 
 def test_single_does_not_validate_the_branch_it_does_not_have():
     """k_periph/merge describe nothing in 'single' — they must not refuse it."""
-    cfg = dict(L4, N=WS, c_frac=1.0, d=1, regions="single",
+    cfg = dict(L4, border_px=0, border_reduce=1, regions="single",
                k_periph=99, merge="sum", s_center=2, s_periph=1)
     assert check_network(cfg) == []
     # ...but for 'split' the same values are still refused
@@ -121,10 +125,10 @@ def test_single_does_not_validate_the_branch_it_does_not_have():
 
 FAMILY = {
     "base foveada L4":      dict(L4),
-    "A mismo tensor":       dict(L4, d=1, regions="single"),
-    "B misma area":         dict(L4, N=24, c_frac=16 / 24, d=1, regions="single"),
-    "C solo la ventana":    dict(L4, N=WS, c_frac=1.0, d=1, regions="single"),
-    "E foveada sin comprimir": dict(L4, d=1),
+    "A mismo tensor":       dict(L4, border_px=2, border_reduce=1, regions="single"),
+    "B misma area":         dict(L4, border_px=4, border_reduce=1, regions="single"),
+    "C solo la ventana":    dict(L4, border_px=0, border_reduce=1, regions="single"),
+    "E foveada sin comprimir": dict(L4, border_px=2, border_reduce=1),
 }
 
 
@@ -133,7 +137,7 @@ def test_every_control_passes_the_same_gate_as_any_other_run(label):
     """All six controls train on the SAME B: contract (1)a holds for each."""
     cfg = full_config(FAMILY[label])
     assert check_run(MANIFEST, cfg) == [], label
-    assert dims_of(cfg).center_out == WS, label
+    assert dims_of(cfg).fovea_px == WS, label
 
 
 def test_the_controls_see_what_the_plan_says_they_see():
@@ -149,21 +153,24 @@ def test_the_derivation_gives_the_flat_base_that_was_asked_for():
     """Measured 2026-08-09: asking for the flat base produced ws16-p1-d1-L4 —
     a net WITH a ring. derive_geometry had a '>=1 periphery' floor, so it
     quietly loosened c_frac to 16/18 and returned a different control. It never
-    lied (the reason was recorded), but nothing refused either."""
-    from fv.models.derive import base_label, derive_base, derive_geometry
+    lied (the reason was recorded), but nothing refused either.
 
-    assert derive_geometry(WS, 1.0, single_region=True) == (WS, 1.0, None)
-    # split still refuses to go without a ring, and says why it loosened
-    N, cf, reason = derive_geometry(WS, 1.0)
-    assert N == 18 and cf == pytest.approx(16 / 18) and reason
+    The 2026-08-25 spelling removes the search that caused it: the border is a
+    length the caller states, so 0 is 0. The legacy shim still reproduces what
+    the old c_frac meant, for plans written before the change."""
+    from fv.models.derive import base_label, derive_base, legacy_border_px
 
-    out = derive_base(WS, overrides={"regions": "single", "d": 1, "n_layers": 4},
-                      c_frac=1.0)
-    assert out["config"]["N"] == WS and out["config"]["c_frac"] == 1.0
-    assert out["dims"].periph_out == 0
+    assert legacy_border_px(WS, 1.0, 1, single_region=True) == 0
+    # split still could not go without a ring: c_frac=1 meant N=18, one cell
+    assert legacy_border_px(WS, 1.0, 1) == 1
+
+    out = derive_base(WS, overrides={"regions": "single", "border_reduce": 1,
+                                     "n_layers": 4}, border_px=0)
+    assert out["config"]["border_px"] == 0
+    assert out["dims"].N == WS and out["dims"].border_cells == 0
     assert base_label(out["dims"], 4) == "ws16-p0-d1-L4"
-    # an explicitly asked-for c_frac is reported as the user's, not as a default
-    assert out["derivation"]["field_origin"]["c_frac"] == {"origin": "user"}
+    # an explicitly asked-for border is reported as the user's, not as a default
+    assert out["derivation"]["field_origin"]["border_px"] == {"origin": "user"}
 
 
 def test_a_study_can_declare_the_base_network_it_runs_on():
@@ -174,17 +181,21 @@ def test_a_study_can_declare_the_base_network_it_runs_on():
 
     plan = {"window_dataset": "b", "base_recipe": "corta", "objective": "f1",
             "seeds": 1, "axes": [{"axis": "lr", "range": [0.001, 0.002]}],
-            "base_network": {"regions": "single", "d": 1, "n_layers": 4},
-            "c_frac": 1.0}
+            "base_network": {"regions": "single", "border_reduce": 1,
+                             "n_layers": 4},
+            "border_px": 0}
     assert validate_plan(plan) == []
     # and the gate refuses, BEFORE creating anything, what would break later
     def codes(p):
         return [x["code"] for x in validate_plan({**plan, **p})]
     assert codes({"base_network": {"perifería": 0}}) == ["unknown_base_network_field"]
-    assert codes({"base_network": {"N": 24}}) == ["base_network_breaks_window_size"]
+    assert codes({"base_network": {"fovea_px": 24}}) == ["base_network_breaks_window_size"]
+    assert codes({"base_network": {"N": 24}}) == ["base_network_uses_old_geometry"]
     assert codes({"base_network": [1, 2]}) == ["base_network_must_be_a_map"]
-    assert codes({"c_frac": 1.5}) == ["c_frac_out_of_range"]
-    assert codes({"c_frac": 0}) == ["c_frac_out_of_range"]
+    assert codes({"border_px": -1}) == ["border_px_out_of_range"]
+    assert codes({"border_px": 1.5}) == ["border_px_out_of_range"]
+    # a plan that states BOTH spellings is refused, never reconciled
+    assert codes({"c_frac": 1.0}) == ["plan_double_geometry"]
 
 
 def test_the_flat_control_really_is_cheaper_in_the_head():

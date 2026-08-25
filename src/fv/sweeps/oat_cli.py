@@ -46,7 +46,8 @@ def main() -> int:
                     help="replica seeds per axis value (>1 adds a seed axis; §11.1)")
     ap.add_argument("--epochs", type=int, default=0, help="0 = recipe default")
     ap.add_argument("--device", default="cpu")
-    ap.add_argument("--c-frac", type=float, default=None)
+    ap.add_argument("--border-px", type=int, default=None,
+                    help="ancho del borde difuso en px reales (0 = CNN plana)")
     ap.add_argument("--winners", default=None,
                     help="JSON {field: {value, from}} carried from previous steps")
     ap.add_argument("--overrides", default=None, help="JSON {field: value} user tunables")
@@ -64,7 +65,7 @@ def main() -> int:
             args.name, args.window_dataset, args.axis, _parse_range(args.range),
             base_recipe=args.recipe, objective=args.objective, strategy=args.strategy,
             budget={"points": args.points, "epochs": args.epochs},
-            device=args.device, seeds=args.seeds, c_frac=args.c_frac,
+            device=args.device, seeds=args.seeds, border_px=args.border_px,
             winners=json.loads(args.winners) if args.winners else None,
             overrides=json.loads(args.overrides) if args.overrides else None,
             study=args.study, sstore=store)

@@ -1,11 +1,14 @@
 # Red congelada para scripts/bench_speed.py — NO tocar por razones de
 # investigacion (esa es la razon de existir de fov-16, no de esta). El
 # benchmark de velocidad de maquina solo compara si la red nunca cambia.
-format_version: 1
-N: 20
-c_frac: 0.8
-d: 2
-pen_frac: 0.1
+format_version: 2
+# geometria en px reales (reparametrizacion 2026-08-25);
+# antes: N=20, c_frac=0.8, d=2, pen_frac=0.1 — misma red, bit a bit
+fovea_px: 16
+border_px: 4
+border_reduce: 2
+overlap_fovea_px: 2
+overlap_border_px: 0
 n_layers: 2
 k_center: 3
 k_periph: 3

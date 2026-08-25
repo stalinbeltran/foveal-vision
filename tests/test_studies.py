@@ -51,30 +51,37 @@ def test_validate_plan_rejects_unknown_axis_and_bad_auto(world):
     assert validate_plan(_plan(world, [{"axis": "n_layers", "range": [1, 2]}])) == []
 
 
-def test_validate_plan_refuses_N_and_c_frac_axes(world):
-    # N/c_frac set center_out, which ①a ties to the fixed window_size — they are
-    # derived, not swept; the plan gate must refuse them (root cause of test2).
-    for axis in ("N", "c_frac"):
-        problems = validate_plan(_plan(world, [{"axis": axis, "range": [8, 10, 12]}]))
-        assert any(p["code"] == "axis_breaks_window_size" for p in problems)
+def test_validate_plan_refuses_the_fovea_as_an_axis(world):
+    # the fovea IS the labelled window, which ①a ties to the fixed window_size —
+    # it is taken, not swept; the plan gate must refuse it (root cause of test2).
+    problems = validate_plan(_plan(world, [{"axis": "fovea_px", "range": [8, 10, 12]}]))
+    assert any(p["code"] == "axis_breaks_window_size" for p in problems)
+
+
+def test_validate_plan_refuses_the_old_geometry_by_name(world):
+    # the same gate as check_sweep: a plan written before 2026-08-25 stops with
+    # the reason instead of being re-interpreted into a different network
+    for axis in ("N", "c_frac", "pen_frac", "d"):
+        problems = validate_plan(_plan(world, [{"axis": axis, "range": [1, 2]}]))
+        assert any(p["code"] == "axis_renamed" for p in problems), axis
 
 
 def test_study_never_overwritten(world):
     _recipe(world)
     store = StudyStore()
-    create_study("est-dup", _plan(world, [{"axis": "d", "range": [1, 2]}]), store)
+    create_study("est-dup", _plan(world, [{"axis": "border_px", "range": [2, 4]}]), store)
     with pytest.raises(Exception):
-        create_study("est-dup", _plan(world, [{"axis": "d", "range": [1, 2]}]), store)
+        create_study("est-dup", _plan(world, [{"axis": "border_px", "range": [2, 4]}]), store)
 
 
 def test_advance_generates_step_and_refuses_until_confirmed(world):
     _recipe(world)
     store, sstore = StudyStore(), None
-    create_study("est1", _plan(world, [{"axis": "d", "range": [1, 2]},
+    create_study("est1", _plan(world, [{"axis": "border_px", "range": [2, 4]},
                                        {"axis": "k_center", "range": "auto"}]), store)
     out = advance("est1", store)
-    assert out["step"]["axis"] == "d"
-    assert out["step"]["sweep"] == "est1-s0-d"
+    assert out["step"]["axis"] == "border_px"
+    assert out["step"]["sweep"] == "est1-s0-border_px"
     assert out["step"]["base_label"].startswith("ws8-")
     # guides, not executes: cannot advance while the winner is unconfirmed
     with pytest.raises(StudyError) as e:
@@ -85,16 +92,16 @@ def test_advance_generates_step_and_refuses_until_confirmed(world):
 def test_confirm_carries_winner_into_next_base(world):
     _recipe(world)
     store = StudyStore()
-    create_study("est2", _plan(world, [{"axis": "d", "range": [1, 2]},
+    create_study("est2", _plan(world, [{"axis": "border_px", "range": [2, 4]},
                                        {"axis": "k_center", "range": "auto"}]), store)
     advance("est2", store)
-    confirm("est2", {"d": 2}, store)
+    confirm("est2", {"border_px": 4}, store)
     st = status("est2", store)
-    assert st["winners"]["d"] == {"value": 2, "from": "est2/step-0"}
+    assert st["winners"]["border_px"] == {"value": 4, "from": "est2/step-0"}
     assert st["next_axis"] == "k_center"
-    # the next step's base carries d=2 (origin winner)
+    # the next step's base carries border_px=4 (origin winner)
     out = advance("est2", store)
-    fo = out["spec"]["derivation"]["field_origin"]["d"]
+    fo = out["spec"]["derivation"]["field_origin"]["border_px"]
     assert fo["origin"] == "winner" and fo["from"] == "est2/step-0"
 
 
@@ -129,13 +136,13 @@ def test_study_seeds_are_wired_into_every_axis_point(world):
     _recipe(world)
     store = StudyStore()
     from fv.sweeps.store import SweepStore
-    create_study("est-seeds", {**_plan(world, [{"axis": "d", "range": [1, 2]}]),
+    create_study("est-seeds", {**_plan(world, [{"axis": "border_px", "range": [2, 4]}]),
                                "seeds": 3}, store)
     out = advance("est-seeds", store)
     assert out["step"]["seeds"] == 3
     assert out["step"]["points"] == 2 * 3
     space = SweepStore().spec(out["step"]["sweep"])["space"]
-    assert space["d"] == [1, 2] and space["seed"] == [1, 2, 3]
+    assert space["border_px"] == [2, 4] and space["seed"] == [1, 2, 3]
 
 
 def test_delete_study_cascades_its_sweeps_so_same_name_can_be_recreated(world):
@@ -148,7 +155,7 @@ def test_delete_study_cascades_its_sweeps_so_same_name_can_be_recreated(world):
     from fv.sweeps.store import SweepStore
     from fv.training.registry import RunStore
     store, sstore, rstore = StudyStore(), SweepStore(), RunStore()
-    create_study("est-recycle", _plan(world, [{"axis": "d", "range": [1, 2]}]), store)
+    create_study("est-recycle", _plan(world, [{"axis": "border_px", "range": [2, 4]}]), store)
     out = advance("est-recycle", store, sstore)
     sweep = out["step"]["sweep"]
     assert sstore.exists(sweep)                       # the study generated it
@@ -159,7 +166,7 @@ def test_delete_study_cascades_its_sweeps_so_same_name_can_be_recreated(world):
     assert not store.exists("est-recycle")
     # the name is reusable: recreate + advance regenerates the SAME sweep name
     # with no collision (before the fix this raised sweep_exists)
-    create_study("est-recycle", _plan(world, [{"axis": "d", "range": [1, 2]}]), store)
+    create_study("est-recycle", _plan(world, [{"axis": "border_px", "range": [2, 4]}]), store)
     out2 = advance("est-recycle", store, sstore)
     assert out2["step"]["sweep"] == sweep and sstore.exists(sweep)
 
@@ -172,7 +179,7 @@ def test_delete_study_refuses_while_a_generated_sweep_is_live(world):
     _recipe(world)
     from fv.sweeps.store import SweepStore
     store, sstore = StudyStore(), SweepStore()
-    create_study("est-live", _plan(world, [{"axis": "d", "range": [1, 2]}]), store)
+    create_study("est-live", _plan(world, [{"axis": "border_px", "range": [2, 4]}]), store)
     sweep = advance("est-live", store, sstore)["step"]["sweep"]   # -> queued
     with pytest.raises(StudyError) as e:
         delete_study("est-live", store, sstore)

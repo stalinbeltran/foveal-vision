@@ -54,13 +54,14 @@ EPOCHS_CAP = 300            # ver el aviso del docstring
 # rango arranca EN 192 -- que asi deja de ser extremo y pasa a ser ancla -- y
 # sube x2 hasta 1536.
 FOVEADA = {"name": "bs-alto-fov", "base": {"n_layers": 4, "channels": [16] * 4},
-           "c_frac": None, "range": [192, 384, 768, 1536]}
+           "border_px": None, "range": [192, 384, 768, 1536]}
 
 # La PLANA (docs/plan-cnn-plana.md §6): su tanteo llego solo a 340. Mismo
 # tratamiento, arrancando en 170 para solapar con lo ya medido.
 PLANA = {"name": "bs-alto-pl",
-         "base": {"regions": "single", "d": 1, "n_layers": 4, "channels": [22] * 4},
-         "c_frac": 16 / 24, "range": [170, 340, 680, 1360]}
+         "base": {"regions": "single", "border_reduce": 1, "n_layers": 4,
+                  "channels": [22] * 4},
+         "border_px": 4, "range": [170, 340, 680, 1360]}
 
 
 def main() -> int:
@@ -83,7 +84,7 @@ def main() -> int:
             print(f"'{q['name']}' ya existe -- se reutiliza")
             creados.append(q["name"])
             continue
-        kw = {"c_frac": q["c_frac"]} if q["c_frac"] else {}
+        kw = {"border_px": q["border_px"]} if q["border_px"] is not None else {}
         try:
             e = generate_sweep(q["name"], args.dataset, "batch_size", q["range"],
                                base_recipe=RECIPE, objective=OBJECTIVE,

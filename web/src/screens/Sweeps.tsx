@@ -374,8 +374,9 @@ export default function Sweeps() {
                 ) : null}
                 {baseDims ? (
                   <div className="sub" style={{ margin: "5px 0 0" }}>
-                    dims: fóvea {baseDims.center_out}px · anillo {baseDims.periph_out}px
-                    {" "}(ve {baseDims.periph_real}px reales) · penetración {baseDims.penetration}px
+                    dims: fóvea {baseDims.fovea_px}px · borde {baseDims.border_px}px
+                    {" "}en {baseDims.border_cells} celdas · solape {baseDims.overlap_fovea_px}px
+                    {" "}dentro / {baseDims.overlap_border_px}px fuera · entrada {baseDims.N}×{baseDims.N}
                     {" "}· recorte {baseDims.original_size}px
                   </div>
                 ) : null}

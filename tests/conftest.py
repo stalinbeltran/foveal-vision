@@ -40,10 +40,13 @@ def make_source(root: Path, name: str, count: int = 10, W: int = 48, H: int = 36
                                       encoding="utf-8")
 
 
-TINY_NET = {"N": 12, "c_frac": 0.667, "d": 2, "pen_frac": 0.1,
+# the same tiny net as before the 2026-08-25 reparameterisation, written in px:
+# it WAS N=12, c_frac=0.667, d=2, pen_frac=0.1 -> fovea 8, ring 2 cells of 2 px
+TINY_NET = {"fovea_px": 8, "border_px": 4, "border_reduce": 2,
+            "overlap_fovea_px": 1, "overlap_border_px": 0,
             "k_center": 3, "k_periph": 3, "s_center": 1, "s_periph": 1,
             "ch1": 4, "ch2": 8, "merge": "concat", "pool_mode": "avg",
-            "pad_mode": "edge"}  # fovea (center_out) = 8
+            "pad_mode": "edge"}
 
 
 @pytest.fixture()

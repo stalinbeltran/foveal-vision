@@ -1,4 +1,4 @@
-format_version: 1
+format_version: 2
 # Control B/D de docs/plan-cnn-plana.md §3, fundidos en una sola red: la CNN
 # "tipica" contra la que se compara la foveada.
 #
@@ -22,10 +22,13 @@ format_version: 1
 # agranda el AREA ORIGINAL (d=2 -> 32x32, medido), asi que dejaria de ser "la
 # misma entrada" y rompe justo la premisa de la comparacion.
 regions: single
-N: 24
-c_frac: 0.6666666666666666
-d: 1
-pen_frac: 0.1
+# geometria en px reales (reparametrizacion 2026-08-25);
+# antes: N=24, c_frac=0.6666666666666666, d=1, pen_frac=0.1 — misma red, bit a bit
+fovea_px: 16
+border_px: 4
+border_reduce: 1
+overlap_fovea_px: 2
+overlap_border_px: 0
 n_layers: 4
 k_center: 3
 k_periph: 3

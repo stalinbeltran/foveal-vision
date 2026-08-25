@@ -14,7 +14,8 @@ point goes through check_network via prepare_sweep.
 
 from __future__ import annotations
 
-from fv.models.derive import derive_base
+from fv.models.builder import NETWORK_DEFAULTS
+from fv.models.derive import derive_base, legacy_border_px
 from fv.sweeps.runner import prepare_sweep
 from fv.sweeps.spec import SweepError
 from fv.sweeps.store import SweepStore
@@ -29,7 +30,9 @@ def build_generated_spec(window_dataset: str, axis: str, axis_range,
                          strategy: str = "grid", device: str = "cpu", seed: int = 1,
                          seeds: int = 1,
                          winners: dict | None = None, overrides: dict | None = None,
-                         c_frac: float | None = None, study: str | None = None,
+                         border_px: int | None = None,
+                         legacy_c_frac: float | None = None,
+                         study: str | None = None,
                          wstore: WindowDatasetStore | None = None,
                          rstore: RecipeStore | None = None) -> tuple[dict, dict]:
     """Derive the inline base from B's window_size, validate it with check_run,
@@ -47,7 +50,18 @@ def build_generated_spec(window_dataset: str, axis: str, axis_range,
     manifest = wstore.manifest(window_dataset)
     window_size = int(manifest["config"]["window_size"])
 
-    derived = derive_base(window_size, winners=winners, overrides=overrides, c_frac=c_frac)
+    if legacy_c_frac is not None and border_px is None:
+        # a plan written before the 2026-08-25 reparameterisation states the
+        # geometry as a central fraction, which is only a length once you know
+        # the N the old derivation would have picked. Resolved HERE, where the
+        # window size is known, so those plans keep meaning what they meant.
+        single = (overrides or {}).get("regions") == "single"
+        border_px = legacy_border_px(
+            window_size, legacy_c_frac,
+            int((overrides or {}).get("border_reduce",
+                                      NETWORK_DEFAULTS["border_reduce"])), single)
+    derived = derive_base(window_size, winners=winners, overrides=overrides,
+                          border_px=border_px)
     base = derived["config"]
 
     problems = check_run(manifest, base)   # the SAME gate, before reserving (§10.1)

@@ -15,7 +15,8 @@ from fv.metrics import MONITORS
 from fv.models.builder import DEFAULT_CHANNEL, NETWORK_DEFAULTS
 from fv.sweeps.generate import generate_sweep
 from fv.sweeps.spec import (GEOMETRY_AUTO, LOSS_WEIGHT_PARAMS, NETWORK_PARAMS,
-                            OBJECTIVES, RECIPE_PARAMS, WINDOW_SIZE_FIELDS)
+                            OBJECTIVES, RECIPE_PARAMS, RENAMED_AXES,
+                            WINDOW_SIZE_FIELDS)
 from fv.sweeps.store import SweepStore
 from fv.sweeps.winner import winner_overrides
 
@@ -54,7 +55,7 @@ def validate_plan(plan: dict) -> list[dict]:
     # reaches that check inside `advance` — half a plan later, in the job. The
     # study screen simply did not offer 'loss' in its select, which HID the gap
     # instead of closing it: the laxer gate is the one an automated chain walks
-    # through (same shape as the N/c_frac bug).
+    # through (same shape as the fovea/border bug).
     loss_axes = sorted({a.get("axis") for a in axes} & LOSS_WEIGHT_PARAMS)
     if obj == "loss" and loss_axes:
         _bad(problems, "objective_varies_with_space",
@@ -71,40 +72,64 @@ def validate_plan(plan: dict) -> list[dict]:
         if not isinstance(base_network, dict):
             _bad(problems, "base_network_must_be_a_map",
                  f"base_network={base_network!r} no es un mapa de campos de C",
-                 "da {campo: valor}, p. ej. {regions: single, d: 1}")
+                 "da {campo: valor}, p. ej. {regions: single, border_reduce: 1}")
         else:
-            unknown = sorted(set(base_network) - NETWORK_PARAMS)
+            # the renamed geometry gets its own message below; without this it
+            # would ALSO trip "unknown field", and the useful reason would be
+            # the second line of two
+            unknown = sorted(set(base_network) - NETWORK_PARAMS - set(RENAMED_AXES))
             if unknown:
                 _bad(problems, "unknown_base_network_field",
                      f"base_network trae campos que no son de C: {unknown}",
                      f"campos válidos: {sorted(NETWORK_PARAMS)}")
+            renamed = sorted(set(base_network) & set(RENAMED_AXES))
+            if renamed:
+                _bad(problems, "base_network_uses_old_geometry",
+                     f"{renamed} es la geometría anterior a 2026-08-25",
+                     "escríbela en px reales: border_px, border_reduce, "
+                     "overlap_fovea_px, overlap_border_px")
             fixed = sorted(set(base_network) & WINDOW_SIZE_FIELDS)
             if fixed:
                 _bad(problems, "base_network_breaks_window_size",
-                     f"{fixed} fija center_out, que el contrato ①a ata al "
-                     f"window_size de B: se DERIVA, no se escribe",
-                     "quita N; para mover la fracción central usa el campo "
-                     "'c_frac' del plan, que la derivación sí honra")
-    cf = plan.get("c_frac")
-    if cf is not None and not (isinstance(cf, (int, float)) and 0 < float(cf) <= 1):
-        _bad(problems, "c_frac_out_of_range", f"c_frac={cf!r} debe estar en (0, 1]",
-             "1.0 solo tiene sentido con base_network.regions='single' "
-             "(sin anillo); si no, usa algo como 0.8")
+                     f"{fixed} fija la fóvea, que el contrato ①a ata al "
+                     f"window_size de B: se TOMA de ahí, no se escribe",
+                     "quita fovea_px; para mover el contexto usa el campo "
+                     "'border_px' del plan, que la derivación sí honra")
+    bpx = plan.get("border_px")
+    if bpx is not None and not (isinstance(bpx, int) and not isinstance(bpx, bool)
+                                and bpx >= 0):
+        _bad(problems, "border_px_out_of_range", f"border_px={bpx!r} debe ser un entero >= 0",
+             "0 solo tiene sentido con base_network.regions='single' "
+             "(la CNN plana); si no, usa algo como 4")
+    if plan.get("c_frac") is not None and bpx is not None:
+        _bad(problems, "plan_double_geometry",
+             "el plan trae 'c_frac' (geometría vieja) y 'border_px' a la vez",
+             "deja solo 'border_px': c_frac se lee únicamente en planes escritos "
+             "antes de 2026-08-25")
     valid_fields = NETWORK_PARAMS | RECIPE_PARAMS
     for a in axes:
         axis = a.get("axis", "")
         rng = a.get("range", "auto")
         is_indexed = bool(CHANNELS_INDEXED.match(axis))
-        if not is_indexed and axis not in valid_fields:
+        # the renamed-geometry check goes FIRST: those names are not fields of C
+        # any more, so the generic "unknown axis" would fire and hide the reason
+        # the plan needs — which spelling replaced it and why (api.md R4)
+        if axis in RENAMED_AXES:
+            new_name, why = RENAMED_AXES[axis]
+            _bad(problems, "axis_renamed",
+                 f"'{axis}' ya no es un eje: la geometria se reparametrizo "
+                 f"(2026-08-25) y ahora se declara en px reales",
+                 f"usa {new_name}. {why}")
+        elif not is_indexed and axis not in valid_fields:
             _bad(problems, "unknown_axis", f"'{axis}' no es un campo de C/D ni channels[i]",
                  f"ejes válidos: {sorted(valid_fields)} o channels[i]")
         elif axis in WINDOW_SIZE_FIELDS:
             _bad(problems, "axis_breaks_window_size",
-                 f"'{axis}' fija center_out (= round_to_even(N*c_frac)), que el "
-                 f"contrato (1)a ata al window_size del dataset: barrerlo daria una "
-                 f"fovea != la ventana etiquetada en cada punto",
-                 "N y c_frac se derivan juntos del window_size (no se barren); barre "
-                 "'d' para el contexto periferico, o usa un dataset con esa ventana")
+                 f"'{axis}' es la fovea, que el contrato (1)a ata al window_size "
+                 f"del dataset: barrerlo daria una fovea != la ventana etiquetada "
+                 f"en cada punto",
+                 "la fovea se toma del window_size (no se barre); barre "
+                 "'border_px' para el contexto, o usa un dataset con esa ventana")
         if rng == "auto" and not is_indexed and axis not in GEOMETRY_AUTO:
             _bad(problems, "auto_needs_geometry",
                  f"'{axis}' no tiene rango calculado: 'auto' solo vale para {sorted(GEOMETRY_AUTO)}",
@@ -272,7 +297,8 @@ def advance(name: str, store: StudyStore | None = None,
         sweep_name, plan["window_dataset"], axis, axis_range,
         base_recipe=plan["base_recipe"], objective=plan["objective"],
         budget=budget or plan.get("budget", {}), winners=winners,
-        overrides=dict(plan.get("base_network") or {}), c_frac=plan.get("c_frac"),
+        overrides=dict(plan.get("base_network") or {}),
+        border_px=plan.get("border_px"), legacy_c_frac=plan.get("c_frac"),
         seeds=seeds, study=name, sstore=sstore)
 
     step = {"step": step_i, "axis": desc["axis"], "kind": desc["kind"],
