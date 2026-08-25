@@ -26,7 +26,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from fv.metrics import permutation_test            # noqa: E402
 from fv.sweeps.runner import sweep_trials          # noqa: E402
 from fv.sweeps.store import SweepStore             # noqa: E402
-from fv.sweeps.winner import aggregate_seeds, suggest_winner, tie_delta  # noqa: E402
+from fv.sweeps.winner import (aggregate_seeds, hashable, suggest_winner,  # noqa: E402
+                              tie_delta)
 from fv.training.registry import RunStore          # noqa: E402
 
 
@@ -38,9 +39,20 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--sweep", required=True)
     ap.add_argument("--eje", default="lr")
-    ap.add_argument("--vigente", type=float, default=None,
-                    help="valor vigente del eje, para el contraste de R4")
+    ap.add_argument("--vigente", default=None,
+                    help="valor vigente del eje, para el contraste de R4. Se lee "
+                         "como JSON, asi que vale para los ejes que NO son "
+                         "numeros: 4 / 0.0014 / '\"val_loss\"' / '[16,16,16,16]'")
     args = ap.parse_args()
+
+    # El eje no siempre es un numero: `monitor` y `scheduler` son cadenas y
+    # `channels` es una LISTA. Se lee como JSON y se cae a la cadena tal cual, que
+    # es lo que deja escribir --vigente val_loss sin comillas raras en Telegram.
+    if args.vigente is not None:
+        try:
+            args.vigente = json.loads(args.vigente)
+        except json.JSONDecodeError:
+            pass                                  # una cadena suelta: vale asi
 
     store, runs = SweepStore(), RunStore()
     spec = store.spec(args.sweep)
@@ -74,15 +86,20 @@ def main() -> int:
     ganador = suggest_winner(args.sweep, store=store, run_store=runs)
 
     # --- R4: cada valor contra el vigente, con permutacion exacta.
-    por_valor = {g["point"].get(args.eje): g for g in grupos}
+    # clave HASHABLE: `channels` es una lista y una lista no puede ser clave de
+    # dict. Se usa la misma normalizacion que aggregate_seeds (winner.hashable),
+    # no otra, o dos sitios agruparian distinto.
+    por_valor = {hashable(g["point"].get(args.eje)): g for g in grupos}
+    vigente_k = hashable(args.vigente) if args.vigente is not None else None
     contrastes = []
-    if args.vigente is not None and args.vigente in por_valor:
+    if vigente_k is not None and vigente_k in por_valor:
         base = [t["value"] for t in scored
-                if t["point"].get(args.eje) == args.vigente]
+                if hashable(t["point"].get(args.eje)) == vigente_k]
         for v, g in por_valor.items():
-            if v == args.vigente:
+            if v == vigente_k:
                 continue
-            otros = [t["value"] for t in scored if t["point"].get(args.eje) == v]
+            otros = [t["value"] for t in scored
+                     if hashable(t["point"].get(args.eje)) == v]
             pt = permutation_test(otros, base)
             if pt:
                 contrastes.append({"valor": v, **pt})
@@ -101,7 +118,8 @@ def main() -> int:
     ]
     for g in grupos:
         v = g["point"].get(args.eje)
-        eps = [d["epocas"] for d in detalle if d["punto"].get(args.eje) == v]
+        eps = [d["epocas"] for d in detalle
+               if hashable(d["punto"].get(args.eje)) == hashable(v)]
         out.append(
             f"| {str(v).replace('.', ',')} | **{num(g['value'])}** | "
             f"{num(g.get('value_sem'))} | {num(g['value_min'])} | "

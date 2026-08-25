@@ -92,7 +92,15 @@ def suggest_winner(name: str, delta: float | None = None,
     }
 
 
-def _hashable(v):
+def hashable(v):
+    """El valor de un punto, en forma que pueda ser CLAVE de un dict.
+
+    `channels` es una lista y una lista no es hashable. Publica a proposito: la
+    agrupacion por valor del eje se hace aqui (aggregate_seeds) y tambien en
+    `scripts/estudio_informe.py`, y si cada uno normalizara por su cuenta
+    acabarian agrupando distinto -- que es el fallo que no se ve hasta que una
+    tabla sale con un valor de mas.
+    """
     return tuple(v) if isinstance(v, list) else v
 
 
@@ -153,7 +161,7 @@ def aggregate_seeds(scored: list[dict], direction: str,
     order: list = []
     for t in scored:
         point = {k: v for k, v in t["point"].items() if k != "seed"}
-        key = tuple(sorted((k, _hashable(v)) for k, v in point.items()))
+        key = tuple(sorted((k, hashable(v)) for k, v in point.items()))
         if key not in groups:
             groups[key] = {"point": point, "values": [], "costs": [],
                            "num_params": t.get("num_params"), "runs": [], "seeds": []}
