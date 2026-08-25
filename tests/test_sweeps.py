@@ -278,3 +278,78 @@ def test_pid_alive():
     assert pid_alive(os.getpid()) is True
     assert pid_alive(2_000_000_000) is False
     assert pid_alive(None) is False and pid_alive(0) is False
+
+
+# --------------------------------------------------------------- ataduras (couple)
+# Un campo que se mueve CON el eje en vez de contra el. Existe para el estudio 1
+# de prioridad 1 (2026-08-25): barrer `border_px` con el anillo FIJO en 2 celdas,
+# que es lo que hace la pregunta "mas contexto a coste constante" en vez de
+# "mas contexto y de paso mas parametros".
+
+def test_couple_moves_a_field_along_the_axis_instead_of_crossing_it(world):
+    from fv.sweeps.spec import expand_points
+    spec = {"space": {"border_px": [2, 4]},
+            "couple": {"border_reduce": {"axis": "border_px", "values": [1, 2]}},
+            "strategy": "grid"}
+    valid, _ = expand_points(spec, TINY_NET)
+    got = [(p["overrides"]["border_px"], p["overrides"]["border_reduce"])
+           for p in valid]
+    # la DIAGONAL: 2 puntos, no los 4 del producto cartesiano
+    assert got == [(2, 1), (4, 2)]
+    # y el anillo se queda quieto, que es de lo que iba el experimento
+    assert {p["network"]["border_px"] // p["network"]["border_reduce"]
+            for p in valid} == {2}
+
+
+def test_couple_is_not_an_axis_so_it_does_not_multiply_the_seeds(world):
+    from fv.sweeps.spec import expand_points
+    spec = {"space": {"border_px": [2, 4], "seed": [1, 2, 3]},
+            "couple": {"border_reduce": {"axis": "border_px", "values": [1, 2]}},
+            "strategy": "grid"}
+    valid, _ = expand_points(spec, TINY_NET)
+    assert len(valid) == 6                      # 2 valores x 3 semillas, no 12
+    for p in valid:
+        esperado = {2: 1, 4: 2}[p["overrides"]["border_px"]]
+        assert p["overrides"]["border_reduce"] == esperado
+
+
+def test_couple_travels_to_the_run_name_and_to_the_point(world):
+    """El campo atado queda ESCRITO, no implicito: agregar por punto tiene que
+    distinguir dos redes distintas aunque compartan el valor del eje."""
+    from fv.sweeps.runner import point_run_name
+    from fv.sweeps.spec import expand_points
+    spec = {"space": {"border_px": [2, 4]},
+            "couple": {"border_reduce": {"axis": "border_px", "values": [1, 2]}},
+            "strategy": "grid"}
+    valid, _ = expand_points(spec, TINY_NET)
+    assert "border_reduce" in valid[0]["overrides"]
+    # el eje manda en el nombre (es el primero), la atadura viaja en el punto
+    assert point_run_name("x", 0, valid[0]["overrides"]).startswith("x-0000-border_px2")
+
+
+@pytest.mark.parametrize("couple,code", [
+    ({"border_reduce": {"axis": "border_px", "values": [1]}},
+     "couple_length_mismatch"),                        # diagonal desalineada
+    ({"border_reduce": {"axis": "no_existe", "values": [1, 2]}},
+     "couple_axis_not_in_space"),
+    ({"border_px": {"axis": "border_px", "values": [1, 2]}},
+     "couple_field_is_axis"),                          # eje y atadura a la vez
+    ({"ni_idea": {"axis": "border_px", "values": [1, 2]}},
+     "unknown_couple_field"),
+])
+def test_a_broken_couple_is_refused_with_its_reason(couple, code):
+    from fv.sweeps.spec import check_sweep
+    problems = check_sweep({"space": {"border_px": [2, 4]}, "couple": couple,
+                            "strategy": "grid", "objective": "f1"})
+    assert code in [p["code"] for p in problems], problems
+
+
+def test_couple_cannot_hang_from_the_replica_axis():
+    """Atar un campo a `seed` haria que cada replica entrenara otra red: la
+    varianza que la semilla debe medir dejaria de ser solo del azar."""
+    from fv.sweeps.spec import check_sweep
+    problems = check_sweep({"space": {"seed": [1, 2]},
+                            "couple": {"border_reduce": {"axis": "seed",
+                                                         "values": [1, 2]}},
+                            "strategy": "grid", "objective": "f1"})
+    assert "couple_axis_is_seed" in [p["code"] for p in problems]

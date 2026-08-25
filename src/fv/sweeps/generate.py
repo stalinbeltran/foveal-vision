@@ -30,7 +30,7 @@ def build_generated_spec(window_dataset: str, axis: str, axis_range,
                          strategy: str = "grid", device: str = "cpu", seed: int = 1,
                          seeds: int = 1,
                          winners: dict | None = None, overrides: dict | None = None,
-                         border_px: int | None = None,
+                         border_px: int | None = None, couple: dict | None = None,
                          legacy_c_frac: float | None = None,
                          study: str | None = None,
                          wstore: WindowDatasetStore | None = None,
@@ -88,6 +88,10 @@ def build_generated_spec(window_dataset: str, axis: str, axis_range,
         "derivation": derived["derivation"],        # §5, §7.2 — how the base was reached
         "corrections": derived["corrections"],      # invalid defaults fixed, with reason
         "space": space,
+        # ataduras: campos que se mueven CON el eje en vez de contra el (spec.py
+        # expand_points). No son ejes -- no multiplican puntos -- y por eso no
+        # rompen el "un eje cada vez" del motor OAT.
+        **({"couple": couple} if couple else {}),
         "strategy": strategy,
         "objective": objective,
         "budget": budget or {},

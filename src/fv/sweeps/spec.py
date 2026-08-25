@@ -115,12 +115,120 @@ def check_sweep(spec: dict) -> list[dict]:
                     bad("unknown_monitor", f"'{v}' no es un monitor",
                         f"usa uno de {sorted(MONITORS)} (el monitor nombra la "
                         f"metrica de val con su 'val_' delante)")
+    problems.extend(_check_couple(spec.get("couple") or {}, space))
+    return problems
+
+
+def _check_couple(couple: dict, space: dict) -> list[dict]:
+    """Valida las ATADURAS: campos que se mueven CON un eje, no contra el.
+
+    Ver `expand_points` para que son y por que hacen falta. Aqui solo se
+    comprueba que la atadura sea legible y no mienta:
+
+    - el campo atado es un campo de C/D, y NO es a su vez un eje (seria las dos
+      cosas a la vez: el producto cartesiano y la diagonal);
+    - el eje del que cuelga existe en el espacio y no es `seed` (la replica);
+    - hay exactamente un valor atado por valor del eje. Una lista mas corta o mas
+      larga es la forma silenciosa de que la diagonal se desalinee, y entonces el
+      recorrido entrena redes que nadie pidio con una tabla que sale igual de
+      creible.
+    """
+    problems = []
+
+    def bad(code, message, hint):
+        problems.append({"code": code, "message": message, "hint": hint})
+
+    if not isinstance(couple, dict):
+        bad("couple_must_be_dict", "'couple' debe ser un diccionario "
+            "{campo: {axis, values}}",
+            'p. ej. {"border_reduce": {"axis": "border_px", "values": [4,5,6,8]}}')
+        return problems
+    for field, regla in couple.items():
+        if field not in NETWORK_PARAMS | RECIPE_PARAMS:
+            bad("unknown_couple_field", f"'{field}' no es un campo de C ni de D",
+                f"los campos atables son {sorted(NETWORK_PARAMS | RECIPE_PARAMS)}")
+            continue
+        if field in space:
+            bad("couple_field_is_axis",
+                f"'{field}' es eje Y campo atado a la vez: o barre libre (producto "
+                f"cartesiano) o va atado a otro eje (diagonal), no las dos",
+                f"quita '{field}' de 'space' o quitalo de 'couple'")
+            continue
+        if not isinstance(regla, dict):
+            bad("couple_rule_must_be_dict", f"la atadura de '{field}' debe ser "
+                f"{{axis, values}}",
+                'p. ej. {"axis": "border_px", "values": [4,5,6,8]}')
+            continue
+        eje = regla.get("axis")
+        valores = regla.get("values")
+        if eje not in space:
+            bad("couple_axis_not_in_space",
+                f"'{field}' cuelga de '{eje}', que no es un eje de este recorrido",
+                f"los ejes declarados son {sorted(space)}")
+            continue
+        if eje == "seed":
+            bad("couple_axis_is_seed",
+                f"'{field}' no puede colgar de 'seed': la semilla es el eje "
+                f"REPLICA, y atarle un campo haria que cada replica entrenara una "
+                f"red distinta",
+                "cuelgalo del eje de verdad")
+            continue
+        if not isinstance(valores, list) or not valores:
+            bad("couple_values_must_be_list",
+                f"la atadura de '{field}' necesita una lista 'values'",
+                'p. ej. {"axis": "border_px", "values": [4,5,6,8]}')
+            continue
+        n_eje = space[eje]
+        if isinstance(n_eje, list) and len(valores) != len(n_eje):
+            bad("couple_length_mismatch",
+                f"'{field}' trae {len(valores)} valores atados y el eje '{eje}' "
+                f"tiene {len(n_eje)}: la diagonal quedaria desalineada",
+                f"da exactamente {len(n_eje)} valores, uno por cada {eje}")
+        elif n_eje == "auto":
+            bad("couple_axis_is_auto",
+                f"'{field}' cuelga de '{eje}', que es 'auto': el rango lo calcula "
+                f"la geometria y no se sabe aqui cuantos valores tendra",
+                f"declara el rango de '{eje}' explicito para poder atarle "
+                f"'{field}'")
     return problems
 
 
 def expand_points(spec: dict, base_network: dict) -> tuple[list[dict], list[dict]]:
     """-> (valid points, discarded points with reasons). A point is
-    {network: {...}, recipe_overrides: {...}}."""
+    {network: {...}, recipe_overrides: {...}}.
+
+    ATADURAS (`spec["couple"]`) — un campo que se mueve CON el eje
+    ---------------------------------------------------------------
+    El motor es OAT y el espacio se expande en PRODUCTO CARTESIANO, que es lo
+    correcto mientras cada eje sea independiente. Pero hay preguntas donde dos
+    campos tienen que moverse **a la vez** para que el experimento signifique lo
+    que dice, y entonces lo que hace falta es la DIAGONAL, no el producto.
+
+    El caso que lo trajo (estudio 1 de prioridad 1, 2026-08-25): *«¿ayuda ver mas
+    contexto, a coste constante?»*. Eso es barrer `border_px` ∈ [8,10,12,16]
+    manteniendo el anillo en 2 celdas, o sea `border_reduce` = `border_px`/2 ∈
+    [4,5,6,8]. Como producto cartesiano serian 16 combinaciones, de las que la
+    geometria acepta 7 (las que dividen) — y entre ellas `border_px`=8 saldria
+    con 2 celdas Y con 1, que son DOS REDES DISTINTAS agregadas bajo el mismo
+    valor del eje. La tabla saldria igual de creible y estaria midiendo otra cosa.
+
+    Con `couple` el recorrido declara la diagonal:
+
+        "space":  {"border_px": [8, 10, 12, 16]},
+        "couple": {"border_reduce": {"axis": "border_px",
+                                     "values": [4, 5, 6, 8]}}
+
+    El campo atado entra en `overrides` como cualquier otro, asi que viaja al
+    nombre del run y al agrupado por punto: queda escrito que la red de
+    `border_px`=8 tenia `border_reduce`=4, en vez de quedar implicito.
+
+    ⚠ Lo que una atadura NO es: un eje. No multiplica puntos, no se rankea por
+    ella y `estudio_informe.py --eje` sigue siendo el eje de verdad. Y no se
+    aplica sola por conveniencia geometrica: hay que escribirla, porque mantener
+    el anillo fijo es una DECISION de diseño del experimento (la alternativa
+    —`border_reduce` fijo— tambien es legal, solo que entonces N crece y el coste
+    con el, y eso hay que decirlo en el plan).
+    """
     base = full_config(base_network)
     ss = build_search_space(base, n_layers=int(base["n_layers"]))
     space: dict[str, list] = {}
@@ -129,6 +237,14 @@ def expand_points(spec: dict, base_network: dict) -> tuple[list[dict], list[dict
             space[param] = ss[param]
         else:
             space[param] = list(values)
+
+    # {eje: {valor_del_eje_por_indice: {campo: valor}}} — resuelto por POSICION
+    # contra el rango del eje, que es como se declara y como lo valida check_sweep
+    atados: dict[str, list[tuple[str, list]]] = {}
+    for field, regla in (spec.get("couple") or {}).items():
+        eje = regla.get("axis")
+        if eje in space:
+            atados.setdefault(eje, []).append((field, list(regla.get("values") or [])))
 
     names = sorted(space)
     combos = list(itertools.product(*(space[k] for k in names)))
@@ -144,6 +260,11 @@ def expand_points(spec: dict, base_network: dict) -> tuple[list[dict], list[dict
     valid, discarded = [], []
     for combo in combos:
         overrides = dict(zip(names, combo))
+        for eje, reglas in atados.items():
+            i = space[eje].index(overrides[eje])
+            for field, valores in reglas:
+                if i < len(valores):
+                    overrides[field] = valores[i]
         net = dict(base)
         net.update({k: v for k, v in overrides.items() if k in NETWORK_PARAMS})
         # channels depends on n_layers (§6.1): sweeping depth WITHOUT sweeping
