@@ -1,0 +1,1213 @@
+{
+  "recorridos": [
+    "pl-t-lr",
+    "pl-t-bs"
+  ],
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "cuando": "2026-08-25T04:35:58+00:00",
+  "reparto": "run",
+  "maquinas": 20,
+  "cpu": "E5-26",
+  "reloj_min": 94.9,
+  "usd": 1.026,
+  "hilos": 8,
+  "criba": {
+    "umbral": 0.75,
+    "cohorte": 13,
+    "necesarias": 20,
+    "mediana_s_paso": 0.02913,
+    "tope_s_paso": 0.03884,
+    "elegidas": [
+      {
+        "etiqueta": "c4",
+        "machine_id": 144409,
+        "s_paso": 0.0185,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz",
+        "usd_hora": 0.06222222222222223
+      },
+      {
+        "etiqueta": "c3",
+        "machine_id": 29917,
+        "s_paso": 0.02358,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "usd_hora": 0.058222222222222224
+      },
+      {
+        "etiqueta": "c5",
+        "machine_id": 142752,
+        "s_paso": 0.02438,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v3 @ 2.40GHz",
+        "usd_hora": 0.0648888888888889
+      },
+      {
+        "etiqueta": "c12",
+        "machine_id": 51703,
+        "s_paso": 0.02443,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2683 v4 @ 2.10GHz",
+        "usd_hora": 0.08103703703703703
+      },
+      {
+        "etiqueta": "c15",
+        "machine_id": 59153,
+        "s_paso": 0.02528,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz",
+        "usd_hora": 0.08222222222222222
+      },
+      {
+        "etiqueta": "c16",
+        "machine_id": 29249,
+        "s_paso": 0.02569,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz",
+        "usd_hora": 0.08814814814814816
+      },
+      {
+        "etiqueta": "c1",
+        "machine_id": 53859,
+        "s_paso": 0.02913,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz",
+        "usd_hora": 0.05703703703703704
+      },
+      {
+        "etiqueta": "c10",
+        "machine_id": 131228,
+        "s_paso": 0.03308,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz",
+        "usd_hora": 0.07111111111111111
+      },
+      {
+        "etiqueta": "c6",
+        "machine_id": 30031,
+        "s_paso": 0.03538,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2683 v4 @ 2.10GHz",
+        "usd_hora": 0.06622222222222222
+      },
+      {
+        "etiqueta": "c2",
+        "machine_id": 131146,
+        "s_paso": 0.03839,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz",
+        "usd_hora": 0.05777777777777778
+      },
+      {
+        "etiqueta": "c11",
+        "machine_id": 11847,
+        "s_paso": 0.05044,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2697 v2 @ 2.70GHz",
+        "usd_hora": 0.14888888888888888
+      },
+      {
+        "etiqueta": "c18",
+        "machine_id": 135622,
+        "s_paso": 0.05078,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2665 0 @ 2.40GHz",
+        "usd_hora": 0.09511111111111112
+      },
+      {
+        "etiqueta": "c19",
+        "machine_id": 28914,
+        "s_paso": 0.05226,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2698 v3 @ 2.30GHz",
+        "usd_hora": 0.09555555555555556
+      }
+    ],
+    "descartadas": [],
+    "completadas_con_lentas": [
+      "c11",
+      "c18",
+      "c19"
+    ],
+    "ganancia_vs_peor": 1.0
+  },
+  "gasto_por_maquina": [
+    {
+      "etiqueta": "c11",
+      "machine_id": 138345,
+      "por_que": "fallo al preparar",
+      "minutos": 1.85,
+      "usd": 0.00249
+    },
+    {
+      "etiqueta": "c13",
+      "machine_id": 140182,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 2.19,
+      "usd": 0.00301
+    },
+    {
+      "etiqueta": "c22",
+      "machine_id": 33987,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 2.42,
+      "usd": 0.00543
+    },
+    {
+      "etiqueta": "c9",
+      "machine_id": 29051,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 2.51,
+      "usd": 0.00294
+    },
+    {
+      "etiqueta": "c20",
+      "machine_id": 47025,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 2.77,
+      "usd": 0.00449
+    },
+    {
+      "etiqueta": "c17",
+      "machine_id": 28087,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.0074
+    },
+    {
+      "etiqueta": "c21",
+      "machine_id": 4558,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00851
+    },
+    {
+      "etiqueta": "c14",
+      "machine_id": 140185,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.36,
+      "usd": 0.00735
+    },
+    {
+      "etiqueta": "c0",
+      "machine_id": 42771,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.48,
+      "usd": 0.00458
+    },
+    {
+      "etiqueta": "c8",
+      "machine_id": 51530,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.7,
+      "usd": 0.00669
+    },
+    {
+      "etiqueta": "c7",
+      "machine_id": 136828,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.91,
+      "usd": 0.00685
+    },
+    {
+      "etiqueta": "c13",
+      "machine_id": 38619,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.92,
+      "usd": 0.01588
+    },
+    {
+      "etiqueta": "c16",
+      "machine_id": 29249,
+      "por_que": "lote terminado",
+      "minutos": 28.24,
+      "usd": 0.04149
+    },
+    {
+      "etiqueta": "c15",
+      "machine_id": 59153,
+      "por_que": "lote terminado",
+      "minutos": 29.09,
+      "usd": 0.03986
+    },
+    {
+      "etiqueta": "c4",
+      "machine_id": 144409,
+      "por_que": "lote terminado",
+      "minutos": 34.32,
+      "usd": 0.03559
+    },
+    {
+      "etiqueta": "c2",
+      "machine_id": 131146,
+      "por_que": "lote terminado",
+      "minutos": 37.37,
+      "usd": 0.03599
+    },
+    {
+      "etiqueta": "c5",
+      "machine_id": 142752,
+      "por_que": "lote terminado",
+      "minutos": 38.02,
+      "usd": 0.04112
+    },
+    {
+      "etiqueta": "c3",
+      "machine_id": 29917,
+      "por_que": "lote terminado",
+      "minutos": 40.67,
+      "usd": 0.03946
+    },
+    {
+      "etiqueta": "c12",
+      "machine_id": 51703,
+      "por_que": "lote terminado",
+      "minutos": 43.64,
+      "usd": 0.05894
+    },
+    {
+      "etiqueta": "c1",
+      "machine_id": 53859,
+      "por_que": "lote terminado",
+      "minutos": 52.07,
+      "usd": 0.0495
+    },
+    {
+      "etiqueta": "c6",
+      "machine_id": 30031,
+      "por_que": "lote terminado",
+      "minutos": 52.99,
+      "usd": 0.05848
+    },
+    {
+      "etiqueta": "c10",
+      "machine_id": 131228,
+      "por_que": "lote terminado",
+      "minutos": 59.79,
+      "usd": 0.07086
+    },
+    {
+      "etiqueta": "c19",
+      "machine_id": 28914,
+      "por_que": "lote terminado",
+      "minutos": 79.72,
+      "usd": 0.12696
+    },
+    {
+      "etiqueta": "c11",
+      "machine_id": 11847,
+      "por_que": "lote terminado",
+      "minutos": 81.29,
+      "usd": 0.20171
+    },
+    {
+      "etiqueta": "c18",
+      "machine_id": 135622,
+      "por_que": "lote terminado",
+      "minutos": 94.88,
+      "usd": 0.1504
+    }
+  ],
+  "maquinas_alquiladas": 25,
+  "git": {
+    "activo": true,
+    "commits": 79,
+    "fallos_push": 0,
+    "ultimo_error": null
+  },
+  "peaje_min": 44.9,
+  "trabajo_min": 564.7,
+  "maquina_min": 672.1,
+  "peaje_pct": 6.7,
+  "lotes": [
+    {
+      "lote": "pl-t-lr-p0",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        0
+      ],
+      "que": "pl-t-lr-0000-lr0p0014_seed1",
+      "oferta": 45255274,
+      "machine_id": 144409,
+      "maquina": {
+        "vcpu": 12.0,
+        "cpu": "Xeon E5-2690 v4",
+        "ram_gb": 62.7,
+        "ghz": 2.599996,
+        "gpu": "GTX 1080",
+        "ubicacion": "United Kingdom, GB",
+        "host": 144409,
+        "fiabilidad": 0.9951
+      },
+      "usd_hora": 0.06222,
+      "ok": true,
+      "error": null,
+      "epocas": 36,
+      "s_por_epoca": 43.4,
+      "instancia": 48619341,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.0185,
+        "s_paso_min": 0.01749,
+        "s_paso_max": 0.02371,
+        "pasos_s": 54.059,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 18.3,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz",
+        "nucleos": 12,
+        "carga": [
+          0.54,
+          0.21,
+          0.45
+        ],
+        "arranque_s": 2.5,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 32.6,
+      "subida_s": 3.3,
+      "instalacion_s": 44.6,
+      "peaje_s": 80.5,
+      "sonda_s": 5.7,
+      "entrenamiento_s": 1561.9,
+      "runs": [
+        "pl-t-lr-0000-lr0p0014_seed1"
+      ],
+      "segundos_vivida": 2059.1,
+      "usd": 0.03559,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p1",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        1
+      ],
+      "que": "pl-t-lr-0001-lr0p0014_seed2",
+      "oferta": 25320172,
+      "machine_id": 29917,
+      "maquina": {
+        "vcpu": 14.0,
+        "cpu": "Xeon E5-2680 v4",
+        "ram_gb": 15.6,
+        "ghz": 3.3,
+        "gpu": "GTX 1660 S",
+        "ubicacion": "Vietnam, VN",
+        "host": 29917,
+        "fiabilidad": 0.9925
+      },
+      "usd_hora": 0.05822,
+      "ok": true,
+      "error": null,
+      "epocas": 46,
+      "s_por_epoca": 41.9,
+      "instancia": 48619347,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02358,
+        "s_paso_min": 0.02088,
+        "s_paso_max": 0.02961,
+        "pasos_s": 42.409,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 23.3,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "nucleos": 28,
+        "carga": [
+          1.59,
+          3.47,
+          5.45
+        ],
+        "arranque_s": 2.4,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 321.3,
+      "subida_s": 9.8,
+      "instalacion_s": 53.4,
+      "peaje_s": 384.5,
+      "sonda_s": 8.2,
+      "entrenamiento_s": 1931.4,
+      "runs": [
+        "pl-t-lr-0001-lr0p0014_seed2"
+      ],
+      "segundos_vivida": 2440.1,
+      "usd": 0.03946,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p2",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        2
+      ],
+      "que": "pl-t-lr-0002-lr0p0007_seed1",
+      "oferta": 48536994,
+      "machine_id": 142752,
+      "maquina": {
+        "vcpu": 12.0,
+        "cpu": "Xeon E5-2673 v3",
+        "ram_gb": 15.6,
+        "ghz": 3.1,
+        "gpu": "GTX 1080 Ti",
+        "ubicacion": "South Korea, KR",
+        "host": 142752,
+        "fiabilidad": 0.9965
+      },
+      "usd_hora": 0.06489,
+      "ok": true,
+      "error": null,
+      "epocas": 39,
+      "s_por_epoca": 45.5,
+      "instancia": 48619337,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02438,
+        "s_paso_min": 0.02156,
+        "s_paso_max": 0.03707,
+        "pasos_s": 41.022,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 24.1,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v3 @ 2.40GHz",
+        "nucleos": 24,
+        "carga": [
+          1.76,
+          1.36,
+          0.65
+        ],
+        "arranque_s": 2.6,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 294.8,
+      "subida_s": 7.4,
+      "instalacion_s": 54.6,
+      "peaje_s": 356.8,
+      "sonda_s": 7.6,
+      "entrenamiento_s": 1776.1,
+      "runs": [
+        "pl-t-lr-0002-lr0p0007_seed1"
+      ],
+      "segundos_vivida": 2281.3,
+      "usd": 0.04112,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p3",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        3
+      ],
+      "que": "pl-t-lr-0003-lr0p0007_seed2",
+      "oferta": 48604771,
+      "machine_id": 51703,
+      "maquina": {
+        "vcpu": 8.0,
+        "cpu": "Xeon E5-2683 v4",
+        "ram_gb": 31.4,
+        "ghz": 3.0,
+        "gpu": "RTX 2080 Ti",
+        "ubicacion": "British Columbia, CA",
+        "host": 51703,
+        "fiabilidad": 0.9793
+      },
+      "usd_hora": 0.08104,
+      "ok": true,
+      "error": null,
+      "epocas": 56,
+      "s_por_epoca": 37.8,
+      "instancia": 48619340,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02443,
+        "s_paso_min": 0.02178,
+        "s_paso_max": 0.03222,
+        "pasos_s": 40.933,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 24.2,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2683 v4 @ 2.10GHz",
+        "nucleos": 32,
+        "carga": [
+          1.32,
+          1.13,
+          0.56
+        ],
+        "arranque_s": 2.6,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 222.8,
+      "subida_s": 3.6,
+      "instalacion_s": 65.0,
+      "peaje_s": 291.4,
+      "sonda_s": 6.0,
+      "entrenamiento_s": 2120.4,
+      "runs": [
+        "pl-t-lr-0003-lr0p0007_seed2"
+      ],
+      "segundos_vivida": 2618.2,
+      "usd": 0.05894,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p4",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        4
+      ],
+      "que": "pl-t-lr-0004-lr0p0028_seed1",
+      "oferta": 36067099,
+      "machine_id": 59153,
+      "maquina": {
+        "vcpu": 20.0,
+        "cpu": "Xeon E5-2673 v4",
+        "ram_gb": 23.6,
+        "ghz": 3.6,
+        "gpu": "RTX 4070S",
+        "ubicacion": "Hong Kong, HK",
+        "host": 59153,
+        "fiabilidad": 0.9885
+      },
+      "usd_hora": 0.08222,
+      "ok": true,
+      "error": null,
+      "epocas": 28,
+      "s_por_epoca": 43.9,
+      "instancia": 48619339,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02528,
+        "s_paso_min": 0.02386,
+        "s_paso_max": 0.02964,
+        "pasos_s": 39.55,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 25.0,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz",
+        "nucleos": 80,
+        "carga": [
+          0.67,
+          0.29,
+          0.16
+        ],
+        "arranque_s": 2.4,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 57.0,
+      "subida_s": 11.1,
+      "instalacion_s": 210.7,
+      "peaje_s": 278.8,
+      "sonda_s": 8.9,
+      "entrenamiento_s": 1234.5,
+      "runs": [
+        "pl-t-lr-0004-lr0p0028_seed1"
+      ],
+      "segundos_vivida": 1745.3,
+      "usd": 0.03986,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p5",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        5
+      ],
+      "que": "pl-t-lr-0005-lr0p0028_seed2",
+      "oferta": 13234297,
+      "machine_id": 29249,
+      "maquina": {
+        "vcpu": 16.0,
+        "cpu": "Xeon E5-2697A v4",
+        "ram_gb": 31.4,
+        "ghz": 2.6,
+        "gpu": "GTX 1060",
+        "ubicacion": "Norway, NO",
+        "host": 29249,
+        "fiabilidad": 0.9993
+      },
+      "usd_hora": 0.08815,
+      "ok": true,
+      "error": null,
+      "epocas": 23,
+      "s_por_epoca": 51.9,
+      "instancia": 48619343,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02569,
+        "s_paso_min": 0.02332,
+        "s_paso_max": 0.02818,
+        "pasos_s": 38.929,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 25.4,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz",
+        "nucleos": 32,
+        "carga": [
+          0.83,
+          0.34,
+          0.17
+        ],
+        "arranque_s": 2.9,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 22.9,
+      "subida_s": 4.0,
+      "instalacion_s": 55.6,
+      "peaje_s": 82.6,
+      "sonda_s": 6.7,
+      "entrenamiento_s": 1196.3,
+      "runs": [
+        "pl-t-lr-0005-lr0p0028_seed2"
+      ],
+      "segundos_vivida": 1694.5,
+      "usd": 0.04149,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p6",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        6
+      ],
+      "que": "pl-t-lr-0006-lr0p00035_seed1",
+      "oferta": 48532013,
+      "machine_id": 53859,
+      "maquina": {
+        "vcpu": 18.0,
+        "cpu": "Xeon E5-2686 v4",
+        "ram_gb": 23.6,
+        "ghz": 3.0,
+        "gpu": "Quadro P4000",
+        "ubicacion": "California, US",
+        "host": 53859,
+        "fiabilidad": 0.9901
+      },
+      "usd_hora": 0.05704,
+      "ok": true,
+      "error": null,
+      "epocas": 55,
+      "s_por_epoca": 47.5,
+      "instancia": 48619353,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02913,
+        "s_paso_min": 0.02529,
+        "s_paso_max": 0.03288,
+        "pasos_s": 34.327,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 28.8,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz",
+        "nucleos": 72,
+        "carga": [
+          10.33,
+          10.41,
+          13.34
+        ],
+        "arranque_s": 3.3,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 45.6,
+      "subida_s": 6.9,
+      "instalacion_s": 96.9,
+      "peaje_s": 149.4,
+      "sonda_s": 9.1,
+      "entrenamiento_s": 2614.9,
+      "runs": [
+        "pl-t-lr-0006-lr0p00035_seed1"
+      ],
+      "segundos_vivida": 3124.4,
+      "usd": 0.0495,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p7",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        7
+      ],
+      "que": "pl-t-lr-0007-lr0p00035_seed2",
+      "oferta": 47824789,
+      "machine_id": 131228,
+      "maquina": {
+        "vcpu": 10.0,
+        "cpu": "Xeon E5-2673 v4",
+        "ram_gb": 23.6,
+        "ghz": 3.6,
+        "gpu": "RTX 3070",
+        "ubicacion": "California, US",
+        "host": 131228,
+        "fiabilidad": 0.9982
+      },
+      "usd_hora": 0.07111,
+      "ok": true,
+      "error": null,
+      "epocas": 54,
+      "s_por_epoca": 57.0,
+      "instancia": 48619338,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.03308,
+        "s_paso_min": 0.02978,
+        "s_paso_max": 0.05199,
+        "pasos_s": 30.226,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 32.7,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz",
+        "nucleos": 80,
+        "carga": [
+          9.58,
+          8.79,
+          8.61
+        ],
+        "arranque_s": 3.0,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 105.1,
+      "subida_s": 8.8,
+      "instalacion_s": 95.2,
+      "peaje_s": 209.1,
+      "sonda_s": 9.1,
+      "degradacion": {
+        "run": "pl-t-lr-0007-lr0p00035_seed2",
+        "base_s": 54.0,
+        "reciente_s": 78.7,
+        "razon": 1.46,
+        "epocas": 42
+      },
+      "entrenamiento_s": 3079.4,
+      "runs": [
+        "pl-t-lr-0007-lr0p00035_seed2"
+      ],
+      "segundos_vivida": 3587.3,
+      "usd": 0.07086,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p8",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        8
+      ],
+      "que": "pl-t-lr-0008-lr0p0056_seed1",
+      "oferta": 30053150,
+      "machine_id": 30031,
+      "maquina": {
+        "vcpu": 16.0,
+        "cpu": "Xeon E5-2683 v4",
+        "ram_gb": 15.6,
+        "ghz": 3.0,
+        "gpu": "RTX 2060S",
+        "ubicacion": "Vietnam, VN",
+        "host": 30031,
+        "fiabilidad": 0.9783
+      },
+      "usd_hora": 0.06622,
+      "ok": true,
+      "error": null,
+      "epocas": 40,
+      "s_por_epoca": 66.7,
+      "instancia": 48619334,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.03538,
+        "s_paso_min": 0.02653,
+        "s_paso_max": 0.05089,
+        "pasos_s": 28.268,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 35.0,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2683 v4 @ 2.10GHz",
+        "nucleos": 32,
+        "carga": [
+          15.41,
+          14.97,
+          14.81
+        ],
+        "arranque_s": 3.8,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 45.0,
+      "subida_s": 8.7,
+      "instalacion_s": 77.4,
+      "peaje_s": 131.1,
+      "sonda_s": 10.8,
+      "entrenamiento_s": 2670.3,
+      "runs": [
+        "pl-t-lr-0008-lr0p0056_seed1"
+      ],
+      "segundos_vivida": 3179.3,
+      "usd": 0.05848,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-lr-p9",
+      "sweep": "pl-t-lr",
+      "puntos": [
+        9
+      ],
+      "que": "pl-t-lr-0009-lr0p0056_seed2",
+      "oferta": 43655097,
+      "machine_id": 131146,
+      "maquina": {
+        "vcpu": 10.0,
+        "cpu": "Xeon E5-2673 v4",
+        "ram_gb": 23.6,
+        "ghz": 3.6,
+        "gpu": "RTX 3060",
+        "ubicacion": "California, US",
+        "host": 131146,
+        "fiabilidad": 0.9981
+      },
+      "usd_hora": 0.05778,
+      "ok": true,
+      "error": null,
+      "epocas": 31,
+      "s_por_epoca": 55.8,
+      "instancia": 48619335,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.03839,
+        "s_paso_min": 0.03761,
+        "s_paso_max": 0.04263,
+        "pasos_s": 26.046,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 38.0,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz",
+        "nucleos": 80,
+        "carga": [
+          13.23,
+          12.97,
+          12.74
+        ],
+        "arranque_s": 3.0,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 105.2,
+      "subida_s": 9.0,
+      "instalacion_s": 81.3,
+      "peaje_s": 195.6,
+      "sonda_s": 9.5,
+      "entrenamiento_s": 1734.3,
+      "runs": [
+        "pl-t-lr-0009-lr0p0056_seed2"
+      ],
+      "segundos_vivida": 2242.5,
+      "usd": 0.03599,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-bs-p0",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        0
+      ],
+      "que": "pl-t-bs-0000-batch_size85_seed1",
+      "oferta": 27581881,
+      "machine_id": 11847,
+      "maquina": {
+        "vcpu": 12.0,
+        "cpu": "Xeon E5-2697 v2",
+        "ram_gb": 31.4,
+        "ghz": 2.693392,
+        "gpu": "RTX 3090 Ti",
+        "ubicacion": "South Africa, ZA",
+        "host": 11847,
+        "fiabilidad": 0.9429
+      },
+      "usd_hora": 0.14889,
+      "ok": true,
+      "error": null,
+      "epocas": 54,
+      "s_por_epoca": 82.8,
+      "instancia": 48619484,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.05044,
+        "s_paso_min": 0.04776,
+        "s_paso_max": 0.08191,
+        "pasos_s": 19.827,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 49.9,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2697 v2 @ 2.70GHz",
+        "nucleos": 12,
+        "carga": [
+          1.61,
+          0.6,
+          0.25
+        ],
+        "arranque_s": 3.9,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 81.4,
+      "subida_s": 12.0,
+      "instalacion_s": 107.3,
+      "peaje_s": 200.7,
+      "sonda_s": 12.7,
+      "entrenamiento_s": 4474.3,
+      "runs": [
+        "pl-t-bs-0000-batch_size85_seed1"
+      ],
+      "segundos_vivida": 4877.2,
+      "usd": 0.20171,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-bs-p1",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        1
+      ],
+      "que": "pl-t-bs-0001-batch_size85_seed2",
+      "oferta": 47975554,
+      "machine_id": 135622,
+      "maquina": {
+        "vcpu": 16.0,
+        "cpu": "Xeon E5-2665 0",
+        "ram_gb": 23.5,
+        "ghz": 3.1,
+        "gpu": "RTX 3070 Ti",
+        "ubicacion": "South Carolina, US",
+        "host": 135622,
+        "fiabilidad": 0.9812
+      },
+      "usd_hora": 0.09511,
+      "ok": true,
+      "error": null,
+      "epocas": 58,
+      "s_por_epoca": 89.6,
+      "instancia": 48619331,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.05078,
+        "s_paso_min": 0.05016,
+        "s_paso_max": 0.05796,
+        "pasos_s": 19.692,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 50.2,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2665 0 @ 2.40GHz",
+        "nucleos": 32,
+        "carga": [
+          0.92,
+          0.32,
+          0.16
+        ],
+        "arranque_s": 3.6,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 46.8,
+      "subida_s": 1.5,
+      "instalacion_s": 63.7,
+      "peaje_s": 112.0,
+      "sonda_s": 8.2,
+      "entrenamiento_s": 5199.6,
+      "runs": [
+        "pl-t-bs-0001-batch_size85_seed2"
+      ],
+      "segundos_vivida": 5692.6,
+      "usd": 0.1504,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-bs-p2",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        2
+      ],
+      "que": "pl-t-bs-0002-batch_size43_seed1",
+      "oferta": 43018121,
+      "machine_id": 28914,
+      "maquina": {
+        "vcpu": 16.0,
+        "cpu": "Xeon E5-2698 v3",
+        "ram_gb": 31.4,
+        "ghz": 3.6,
+        "gpu": "RTX 4070",
+        "ubicacion": "Alberta, CA",
+        "host": 28914,
+        "fiabilidad": 0.9994
+      },
+      "usd_hora": 0.09556,
+      "ok": true,
+      "error": null,
+      "epocas": 51,
+      "s_por_epoca": 84.1,
+      "instancia": 48619342,
+      "sonda": {
+        "ok": true,
+        "sweep": "pl-t-lr",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.05226,
+        "s_paso_min": 0.04157,
+        "s_paso_max": 0.06808,
+        "pasos_s": 19.135,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 51.7,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2698 v3 @ 2.30GHz",
+        "nucleos": 64,
+        "carga": [
+          10.47,
+          9.65,
+          8.16
+        ],
+        "arranque_s": 3.9,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 157.6,
+      "subida_s": 2.7,
+      "instalacion_s": 60.2,
+      "peaje_s": 220.6,
+      "sonda_s": 9.3,
+      "entrenamiento_s": 4287.8,
+      "runs": [
+        "pl-t-bs-0002-batch_size43_seed1"
+      ],
+      "segundos_vivida": 4783.2,
+      "usd": 0.12696,
+      "intento": 1
+    },
+    {
+      "lote": "pl-t-bs-p3",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        3
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pl-t-bs-p4",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        4
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pl-t-bs-p5",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        5
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pl-t-bs-p6",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        6
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pl-t-bs-p7",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        7
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pl-t-bs-p8",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        8
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pl-t-bs-p9",
+      "sweep": "pl-t-bs",
+      "puntos": [
+        9
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    }
+  ]
+}
