@@ -806,6 +806,14 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
   vivo le ocupa el puerto o le contesta con rutas obsoletas. Matar hijos antes que padres (vite
   antes de `npm run dev`; el `fv-api` que escucha antes de su lanzador) y filtrar por ruta —
   en esta máquina hay pythons ajenos al proyecto.
+- **Los reportes van a `reportes/<año>/<mes>-<nombre-del-mes>/`** — p. ej.
+  `reportes/2026/08-agosto/`. Un *reporte* es todo informe dirigido al usuario que resume, compara
+  o prioriza (inventarios de parámetros, análisis de resultados, comparativas, informes de
+  estado); **no** lo son los planes de estudio, que siguen en `docs/plan-*.md` porque se escriben
+  **antes** de medir y son criterio, no informe. El mes va **con su número delante** para que
+  ordenen solos, y el nombre en español y en minúscula (`01-enero` … `12-diciembre`). Fichero por
+  reporte, nombre en kebab-case que diga de qué va, y **se commitean y se empujan**: un reporte
+  que sólo existe en esta máquina desaparece con ella.
 - `data/`, `runs/` y `sweeps/` son artefactos: **se versiona la descripción (configs, métricas,
   manifests, specs), se ignora la carga (`.npz`, `.pt`, `optuna.db`)** — formatos.md §5.
 - **Enlaces a ficheros en las respuestas**: siempre en formato markdown `[texto](ruta)` con la
