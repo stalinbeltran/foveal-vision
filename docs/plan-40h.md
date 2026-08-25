@@ -1,5 +1,14 @@
 # Plan de 40 h desatendidas — criterio escrito ANTES de mirar
 
+> ⚠ **Geometría: este documento usa la ortografía anterior al 2026-08-25.** `N`, `c_frac`,
+> `d` y `pen_frac` fueron reemplazados por longitudes en px reales (`fovea_px`, `border_px`,
+> `border_reduce`, `overlap_fovea_px`, `overlap_border_px`). **Ninguna red cambió** — es un
+> cambio de nombre, verificado bit a bit — así que **todos los números de aquí siguen siendo
+> válidos**. La traducción está en [instructionsNewNN.md](../instructionsNewNN.md) §2.1.
+> Ojo con uno: **`d` cambió de significado**, no sólo de nombre. Antes agrandaba el contexto
+> (`borde = celdas·d`); hoy `border_reduce` sólo dice cuánto se comprime un borde de tamaño
+> fijo. Un eje `d` de aquella época medía **área y compresión a la vez**.
+
 > **Este documento se comitea antes de que exista un solo run del plan.** Su valor entero está en
 > eso: las reglas de decisión de abajo se pueden comprobar contra el commit. Si se cambian después
 > de ver resultados, el plan deja de decidir nada (protocolo.md §1).

@@ -510,9 +510,10 @@ Para comprobar que **todos** los ejes corren de punta a punta:
 .\.venv\Scripts\python.exe scripts\verify_axes.py --dataset synth-b16
 ```
 
-> Corre un recorrido real por eje (`generate_sweep` + `run_sweep`), entrena sus puntos en un
-> store temporal y comprueba que se miden, y comprueba además los rechazos (`fovea_px` y las
-> cuatro grafías viejas, en las dos puertas). Ejes de red: `border_px, border_reduce,
+> Verificado (2026-08-25): **28/28 ejes**, 0 fallos — 13 de red, 13 de receta y 5 rehusados
+> (`fovea_px` con `axis_breaks_window_size`, y `N`/`c_frac`/`pen_frac`/`d` con `axis_renamed`, en
+> las dos puertas). Corre un recorrido real por eje (`generate_sweep` + `run_sweep`), entrena sus
+> puntos en un store temporal y comprueba que se miden. Ejes de red: `border_px, border_reduce,
 > overlap_fovea_px, overlap_border_px, n_layers, k_center,
 > k_periph, s_center, s_periph, channels, merge, pool_mode, pad_mode`. Ejes de receta: `lr,
 > optimizer, momentum, weight_decay, batch_size, epochs, scheduler, patience, lambda_pos,

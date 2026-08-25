@@ -12,7 +12,7 @@ recetas.
 **La especificación de la red es [instructionsNewNN.md](instructionsNewNN.md)** — ese documento
 manda sobre todo lo que toque la arquitectura. Su principio rector gobierna el proyecto entero:
 *todo dato es un parámetro*; las dimensiones y los **rangos de búsqueda se calculan** a partir de
-`N` y unas pocas fracciones, nunca se escriben a mano.
+unas pocas longitudes en píxeles reales, nunca se escriben a mano.
 
 El objetivo operativo: poder **preparar series de runs secuenciales** —pruebas cortas en esta
 máquina (CPU), luego largas en un server con GPU— que recorran configuraciones de red y
@@ -22,6 +22,69 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 ---
 
 ## Estado actual — léelo primero
+
+> **✅ 2026-08-25 — LA GEOMETRÍA SE DECLARA EN PÍXELES REALES. NINGUNA RED CAMBIÓ.**
+> Reparametrización pedida por el usuario y decidida con él (decisión **C14**). La geometría se
+> declaraba desde el lado equivocado: `N` y `c_frac` fijaban la fóvea **entre los dos**, así que
+> ninguno podía ser eje (cada uno *solo* rompía ①a) y **una parte legal del espacio era
+> inalcanzable por barrido** — el motor es OAT, un eje cada vez. Ahora:
+>
+> | | |
+> |---|---|
+> | `fovea_px` | la ventana etiquetada de B (contrato ①a: se **toma**, no se busca) |
+> | `border_px` | el borde difuso, por lado, en **px reales** |
+> | `border_reduce` | px reales por celda de borde — **sólo el método de reducción** |
+> | `overlap_fovea_px` | px de **fóvea** que ve también la rama del borde |
+> | `overlap_border_px` | px de **borde** que ve también la rama de la fóvea (**nuevo**) |
+>
+> 1. **`N` pasa a derivado** (`fovea_px + 2·border_px/border_reduce`) y no lo escribe nadie. El
+>    objetivo del usuario era separar **cuánto borde hay** de **cómo se comprime**, para que el
+>    método de reducción pueda cambiar mañana sin tocar ninguna de las dos definiciones.
+> 2. **Los dos solapes son un grado de libertad nuevo.** Antes sólo existía la penetración hacia
+>    dentro, y con **suelo de 1 px**: que la fóvea saliera sobre el borde no era expresable, y la
+>    ausencia de solape tampoco. Hoy `overlap_fovea_px=0` es el **control** de la elección de
+>    solape contributivo de instructionsNewNN.md §7.
+> 3. ⚠ **NO cambia ni un peso, y está verificado, no razonado**: un checkpoint guardado con la
+>    ortografía vieja carga `strict=True` en una red construida con la nueva, con los **168.652
+>    params** documentados de la L4 vigente, y las dos dan **la misma salida bit a bit** (test
+>    permanente en `test_contracts.py`). Los **478 runs en disco** siguen resolviendo su geometría
+>    (otro test). Los `.pt` no se pudieron cargar de verdad porque **esta máquina se rehizo y no
+>    quedan** (son artefactos ignorados por git) — la equivalencia se probó construyendo y
+>    guardando, que es la misma afirmación.
+> 4. ⚠ **`d` se RENOMBRÓ a `border_reduce` porque cambió de significado**, no sólo de nombre: antes
+>    agrandaba el contexto (`borde = celdas·d`), hoy sólo comprime un borde de tamaño fijo. Un spec
+>    viejo con eje `d` **para con `axis_renamed`** en las dos puertas en vez de entrenar otra red en
+>    silencio. Misma idea con una config que trae **las dos ortografías**: `geometry_double_spec`,
+>    rechazo — nunca precedencia (es «el mismo dato en dos sitios»).
+> 5. **`derive_geometry` muere.** Existía sólo para buscar el `N` cuya fóvea cayera en `W` y para
+>    aflojar `c_frac` con una razón cuando no lo encontraba (D-G2/D-G3, ahora obsoletas). Queda
+>    `legacy_border_px` como shim para leer los planes escritos antes (`studies/plana-*`).
+> 6. ⚠⚠ **HALLAZGO QUE SALE GRATIS DE LA TRADUCCIÓN, y vale más que el refactor.** Los recorridos
+>    `proxy-c-d` y `d5-L4` barrían `d` con `N` fijo, o sea movían **`border_px` y `border_reduce`
+>    juntos** dejando el anillo en 2 celdas: lo que midieron fue **`border_px` = 2, 4, 6, 8 px a
+>    coste constante**. Y sube monótono — 0,9310 · 0,9341 · 0,9362 · **0,9408** — con el ganador en
+>    **el borde del rango** (p = 0,063) y siendo **el punto más barato**. Es decir: **ensanchar el
+>    borde sin pagar nada estaba ganando cuando se cortó el rango.** Eso es ahora el estudio nº 1 del
+>    inventario, y el rango recomendado (`border_px ∈ [8,10,12,16]` con el anillo fijo en 2 celdas)
+>    para **justo antes** de que el relleno domine: a 16 px el recorte es 48×48 sobre imágenes de
+>    60×80 y el **26 % del anillo ya es `pad_mode: edge`**, no imagen.
+> 7. ⚠ **Corrige un titular anterior**: «la periferia no está aportando» (nota del 2026-07-26) vale
+>    para *aquel* dataset y *aquella* red (L2, 20 épocas). `d5-L4`, sobre el dataset del 24-ago y la
+>    L4 vigente, sale **al revés**. Cítese con las dos fechas.
+> 8. **La pregunta simétrica sigue sin medir**: *a igual área de contexto, ¿ayuda verla con más
+>    resolución?* — `border_reduce` con `border_px` fijo. **No es cost-neutral**: la cabeza es el
+>    97 % de los parámetros y crece con `N²` (+44 % al pasar de 2 a 4 celdas, +156 % a 8).
+>
+> ⚠ **Verificado, no razonado**: **183 tests en verde** (+33), `npm run build` limpio, los 5 configs
+> de red migrados a `format_version: 2` con la geometría comprobada idéntica uno a uno, y los
+> scripts de estudio/verificación reescritos. **Esta máquina se había rehecho**: no había `.venv`
+> ni Python 3.12 ni `node_modules`, así que se instaló Python 3.12, se recreó el entorno
+> (torch 2.13.0+cpu) y se hizo `npm install` — sin eso no se podía cumplir la regla del proyecto de
+> verificar ejecutando. **Cero entrenamiento, cero artefactos borrados.**
+>
+> **Lo siguiente, por valor**: (a) el estudio nº 1 de arriba, que es barato y tiene evidencia
+> directa; (b) la comparación foveada vs plana, que sigue siendo *la* pregunta del proyecto y sigue
+> sin contestar; (c) los knobs de F, gratis y sin aplicar (decisión F15 del usuario).
 
 > **✅ 2026-08-11 — TODO PARADO. Los dos procesos cerraron; no hay nada corriendo.**
 > `p40-lr-L4` terminó 20/20 (analizado en [docs/plan-lr-L4.md](docs/plan-lr-L4.md) §7: *el eje es
@@ -720,22 +783,23 @@ Reglas que estos documentos fijan y que se citan aquí porque se incumplen solas
 |---|---|---|---|
 | **A** | Fuente | Imágenes + geometría de párrafos (proyecto externo, solo-lectura) | `src/fv/datasets/` |
 | **B** | Dataset de ventanas | Lo que se etiqueta: imágenes completas + etiquetas por ventana. **La vista foveada NO se hornea aquí: se construye en el dataloader** | `src/fv/windows/`, `data/window-datasets/` |
-| **C** | Red foveada | `N`, fracciones, kernels/strides por rama, fusión. Config puro, cero datos | `src/fv/models/`, `configs/networks/` |
+| **C** | Red foveada | Fóvea y borde en px reales, kernels/strides por rama, fusión. Config puro, cero datos | `src/fv/models/`, `configs/networks/` |
 | **D** | Receta | Hiperparámetros de entrenamiento que definen el resultado | `src/fv/training/`, `configs/recipes/` |
 | **E** | Run | Modelo entrenado: pesos + métricas + procedencia | `runs/<name>/` |
 | **H** | Recorrido | Un espacio sobre **C y/o D** con B fijo → muchos E, sin intervención humana | `src/fv/sweeps/`, `sweeps/` |
 | **I** | Estudio (OAT) | Un plan ordenado de ejes sobre **H** con B fijo → muchos recorridos; guía, **no ejecuta** | `src/fv/studies/`, `studies/` |
 | **F** | Inferencia | Aplicar un E a una imagen completa (ventana foveada deslizante) | `src/fv/inference/` |
-| **G** | Geometría foveada | `derive_dims`, `build_foveated_input`, `build_masks`, rangos calculados. **Un solo módulo, todos lo importan** | `src/fv/fovea/` |
+| **G** | Geometría foveada | `normalize_geometry`, `derive_dims`, `build_foveated_input`, `build_masks`, rangos calculados. **Un solo módulo, todos lo importan** | `src/fv/fovea/` |
 | **X** | Ejecución | `device`, `num_workers`, concurrencia. **Cuesta tiempo, no cambia el resultado** | `src/fv/api/jobs.py` |
 
 ### Antes de tocar nada, pregúntate a qué dominio pertenece
 
 El criterio, en orden:
 
-1. ¿Cambia **la forma del modelo o de su entrada**? → **C** (`N`, `c_frac`, `d`, `pen_frac`,
-   kernels, strides, `merge`, `pool_mode`, `dropout` son C — *incluida la geometría del muestreo
-   foveado*, aunque suene a datos: es la red quien define qué vista consume).
+1. ¿Cambia **la forma del modelo o de su entrada**? → **C** (`fovea_px`, `border_px`,
+   `border_reduce`, `overlap_fovea_px`, `overlap_border_px`, kernels, strides, `merge`,
+   `pool_mode`, `dropout` son C — *incluida la geometría del muestreo foveado*, aunque suene a
+   datos: es la red quien define qué vista consume). `N` **no es un parámetro: se deriva**.
 2. ¿Cambia **los pesos resultantes** sin cambiar la forma? → **D** (`lr`, `batch_size`, pesos de
    la pérdida).
 3. ¿Solo cambia **cuánto tarda**? → **X**. Nunca dentro de la identidad de D. **`batch_size` es

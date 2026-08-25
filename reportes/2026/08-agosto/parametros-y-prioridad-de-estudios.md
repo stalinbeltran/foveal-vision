@@ -23,10 +23,10 @@ Si no eres experto, estas cuatro reglas del proyecto explican por qué la column
    de épocas corta a todos los runs, se midió *velocidad de convergencia*, no *calidad*. Eso
    invalidó los tres estudios de `batch_size` de julio — [plan-tres-ejes.md](../../../docs/plan-tres-ejes.md) §2.1.
 3. **Un óptimo pegado al borde del rango no es un óptimo**, es el final de la regla: no se sabe si
-   más allá sigue subiendo. Por eso `d` y `batch_size` siguen «abiertos por la derecha».
+   más allá sigue subiendo. Por eso `border_px` y `batch_size` siguen «abiertos por la derecha».
 4. **El f1 de ventana es un *proxy*.** Lo que de verdad importa es reconstruir el párrafo entero en
    la imagen (`paragraph_f1`). Están correlacionados (+0,956 en ejes de entrenamiento, +1,000 en el
-   eje `d`), pero **el proxy exagera**: en `n_layers` la ganancia real fue la mitad —
+   eje del borde), pero **el proxy exagera**: en `n_layers` la ganancia real fue la mitad —
    [metrica-de-tarea.md](../../../docs/metrica-de-tarea.md).
 
 **Un dato de coste para calibrar todo lo que sigue:** con el reparto en flota medido el 2026-08-25,
@@ -40,19 +40,35 @@ O sea ≈ **0,054 $ por run**. Un estudio típico (4 valores × 5 semillas = 20 
 
 Definen **la forma del modelo y de lo que ve**. Cambiar uno cambia la red: hay que reentrenar.
 
-Vigentes: foveada `ws20-c0.8-d2-L4` (≈**167.852** parámetros) · plana `plana-24-single`
+Vigentes: foveada `ws16-p2-d2-L4` (≈**167.852** parámetros) · plana `plana-24-single`
 (≈**165.430**, elegida a propósito para que ambas tengan el mismo tamaño).
+
+> ⚠ **Actualizado el 2026-08-25 por la reparametrización de la geometría** (decisión C14). Los
+> parámetros de forma **se llaman distinto y se declaran en píxeles reales**; ninguna red cambió.
+> La tabla de abajo ya usa los nombres nuevos, y cada fila dice cómo se traducía. La traducción
+> completa está en [instructionsNewNN.md](../../../instructionsNewNN.md) §2.1.
+>
+> | Antes | Ahora | |
+> |---|---|---|
+> | `N` | — | **derivado** (`fovea_px + 2·border_px/border_reduce`) |
+> | `c_frac` | — | derivado; la fóvea se declara directa |
+> | (implícito) | **`fovea_px`** | la ventana etiquetada de B |
+> | `periph_out·d` | **`border_px`** | cuánto contexto, en px reales |
+> | `d` | **`border_reduce`** | sólo *cómo* se comprime ese contexto |
+> | `pen_frac` | **`overlap_fovea_px`** | en px, y ya puede ser 0 |
+> | — | **`overlap_border_px`** | **nuevo**: la fóvea sobre el borde |
 
 | Parámetro | Qué es, en cristiano | Foveada | Plana | ¿Barrido con 5 semillas? | Qué se sabe |
 |---|---|---|---|---|---|
-| **`N`** | Lado, en píxeles, del tensor cuadrado que entra en la red. La imagen se recorre con una ventana y cada ventana se convierte en un cuadrado de N×N. | 20 | 24 | **No, y no es barrible** | Está atado por el contrato ①a al tamaño de ventana del dataset. Se **deriva**, no se barre: la puerta lo rechaza (`axis_breaks_window_size`, [spec.py:31](../../../src/fv/sweeps/spec.py#L31)). Para cambiarlo hay que regenerar el dataset. |
-| **`c_frac`** | Qué fracción de ese cuadrado es **fóvea** (la parte a resolución completa, donde se etiquetan las esquinas). El resto es periferia. | 0,8 → fóvea 16 px | 0,667 → fóvea 16 px | **No, y no es barrible** | Igual que `N`: juntos fijan que la fóvea mida exactamente la ventana etiquetada (16 px). |
-| **`d`** | Cuánto **comprime la periferia**. `d=2` significa que cada píxel del anillo exterior resume un bloque 2×2 del original: se ve **más área** por el mismo coste, pero borrosa. Es la idea central de la visión foveada. | **2** | 1 (n/a) | **Sí, dos veces** — `proxy-c-d` (6×5, red L2) y `d5-L4` (4×5, red vigente) | ⚠ **ABIERTO POR LA DERECHA.** El eje **sube de forma monótona**: 1 → 0,9310 · 2 → 0,9341 · 3 → 0,9362 · **4 → 0,9408**, y `d=4` es además **el más barato** (39,8 s/época contra 46,6). El ganador es el extremo del rango, con p = 0,063 contra el vigente. [plan-tres-ejes.md](../../../docs/plan-tres-ejes.md) §7.3 reconoce que recortar el rango a `[1..4]` fue un error de diseño. |
-| **`pen_frac`** | Anchura de la **banda de penetración**: la franja donde la rama central y la periférica se solapan y ambas aportan. Con 0,1 son 2 px en N=20. Es el «pegamento» entre las dos vistas. | 0,1 | 0,1 (n/a) | **NUNCA** | Sin medir jamás, ni con una semilla. Es un mando **propio de esta arquitectura**: si el solape importa, aquí se vería. |
+| **`fovea_px`** | El lado, en píxeles, de la **fóvea**: la parte a resolución completa, que es exactamente la ventana etiquetada donde se predicen las esquinas. | 16 | 16 | **No, y no es barrible** | Atada por el contrato ①a al `window_size` del dataset. Se **toma** de B, no se barre: la puerta lo rechaza (`axis_breaks_window_size`). Para cambiarla hay que regenerar el dataset. *(Antes esto lo fijaban `N` y `c_frac` entre los dos, y por eso ninguno de los dos podía ser eje.)* |
+| **`border_px`** | Cuántos píxeles **reales** de contexto ve la red alrededor de la fóvea, por lado. Es «cuánto mira de reojo». El recorte real es `16 + 2·border_px`. | **4** | 4 (`single`) | **Sí, dos veces, pero mezclado** — ver la nota ⚠ de abajo | ⚠ **ABIERTO POR LA DERECHA, y es el hallazgo que la reparametrización deja a la vista.** Los recorridos `proxy-c-d` y `d5-L4` barrían `d`, que con `N` fijo movía **`border_px` y `border_reduce` a la vez**: eran los puntos `border_px` = 2, 4, 6, 8 px con el anillo siempre en **2 celdas** — es decir, **más área con el mismo `N` y los mismos parámetros**. Y sube monótono: 2 px → 0,9310 · 4 px → 0,9341 · 6 px → 0,9362 · **8 px → 0,9408** (p = 0,063 contra el vigente), con el punto más ancho además **el más barato** (39,8 s/época contra 46,6). O sea: **ensanchar el borde a coste constante estaba ganando cuando se cortó el rango**. |
+| **`border_reduce`** | Cuántos píxeles reales se condensan en **una celda** del anillo. Con `border_px` fijo, subirlo **abarata** (menos celdas, `N` menor) a cambio de ver el contexto más borroso. Es la idea central de la visión foveada, ahora aislada de «cuánto contexto». | **2** | 1 (n/a) | **NUNCA por separado** | Nunca se ha medido con `border_px` fijo, que es la pregunta *«a igual área, ¿ayuda verla con más resolución?»*. Todo lo medido lo movía junto al área (fila anterior). ⚠ Es el mando **de coste**: la cabeza es el 97 % de los parámetros y crece con `N²`. |
+| **`overlap_fovea_px`** | Cuántos píxeles **de la fóvea** ve *también* la rama del borde: la franja donde las dos ramas se solapan y ambas aportan. Es el «pegamento» entre las dos vistas. | **2** | n/a | **NUNCA** | Sin medir jamás, ni con una semilla. Es un mando **propio de esta arquitectura**: si el solape importa, aquí se vería. **Novedad**: ahora admite **0**, que hace las dos ramas disjuntas — el control de la elección de solape contributivo. Antes tenía suelo de 1 px y ese control no era expresable. |
+| **`overlap_border_px`** | El simétrico: cuántos píxeles **del borde** ve *también* la rama de la fóvea. | **0** | n/a | **NUNCA (no existía)** | Grado de libertad **nuevo** (2026-08-25). Hasta ahora el solape sólo iba hacia dentro: que la fóvea saliera sobre el borde no se podía ni escribir. Con el borde vigente de 4 px y `border_reduce`=2 sólo admite `{0, 2}`; para barrerlo en serio hay que ensanchar el borde primero. |
 | **`n_layers`** | Cuántas capas convolucionales tiene cada rama. Más capas = **campo receptivo mayor** (cada neurona final «ve» más contexto), no más capacidad: el 97 % de los parámetros está en la cabeza final. | **4** | **4** | **Sí, cuatro veces** — `p40-confirm-n_layers`, `nl5-L4` (foveada); `plana-confirm-s0`, `plana-screen-s0` (plana) | **CERRADO por los dos lados.** Gana 4: 2 → 0,9066 (p = 0,008) · 3 → 0,9246 (p = 0,040) · **4 → 0,9341** · 5 → 0,9136. ⚠ **A partir de 5 el entrenamiento a veces no arranca**: `sem` 7× mayor y semillas bimodales (0,8585 … 0,9415). En la plana pasa lo mismo, y con L5/L6 hubo semillas con f1 exactamente 0,0000 ([plan-plana.md](../../../docs/plan-plana.md) §6.1). Para pasar de 4 haría falta cambiar la arquitectura (residuales, otra inicialización), no el número. |
 | **`channels`** | Cuántos **filtros** (detectores de patrón) aprende cada capa. Es la «anchura» de la red, frente a `n_layers`, que es la «profundidad». | [16,16,16,16] | [22,22,22,22] | **NO** (sólo 1 semilla, en `p40-screen-width`, borrado) | Con 1 semilla, doblar canales dio **+0,0046** — dentro del ruido — con **2× parámetros y más coste** ([plan-40h.md](../../../docs/plan-40h.md) §2). Indicio de que la anchura no es el cuello de botella, **pero no es un estudio**. Los 22 canales de la plana no son un óptimo: se eligieron para igualar parámetros con la foveada. |
 | **`k_center`** | Tamaño del **kernel** (la ventanita que barre la imagen) en la rama central. 3 = mira 3×3 píxeles a la vez. | 3 | 3 | **NO** (1 semilla) | ⚠ El dato de 1 semilla es **contradictorio, y por eso interesante**: `k_center=5` fue **el peor por f1 de ventana** (−0,0063) y a la vez **el mejor de los cuatro por métrica de tarea** (0,7594). Candidato barato si se vuelve a mirar estructura ([plan-40h.md](../../../docs/plan-40h.md) §8). |
-| **`k_periph`** | Lo mismo en la rama periférica. Como la periferia está comprimida, un kernel de 3 abarca ahí `3·d` píxeles originales. | 3 | n/a | **NO** (1 semilla, recorrido borrado) | Sin evidencia utilizable. |
+| **`k_periph`** | Lo mismo en la rama periférica. Como el borde está comprimido, un kernel de 3 abarca ahí `3·border_reduce` píxeles originales. | 3 | n/a | **NO** (1 semilla, recorrido borrado) | Sin evidencia utilizable. |
 | **`s_center`** | **Paso** (stride) del kernel central: cada cuántos píxeles se aplica. Subirlo **reduce el coste** y la resolución de salida. Sólo actúa en la primera capa (D-S1). | 1 | 1 | **NO** (1 semilla, borrado) | Es el mando de **coste**, no tanto de calidad. Sin medir con semillas. |
 | **`s_periph`** | Ídem en la periferia. | 1 | n/a | **NO** (1 semilla, borrado) | ⚠ Con `merge: sum` los dos strides deben ser iguales (`merge_sum_needs_equal_strides`). |
 | **`merge`** | Cómo se juntan las dos ramas: `concat` las pega una detrás de otra (más parámetros en la cabeza), `sum` las suma píxel a píxel (exige la misma forma). | concat | n/a | **NUNCA** | Elección discreta de 2 valores, nunca medida. Barata de probar (2 valores × 5 semillas = 10 runs). |
@@ -175,7 +191,7 @@ otra pregunta)**. Los costes son extrapolaciones de los 0,054 $/run medidos el 2
 
 | # | Estudio | Coste | Por qué es lo primero |
 |---|---|---|---|
-| **1** | **`d ∈ [4,5,6]`, 5 semillas** (foveada) | 15 runs · ≈0,8 $ · ~1 h | El único eje con **evidencia directa sin cerrar**: sube monótono, el ganador está en el borde (p = 0,063) y `d=4` es **además el más barato**. Y no es un ajuste cualquiera: `d` **es la variable que define la visión foveada**. Si sube hasta 6, la tesis del proyecto se refuerza; si cae, queda acotada. [plan-tres-ejes.md](../../../docs/plan-tres-ejes.md) §7.3 ya lo dejó escrito como *«la pregunta abierta y la única accionable»*. |
+| **1** | **Ensanchar el borde a coste constante: `border_px ∈ [8, 10, 12, 16]` con el anillo fijo en 2 celdas** (`border_reduce` = `border_px`/2), 5 semillas | 20 runs · ≈1,1 $ · ~1–2 h | El único eje con **evidencia directa sin cerrar**: es la continuación exacta de la serie que midieron `proxy-c-d` y `d5-L4` (2, 4, 6, **8** px), que sube monótona y se cortó con el ganador en el borde (p = 0,063) y **siendo el punto más barato**. Como el anillo se queda en 2 celdas, `N` no se mueve: **mismos parámetros, mismo coste, más contexto**. Y no es un ajuste cualquiera: es *cuánto mira de reojo* la red, la variable que define la visión foveada. ⚠ **Tope**: a 16 px el recorte es 48×48 sobre imágenes de 60×80 y **el 26 % del anillo ya es relleno replicado** — más allá se mide el `pad_mode`, no la imagen ([instructionsNewNN.md](../../../instructionsNewNN.md) §2.2). Rango pensado para parar justo antes. |
 | **2** | **Terminar el afinado de la plana**: `pl-t-bs` (los 7 runs que faltan), `pl-t-nl` (10) y la **fase 2 con 5 semillas** | ≈45 runs · ≈2,5 $ | **Bloquea la pregunta central del proyecto.** Comparar la foveada afinada contra una plana sin afinar mediría el afinado, no la arquitectura ([plan-cnn-plana.md](../../../docs/plan-cnn-plana.md) §6). Ya está a medias. |
 | **3** | **Foveada vs plana por métrica de tarea**, 5 semillas, permutación exacta | 0 entrenamientos nuevos si se reusan los runs de (2) | **Es la pregunta que da nombre al proyecto** ([protocolo.md](../../../docs/protocolo.md) §6) y sigue sin contestar. Todo lo demás es afinar sin saber si la arquitectura gana. |
 | **4** | **Aplicar (o rechazar) los knobs de F** | **0 $, minutos** | +0,065 a +0,261 de métrica de tarea **con los pesos que ya hay**. Es la mayor ganancia por euro del inventario. ⚠ Requiere **decisión del usuario (F15)**, porque re-escala todos los números publicados, y hay que sopesar que comprime la separación entre modelos. |
@@ -189,19 +205,21 @@ otra pregunta)**. Los costes son extrapolaciones de los 0,054 $/run medidos el 2
 | **7** | **`scheduler: cosine`** vs `none`, 5 semillas | 10 runs · ≈0,6 $ | Mejora esperable a priori y nunca medida. ⚠ Hay que diseñar con cuidado su interacción con `patience`. |
 | **8** | **`channels` (anchura)** ∈ {8, 16, 24, 32}, 5 semillas | 20 runs · ≈1,1 $ | El indicio de 1 semilla dice que no aporta, pero **es un indicio, no un estudio**, y se tomó sobre L2 con 20 épocas. Además puede ir **hacia abajo**: si 8 canales empatan, la red es la mitad de cara. |
 | **9** | **`k_center`** ∈ {3, 5, 7}, 5 semillas, **con métrica de tarea** | 15 runs · ≈0,8 $ | El único parámetro donde proxy y tarea se **contradicen en el signo** con la evidencia que hay. Barato y potencialmente revelador sobre el propio proxy. |
-| **10** | **`pen_frac`** ∈ {0,05, 0,1, 0,2}, 5 semillas | 15 runs · ≈0,8 $ | Mando **exclusivo de esta arquitectura** —cuánto se solapan las dos vistas— y nunca mirado. La periferia ya salió una vez «sin aportar de forma medible»; esto dice si el problema es *cómo se cosen*, no *cuánta* hay. |
+| **10** | **`overlap_fovea_px`** ∈ {0, 1, 2, 4}, 5 semillas | 20 runs · ≈1,1 $ | Mando **exclusivo de esta arquitectura** —cuánto se solapan las dos vistas— y nunca mirado. La periferia ya salió una vez «sin aportar de forma medible»; esto dice si el problema es *cómo se cosen*, no *cuánta* hay. ⚠ **El 0 es el punto que más dice**: hace las dos ramas **disjuntas**, o sea es el control de la elección de solape contributivo de la spec §7 — y hasta la reparametrización de 2026-08-25 **no se podía ni escribir** (el suelo era 1 px). |
+| **10 bis** | **`border_reduce` con `border_px` fijo**, 5 semillas | ≈15 runs · ≈0,8 $ | La otra mitad de la pregunta del borde, que nunca se ha aislado: *a igual área de contexto, ¿ayuda verla con más resolución?*. Con `border_px`=8: `border_reduce` ∈ {4, 2, 1} da anillos de 2, 4 y 8 celdas (N = 20, 24, 32). ⚠ **No es cost-neutral**: la cabeza crece con N² (+44 % y +156 % de parámetros). Hay que escribirlo en el plan o el confound se lee como señal. Va después del (1) porque conviene fijar primero **cuánta** área conviene. |
 
 ### Prioridad 3 — completar el mapa, sin prisa
 
 | # | Estudio | Por qué está abajo |
 |---|---|---|
-| **11** | `merge` (concat / sum), `pool_mode` (avg / max) | 10 runs cada uno. Elecciones discretas nunca medidas; `pool_mode` gana interés **sólo si `d` sube** (comprimir más hace que importe más cómo se resume). |
+| **11** | `merge` (concat / sum), `pool_mode` (avg / max) | 10 runs cada uno. Elecciones discretas nunca medidas; `pool_mode` gana interés **sólo si `border_reduce` sube** (comprimir más hace que importe más cómo se resume) — y en el estudio (1) sube hasta 8. |
+| **11 bis** | `overlap_border_px` | Grado de libertad nuevo y nunca medido, pero con el borde vigente de 4 px **sólo admite dos valores** (0 y 2). Sólo es un estudio de verdad **después** de ensanchar el borde en (1). |
 | **12** | `s_center` / `s_periph` | Son mandos de **coste**, no de calidad. Interesan si algún día el reloj aprieta. |
 | **13** | `weight_decay`, `optimizer`, `smooth_l1_beta`, `lambda_pos` | Sin indicio de que sean el problema. `optimizer` está casi vacío hoy (con `weight_decay=0`, adam ≡ adamw). |
 | **14** | `patience`, `epochs` | No son calidad: son **criterio de parada y guarda**. Ya están en valores seguros medidos. |
 | **15** | `pad_mode` | Afecta sólo a las ventanas de borde. |
 | **16** | Re-medir **`lr`** sobre el dataset del 24-ago | Cerrado por los dos lados, pero sobre el dato anterior — y el dato nuevo movió la escala +0,0095. Es una **replicación**, no un descubrimiento. |
-| **17** | `N` / `c_frac` | **No son barribles**: cambiarlos exige regenerar el dataset de ventanas. Es un estudio de otro tipo (¿qué tamaño de ventana conviene?), no un eje. |
+| **17** | `fovea_px` | **No es barrible**: cambiarla exige regenerar el dataset de ventanas. Es un estudio de otro tipo (¿qué tamaño de ventana conviene?), no un eje. |
 
 ### Lo que este informe recomienda **no** hacer
 
@@ -218,12 +236,14 @@ otra pregunta)**. Los costes son extrapolaciones de los 0,054 $/run medidos el 2
 
 - **Barridos y cerrados:** `lr` (foveada, por los dos lados) y `n_layers` (por los dos lados, en las
   dos arquitecturas).
-- **Barridos y abiertos por un lado:** **`d`** (sube hacia la derecha — *lo más accionable que hay*)
-  y `batch_size` (el tanteo de hoy sugiere que ya se cierra por arriba; falta confirmarlo).
+- **Barridos y abiertos por un lado:** **`border_px`** (sube hacia la derecha, y a coste constante
+  — *lo más accionable que hay*) y `batch_size` (el tanteo de hoy sugiere que ya se cierra por
+  arriba; falta confirmarlo).
 - **Medidos con 1 semilla, o sea sin medir:** `channels`, `k_center`, `k_periph`, `s_center`,
   `s_periph`.
-- **Nunca tocados:** `pen_frac`, `merge`, `pool_mode`, `pad_mode`, `weight_decay`, `scheduler`,
-  `optimizer`, `momentum`, `patience`, `lambda_pos`, `pos_weight`, `smooth_l1_beta`, `monitor`.
-- **No barribles por diseño:** `N` y `c_frac` (los fija el dataset).
+- **Nunca tocados:** `overlap_fovea_px`, `overlap_border_px`, `border_reduce` *aislado*, `merge`,
+  `pool_mode`, `pad_mode`, `weight_decay`, `scheduler`, `optimizer`, `momentum`, `patience`,
+  `lambda_pos`, `pos_weight`, `smooth_l1_beta`, `monitor`.
+- **No barrible por diseño:** `fovea_px` (la fija el dataset). `N` ya no es un parámetro: se deriva.
 - **Gratis y sin aplicar:** los tres knobs de inferencia, con +0,065 a +0,261 medidos.
 - **Sin contestar:** la pregunta del proyecto — **¿gana la foveada a la CNN plana?**

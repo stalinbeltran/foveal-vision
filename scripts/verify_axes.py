@@ -117,7 +117,7 @@ def main() -> int:
     print(f"dataset: {args.dataset}  (store temporal: {tmp})\n")
     failures = 0
 
-    print("== ejes REHUSADOS (rompen center_out==window_size) ==")
+    print("== ejes REHUSADOS (la fovea, y la ortografia anterior a 2026-08-25) ==")
     for r in _assert_refusals(args.dataset):
         mark = "OK " if r["ok"] else "XX "
         failures += 0 if r["ok"] else 1

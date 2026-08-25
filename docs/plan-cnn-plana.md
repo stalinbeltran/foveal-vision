@@ -1,5 +1,14 @@
 # La CNN plana contra la foveada — el criterio, escrito antes de medir
 
+> ⚠ **Geometría: este documento usa la ortografía anterior al 2026-08-25.** `N`, `c_frac`,
+> `d` y `pen_frac` fueron reemplazados por longitudes en px reales (`fovea_px`, `border_px`,
+> `border_reduce`, `overlap_fovea_px`, `overlap_border_px`). **Ninguna red cambió** — es un
+> cambio de nombre, verificado bit a bit — así que **todos los números de aquí siguen siendo
+> válidos**. La traducción está en [instructionsNewNN.md](../instructionsNewNN.md) §2.1.
+> Ojo con uno: **`d` cambió de significado**, no sólo de nombre. Antes agrandaba el contexto
+> (`borde = celdas·d`); hoy `border_reduce` sólo dice cuánto se comprime un borde de tamaño
+> fijo. Un eje `d` de aquella época medía **área y compresión a la vez**.
+
 **Estado: el criterio y el código. Ni un run entrenado todavía.**
 Este documento cierra la decisión **F12** de [decisiones.md](decisiones.md) y construye el control
 que el **§6 de [protocolo.md](protocolo.md)** lleva pidiendo desde el día 1: *¿la periferia foveada

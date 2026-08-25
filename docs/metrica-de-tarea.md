@@ -104,6 +104,14 @@ convierte en código de primera clase y §5 lo repite sobre un eje de C.
 `val_loss` · **knobs de F por defecto** (los mismos que §2, a propósito: si no, las dos
 correlaciones no serían comparables — ver §9.2 y F15).
 
+> ⚠ **Traducción a la geometría de 2026-08-25 (léase antes de citar esto).** El eje se llamaba `d`
+> y, con `N` fijo, movía **dos cosas a la vez**: el contexto real (`border_px = 2·d`) y la
+> compresión (`border_reduce = d`), dejando el anillo siempre en **2 celdas**. En la ortografía de
+> hoy, lo que esta tabla midió es **`border_px` = 2, 4, 6, 8, 10, 12 px a `N` constante** — es
+> decir, *más área con el mismo coste*, no *más compresión*. La pregunta simétrica —*a igual área,
+> ¿ayuda verla con más resolución?*— **no la mide nadie todavía**: exigiría fijar `border_px` y
+> mover `border_reduce`, y eso sí cambia `N` y el número de parámetros.
+
 | `d` | ventana (f1) | sem entre semillas | **tarea** (macro F1) | periferia real | entrada | s/época |
 |---|---|---|---|---|---|---|
 | 1 | 0,6213 | 0,0219 | 0,5421 | 2 px | 20 | 7,2 |
@@ -155,6 +163,12 @@ exactamente el mando del contexto periférico: de `d=1` (2 px de periferia real)
   media de 5 semillas (±0,0403). Y `d = 5` rompe la tendencia (0,5342, por encima de `d=4` y
   `d=6`), que es justo el aspecto que tiene el ruido de 1,4 SE. **No se puede afirmar «la periferia
   estorba»; sí se puede afirmar «la periferia no está ayudando de forma medible».**
+
+> ⚠ **Matiz de 2026-08-25, y no menor.** Este párrafo se escribió con `d` como «el mando del
+> contexto». Con la ortografía nueva se ve que el mando movía área *y* compresión juntas, y que
+> **el recorrido `d5-L4` (24-ago, dataset nuevo, red L4) sale al revés**: el eje sube monótono
+> hasta el extremo del rango. O sea que «la periferia no aporta» vale para *aquel* dataset y
+> *aquella* red (L2, 20 épocas), **no como afirmación del proyecto**. Cítese con las dos fechas.
 
 **Qué se hace con esto:** protocolo.md §6 y F12 preguntan si fóvea+periferia gana a una CNN plana
 equivalente. Este recorrido dice que, **en este dataset y con esta geometría, el margen que ese
