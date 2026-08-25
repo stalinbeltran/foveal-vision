@@ -235,6 +235,15 @@ GASTO: list = []
 # numeros.
 DESTINOS: dict = {}
 
+# Cuando se alquilo la ultima maquina. Los alquileres se ESCALONAN, y no es un
+# capricho: el desfase de la API que describe `resolver_destino` afecta a las
+# instancias que nacen a la vez. MEDIDO el 2026-08-25: pidiendo 25 maquinas en el
+# mismo segundo salieron 16 colisiones y solo 11 llegaron a estar listas; el
+# 2026-08-24, pidiendo 10, salieron 7 colisiones pero ninguna maquina perdida.
+# Separarlas unos segundos cuesta nada -- el peaje por maquina son ~4 min -- y le
+# da al catalogo tiempo de publicar cada puerto antes de que se pida el siguiente.
+ULTIMO_ALQUILER: list = [0.0]
+
 _impresion = threading.Lock()
 _registro = threading.Lock()      # bloquear_maquina lee-modifica-escribe un fichero
 _reparto = threading.Lock()
@@ -660,7 +669,8 @@ class Maquinas:
     """
 
     def __init__(self, cuantas: int, repuestos: int, cpus: int, max_cpus: int,
-                 min_ram: float, max_price: float, cpu: str = ""):
+                 min_ram: float, max_price: float, cpu: str = "",
+                 sin_cpu: str = ""):
         # Nunca alquilar una maquina que YA estoy usando. Sin esto, dos flotas a
         # la vez -- un estudio corriendo y otro que se lanza -- eligen ambas por
         # precio, o sea que eligen las MISMAS ofertas, y la segunda se encuentra
@@ -677,6 +687,20 @@ class Maquinas:
             cuantas + repuestos + margen, cpus=cpus, max_cpus=max_cpus,
             min_ram_gb=min_ram, max_price=max_price, cpu=cpu)
         self.pool = [o for o in ofertas if int(o.get("machine_id", -1)) not in en_uso]
+        # `--cpu` es una SUBCADENA y no puede excluir: "E5-26" deja pasar las v2
+        # (Ivy Bridge), que NO tienen AVX2 -- plan-lr-alto §7.6 lo dejo escrito
+        # como el agujero del filtro, y el 2026-08-25 el catalogo entrego una
+        # E5-2697 v2 que ademas fue la mas lenta de la cohorte (50 ms/paso contra
+        # 24 de una v4). Para lo que decide hace falta poder decir que NO.
+        if sin_cpu:
+            fuera = [t.strip().lower() for t in sin_cpu.split(",") if t.strip()]
+            antes = len(self.pool)
+            self.pool = [o for o in self.pool
+                         if not any(t in (o.get("cpu_name") or "").lower()
+                                    for t in fuera)]
+            if antes != len(self.pool):
+                log(f"  ({antes - len(self.pool)} ofertas saltadas por CPU excluida "
+                    f"'{sin_cpu}')")
         if en_uso:
             log(f"  ({len(ofertas) - len(self.pool)} ofertas saltadas por estar YA "
                 f"alquiladas por mi: {sorted(en_uso)})")
@@ -753,6 +777,15 @@ class Maquina:
                 f"    python3 {LANZADOR}/scripts/vast_instance.py destroy {self.iid} --yes")
 
 
+def escalonar(separacion_s: float = 4.0) -> None:
+    """No alquilar dos maquinas en el mismo instante. Ver ULTIMO_ALQUILER."""
+    with _reparto:
+        espera = ULTIMO_ALQUILER[0] + separacion_s - time.time()
+        ULTIMO_ALQUILER[0] = max(time.time(), ULTIMO_ALQUILER[0] + separacion_s)
+    if espera > 0:
+        time.sleep(espera)
+
+
 def preparar(oferta: dict, payload: Path, etiqueta: str, hilos: int, disco_gb: float,
              sonda_sweep: str, sonda_punto: int, sonda_pasos: int) -> Maquina:
     """Alquila, sube, instala y CRONOMETRA. Lanza si algo de eso falla.
@@ -769,6 +802,7 @@ def preparar(oferta: dict, payload: Path, etiqueta: str, hilos: int, disco_gb: f
         f"{maquina['vcpu']:g} vCPU {maquina['ram_gb']:g} GB "
         f"{float(oferta.get('dph_total') or 0):.4f} $/h {maquina['ubicacion']} "
         f"· {maquina.get('cpu') or '?'}")
+    escalonar()
     t0 = time.time()
     iid = V.alquilar(oferta, f"estudio-{etiqueta}", V.cfg("VAST_IMAGE"), disco_gb)
     log(f"[{etiqueta}] instancia {iid} alquilada")
@@ -1316,6 +1350,12 @@ def main() -> int:
                          "familia (hasta 0,0457 en f1). Fijarla convierte el ruido "
                          "de maquina en cero -- ver docs/plan-lr-alto.md §7.4. "
                          "Ademas es lo que hace SEGURA la criba de velocidad")
+    ap.add_argument("--sin-cpu", default="",
+                    help="excluye estas CPU (subcadenas separadas por coma, p.ej. "
+                         "'v2'). `--cpu` es una subcadena y NO puede excluir: "
+                         "'E5-26' deja pasar las v2 (Ivy Bridge, sin AVX2), que "
+                         "por el razonamiento de plan-lr-alto §7.4 deberian "
+                         "divergir del resto de la familia")
     ap.add_argument("--max-price", type=float, default=None, metavar="USD_HORA")
     ap.add_argument("--disk", type=float, default=16.0, metavar="GB")
     ap.add_argument("--hilos", type=int, default=8,
@@ -1393,7 +1433,7 @@ def main() -> int:
             "La eleccion deja de ser inocua para el resultado. Usa --cpu 'E5-26'.")
     tope = args.max_price or V.limite_precio()
     pool = Maquinas(cuantas, args.repuestos, args.cpus, args.max_cpus,
-                    args.min_ram, tope, args.cpu)
+                    args.min_ram, tope, args.cpu, args.sin_cpu)
     log(f"\n{len(pool.pool)} maquinas DISTINTAS disponibles "
         f"({len(lotes)} a usar + {args.criba} de criba + "
         f"{len(pool.pool) - cuantas} de repuesto):")
