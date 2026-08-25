@@ -8,8 +8,15 @@ independientes por región** que se **suman** en las zonas de solape.
 
 **Principio rector:** *todo dato es un parámetro*. Nada está hardcodeado a
 20×20 ni a downsample=2. Las dimensiones concretas y los **rangos de búsqueda**
-(kernels, strides, downsample) se **calculan** en función de un lado de entrada
-`N` y unas pocas fracciones. Cambiar `N` recalcula todo automáticamente.
+(kernels, strides, reducción del borde) se **calculan** a partir de unas pocas
+longitudes en **píxeles reales de la imagen**.
+
+> ⚠ **2026-08-25 — reparametrización.** Este documento decía «se calculan en
+> función de un lado de entrada `N` y unas pocas fracciones». Ya no: **`N` se
+> deriva**, y lo que se declara son longitudes. El porqué está en §2.1. **Ninguna
+> red cambia**: es un cambio de ortografía, verificado bit a bit — un checkpoint
+> guardado con la ortografía vieja carga `strict=True` en una red construida con
+> la nueva y las dos dan la misma salida.
 
 ---
 
@@ -36,40 +43,104 @@ entorno. Dos objetivos combinados, que son **etapas separadas**:
 
 ## 2. Parámetros fundamentales (todo lo demás se deriva)
 
-Estos son los únicos grados de libertad reales. Antes eran constantes; ahora
-todo sale de aquí:
+Estos son los únicos grados de libertad reales, y **todos son longitudes en
+píxeles de la imagen original** salvo `border_reduce`, que pertenece al *método*
+de reducción y no es una longitud:
 
 ```python
-N          # lado de la entrada compuesta que consume la NN (antes 20)
-c_frac     # fracción del input que ocupa el centro (antes 16/20 = 0.8)
-d          # factor de downsampling de la periferia (antes 2)
-pen_frac   # fracción de penetración hacia el centro (antes 2/20 = 0.1)
-n_layers   # nº de capas conv por rama (para acotar strides; antes 2)
+fovea_px           # lado de la fovea. ES la ventana etiquetada de B (contrato (1)a)
+border_px          # grosor del borde difuso, por lado, en px REALES
+border_reduce      # px reales que se condensan en UNA celda de borde (antes `d`)
+overlap_fovea_px   # px de FOVEA que ve tambien la rama del borde
+overlap_border_px  # px de BORDE que ve tambien la rama de la fovea
+n_layers           # n de capas conv por rama (para acotar strides; antes 2)
 ```
 
-Dimensiones derivadas (con paridad controlada):
+Dimensiones derivadas:
 
 ```python
-center_out    = round_to_even(N * c_frac)       # centro en el input
-periph_out    = (N - center_out) // 2           # grosor del anillo en el input
-penetration   = max(1, round(N * pen_frac))     # filas/cols compartidas
-periph_band   = periph_out + penetration        # banda útil del kernel externo
-periph_real   = periph_out * d                  # ← ANTES fijo en 4; ahora = periph_out·d
-original_size = center_out + 2 * periph_real     # imagen original necesaria
+border_cells         = border_px // border_reduce      # celdas de anillo, por lado
+N                    = fovea_px + 2 * border_cells     # <- DERIVADO: la entrada de la NN
+overlap_border_cells = overlap_border_px // border_reduce
+center_band          = fovea_px + 2 * overlap_border_cells   # banda del kernel central
+periph_band          = border_cells + overlap_fovea_px       # banda del kernel externo
+original_size        = fovea_px + 2 * border_px        # imagen original necesaria
 ```
-
-**Punto clave:** `periph_real` ya **no** es 4. "Cuánto ve la periferia" es
-`periph_out · d`, producto de dos parámetros buscables. Si `periph_out=2` y
-querés que vean 6px reales, subís `d=3`. Para "ven entre 5 y 9 px": con
-`periph_out=2` → `d∈[3,4]` (dan 6 y 8); con `periph_out=1` → `d∈[5,9]`.
 
 Validaciones de consistencia obligatorias:
 
 ```python
-assert center_out % 2 == 0                       # anillo reparte simétrico
-assert 2 * periph_out + center_out == N
-assert penetration < center_out // 2             # el núcleo no desaparece
+assert fovea_px % 2 == 0                        # el borde reparte simetrico
+assert border_px % border_reduce == 0           # el borde cae en celdas enteras
+assert overlap_border_px % border_reduce == 0   # el solape, tambien
+assert overlap_fovea_px < fovea_px // 2         # el nucleo de la fovea no desaparece
+assert overlap_border_px < border_px            # el borde exclusivo tampoco
 ```
+
+### 2.1 Por qué se declara así (y no con `N` y fracciones)
+
+La ortografía anterior era `N`, `c_frac`, `d`, `pen_frac`, y tenía tres
+problemas que se pagaban:
+
+1. **La fóvea estaba repartida entre dos números.** `center_out =
+   round_to_even(N·c_frac)`, y el contrato ①a la ata al `window_size` de B. Así
+   que **ni `N` ni `c_frac` podían ser eje** — mover cualquiera *solo* rompía
+   ①a. Para pasar de 2 a 4 celdas de anillo había que mover **los dos a la vez**,
+   y el motor es OAT (un eje cada vez): esa parte del espacio era legal pero
+   **inalcanzable por barrido**. Hoy `border_px` es un eje de primera clase.
+2. **«Cuánto contexto» y «cómo se comprime» eran el mismo mando.** El contexto
+   real era `periph_out · d`, un producto: `d` movía las dos cosas a la vez. Hoy
+   `border_px` es la longitud y `border_reduce` sólo el método, así que se pueden
+   separar dos preguntas que son experimentos distintos — *¿ayuda más área?* y
+   *¿ayuda verla con más resolución?*. Y si mañana el borde se reduce de otra
+   forma (no un promedio de bloques), **la definición del borde no se toca**:
+   cambia el método.
+3. **El solape sólo existía hacia dentro, y nunca podía ser 0.** `penetration =
+   max(1, round(N·pen_frac))` describía cuánto entra el borde en la fóvea; que la
+   fóvea saliera sobre el borde **no era expresable**, y tampoco lo era la
+   ausencia de solape. Hoy son dos parámetros independientes y barribles, y
+   `overlap_fovea_px = 0` es el **control** de la elección de solape contributivo
+   de §7.
+
+Y una consecuencia práctica: `derive_geometry` —la función que buscaba el menor
+`N` par cuya fóvea cayera exactamente en `W`, aflojando `c_frac` con una razón
+cuando no lo encontraba— **desaparece**. Existía sólo porque la geometría se
+declaraba desde el lado equivocado.
+
+### 2.2 Coste: `border_px` no es gratis, `border_reduce` casi sí
+
+`N` crece con el borde **en celdas**, y la cabeza es `Linear(2·C·N², 12)` — el
+97 % de los parámetros (medido, plan-40h §2). Con la fóvea de 16 y C=16:
+
+| `border_px` | `border_reduce` | celdas | N | params de la cabeza |
+|---:|---:|---:|---:|---:|
+| 4 (vigente) | 2 | 2 | 20 | 153.612 |
+| 8 | 4 | 2 | 20 | 153.612 |
+| 8 | 2 | 4 | 24 | 221.196 (+44 %) |
+| 16 | 2 | 8 | 32 | 393.228 (+156 %) |
+
+Es decir: **más área con la misma resolución es casi gratis** (sube
+`border_reduce` a la par que `border_px` y `N` no se mueve); **más resolución
+sobre la misma área cuesta N²**. Un estudio que barra `border_px` con
+`border_reduce` fijo mueve las dos cosas, y hay que escribirlo en el plan o el
+confound se lee como señal.
+
+Y hay un techo físico que G no conoce: `original_size = fovea_px + 2·border_px`
+tiene que caber en la imagen. Sobre las de 60×80 px de este proyecto, con ventana
+16 y stride 8, la fracción del anillo que es **relleno replicado**
+(`pad_mode: edge`) y no contexto sube así — medido:
+
+| `border_px` | recorte | % ventanas con relleno | % del anillo que es relleno |
+|---:|---:|---:|---:|
+| 4 | 24×24 | 35 % | 11,5 % |
+| 8 | 32×32 | 48 % | 15,3 % |
+| 12 | 40×40 | 72 % | 21,4 % |
+| 16 | 48×48 | 82 % | 26,4 % |
+| 22 | 60×60 | 100 % | 34,9 % |
+
+Pasados los ~8–12 px se mide el relleno, no la comprensión de la imagen. La
+**máscara de cobertura** que devuelve `build_view` es exactamente lo que lo
+cuantifica, celda por celda.
 
 ---
 
@@ -87,8 +158,8 @@ def kernel_range(region_size):
         k_max -= 1                    # forzar impar
     return [k for k in range(3, max(3, k_max) + 1, 2)]
 
-# centro=16 → [3,5,7];  centro=32 (N=40) → [3,5,7,9,11,13,15]
-k_center_options = kernel_range(center_out)
+# centro=16 → [3,5,7];  centro=32 → [3,5,7,9,11,13,15]
+k_center_options = kernel_range(center_band)   # la fovea + lo que sale sobre el borde
 k_periph_options = kernel_range(periph_band)   # banda fina → [3] o [3,5]
 ```
 
@@ -104,7 +175,7 @@ def stride_range(region_size, n_layers=2):
     s_max = max(1, int(round(max_cumulative ** (1 / n_layers))))
     return list(range(1, s_max + 1))
 
-s_center_options = stride_range(center_out, n_layers)   # centro 16 → [1,2]
+s_center_options = stride_range(center_band, n_layers)  # centro 16 → [1,2]
 s_periph_options = stride_range(periph_band, n_layers)  # banda fina → [1]
 ```
 
@@ -118,68 +189,107 @@ padding = k // 2      # por rama; conserva 20×20 espacial con stride=1
 ```
 Fuerza `kernel_size` impar (padding entero). Un kernel par desalinea máscaras.
 
-### 3.4 Downsample (su propio rango factible)
+### 3.4 El borde y su reducción (dos rangos, no uno)
+
+Antes había un solo rango, `downsample_range`, y estaba acotado por «que la
+original no explote» — porque `d` era también el mando del área. Ya no lo es: el
+recorte real es `fovea_px + 2·border_px` y **no se mueve con la reducción**. Así
+que son dos rangos independientes:
 
 ```python
-def downsample_range(periph_out, N, max_original=None):
-    """d tal que el anillo reduzca a >=1px y la original no explote."""
-    d_min, d_max = 1, 8
-    if max_original:
-        while (periph_out * d_max * 2 + (N - 2*periph_out)) > max_original and d_max > 1:
-            d_max -= 1
-    return list(range(d_min, d_max + 1))
+def reduce_range(border_px):
+    """Los factores que un borde de este tamaño admite: sus divisores."""
+    if border_px <= 0:
+        return [1]
+    return [r for r in range(1, border_px + 1) if border_px % r == 0]
+
+def border_range(fovea_px, border_reduce=1, max_original=None):
+    """Anchos de borde (px) sobre la rejilla de celdas, con el recorte acotado.
+    max_original por defecto = 3*fovea_px (un borde tan ancho como la fovea).
+    Es una cota de BUSQUEDA: el limite duro es la imagen, y solo B sabe cuanto
+    mide."""
+    r = max(1, border_reduce)
+    cap = max_original or 3 * fovea_px
+    return [b for b in range(r, max(0, (cap - fovea_px) // 2) + 1, r)]
 ```
 
-### 3.5 Ensamblado del espacio de búsqueda
+### 3.5 Los dos solapes (uno por región)
 
 ```python
-def build_search_space(N, c_frac=0.8, pen_frac=0.1, n_layers=2):
-    center_out  = round_to_even(N * c_frac)
-    periph_out  = (N - center_out) // 2
-    penetration = max(1, round(N * pen_frac))
-    periph_band = periph_out + penetration
+def overlap_fovea_range(fovea_px):
+    """Cuanto entra la rama del borde en la fovea: 0 .. fovea/2 - 1.
+    El 0 es legal y es NUEVO: hace las dos ramas disjuntas, que es el control
+    de la eleccion de solape contributivo de la seccion 7."""
+    return list(range(0, max(1, fovea_px // 2)))
 
+def overlap_border_range(border_px, border_reduce=1):
+    """Cuanto sale la rama de la fovea sobre el borde: 0 .. border - reduce.
+    Acotado una celda antes del borde entero: espejo de la regla de la fovea,
+    la rama del borde conserva algo exclusivo."""
+    r = max(1, border_reduce)
+    return [b for b in range(0, max(0, border_px - r) + 1, r)]
+```
+
+### 3.6 Ensamblado del espacio de búsqueda
+
+```python
+def build_search_space(geom, n_layers=2, max_original=None):
+    dims = derive_dims(normalize_geometry(geom))
     return {
-        "k_center":   kernel_range(center_out),
-        "k_periph":   kernel_range(periph_band),
-        "s_center":   stride_range(center_out, n_layers),
-        "s_periph":   stride_range(periph_band, n_layers),
-        "downsample": downsample_range(periph_out, N, max_original=2*N),
+        "k_center":          kernel_range(dims.center_band),
+        "k_periph":          kernel_range(dims.periph_band),
+        "s_center":          stride_range(dims.center_band, n_layers),
+        "s_periph":          stride_range(dims.periph_band, n_layers),
+        "border_px":         border_range(dims.fovea_px, dims.border_reduce, max_original),
+        "border_reduce":     reduce_range(dims.border_px),
+        "overlap_fovea_px":  overlap_fovea_range(dims.fovea_px),
+        "overlap_border_px": overlap_border_range(dims.border_px, dims.border_reduce),
         # derivados no-buscables:
-        "_center_out": center_out,
-        "_periph_out": periph_out,
-        "_penetration": penetration,
-        "_original_size": center_out + 2 * periph_out * 1,  # ×d al elegir downsample
+        "_fovea_px": dims.fovea_px,
+        "_border_cells": dims.border_cells,
+        "_N": dims.N,
     }
 ```
 
-Un solo `N` (más las fracciones) define **todo**: dimensiones y los tres
-rangos buscables. `N=28` (MNIST), `N=32`, `N=64` → los rangos se recalculan
-solos.
+Las longitudes definen **todo**: dimensiones y los siete rangos buscables. Una
+fóvea de 28 (MNIST), 32 o 64 recalcula los rangos sola — y ahora también los
+recalcula cambiar el borde, que antes no era una pregunta que se pudiera hacer.
+
+⚠ **`k_center` sale de `center_band`, no de la fóvea.** Con
+`overlap_border_px > 0` la rama central ve más que la fóvea, y su kernel puede
+crecer con ella. Con solape 0 los dos coinciden, así que nada cambia respecto de
+lo que se midió antes.
 
 ---
 
 ## 4. Geometría del muestreo foveado (construcción de la entrada)
 
 Descomposición de la imagen original de `original_size` (ejemplo con los
-valores clásicos N=20, c_frac=0.8, d=2 → original 24×24):
+valores vigentes: fóvea 16 px, borde 4 px, `border_reduce`=2 → N=20, original
+24×24):
 
 ```
-Imagen original: original_size × original_size   (ej. 24×24)
-├── Centro center_out×center_out → se toma TAL CUAL     → ocupa center_out px centrales
-│   (px periph_real .. periph_real+center_out-1)
-└── Anillo de periph_real px     → se reduce ÷d → periph_out → ocupa el anillo del input
-    (borde de la original)
+Imagen original: original_size × original_size       (ej. 24×24)
+├── Fovea fovea_px×fovea_px  → se toma TAL CUAL      → ocupa fovea_px celdas centrales
+│   (px border_px .. border_px+fovea_px-1)
+└── Borde de border_px px    → se reduce /border_reduce
+                             → border_cells celdas   → ocupa el anillo del input
 
-Resultado: entrada compuesta N×N  →  periph_out + center_out + periph_out = N
+Resultado: entrada compuesta N×N  →  border_cells + fovea_px + border_cells = N
 ```
 
-Correspondencia de coordenadas (ejemplo N=20, original 24):
+Correspondencia de coordenadas (ejemplo: fóvea 16, borde 4 px, reduce 2 → N=20,
+original 24):
 
-| Zona           | Original (24px)   | Reducción | Input (20px)      |
-|----------------|-------------------|-----------|-------------------|
-| Anillo externo | px 0–3 / 20–23    | ÷2        | px 0–1 / 18–19    |
-| Centro         | px 4–19           | ×1        | px 2–17           |
+| Zona          | Original (24px) | Reducción | Input (20px)   |
+|---------------|-----------------|-----------|----------------|
+| Borde difuso  | px 0–3 / 20–23  | ÷2        | px 0–1 / 18–19 |
+| Fóvea         | px 4–19         | ×1        | px 2–17        |
+
+Los mismos 4 px de borde con `border_reduce=1` darían **4 celdas** por lado
+(N=24) y el mismo recorte de 24×24: **misma información, más resolución, cabeza
+más grande** (§2.2). Ésa es la separación que la ortografía nueva permite
+expresar y la vieja no.
 
 ---
 
@@ -189,6 +299,15 @@ El "**lienzo con relleno cero**" es un tensor `N×N` inicializado en ceros que
 sirve de superficie donde se "pegan" las piezas. Aquí la asignación es
 **excluyente** (cada píxel del input tiene un único origen: centro *o* borde),
 lo cual es correcto para el muestreo foveado.
+
+> ⚠ **Código de referencia del diseño original, no el implementado.** Conserva
+> los nombres viejos (`center_out`, `periph_out`, `d`) y el lienzo de ceros. La
+> implementación viva es `fv.fovea.build_foveated_input` / `build_view`: usa la
+> ortografía en px, hace el muestreo con `reduceat` (no con un doble bucle) y
+> rellena con `pad_mode: edge` en vez de ceros — un cero significa «no hay
+> tinta» y enseñaría una regla falsa (decisión C11). La traducción es directa:
+> `center_out`→`fovea_px`, `periph_out`→`border_cells`, `periph_out*d`→`border_px`,
+> `d`→`border_reduce`.
 
 ```python
 import torch
@@ -237,29 +356,43 @@ Sobre la entrada `N×N` ya construida actúan **dos ramas convolucionales
 independientes**. En la **zona de penetración ambas contribuyen y se suman**
 (no se sobrescriben). Se implementa con **máscaras solapadas**.
 
+El solape tiene **dos lados y son independientes** (reparametrización
+2026-08-25). Antes sólo existía el primero, y con suelo de 1 px:
+
+- `overlap_fovea_px` — cuánto entra la rama **del borde** hacia la fóvea.
+- `overlap_border_px` — cuánto sale la rama **de la fóvea** sobre el borde.
+
 ```
-Zonas dentro de la entrada N×N (ejemplo margin=periph_out=2, penetration=2):
-├── Anillo externo:  px 0-1 y 18-19   -> solo kernel periférico
-├── Zona compartida: px 2-3 y 16-17   -> AMBOS kernels (se suman)  ← penetración
-└── Núcleo central:  px 4-15          -> solo kernel central
+Zonas dentro de la entrada N×N
+(ejemplo: border_cells=2, overlap_fovea_px=2, overlap_border_px=0):
+├── Anillo externo:  px 0-1 y 18-19   -> solo kernel periferico
+├── Zona compartida: px 2-3 y 16-17   -> AMBOS kernels (se suman)
+└── Nucleo central:  px 4-15          -> solo kernel central
+
+Con overlap_border_px=2 (una celda, si border_reduce=2) la rama central
+crece hacia fuera y la celda 1 / 18 pasa a ser tambien compartida.
+Con overlap_fovea_px=0 no hay zona compartida: las ramas son DISJUNTAS
+(el control de la eleccion de la seccion 8, que antes no era expresable).
 ```
 
 ```python
-def build_masks(N, periph_out, center_out, penetration):
+def build_masks(dims):
+    N, po = dims.N, dims.border_cells
+    pen, ob = dims.overlap_fovea_px, dims.overlap_border_cells
     center_mask = torch.zeros(1, 1, N, N)
     periph_mask = torch.zeros(1, 1, N, N)
 
-    # Kernel central: toda la región interna center_out×center_out
-    lo, hi = periph_out, N - periph_out
+    # Rama de la fovea: la fovea, CRECIDA hacia fuera ob celdas
+    lo, hi = po - ob, N - po + ob
     center_mask[..., lo:hi, lo:hi] = 1
 
-    # Kernel periférico: anillo externo + penetración hacia adentro.
-    inner_lo = periph_out + penetration
-    inner_hi = N - periph_out - penetration
+    # Rama del borde: todo menos el nucleo exclusivo de la fovea
+    inner_lo = po + pen
+    inner_hi = N - po - pen
     periph_mask[...] = 1
     periph_mask[..., inner_lo:inner_hi, inner_lo:inner_hi] = 0
 
-    # En la banda de penetración AMBAS valen 1 -> se suman.
+    # Donde AMBAS valen 1 -> se suman.
     return center_mask, periph_mask
 ```
 
@@ -267,6 +400,8 @@ def build_masks(N, periph_out, center_out, penetration):
 import torch.nn as nn
 
 class FoveatedRegionalNN(nn.Module):
+    # referencia del diseño original; el builder vivo (fv.models.builder) recibe
+    # el config entero y deriva la geometría con fv.fovea.dims_of
     def __init__(self, N, center_out, periph_out, penetration,
                  k_center=3, k_periph=3, s_center=1, s_periph=1,
                  ch1=32, ch2=64, num_classes=10):
@@ -357,8 +492,17 @@ Con centro grande (N alto) aparecen 5, 7, 9... automáticamente.
 **Stride interno:** típico `[1,2]`; 3 solo con centros grandes. **Stride
 externo:** casi siempre `[1]` por lo delgada que es la banda.
 
-**Downsample:** `[1..8]` acotado por que la original no explote (`≤ 2N` por
-defecto). Define cuánto contexto ve la periferia (`periph_out·d`).
+**Borde difuso (`border_px`):** múltiplos de `border_reduce`, acotado por que
+el recorte real quepa (`≤ 3·fovea_px` por defecto — y por la imagen, que sólo B
+conoce). Define **cuánto contexto** ve la red, y ya no lo define nadie más.
+
+**Reducción del borde (`border_reduce`):** los divisores de `border_px`. Define
+**con cuánta resolución** se ve ese contexto, y por tanto `N` y el coste. Ojo:
+antes esto se llamaba `downsample`/`d` y definía *las dos cosas a la vez*.
+
+**Solapes (`overlap_fovea_px`, `overlap_border_px`):** `0 .. fovea/2-1` y
+`0 .. border-reduce`, cada uno sobre su rejilla. Ambos con 0 legal: son el
+control de la elección de §8.
 
 Espacio típico (N=20): |k_center|·|k_periph|·|s_center|·|s_periph|·|d| ≈
 3·2·2·1·varios. Manejable con grid exhaustivo; reservar Optuna para canales,
@@ -379,19 +523,31 @@ lr, dropout.
 ## 11. Decisiones tomadas y pendientes
 
 **Tomadas:**
-- Todo es parámetro; los rangos se **calculan** a partir de `N` y fracciones.
-- `periph_real = periph_out · d` (cuánto ve la periferia es buscable, no fijo en 4).
-- Penetración **contributiva** (ambos kernels suman en la banda compartida).
+- Todo es parámetro; los rangos se **calculan** a partir de las longitudes.
+- La geometría se declara en **px reales de la imagen** y `N` se **deriva**
+  (2026-08-25, §2.1). El borde (`border_px`) y su reducción (`border_reduce`) son
+  parámetros **separados**: cuánto contexto y con cuánta resolución.
+- Solape **contributivo** (ambos kernels suman en la banda compartida), y con
+  **dos lados independientes** (`overlap_fovea_px`, `overlap_border_px`), ambos
+  con 0 legal.
 - Enmascarar ANTES de convolucionar (opción A).
-- `N` es **fijo por experimento** (no se mezclan escalas de imagen en una corrida).
+- La **fóvea** es fija por experimento: es la ventana etiquetada de B
+  (contrato ①a). Lo que antes se decía de `N` se dice ahora de ella; `N` ya no es
+  un parámetro, es una consecuencia.
 
 **Pendientes / a experimentar:**
-- `avg_pool2d` vs `max_pool2d` para reducir la periferia (trazos finos EMNIST).
+- `avg_pool2d` vs `max_pool2d` para reducir el borde (trazos finos EMNIST).
 - **Suma vs. concatenación** de ramas (decide si se pueden buscar strides por
   rama independientes). Recomendado concat si strides difieren.
-- ¿`c_frac` y `pen_frac` fijas por aplicación o también buscables? (Si buscables,
-  muchas combinaciones son geométricamente inválidas → grid aparte, con asserts.)
-- Política de redondeo/paridad al derivar `center_out`, `periph_out` de `N`.
-- ¿Kernels periféricos con forma distinta o sparsity, aprovechando que la
-  periferia ya condensa más contexto?
+- **Otro método de reducción del borde.** Hoy es un promedio (o máximo) de
+  bloques de `border_reduce` px, y por eso el borde tiene que ser múltiplo suyo.
+  La reparametrización deja esa pieza aislada: cambiarla no toca la definición
+  del borde ni la de la fóvea. Si el método nuevo no cae en rejilla, la
+  restricción `border_px % border_reduce == 0` se va con él.
+- **Los cuatro ejes geométricos nuevos, sin medir**: `border_px`,
+  `border_reduce`, `overlap_fovea_px`, `overlap_border_px`. Ninguno se ha barrido
+  con la ortografía nueva. Ojo al leer resultados viejos del eje `d`: medían
+  *área y compresión a la vez* (§2.1).
+- ¿Kernels periféricos con forma distinta o sparsity, aprovechando que el borde
+  ya condensa más contexto?
 - Integración con el modelo RAM (glimpses secuenciales) si se retoma esa línea.
