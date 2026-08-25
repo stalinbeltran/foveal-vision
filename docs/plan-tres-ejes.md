@@ -639,3 +639,70 @@ veces **en la misma máquina** (la comprobación que cerraría el asunto, plan-l
 - **`lr` no se re-midió** sobre el dato nuevo. Su estudio está cerrado por los dos lados sobre el
   dato del 23 de agosto, y §7.4 acaba de medir que el dato movió la escala — así que el óptimo de
   `lr` **no está comprobado sobre `r20260824`**, sólo su vecindario.
+
+---
+
+## 8. Cerrar `batch_size` por arriba — criterio escrito ANTES (2026-08-25 10:35)
+
+> §7.3 dejó escrito que no se lanzaba el seguimiento de `d` porque *«este documento no lo tenía
+> escrito antes y añadirlo ahora sería exactamente lo que §0 prohíbe»*. Esto se escribe **antes de
+> ver un solo run** de los recorridos `bs-alto-fov` / `bs-alto-pl`, que se lanzaron a las 10:35 —
+> la misma regla, cumplida en vez de citada.
+
+### 8.1 La pregunta
+
+§7.1 dejó `batch_size` **sin acotar por la derecha**: el ganador nominal fue **192, el extremo del
+rango**, y el eje salió **plano entre 57 y 192** (0,9302 a 0,9351, todo dentro de ~2 δ). No se sabe
+si sigue plano, si sube, o dónde cae.
+
+**No es una curiosidad, es dinero:** subir el batch **abarata la época** (192 va 1,08× más rápido
+que 85, medido). Saber hasta dónde se puede subir sin perder calidad es reloj y coste directos en
+todos los estudios que vengan.
+
+### 8.2 El rango, y por qué empieza en el extremo anterior
+
+| red | rango | span |
+|---|---|---|
+| foveada (`bs-alto-fov`) | **192 · 384 · 768 · 1536** | 8× (18× el vigente 85) |
+| plana (`bs-alto-pl`) | **170 · 340 · 680 · 1360** | 8× |
+
+**Empieza en 192, que así deja de ser extremo y pasa a ser ancla.** Es la misma construcción que
+[plan-lr-alto.md](plan-lr-alto.md) §1 usó para cerrar `lr` por la derecha: se re-mide el punto
+conocido en las condiciones de hoy, y eso es lo que permite leer los valores nuevos contra algo
+conocido en vez de contra un número de otro recorrido.
+
+Sube **×2 por paso** y no menos: el eje es plano en la zona baja, así que pasos finos ahí no
+compran nada. Lo que se busca es **dónde cae**, y para eso hace falta llegar lejos.
+
+### 8.3 ⚠ El tope de épocas sube a 300 en el tanteo, y hay que decir por qué
+
+Un batch grande da **menos actualizaciones por época**, así que necesita más épocas para el mismo
+trabajo. Con el tope de 150 de `bs5-L4`, los puntos altos pararían **por el tope y no por
+`patience`** — que es exactamente el defecto (R1) que invalidó los tres estudios de `batch_size` de
+julio, y sería repetirlo **justo en la zona que se quiere medir**.
+
+Las épocas altas son además baratas ahí: a batch 1536 son **55 pasos por época** contra 989 a batch
+85. El tope alto cuesta poco y el tope bajo falsearía el resultado en la dirección conocida.
+
+### 8.4 Cómo se lee (escrito antes)
+
+**T1 — el tanteo NO declara ganador.** 2 semillas dan 2 arreglos en la permutación exacta. Su único
+trabajo es **acotar**: decir en qué intervalo cae el eje. Misma regla que
+[plan-40h.md](plan-40h.md) §2 y que §6.2 de [plan-cnn-plana.md](plan-cnn-plana.md).
+
+**T2 — qué cuenta como «acotado».** El rango de la fase final se elige de modo que **el mejor punto
+del tanteo quede INTERIOR**, con al menos un valor por encima que sea claramente peor. Si el mejor
+del tanteo vuelve a ser 1536 (el extremo), **el eje sigue sin acotarse** y se dice, en vez de
+publicar un rango que finge estarlo.
+
+**T3 — validez antes que forma.** Un punto cuyos runs paren por el tope de 300 **no acota nada**:
+mide presupuesto. Se reporta como `budget-limited` y no se usa para elegir el rango final.
+
+**T4 — la fase final.** 5 semillas sobre el rango acotado, tope de épocas el que el tanteo muestre
+necesario (no el de 150 por inercia), reparto **una máquina por recorrido × semilla**, y las reglas
+R1–R6 de §5 sin cambios. El vigente sólo se mueve si p < 0,05 **y** la diferencia supera δ.
+
+**T5 — las dos redes se miden igual pero NO se comparan aquí.** `bs-alto-fov` y `bs-alto-pl` van en
+la misma flota por comodidad y coste, no porque este recorrido compare arquitecturas. La
+comparación foveada-contra-plana tiene su propio criterio en
+[plan-cnn-plana.md](plan-cnn-plana.md) §4, y exige métrica de tarea, no f1 de ventana.
