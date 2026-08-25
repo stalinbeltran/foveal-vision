@@ -472,6 +472,170 @@ python3 ~/src/digital-ocean-dropplet-auto-launching/scripts/vast_instance.py des
 …y desde Telegram, que es desde donde se opera cuando no hay portátil delante: **`/use
 apagar-vast`**.
 
-## 7. RESULTADO
+## 7. RESULTADO (2026-08-25) — dos ejes cerrados, uno que se abre por la derecha
 
-*(Se rellena al cerrar, con los mismos apartados R1..R6 y la comparación del ancla de §3.)*
+**65/65 runs.** Reloj 6,1 h + 2,5 h (dos pasadas, §7.5). Coste **3,49 $**. Los 65 pararon por
+`patience` (R1 ✅ en los tres recorridos), entre 32 y 81 épocas: ninguno se acercó al tope de 150.
+
+### 7.1 `batch_size` — el vigente se queda, pero el eje NO queda acotado por la derecha
+
+| `batch_size` | f1 | sem | min | max | s/época |
+|---:|---:|---:|---:|---:|---:|
+| **192** | **0,9351** | 0,0040 | 0,9197 | 0,9428 | **35,3** |
+| **85** (vigente) | 0,9341 | 0,0022 | 0,9296 | 0,9416 | 38,1 |
+| 128 | 0,9317 | 0,0041 | 0,9212 | 0,9419 | 36,0 |
+| 57 | 0,9302 | 0,0012 | 0,9269 | 0,9331 | 40,1 |
+| 38 | 0,9197 | 0,0029 | 0,9149 | 0,9307 | 45,9 |
+
+**R4 — el vigente se queda.** 192 le saca **+0,0010** con **p = 0,857**: indistinguible. La regla
+escrita en §5 pide p < 0,05 **y** diferencia > δ; no se cumple ninguna de las dos.
+
+**R3 ⚠ — acotado por la izquierda, NO por la derecha.** 38 pierde con **p = 0,024**, así que el
+lado bajo queda cerrado. Pero **el ganador nominal es 192, que es el extremo del rango**, y eso es
+exactamente la condición que §5 definió como *«sigue sin acotar por ese lado»*. Se publica como
+tal.
+
+**Y lo que sí cambia respecto a los estudios viejos.** Los tres anteriores dieron 100, 25 y 85 —
+tres respuestas distintas— y los 105 runs pararon por el tope. Con `patience` decidiendo, el eje
+resulta **plano entre 57 y 192** (0,9302 a 0,9351, todo dentro de ~2 δ) y sólo cae de verdad en
+38. La respuesta correcta no era ninguno de los tres ganadores: era **«el eje es plano en esa
+zona»**, y con 20 épocas no se podía ver.
+
+⚠ **Consecuencia práctica que sí se puede usar hoy: 192 es 1,08× más rápido por época que 85**
+(35,3 contra 38,1 s) sin perder calidad medible. No mueve el vigente por regla, pero si algún día
+hace falta abaratar el reloj, subir el batch es gratis en calidad.
+
+### 7.2 `n_layers` — replica julio y queda acotado por los dos lados (R3 ✅)
+
+| `n_layers` | f1 | sem | min | max | s/época |
+|---:|---:|---:|---:|---:|---:|
+| **4** (vigente) | **0,9341** | 0,0022 | 0,9296 | 0,9416 | 46,3 |
+| 3 | 0,9246 | 0,0026 | 0,9180 | 0,9313 | 39,9 |
+| 5 | 0,9136 | 0,0146 | 0,8585 | 0,9415 | 52,3 |
+| 2 | 0,9066 | 0,0018 | 0,9008 | 0,9119 | 31,9 |
+
+**R3 ✅ y R4 ✅.** Gana 4, que es interior; 3 pierde con **p = 0,040** y 2 con **p = 0,008** (el
+suelo alcanzable). El vigente se confirma sobre el dato de hoy, que era la pregunta.
+
+⚠ **El 5 vuelve a ser inestable, y el aviso de §2.2 se cumple entero.** `sem` 0,0146 contra 0,0022
+del ganador —**siete veces más**— y su peor semilla cae a 0,8585 mientras la mejor llega a 0,9415.
+Por eso **no** alcanza significación (p = 0,167) pese a estar 0,0205 por debajo: no es que se
+parezca al 4, es que no se parece ni a sí mismo. Con una sola semilla, L5 podría haber salido
+ganador por suerte.
+
+### 7.3 ⚠ `d` — el eje SUBE hacia la derecha, y mi recorte del rango estaba mal
+
+| `d` | f1 | sem | min | max | s/época |
+|---:|---:|---:|---:|---:|---:|
+| **4** | **0,9408** | 0,0021 | 0,9333 | 0,9446 | **39,8** |
+| 3 | 0,9362 | 0,0026 | 0,9266 | 0,9420 | 50,8 |
+| **2** (vigente) | 0,9341 | 0,0022 | 0,9296 | 0,9416 | 46,6 |
+| 1 | 0,9310 | 0,0044 | 0,9151 | 0,9386 | 47,5 |
+
+**R4 — el vigente se queda, por poco.** 4 le saca +0,0067 con **p = 0,063**. No cruza el 5 %, así
+que por la regla escrita antes el vigente no se mueve. Pero es el p más bajo de los tres
+recorridos contra su vigente, y **la tendencia es monótona**: 1 < 2 < 3 < 4.
+
+**R3 ❌ — y aquí hay que reconocer un error de diseño, no del resultado.** El ganador es el extremo
+derecho, así que `d` **no queda acotado por arriba**. Y el rango lo recorté yo: §2.3 dice
+*«se quitan el 5 y el 6 porque el estudio anterior los midió por debajo del 2 y porque, si el eje
+vuelve a salir plano, gastar dos puntos en la cola derecha es presupuesto que no compra
+información»*.
+
+**Las dos premisas de esa frase eran falsas, y se podía saber antes:**
+
+1. *«el eje vuelve a salir plano»* — no salió plano: sube de forma monótona en todo el rango.
+2. *«el estudio anterior los midió por debajo»* — sí, pero ese estudio era **L2, receta `corta`,
+   otro dataset y con los 30 runs topados a 20 épocas**. Yo mismo escribí en §2.3 que arrastraba
+   *«los mismos tres defectos»*… y aun así usé su forma para recortar el rango. **Un estudio que se
+   declara inválido para decidir el ganador tampoco vale para decidir dónde mirar.** Es la lección
+   de este recorrido y no la sabía escrita en ningún sitio.
+
+⚠ **Y el coste refuerza la sospecha en vez de calmarla**: `d = 4` es además **el más barato**
+(39,8 s/época contra 46,6 del vigente). Un punto que es a la vez mejor en media y más rápido, con
+p = 0,063, es exactamente el caso en el que dejarlo sin acotar duele.
+
+**Qué haría falta, dicho sin lanzarlo:** un recorrido `d ∈ [4, 5, 6]` con 5 semillas — el rango
+`auto` completo llega a 6. Son 15 runs, ~0,6 $ y ~1 h con este reparto. **No se lanza aquí** porque
+este documento no lo tenía escrito antes y añadirlo ahora sería exactamente lo que §0 prohíbe.
+Queda como la pregunta abierta que este estudio deja.
+
+### 7.4 El ancla: cuánto movió el dato
+
+El vigente (`L4`, `batch 85`, `d 2`) está medido en los tres recorridos y en los dos estudios
+anteriores:
+
+| medida | f1 | sem | dataset |
+|---|---:|---:|---|
+| `p40-lr-L4` (julio) | 0,9244 | 0,0041 | `dirty1000-80px-16px` |
+| `lr-alto-L4` (23-ago) | 0,9246 | 0,0003 | `…-r20260823` |
+| **este estudio** (25-ago) | **0,9341** | 0,0022 | `…-r20260824` |
+
+**El dato nuevo sube la medida +0,0095**, unas 4 δ. No es ruido: es el efecto de rasterizar con
+otro Chromium (§3), y confirma que el nombre nuevo del dataset era obligatorio. Los números de
+este estudio **no se comparan** con los de julio ni con los del 23 de agosto.
+
+⚠ Y el sentido del cambio importa: el dato de hoy es **más fácil**, no más difícil. Si alguien
+compara 0,9341 contra el 0,9244 de julio y concluye que algo mejoró, estará midiendo el dataset.
+
+### 7.5 Lo que costó, y qué falló por el camino
+
+| | pasada 1 | pasada 2 | total |
+|---|---:|---:|---:|
+| runs | 48 | 17 | **65** |
+| reloj | 6,1 h | 2,5 h | 8,6 h |
+| máquinas alquiladas | 22 | 11 | 33 |
+| coste | 2,6471 $ | 0,7071 $ | **3,35 $** |
+| (+ dos lanzamientos abortados) | | | 0,14 $ |
+| **total** | | | **≈ 3,49 $** |
+
+Estimado antes de lanzar: **2,17–3,11 $ y 2,6–3,8 h**. El coste cae justo por encima de la banda y
+el reloj la dobla, y **la causa es una sola máquina**:
+
+- La criba marcó `c8` como **2,42× más lenta que la mediana** y lo dijo: *«El estudio corre, pero
+  su reloj lo marcan estas»*. Tuvo que usarla igual porque sólo sobrevivieron **11 máquinas para
+  15 lotes** — el fallo de los puertos (§4.2 bis) se había comido 8 del pozo.
+- Esa máquina corrió a **92 s/época**, consumió **368 de los 2.058 minutos-máquina** de la pasada 1
+  y agotó su plazo de 6 h con un run a medias. **Los otros 10 lotes acabaron en 228 min — 3,8 h,
+  exactamente la predicción pesimista.**
+
+**La pasada 2, ya con el arreglo, es el control de que era eso**: la criba tuvo margen (9 máquinas
+medidas para 5 lotes), descartó 4 y la peor elegida fue **2,21× más rápida** que la peor de la
+cohorte. Reloj 2,5 h y 0,71 $ contra 2,1–2,9 h y 0,53–0,76 $ estimados: **dentro de la banda en las
+dos columnas.**
+
+O sea que el modelo de coste no falló; falló tener que usar máquinas que el propio filtro había
+marcado. **El peaje fue el 1,9 %** de los minutos-máquina: repartir fino sigue siendo barato.
+
+### 7.6 El hallazgo que no se buscaba: reproducibilidad bit a bit, con 5 pares
+
+El punto vigente aparece en `bs5-L4` (como `batch_size=85`) y en `nl5-L4` (como `n_layers=4`): es
+la **misma configuración con las mismas semillas, entrenada en máquinas distintas**. Las cinco
+semillas salieron **idénticas**:
+
+| semilla | `bs5-L4` | `nl5-L4` | época del checkpoint | épocas |
+|---|---:|---:|---:|---:|
+| 1 | 0,9305 | 0,9305 | 44 | 54 |
+| 2 | 0,9326 | 0,9326 | 37 | 47 |
+| 3 | 0,9296 | 0,9296 | 38 | 48 |
+| 4 | 0,9416 | 0,9416 | 48 | 58 |
+| 5 | 0,9360 | 0,9360 | 60 | 70 |
+
+**5 de 5, al cuarto decimal y con el mismo número de épocas.** [plan-lr-alto.md](plan-lr-alto.md)
+§7.4 afirmó esto con **3 pares** y §7.6 avisaba de que era todo lo comprobado. Ahora son 8 pares en
+total, y estos 5 con la criba de por medio — o sea que **seleccionar máquinas por velocidad no
+altera el resultado**, que era la condición que §4.1 necesitaba para ser legítima.
+
+⚠ Sigue sin comprobarse lo mismo **fuera** de `E5-26xx`, y sigue sin correrse el mismo run dos
+veces **en la misma máquina** (la comprobación que cerraría el asunto, plan-lr-alto §7.6).
+
+### 7.7 Qué NO contesta esto
+
+- **`d` sin acotar por arriba** (§7.3). Es la pregunta abierta y la única accionable.
+- **`batch_size` sin acotar por arriba** (§7.1), aunque ahí el eje es plano y el interés es sólo de
+  coste.
+- **Es f1 de ventana, un proxy.** R5 no se ha corrido porque **no se arrastra ningún ganador**: los
+  tres vigentes se quedan. Si alguna vez se moviera uno, antes va `scripts/proxy_vs_task.py`.
+- **`lr` no se re-midió** sobre el dato nuevo. Su estudio está cerrado por los dos lados sobre el
+  dato del 23 de agosto, y §7.4 acaba de medir que el dato movió la escala — así que el óptimo de
+  `lr` **no está comprobado sobre `r20260824`**, sólo su vecindario.
