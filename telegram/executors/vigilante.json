@@ -1,0 +1,13 @@
+{
+  "name": "vigilante",
+  "descripcion": "Cada hora mira si a los estudios de prioridad les falta algun punto (servers caidos, plazos agotados) y relanza la flota SOLO para lo que falte. Nunca relanza si ya hay una flota viva. Con 'parar' lo detiene.",
+  "ejemplos": [
+    "--sweep borde-ancho --sweep pw-fov --cada 3600",
+    "estado",
+    "parar"
+  ],
+  "command": "case \"{{input}}\" in parar) pkill -f vigilante_prioridades.py && echo 'vigilante detenido. La flota que ya estuviera corriendo NO se toca: para eso esta /use apagar-vast.' || echo 'no habia ningun vigilante corriendo';; estado|'') echo '--- vigilante ---'; pgrep -f vigilante_prioridades.py >/dev/null && echo 'VIVO' || echo 'parado'; echo '--- flota ---'; pgrep -f estudio_flota.py >/dev/null && echo 'VIVA (alquilando/entrenando)' || echo 'parada'; echo '--- ultimas lineas de su log ---'; tail -c 2000 /tmp/vigilante-prioridades.log 2>/dev/null || echo '(sin log)';; *) \"$COORD_HOME/scripts/desacoplar.sh\" sh -c 'set -a; [ -f \"$COORD_HOME/.env\" ] && . \"$COORD_HOME/.env\"; [ -f \"$HOME/.config/dev-secrets.env\" ] && . \"$HOME/.config/dev-secrets.env\"; set +a; .venv/bin/python scripts/vigilante_prioridades.py {{input}} > /tmp/vigilante-prioridades.log 2>&1' >/dev/null 2>&1 & echo 'Vigilante lanzado en su propio cgroup. Cada vuelta relanza la flota si faltan puntos, y PUEDE ALQUILAR MAQUINAS. Log: /tmp/vigilante-prioridades.log. Para pararlo: /use vigilante -> parar';; esac",
+  "encargados": ["echo"],
+  "timeoutMs": 60000,
+  "requiere": ["python3"]
+}
