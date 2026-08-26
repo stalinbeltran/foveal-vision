@@ -3,3 +3,4 @@
 {"epoch": 3, "train_loss": 0.806397788505342, "val": {"loss": 0.8109607295556502, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.089971542358398}, "lr": 0.0014, "seconds": 53.652}
 {"epoch": 4, "train_loss": 0.8059130254963411, "val": {"loss": 0.8092919138344852, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.077411651611328}, "lr": 0.0014, "seconds": 53.607}
 {"epoch": 5, "train_loss": 0.8057390791340472, "val": {"loss": 0.8130212149836801, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.115234851837158}, "lr": 0.0014, "seconds": 53.824}
+{"epoch": 6, "train_loss": 0.8060083046962325, "val": {"loss": 0.8107365066354925, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.082342147827148}, "lr": 0.0014, "seconds": 53.684}
