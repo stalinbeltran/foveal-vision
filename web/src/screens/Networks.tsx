@@ -35,7 +35,7 @@ function ZoneDiagram({ dims }: { dims: any }) {
       <svg width={N * s} height={N * s} data-testid="zone-diagram"
         data-view="FG1" data-fixes="C" data-varies="-" data-measures="la geometria derivada">{cells}</svg>
       <div className="cap" style={{ fontSize: 12, color: "var(--text-dim)" }}>
-        anillo (solo periferia) · banda de penetración (ambas ramas SUMAN) · núcleo (solo centro)
+        borde (solo su rama) · zona compartida (ambas ramas SUMAN) · núcleo de la fóvea (solo su rama)
       </div>
     </div>
   );
