@@ -1,6 +1,5 @@
 {
-  "status": "interrupted",
-  "updated_at": 1787750047.2402203,
-  "epoch": 54,
-  "reason": "el proceso que lo entrenaba ya no existe (caida/reinicio/hibernacion)"
+  "status": "done",
+  "updated_at": 1787750195.19807,
+  "epoch": 63
 }
