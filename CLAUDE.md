@@ -75,12 +75,30 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    resolución?* — `border_reduce` con `border_px` fijo. **No es cost-neutral**: la cabeza es el
 >    97 % de los parámetros y crece con `N²` (+44 % al pasar de 2 a 4 celdas, +156 % a 8).
 >
-> ⚠ **Verificado, no razonado**: **183 tests en verde** (+33), `npm run build` limpio, los 5 configs
-> de red migrados a `format_version: 2` con la geometría comprobada idéntica uno a uno, y los
-> scripts de estudio/verificación reescritos. **Esta máquina se había rehecho**: no había `.venv`
-> ni Python 3.12 ni `node_modules`, así que se instaló Python 3.12, se recreó el entorno
-> (torch 2.13.0+cpu) y se hizo `npm install` — sin eso no se podía cumplir la regla del proyecto de
-> verificar ejecutando. **Cero entrenamiento, cero artefactos borrados.**
+> ⚠ **Verificado, no razonado**:
+> - **183 tests en verde** (+33) y `npm run build` limpio.
+> - **`verify_axes.py`: 28/28 ejes, 0 fallos** — los **cuatro ejes geométricos nuevos entrenan
+>   runs de verdad** (`border_px`, `border_reduce`, `overlap_fovea_px`, `overlap_border_px`), y los
+>   **cinco rechazos** salen en **las dos puertas** (`fovea_px` → `axis_breaks_window_size`;
+>   `N`/`c_frac`/`pen_frac`/`d` → `axis_renamed`).
+> - **`verify_spec.py --live`: 0 violadas**, 44 ok. ⚠ La cobertura sale **55 %** y no el 82 %
+>   documentado: **no es una regresión**, son 30 reglas «no aplicables» porque en esta máquina no
+>   hay recorridos ni runs con carga que ejercitarlas (ver el punto siguiente).
+> - **UI en la instancia real**: 12 pantallas **sin un error de consola**; Redes enseña los cinco
+>   campos nuevos y **ya no enseña `c_frac`/`pen_frac`**; el panel «lo que implica» reacciona en
+>   vivo (borde 4 px → N=20, recorte 24; borde 8 px → N=24, recorte 32) y un `border_px=5` con
+>   `border_reduce=2` sale como **`[border_not_divisible]` con razón y arreglo**. Backend y vite
+>   **se cerraron** al terminar.
+> - Los **5 configs de red migrados** a `format_version: 2`, con la geometría comprobada idéntica
+>   uno a uno.
+>
+> ⚠ **Esta máquina se había rehecho**: no había `.venv`, ni Python 3.12, ni `node_modules`, ni
+> **ningún `.npz` ni `.pt`** (son artefactos ignorados por git). Se instaló Python 3.12, se recreó
+> el entorno (torch 2.13.0+cpu), se hizo `npm install`, y para `verify_axes` se regeneró una fuente
+> sintética temporal que **se borró después**. Consecuencia a tener presente: **no se pudo cargar
+> ningún checkpoint histórico** porque no queda ninguno — la equivalencia de pesos se probó
+> construyendo y guardando (test permanente), que afirma lo mismo, pero no es lo mismo que abrir un
+> `best.pt` de agosto. **Cero entrenamiento, cero artefactos del usuario borrados.**
 >
 > **Lo siguiente, por valor**: (a) el estudio nº 1 de arriba, que es barato y tiene evidencia
 > directa; (b) la comparación foveada vs plana, que sigue siendo *la* pregunta del proyecto y sigue
