@@ -1,0 +1,17 @@
+{
+  "run": "kc-fov-0001-k_center3_seed2",
+  "epochs_run": 47,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.10051857300780036,
+  "best_epoch": 37,
+  "seconds_per_epoch": 37.591,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
