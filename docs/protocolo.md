@@ -22,7 +22,10 @@ Para poder decir *«X es mejor que Y»*:
    este campo esa comparación no puede ni declararse. Cambiar de versión de torch mueve
    resultados sin mover el commit.
 4. **N semillas, media ± sd. Nunca un número suelto.** Un run aislado es una anécdota. N=5 es el
-   canon; N=3 ve el signo de un efecto grande.
+   canon; N=3 ve el signo de un efecto grande. ⚠ Esas N semillas son las de **D** (réplica): el
+   split lo fijó el `seed` de **B** al extraer y es **el mismo para las N**. La banda mide la
+   varianza de reinicializar, **no** la de haber elegido otro val — ver §3, Paso 1. Consecuencia
+   al citar: **las diferencias entre puntos son comparables; el nivel absoluto no está acotado.**
 5. **La diferencia supera la banda de ruido** (§4). Si no, es un empate — y no se rompe con
    «pero es que este subió».
 6. **El test se toca una sola vez, al final, y solo el ganador.** El val hace dos trabajos
@@ -137,6 +140,34 @@ F1 traiga (si hay smoothL1: su `beta`). Barrer antes de esto es **medir el bug**
 
 5 runs idénticos variando solo el `seed` de D (el de B no se toca). Media ± sd de la métrica de
 tarea. El resultado es **un número: la diferencia mínima creíble** — y la baseline sale gratis.
+
+⚠ **Qué varianza mide esa banda, y cuál NO.** Las dos semillas viven en dominios distintos y
+**nunca se comunican** (glosario, entrada `seed`):
+
+| | | |
+|---|---|---|
+| **`ExtractConfig.seed`** | B | Baraja **las imágenes** en `_assign_splits` y decide quién cae en train/val/test. Se usa **una sola vez**, al extraer, y el reparto queda **congelado en disco** (`split.json` + el array `split` del `.npz`) |
+| **`Recipe.seed`** | D | Pesos iniciales (`torch.manual_seed`) y orden de barajado de los lotes de train (`g.manual_seed`). Nada más |
+
+Correr N semillas mueve **solo el segundo**: el dataset B es el mismo objeto en disco para las N,
+así que **las mismas imágenes están en val en los N runs**. De ahí lo que la banda sí y no cubre:
+
+- **A favor, y por eso está bien así**: dos puntos de un eje se miden contra **exactamente el mismo
+  val**, de modo que la diferencia es de la red y no de que a uno le tocara un val más fácil. Es
+  también lo que legitima `fv.metrics.permutation_test`: las semillas son intercambiables porque
+  sólo difieren en inicialización.
+- **La reserva**: la banda mide **la varianza de reinicializar**, no la de *haber elegido otro val*.
+  Si el `seed` de extracción hubiera dejado en val 200 imágenes atípicamente fáciles, los N runs lo
+  heredan por igual y **ninguna banda lo delata**. Ese error es **común a todos los puntos del eje**,
+  así que no invalida el **orden** — que es lo que decide un ganador — pero sí significa que el
+  **número absoluto** («f1 = 0,9574») tiene una incertidumbre que las bandas publicadas no enseñan.
+  **Cítense los niveles como lo que son: comparables entre sí, no absolutos.**
+
+Es la misma reserva que el ± de metrica-de-tarea.md §4.1, un nivel más arriba: aquel `sem` sale de
+la dispersión **entre imágenes dentro** de ese val; la incertidumbre de **cuál** val **no se ha
+medido nunca aquí**. Medirla exige re-extraer B con otras semillas de split y repetir el recorrido
+entero — caro, y **F11** decidió no regenerar el dato por ahora justamente para conservar la
+comparabilidad con los runs históricos. Queda anotado como pregunta abierta, no como defecto.
 
 > **Toda diferencia dentro de la banda es un empate.** Si los 6 primeros puntos de un recorrido
 > caben en la banda, el resultado es «seis empatados», no «ganó el primero».

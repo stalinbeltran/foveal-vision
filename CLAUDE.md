@@ -23,6 +23,46 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **✅ 2026-08-26 — LAS DOS SEMILLAS, DOCUMENTADAS: EL SPLIT ES POR IMAGEN Y ES DE B.**
+> El usuario pidió verificar dónde se separan las muestras, sospechando que se repartieran las
+> **ventanas** ya recortadas (lo que filtraría la misma imagen a train y val). **No es el caso, y
+> está comprobado ejecutando, no razonando.** Lo que hay que saber:
+> 1. **El reparto es POR IMAGEN y ocurre ANTES de recortar.**
+>    [`_assign_splits`](src/fv/windows/extract.py#L53-L64) recibe el número de **imágenes**, baraja
+>    esos índices y devuelve `split_by_image`; dentro del doble bucle de posiciones cada ventana
+>    sólo **hereda** `split_by_image[si]` ([extract.py:127](src/fv/windows/extract.py#L127)). No hay
+>    ninguna decisión aleatoria a nivel de ventana. `grep` de `_assign_splits`/`split_by_image` en
+>    `src`, `tests` y `scripts`: **una sola ruta**. El resto de la cadena sólo **filtra** por esa
+>    etiqueta (`dataset.py:20`, `loop.py:120-122`).
+> 2. ⚠ **HAY DOS `seed` Y NO SE COMUNICAN — es la confusión que el glosario ya avisaba, ahora con
+>    su consecuencia escrita.** `ExtractConfig.seed` (**B**) baraja las imágenes **una sola vez**, al
+>    extraer, y el reparto queda **congelado en disco** (`split.json` + el array `split` del `.npz`).
+>    `Recipe.seed` (**D**) sólo fija pesos iniciales y orden de lotes. **Correr N semillas mueve sólo
+>    el segundo**: los N runs comparten val.
+> 3. ⚠⚠ **Consecuencia que NO estaba documentada y cambia cómo se citan los números.** La banda de
+>    N semillas mide **la varianza de reinicializar**, no la de *haber elegido otro val*. A favor:
+>    dos puntos de un eje se comparan contra el mismo val, y eso es lo que legitima
+>    `permutation_test`. En contra: si el `seed` de extracción dejó en val 200 imágenes atípicamente
+>    fáciles, los N runs lo heredan y **ninguna banda lo delata**. El error es **común a todos los
+>    puntos**, así que **el orden se sostiene** (que es lo que decide un ganador) pero **el nivel
+>    absoluto no está acotado**. Todos los f1 del inventario — el 0,9574 de `red-fov` incluido — son
+>    **comparables entre sí, no absolutos**.
+> 4. **Es un nivel por encima del ± de metrica-de-tarea.md §4.1**: aquel `sem` sale de la dispersión
+>    entre imágenes **dentro** de ese val; la incertidumbre de **cuál** val **no se ha medido nunca
+>    aquí**. Exigiría re-extraer B con otras semillas de split y repetir el recorrido entero — y
+>    **F11** decidió no regenerar el dato, justo para conservar la comparabilidad histórica. Queda
+>    como **pregunta abierta, no como defecto**.
+> **Dónde quedó escrito**: protocolo.md §1 regla 4 (el aviso donde se declara un ganador) y §3 Paso 1
+> (la tabla de las dos semillas y las dos caras de la reserva) · formatos.md §4.1 (el reparto se
+> congela, y `split.json` y el `.npz` dicen lo mismo) · glosario.md (entrada `seed`, ampliada).
+> ⚠ **Verificado, no razonado**: extracción real de una fuente sintética temporal (30 img, 2.640
+> ventanas) → **0 imágenes en más de un split**, y los conjuntos del `.npz` coinciden con
+> `split.json` en los tres; los **10 `split.json` del repo** tienen los tres conjuntos disjuntos (sus
+> `.npz` no están en disco: son artefactos ignorados). **192 tests** (el contrato ⑧ ampliado con dos
+> aserciones nuevas: `split.json` ≡ array del `.npz`, y que el extractor **no importa `Recipe`**),
+> y **las dos se probaron rompiéndolas a propósito**: fallan cuando deben. La fuente y el dataset
+> temporales se **borraron**.
+
 > **✅ 2026-08-26 — LA GEOMETRÍA NUEVA YA DIO RESULTADOS, Y SON LOS MÁS GRANDES DEL INVENTARIO.**
 > Los ocho recorridos de prioridad que corrió la flota, **leídos** en esta sesión desde los
 > artefactos del repo con `scripts/estudio_informe.py` (aplica R1–R6, escritas antes). Detalle

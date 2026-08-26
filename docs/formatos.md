@@ -111,6 +111,15 @@ el manifest**: si se pierde, los datos cargan y significan otra cosa.
 
 **`split.json`** — índices **de A** por split (permite el cruce A×B de Predecir).
 
+⚠ **El reparto es POR IMAGEN y se congela aquí.** `config.seed` es la **semilla del split**, no la
+del entrenamiento: `extract.py:_assign_splits` baraja **las imágenes** (nunca las ventanas — las de
+una misma imagen están correlacionadas) **antes** de recortar, y cada ventana sólo **hereda** el
+split de su imagen. Se usa **una sola vez**, al extraer; a partir de ahí el reparto es un hecho
+fijo del dataset, escrito dos veces y de acuerdo: en `split.json` (índices de A) y en el array
+`split` del `.npz` (uno por ventana). Un recorrido con N semillas mueve el `seed` de **D**
+(réplica) y **no vuelve a tocar esto**: los N runs comparten val. Qué mide y qué no mide esa banda
+está en protocolo.md §3, Paso 1.
+
 ### 4.2 `runs/<name>/` — el run (E)
 
 | Fichero | Qué |

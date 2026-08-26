@@ -1,5 +1,8 @@
 """One test per contract of organizacion.md §2, named by number (tests.md §3)."""
 
+import inspect
+import sys
+
 import numpy as np
 import pytest
 
@@ -272,6 +275,22 @@ def test_contract_08_fingerprint_tracks_content_and_split_is_per_image(world):
     arrays = store.arrays(world["dataset"])
     for s in np.unique(arrays["sample_idx"]):
         assert len(np.unique(arrays["split"][arrays["sample_idx"] == s])) == 1
+    # ...and split.json (indexes of A) says the SAME as the per-window array
+    smap = store.split_map(world["dataset"])
+    for i, name in enumerate(("train", "val", "test")):
+        from_npz = {int(x) for x in
+                    np.unique(arrays["sample_idx"][arrays["split"] == i])}
+        assert set(smap[name]) == from_npz, f"split.json vs .npz disagree on {name}"
+    # the SPLIT seed is B's and only B's: D's seed (the replica axis) is not an
+    # input to the extractor at all, so N replicas share one val by construction.
+    from dataclasses import fields
+    assert "seed" in {f.name for f in fields(ExtractConfig)}
+    from fv.training.recipe import Recipe
+    recipe_only = {f.name for f in fields(Recipe)} - {f.name for f in fields(ExtractConfig)}
+    assert "lr" in recipe_only          # control: the sets really are different
+    src = inspect.getsource(extract_windows) + inspect.getsource(
+        sys.modules["fv.windows.extract"]._assign_splits)
+    assert "Recipe" not in src, "the extractor must not know about D's recipe"
 
 
 def test_contract_09_objective_cannot_be_loss_if_lambda_in_space():

@@ -23,6 +23,10 @@ Regla: cuando una palabra tiene dos significados, **en prosa y en la UI se cuali
   cualificado.
 - **`seed` — el de B fija el split (fijo en un recorrido); el de D es el eje de réplica.**
   Confundirlos hace que cada punto se evalúe sobre un split distinto: mides el ruido del split.
+  El de B (`ExtractConfig.seed`) baraja **las imágenes** al extraer y queda **congelado** en
+  `split.json`; el de D (`Recipe.seed`) sólo fija pesos iniciales y orden de lotes. Correr N
+  semillas mueve **sólo el segundo** — la banda mide reinicialización, no elección de val
+  (protocolo.md §3, Paso 1).
 - **`kernel` — el tamaño (`k_center: 3`), el tensor de pesos («los kernels de la capa 1»), o
   cuántos hay (`channels[i]`).** `kernel_size` para el tamaño, **filtros** para el número, kernel a
   secas solo para el tensor. (`channels` es la lista por capa que reemplaza a `ch1/ch2` — D-C3.)
