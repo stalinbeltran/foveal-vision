@@ -1,0 +1,356 @@
+{
+  "recorrido": "borde-ancho",
+  "eje": "border_px",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.0021112598992853887,
+  "delta_fuente": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "border_px": 8,
+        "border_reduce": 4
+      },
+      "value": 0.9407967647209201,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9333149247549358,
+      "value_max": 0.9445623160632401,
+      "value_std": 0.0047209206529714885,
+      "value_sem": 0.0021112598992853887,
+      "runs": [
+        "borde-ancho-0008-border_px8_seed4",
+        "borde-ancho-0006-border_px8_seed2",
+        "borde-ancho-0007-border_px8_seed3",
+        "borde-ancho-0005-border_px8_seed1",
+        "borde-ancho-0009-border_px8_seed5"
+      ],
+      "seconds_per_epoch": 42.5322
+    },
+    {
+      "point": {
+        "border_px": 10,
+        "border_reduce": 5
+      },
+      "value": 0.9363944031337235,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9302839007899548,
+      "value_max": 0.9430051813471503,
+      "value_std": 0.005383517329103426,
+      "value_sem": 0.0024075821411846735,
+      "runs": [
+        "borde-ancho-0013-border_px10_seed4",
+        "borde-ancho-0012-border_px10_seed3",
+        "borde-ancho-0010-border_px10_seed1",
+        "borde-ancho-0011-border_px10_seed2",
+        "borde-ancho-0014-border_px10_seed5"
+      ],
+      "seconds_per_epoch": 40.639
+    },
+    {
+      "point": {
+        "border_px": 4,
+        "border_reduce": 2
+      },
+      "value": 0.9340627672774753,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.929590235396687,
+      "value_max": 0.9415945078828439,
+      "value_std": 0.0048800652875947296,
+      "value_sem": 0.002182431543539775,
+      "runs": [
+        "borde-ancho-0003-border_px4_seed4",
+        "borde-ancho-0004-border_px4_seed5",
+        "borde-ancho-0001-border_px4_seed2",
+        "borde-ancho-0000-border_px4_seed1",
+        "borde-ancho-0002-border_px4_seed3"
+      ],
+      "seconds_per_epoch": 36.8178
+    },
+    {
+      "point": {
+        "border_px": 12,
+        "border_reduce": 6
+      },
+      "value": 0.8856068561363099,
+      "n_seeds": 1,
+      "seeds": [
+        1
+      ],
+      "value_min": 0.8856068561363099,
+      "value_max": 0.8856068561363099,
+      "value_std": null,
+      "value_sem": null,
+      "runs": [
+        "borde-ancho-0015-border_px12_seed1"
+      ],
+      "seconds_per_epoch": null
+    }
+  ],
+  "detalle": [
+    {
+      "run": "borde-ancho-0008-border_px8_seed4",
+      "punto": {
+        "border_px": 8,
+        "seed": 4,
+        "border_reduce": 4
+      },
+      "valor": 0.9445623160632401,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 40.851
+    },
+    {
+      "run": "borde-ancho-0006-border_px8_seed2",
+      "punto": {
+        "border_px": 8,
+        "seed": 2,
+        "border_reduce": 4
+      },
+      "valor": 0.9440054728920814,
+      "epocas": 59,
+      "mejor_epoca": 49,
+      "paro_patience": true,
+      "s_por_epoca": 41.597
+    },
+    {
+      "run": "borde-ancho-0007-border_px8_seed3",
+      "punto": {
+        "border_px": 8,
+        "seed": 3,
+        "border_reduce": 4
+      },
+      "valor": 0.9431201483822217,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 40.553
+    },
+    {
+      "run": "borde-ancho-0013-border_px10_seed4",
+      "punto": {
+        "border_px": 10,
+        "seed": 4,
+        "border_reduce": 5
+      },
+      "valor": 0.9430051813471503,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    },
+    {
+      "run": "borde-ancho-0003-border_px4_seed4",
+      "punto": {
+        "border_px": 4,
+        "seed": 4,
+        "border_reduce": 2
+      },
+      "valor": 0.9415945078828439,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 36.836
+    },
+    {
+      "run": "borde-ancho-0012-border_px10_seed3",
+      "punto": {
+        "border_px": 10,
+        "seed": 3,
+        "border_reduce": 5
+      },
+      "valor": 0.9409238866957546,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    },
+    {
+      "run": "borde-ancho-0005-border_px8_seed1",
+      "punto": {
+        "border_px": 8,
+        "seed": 1,
+        "border_reduce": 4
+      },
+      "valor": 0.9389809615121216,
+      "epocas": 51,
+      "mejor_epoca": 41,
+      "paro_patience": true,
+      "s_por_epoca": 38.87
+    },
+    {
+      "run": "borde-ancho-0004-border_px4_seed5",
+      "punto": {
+        "border_px": 4,
+        "seed": 5,
+        "border_reduce": 2
+      },
+      "valor": 0.9360301679808022,
+      "epocas": 70,
+      "mejor_epoca": 60,
+      "paro_patience": true,
+      "s_por_epoca": 39.907
+    },
+    {
+      "run": "borde-ancho-0010-border_px10_seed1",
+      "punto": {
+        "border_px": 10,
+        "seed": 1,
+        "border_reduce": 5
+      },
+      "valor": 0.9348076792619225,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 40.639
+    },
+    {
+      "run": "borde-ancho-0009-border_px8_seed5",
+      "punto": {
+        "border_px": 8,
+        "seed": 5,
+        "border_reduce": 4
+      },
+      "valor": 0.9333149247549358,
+      "epocas": 35,
+      "mejor_epoca": 25,
+      "paro_patience": true,
+      "s_por_epoca": 50.79
+    },
+    {
+      "run": "borde-ancho-0011-border_px10_seed2",
+      "punto": {
+        "border_px": 10,
+        "seed": 2,
+        "border_reduce": 5
+      },
+      "valor": 0.9329513675738353,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    },
+    {
+      "run": "borde-ancho-0001-border_px4_seed2",
+      "punto": {
+        "border_px": 4,
+        "seed": 2,
+        "border_reduce": 2
+      },
+      "valor": 0.93255579853518,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 35.834
+    },
+    {
+      "run": "borde-ancho-0000-border_px4_seed1",
+      "punto": {
+        "border_px": 4,
+        "seed": 1,
+        "border_reduce": 2
+      },
+      "valor": 0.9305431265918633,
+      "epocas": 54,
+      "mejor_epoca": 44,
+      "paro_patience": true,
+      "s_por_epoca": 35.007
+    },
+    {
+      "run": "borde-ancho-0014-border_px10_seed5",
+      "punto": {
+        "border_px": 10,
+        "seed": 5,
+        "border_reduce": 5
+      },
+      "valor": 0.9302839007899548,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    },
+    {
+      "run": "borde-ancho-0002-border_px4_seed3",
+      "punto": {
+        "border_px": 4,
+        "seed": 3,
+        "border_reduce": 2
+      },
+      "valor": 0.929590235396687,
+      "epocas": 48,
+      "mejor_epoca": 38,
+      "paro_patience": true,
+      "s_por_epoca": 36.505
+    },
+    {
+      "run": "borde-ancho-0015-border_px12_seed1",
+      "punto": {
+        "border_px": 12,
+        "seed": 1,
+        "border_reduce": 6
+      },
+      "valor": 0.8856068561363099,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": 8,
+      "diff": 0.006733997443444828,
+      "p": 0.06349206349206349,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": 10,
+      "diff": 0.002331635856248182,
+      "p": 0.48412698412698413,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    }
+  ],
+  "pendientes": [
+    "borde-ancho-0016-border_px12_seed2",
+    "borde-ancho-0017-border_px12_seed3",
+    "borde-ancho-0018-border_px12_seed4",
+    "borde-ancho-0019-border_px12_seed5",
+    "borde-ancho-0020-border_px16_seed1",
+    "borde-ancho-0021-border_px16_seed2",
+    "borde-ancho-0022-border_px16_seed3",
+    "borde-ancho-0023-border_px16_seed4",
+    "borde-ancho-0024-border_px16_seed5"
+  ],
+  "sugerido": {
+    "border_px": 8,
+    "border_reduce": 4
+  }
+}

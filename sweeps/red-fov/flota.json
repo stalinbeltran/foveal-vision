@@ -1,0 +1,189 @@
+{
+  "recorridos": [
+    "mon-fov",
+    "sch-fov",
+    "red-fov"
+  ],
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "cuando": "2026-08-26T01:38:46+00:00",
+  "reparto": "seed",
+  "maquinas": 15,
+  "cpu": "E5-26",
+  "reloj_min": 4.3,
+  "usd": 0,
+  "hilos": 8,
+  "criba": {
+    "umbral": 0.75,
+    "cohorte": 0,
+    "necesarias": 15
+  },
+  "gasto_por_maquina": [],
+  "maquinas_alquiladas": 0,
+  "git": {
+    "activo": true,
+    "commits": 0,
+    "fallos_push": 0,
+    "ultimo_error": null
+  },
+  "peaje_min": 0.0,
+  "trabajo_min": 0.0,
+  "maquina_min": 0.0,
+  "peaje_pct": null,
+  "lotes": [
+    {
+      "lote": "red-fov-s1",
+      "sweep": "red-fov",
+      "puntos": [
+        0,
+        5,
+        10
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "red-fov-s2",
+      "sweep": "red-fov",
+      "puntos": [
+        1,
+        6,
+        11
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "red-fov-s3",
+      "sweep": "red-fov",
+      "puntos": [
+        2,
+        7,
+        12
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "red-fov-s4",
+      "sweep": "red-fov",
+      "puntos": [
+        3,
+        8,
+        13
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "red-fov-s5",
+      "sweep": "red-fov",
+      "puntos": [
+        4,
+        9,
+        14
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "mon-fov-s1",
+      "sweep": "mon-fov",
+      "puntos": [
+        0,
+        5
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "mon-fov-s2",
+      "sweep": "mon-fov",
+      "puntos": [
+        1,
+        6
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "mon-fov-s3",
+      "sweep": "mon-fov",
+      "puntos": [
+        2,
+        7
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "mon-fov-s4",
+      "sweep": "mon-fov",
+      "puntos": [
+        3,
+        8
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "mon-fov-s5",
+      "sweep": "mon-fov",
+      "puntos": [
+        4,
+        9
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "sch-fov-s1",
+      "sweep": "sch-fov",
+      "puntos": [
+        0,
+        5
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "sch-fov-s2",
+      "sweep": "sch-fov",
+      "puntos": [
+        1,
+        6
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "sch-fov-s3",
+      "sweep": "sch-fov",
+      "puntos": [
+        2,
+        7
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "sch-fov-s4",
+      "sweep": "sch-fov",
+      "puntos": [
+        3,
+        8
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "sch-fov-s5",
+      "sweep": "sch-fov",
+      "puntos": [
+        4,
+        9
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    }
+  ]
+}
