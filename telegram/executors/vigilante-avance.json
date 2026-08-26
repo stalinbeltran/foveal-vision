@@ -1,0 +1,19 @@
+{
+  "name": "vigilante-avance",
+  "descripcion": "Cada 10 min mira si cada maquina alquilada AVANZA, y destruye la que no (alquilada y muda, congelada, o con su lote ya terminado). Si ademas no queda flota viva y faltan puntos, relanza solo para lo que falte. Complementa a /use vigilante, que solo mira cuando NO hay flota. Con 'parar' lo detiene; con --dry-run no destruye ni alquila nada.",
+  "ejemplos": [
+    "--sweep ov-fov --cada 600",
+    "--sweep ov-fov --sweep ch-fov --dry-run --una-vuelta",
+    "--sweep ov-fov --cada 300 --gracia 25 --sin-avance 20",
+    "estado",
+    "parar"
+  ],
+  "command": "case \"{{input}}\" in parar) p=$(pgrep -af \"[v]igilante_avance.py\" | grep -v -e pgrep -e pkill -e awk | awk '{print $1}' | tr '\\n' ' '); if [ -n \"$p\" ]; then kill $p && echo \"vigilante de avance detenido (pid $p). Las maquinas que estuvieran vivas NO se tocan: para eso esta /use apagar-vast.\"; else echo 'no habia ningun vigilante de avance corriendo'; fi;; estado|'') echo '--- vigilante de avance ---'; p=$(pgrep -af \"[v]igilante_avance.py\" | grep -v -e pgrep -e pkill -e awk | awk '{print $1}' | tr '\\n' ' '); [ -n \"$p\" ] && echo \"VIVO (pid $p)\" || echo 'parado'; echo '--- flota ---'; f=$(pgrep -af \"[e]studio_flota.py\" | grep -v -e pgrep -e pkill -e awk | awk '{print $1}' | tr '\\n' ' '); [ -n \"$f\" ] && echo \"VIVA (alquilando/entrenando, pid $f)\" || echo 'parada'; echo '--- ultimas lineas de su log ---'; tail -c 2000 /tmp/vigilante-avance.log 2>/dev/null || echo '(sin log)';; *) \"$COORD_HOME/scripts/desacoplar.sh\" sh -c 'set -a; [ -f \"$COORD_HOME/.env\" ] && . \"$COORD_HOME/.env\"; [ -f \"$HOME/.config/dev-secrets.env\" ] && . \"$HOME/.config/dev-secrets.env\"; set +a; .venv/bin/python scripts/vigilante_avance.py {{input}} > /tmp/vigilante-avance.log 2>&1' >/dev/null 2>&1 & echo 'Vigilante de avance lanzado en su propio cgroup. Cada vuelta DESTRUYE las maquinas que no avanzan y, si no hay flota, PUEDE ALQUILAR. Log: /tmp/vigilante-avance.log. Estado: /use vigilante-avance -> estado. Pararlo: /use vigilante-avance -> parar';; esac",
+  "encargados": [
+    "echo"
+  ],
+  "timeoutMs": 60000,
+  "requiere": [
+    "python3"
+  ]
+}
