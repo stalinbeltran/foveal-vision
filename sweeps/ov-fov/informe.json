@@ -1,0 +1,196 @@
+{
+  "recorrido": "ov-fov",
+  "eje": "overlap_fovea_px",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.0026381188057198446,
+  "delta_fuente": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "overlap_fovea_px": 1
+      },
+      "value": 0.9272612672503968,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9198144466534128,
+      "value_max": 0.934492071186206,
+      "value_std": 0.005899012982310134,
+      "value_sem": 0.0026381188057198446,
+      "runs": [
+        "ov-fov-0007-overlap_fovea_px1_seed3",
+        "ov-fov-0008-overlap_fovea_px1_seed4",
+        "ov-fov-0006-overlap_fovea_px1_seed2",
+        "ov-fov-0009-overlap_fovea_px1_seed5",
+        "ov-fov-0005-overlap_fovea_px1_seed1"
+      ],
+      "seconds_per_epoch": 48.124
+    },
+    {
+      "point": {
+        "overlap_fovea_px": 0
+      },
+      "value": 0.9185580690455246,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9143918421698146,
+      "value_max": 0.9306453832393009,
+      "value_std": 0.006799292251926668,
+      "value_sem": 0.0030407359348391307,
+      "runs": [
+        "ov-fov-0003-overlap_fovea_px0_seed4",
+        "ov-fov-0004-overlap_fovea_px0_seed5",
+        "ov-fov-0002-overlap_fovea_px0_seed3",
+        "ov-fov-0000-overlap_fovea_px0_seed1",
+        "ov-fov-0001-overlap_fovea_px0_seed2"
+      ],
+      "seconds_per_epoch": 46.6762
+    }
+  ],
+  "detalle": [
+    {
+      "run": "ov-fov-0007-overlap_fovea_px1_seed3",
+      "punto": {
+        "overlap_fovea_px": 1,
+        "seed": 3
+      },
+      "valor": 0.934492071186206,
+      "epocas": 86,
+      "mejor_epoca": 76,
+      "paro_patience": true,
+      "s_por_epoca": 41.199
+    },
+    {
+      "run": "ov-fov-0008-overlap_fovea_px1_seed4",
+      "punto": {
+        "overlap_fovea_px": 1,
+        "seed": 4
+      },
+      "valor": 0.9318371317398555,
+      "epocas": 45,
+      "mejor_epoca": 35,
+      "paro_patience": true,
+      "s_por_epoca": 53.592
+    },
+    {
+      "run": "ov-fov-0003-overlap_fovea_px0_seed4",
+      "punto": {
+        "overlap_fovea_px": 0,
+        "seed": 4
+      },
+      "valor": 0.9306453832393009,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 51.733
+    },
+    {
+      "run": "ov-fov-0006-overlap_fovea_px1_seed2",
+      "punto": {
+        "overlap_fovea_px": 1,
+        "seed": 2
+      },
+      "valor": 0.9257923573063319,
+      "epocas": 64,
+      "mejor_epoca": 54,
+      "paro_patience": true,
+      "s_por_epoca": 40.851
+    },
+    {
+      "run": "ov-fov-0009-overlap_fovea_px1_seed5",
+      "punto": {
+        "overlap_fovea_px": 1,
+        "seed": 5
+      },
+      "valor": 0.9243703293661777,
+      "epocas": 51,
+      "mejor_epoca": 41,
+      "paro_patience": true,
+      "s_por_epoca": 52.883
+    },
+    {
+      "run": "ov-fov-0005-overlap_fovea_px1_seed1",
+      "punto": {
+        "overlap_fovea_px": 1,
+        "seed": 1
+      },
+      "valor": 0.9198144466534128,
+      "epocas": 45,
+      "mejor_epoca": 35,
+      "paro_patience": true,
+      "s_por_epoca": 52.095
+    },
+    {
+      "run": "ov-fov-0004-overlap_fovea_px0_seed5",
+      "punto": {
+        "overlap_fovea_px": 0,
+        "seed": 5
+      },
+      "valor": 0.9163052757384326,
+      "epocas": 42,
+      "mejor_epoca": 32,
+      "paro_patience": true,
+      "s_por_epoca": 55.546
+    },
+    {
+      "run": "ov-fov-0002-overlap_fovea_px0_seed3",
+      "punto": {
+        "overlap_fovea_px": 0,
+        "seed": 3
+      },
+      "valor": 0.9161245674740485,
+      "epocas": 31,
+      "mejor_epoca": 21,
+      "paro_patience": true,
+      "s_por_epoca": 37.764
+    },
+    {
+      "run": "ov-fov-0000-overlap_fovea_px0_seed1",
+      "punto": {
+        "overlap_fovea_px": 0,
+        "seed": 1
+      },
+      "valor": 0.9153232766060271,
+      "epocas": 62,
+      "mejor_epoca": 52,
+      "paro_patience": true,
+      "s_por_epoca": 51.912
+    },
+    {
+      "run": "ov-fov-0001-overlap_fovea_px0_seed2",
+      "punto": {
+        "overlap_fovea_px": 0,
+        "seed": 2
+      },
+      "valor": 0.9143918421698146,
+      "epocas": 65,
+      "mejor_epoca": 55,
+      "paro_patience": true,
+      "s_por_epoca": 36.426
+    }
+  ],
+  "truncados": [],
+  "contrastes": [],
+  "pendientes": [
+    "ov-fov-0015-overlap_fovea_px4_seed1",
+    "ov-fov-0016-overlap_fovea_px4_seed2",
+    "ov-fov-0017-overlap_fovea_px4_seed3",
+    "ov-fov-0018-overlap_fovea_px4_seed4",
+    "ov-fov-0019-overlap_fovea_px4_seed5"
+  ],
+  "sugerido": {
+    "overlap_fovea_px": 1
+  }
+}

@@ -1,6 +1,6 @@
 {
-  "status": "running",
-  "updated_at": 1787703189.2907188,
+  "status": "interrupted",
+  "updated_at": 1787708666.2081017,
   "epoch": 35,
-  "pid": 722
+  "reason": "el proceso que lo entrenaba ya no existe (caida/reinicio/hibernacion)"
 }

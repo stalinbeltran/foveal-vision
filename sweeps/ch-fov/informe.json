@@ -1,0 +1,406 @@
+{
+  "recorrido": "ch-fov",
+  "eje": "channels",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.0016947097149454522,
+  "delta_fuente": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "channels": [
+          16,
+          16,
+          16,
+          16
+        ]
+      },
+      "value": 0.9334660974019814,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.929590235396687,
+      "value_max": 0.9386111585053745,
+      "value_std": 0.0037894861247473226,
+      "value_sem": 0.0016947097149454522,
+      "runs": [
+        "ch-fov-0008-channels16x16x16x16_seed4",
+        "ch-fov-0009-channels16x16x16x16_seed5",
+        "ch-fov-0006-channels16x16x16x16_seed2",
+        "ch-fov-0005-channels16x16x16x16_seed1",
+        "ch-fov-0007-channels16x16x16x16_seed3"
+      ],
+      "seconds_per_epoch": 42.1592
+    },
+    {
+      "point": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ]
+      },
+      "value": 0.9085718500956663,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.8257550614005974,
+      "value_max": 0.9380305016907046,
+      "value_std": 0.047018968603018685,
+      "value_sem": 0.021027522005655618,
+      "runs": [
+        "ch-fov-0010-channels24x24x24x24_seed1",
+        "ch-fov-0011-channels24x24x24x24_seed2",
+        "ch-fov-0013-channels24x24x24x24_seed4",
+        "ch-fov-0012-channels24x24x24x24_seed3",
+        "ch-fov-0014-channels24x24x24x24_seed5"
+      ],
+      "seconds_per_epoch": null
+    },
+    {
+      "point": {
+        "channels": [
+          8,
+          8,
+          8,
+          8
+        ]
+      },
+      "value": 0.9021270534026341,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.8448828068132188,
+      "value_max": 0.9232968412244613,
+      "value_std": 0.03297767844591143,
+      "value_sem": 0.014748066149037514,
+      "runs": [
+        "ch-fov-0003-channels8x8x8x8_seed4",
+        "ch-fov-0000-channels8x8x8x8_seed1",
+        "ch-fov-0002-channels8x8x8x8_seed3",
+        "ch-fov-0004-channels8x8x8x8_seed5",
+        "ch-fov-0001-channels8x8x8x8_seed2"
+      ],
+      "seconds_per_epoch": 33.2164
+    }
+  ],
+  "detalle": [
+    {
+      "run": "ch-fov-0008-channels16x16x16x16_seed4",
+      "punto": {
+        "channels": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "seed": 4
+      },
+      "valor": 0.9386111585053745,
+      "epocas": 62,
+      "mejor_epoca": 52,
+      "paro_patience": true,
+      "s_por_epoca": 40.821
+    },
+    {
+      "run": "ch-fov-0010-channels24x24x24x24_seed1",
+      "punto": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ],
+        "seed": 1
+      },
+      "valor": 0.9380305016907046,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    },
+    {
+      "run": "ch-fov-0009-channels16x16x16x16_seed5",
+      "punto": {
+        "channels": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "seed": 5
+      },
+      "valor": 0.9360301679808022,
+      "epocas": 70,
+      "mejor_epoca": 60,
+      "paro_patience": true,
+      "s_por_epoca": 51.671
+    },
+    {
+      "run": "ch-fov-0011-channels24x24x24x24_seed2",
+      "punto": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ],
+        "seed": 2
+      },
+      "valor": 0.9329261945244457,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    },
+    {
+      "run": "ch-fov-0006-channels16x16x16x16_seed2",
+      "punto": {
+        "channels": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "seed": 2
+      },
+      "valor": 0.93255579853518,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 34.987
+    },
+    {
+      "run": "ch-fov-0005-channels16x16x16x16_seed1",
+      "punto": {
+        "channels": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "seed": 1
+      },
+      "valor": 0.9305431265918633,
+      "epocas": 54,
+      "mejor_epoca": 44,
+      "paro_patience": true,
+      "s_por_epoca": 41.913
+    },
+    {
+      "run": "ch-fov-0013-channels24x24x24x24_seed4",
+      "punto": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ],
+        "seed": 4
+      },
+      "valor": 0.9302485949729339,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    },
+    {
+      "run": "ch-fov-0007-channels16x16x16x16_seed3",
+      "punto": {
+        "channels": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "seed": 3
+      },
+      "valor": 0.929590235396687,
+      "epocas": 48,
+      "mejor_epoca": 38,
+      "paro_patience": true,
+      "s_por_epoca": 41.404
+    },
+    {
+      "run": "ch-fov-0003-channels8x8x8x8_seed4",
+      "punto": {
+        "channels": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "seed": 4
+      },
+      "valor": 0.9232968412244613,
+      "epocas": 38,
+      "mejor_epoca": 28,
+      "paro_patience": true,
+      "s_por_epoca": 29.484
+    },
+    {
+      "run": "ch-fov-0000-channels8x8x8x8_seed1",
+      "punto": {
+        "channels": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "seed": 1
+      },
+      "valor": 0.9217830691493043,
+      "epocas": 52,
+      "mejor_epoca": 42,
+      "paro_patience": true,
+      "s_por_epoca": 32.5
+    },
+    {
+      "run": "ch-fov-0002-channels8x8x8x8_seed3",
+      "punto": {
+        "channels": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "seed": 3
+      },
+      "valor": 0.9175440425310122,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 31.655
+    },
+    {
+      "run": "ch-fov-0012-channels24x24x24x24_seed3",
+      "punto": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ],
+        "seed": 3
+      },
+      "valor": 0.91589889788965,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    },
+    {
+      "run": "ch-fov-0004-channels8x8x8x8_seed5",
+      "punto": {
+        "channels": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "seed": 5
+      },
+      "valor": 0.9031285072951739,
+      "epocas": 53,
+      "mejor_epoca": 43,
+      "paro_patience": true,
+      "s_por_epoca": 42.61
+    },
+    {
+      "run": "ch-fov-0001-channels8x8x8x8_seed2",
+      "punto": {
+        "channels": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "seed": 2
+      },
+      "valor": 0.8448828068132188,
+      "epocas": 79,
+      "mejor_epoca": 69,
+      "paro_patience": true,
+      "s_por_epoca": 29.833
+    },
+    {
+      "run": "ch-fov-0014-channels24x24x24x24_seed5",
+      "punto": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ],
+        "seed": 5
+      },
+      "valor": 0.8257550614005974,
+      "epocas": null,
+      "mejor_epoca": null,
+      "paro_patience": null,
+      "s_por_epoca": null
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "diff": -0.024894247306315065,
+      "p": 0.25396825396825395,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "diff": -0.03133904399934728,
+      "p": 0.007936507936507936,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    }
+  ],
+  "pendientes": [
+    "ch-fov-0015-channels32x32x32x32_seed1",
+    "ch-fov-0016-channels32x32x32x32_seed2",
+    "ch-fov-0017-channels32x32x32x32_seed3",
+    "ch-fov-0018-channels32x32x32x32_seed4",
+    "ch-fov-0019-channels32x32x32x32_seed5"
+  ],
+  "sugerido": {
+    "channels": [
+      16,
+      16,
+      16,
+      16
+    ]
+  }
+}
