@@ -90,6 +90,45 @@ PLANA = {"regions": "single", "border_reduce": 1, "n_layers": 4,
          "channels": [22] * 4}
 
 ESTUDIOS = [
+    # ================================================================ bloque 0
+    # NO es un estudio: es la COMPROBACION PREVIA de que el dato reproduce.
+    #
+    # Por que existe (medido el 2026-08-26): esta maquina se rehizo y `data/` se
+    # perdio entera. El dataset se reconstruyo desde los specs congelados y
+    # `bench-dirty1000-16` (stride 8) SI reproduce su huella de git -- o sea que
+    # la fuente es la buena. Pero el de los estudios (stride 5) NO: misma
+    # config, mismos num_windows, mismo windows_per_split, mismos
+    # positives_per_corner y `split.json` identico byte a byte... y otro sha256
+    # del .npz.
+    #
+    # Eso deja la pregunta abierta, y no es academica: ov-sig, bp-sig y pl-f2-*
+    # SUMAN semillas a runs que ya existen. Si el dato no es el mismo, esos tres
+    # comparan peras con manzanas y NO dan ningun sintoma -- el `p` sale igual de
+    # creible. Es exactamente el fallo silencioso que el proyecto evita.
+    #
+    # El contraste local no vale: divergencia de CPU y divergencia de dato se
+    # confunden (medido: cruzar de familia mueve el f1 hasta 0,0457). Asi que se
+    # re-corre EL MISMO punto con LA MISMA semilla en la MISMA familia de CPU
+    # (--cpu E5-26, donde esta medido que el entrenamiento sale identico bit a
+    # bit) y se compara epoca a epoca contra lo que dejo escrito el run viejo.
+    #
+    # Referencia (runs/ov-fov-0010-overlap_fovea_px2_seed1/metrics.jsonl):
+    #   e1 train_loss=0.4850498190031013  val_f1=0.6806736039399476
+    #   e2 train_loss=0.29654462766599127 val_f1=0.8084834834834835
+    #   e3 train_loss=0.2159383792818135  val_f1=0.8524697415767093
+    # Iguales -> el dato reproduce y los tres recorridos que suman son validos.
+    # Distintas -> no reproduce, y hay que rehacer el diseno (ver el plan §4).
+    #
+    # 3 epocas y patience=0: con esto basta para distinguir, y cuesta ~2 runs
+    # cortos en vez de dos completos.
+    {
+        "bloque": "0", "name": "repro-chk",
+        "que": "B0 - ¿reproduce el dato? Mismo punto, misma semilla, misma familia de CPU",
+        "axis": "overlap_fovea_px", "range": [2],
+        "base": FOVEADA, "border_px": 4, "epochs": 3, "semillas": 2,
+        "receta_extra": {"patience": 0},   # que pare en la 3, no antes
+    },
+
     # ================================================================ bloque A
     # Cerrar overlap_fovea_px. MEDIDO el 2026-08-26: el eje es cost-neutral en
     # parametros (167.852 en todo el rango 0..7), asi que no hay coste que
@@ -265,7 +304,7 @@ def _hereda(name: str, est: dict, dataset: str, receta: dict,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--dataset", required=True)
-    ap.add_argument("--bloque", action="append", choices=["A", "B", "C"],
+    ap.add_argument("--bloque", action="append", choices=["0", "A", "B", "C"],
                     help="crea solo estos bloques (repetible)")
     ap.add_argument("--solo", action="append",
                     help="crea solo estos recorridos (repetible)")
@@ -276,7 +315,7 @@ def main() -> int:
     store = SweepStore()
     existentes = {p.name for p in (ROOT / "sweeps").iterdir() if p.is_dir()}
     receta_base = RecipeStore().get(RECIPE).as_dict()
-    bloques = set(args.bloque or ["A", "B", "C"])
+    bloques = set(args.bloque or ["0", "A", "B", "C"])
     pedidos = set(args.solo or [])
     creados, saltados, fallidos = [], [], []
 
@@ -312,6 +351,7 @@ def main() -> int:
         receta = dict(receta_base)
         if est.get("seed0"):
             receta["seed"] = int(est["seed0"])
+        receta.update(est.get("receta_extra") or {})
 
         try:
             if est.get("hereda_de"):
