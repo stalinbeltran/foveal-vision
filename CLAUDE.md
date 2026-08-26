@@ -67,9 +67,32 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > `None` — creíble y falsa, peor que un error. Ahora **se deriva del `space` del recorrido**, y si
 > no hay un único eje se niega diciéndolo.
 
-> **⚠ 2026-08-26 — HAY TRABAJO EN VUELO QUE NO SALIÓ DE ESTA MÁQUINA. LÉELO ANTES DE TOCAR NADA.**
+> **✅ 2026-08-26 (15:12 UTC) — LA FLOTA SE APAGÓ A MANO. NO QUEDA NADA CORRIENDO.**
+> El usuario apagó la instancia de Vast (`estudio-c11` y las demás de su flota) mientras el
+> relanzamiento de los cuatro recorridos a medias estaba en marcha. Estado comprobado en el repo
+> justo después:
+> - **`sch-fov` 10/10 y `pw-fov` 20/20 se cerraron enteros** antes del apagado, y se leen en el
+>   punto 4 del bloque de arriba. Los dos dejan el vigente donde estaba.
+> - **`ch-fov` quedó en 19/20** (falta `channels`=32 semilla 5; la lectura no depende de ella) y
+>   **`ov-fov` en 16/20** (faltan 4, y ahí la falta **sí** bloquea el veredicto — punto 3 de arriba).
+> - **Cuatro runs murieron a mitad** (épocas 43–57). Al pasar `estudio_informe.py` después del
+>   apagado se detectaron solos y quedaron marcados **`interrupted`** con el motivo escrito, así que
+>   **están excluidos de todas las tablas**. No son medidas: pararon por la muerte de la máquina, no
+>   por `patience`, que es R1.
+> - ⚠ **El `flota.json` de ese relanzamiento NO llegó a escribirse**, porque lo escribe
+>   `estudio_flota.py` al terminar y la flota se apagó desde fuera. **Coste e instancias de esa
+>   corrida son irrecuperables** desde el repo; los `flota.json` que hay en esos cuatro directorios
+>   son de la corrida **anterior** (06:53 UTC) y atribuírselos sería contar dos veces 101 instancias
+>   y 3,2996 $. Reporte con el detalle:
+>   [telegram-coordinator/reportes/2026/08-agosto/2026-08-26-prioridad2-relanzamiento.md](https://github.com/stalinbeltran/telegram-coordinator/blob/main/reportes/2026/08-agosto/2026-08-26-prioridad2-relanzamiento.md).
+> - ⚠ **El vigilante horario sigue existiendo y PUEDE VOLVER A ALQUILAR MÁQUINAS** si está armado:
+>   mira si a un estudio le faltan puntos y relanza la flota sólo para lo que falte — y a `ov-fov` y
+>   `ch-fov` **les faltan**. Se para con `/use vigilante` → `parar`. Comprueba en qué estado está
+>   antes de dar por hecho que no va a gastar nada.
+
+> **⚠ 2026-08-26 — CÓMO LLEGÓ AQUÍ ESE TRABAJO (contexto; ya NO está en vuelo — ver el bloque de arriba).**
 > Al hacer merge a `main` apareció que `origin/main` **ya tenía** la reparametrización de abajo y
-> **había seguido construyendo encima** desde otra máquina (la flota). Esto NO lo midió esta
+> **había seguido construyendo encima** desde otra máquina (la flota). Esto NO lo midió aquella
 > sesión; se registra aquí porque el aviso de «TODO PARADO» de más abajo **quedó obsoleto** y la
 > siguiente sesión lo leería como si nada corriera. Lo que hay, comprobado en el repo:
 > 1. **Mecanismo nuevo `couple` («ataduras»)** en `fv.sweeps.spec`: un campo que se mueve **con**
@@ -81,13 +104,20 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    plana, E3 foveada vs plana por métrica de tarea, E4 los knobs de F) **con el criterio escrito
 >    antes de mirar**, como manda protocolo.md §1.
 > 3. **18 recorridos en `queued`** en `sweeps/` (`borde-ancho`, `pw-fov`, `sch-fov`, `red-fov`,
->    `ch-fov`, `kc-fov`, `mon-fov`, `ov-fov`, los `pl-t-*`…). **Ninguno tiene resultados todavía**
->    en esta copia: `state.json` dice `queued` y no hay `.pt` ni `.npz` (artefactos ignorados).
+>    `ch-fov`, `kc-fov`, `mon-fov`, `ov-fov`, los `pl-t-*`…). ~~Ninguno tiene resultados todavía~~
+>    **— desactualizado: los resultados llegaron después** (ver los dos bloques de arriba).
+>    ⚠ **Y el `state.json` de esos directorios sigue diciendo `queued` aunque los runs estén
+>    hechos**, porque lo escribe quien lanza el recorrido y aquí los runs llegaron por el libro de a
+>    bordo desde la flota. **No uses `state.json` para saber si un recorrido tiene datos**: cuenta
+>    `runs/<recorrido>-*/status.json`, o pasa `scripts/estudio_informe.py`, que además excluye los
+>    que murieron a medias.
 > 4. ⚠ **Hay automatización que ALQUILA MÁQUINAS**: el ejecutor `telegram/executors/vigilante.json`
 >    corre `scripts/vigilante_prioridades.py` cada hora, mira si a un estudio le faltan puntos y
 >    **relanza la flota sólo para lo que falte**. Se para con `/use vigilante -> parar`, y eso **no**
 >    detiene una flota ya viva (para eso está `/use apagar-vast`). Si vas a tocar `spec.py`,
 >    `runner.py` o la geometría, cuenta con que puede haber runs entrando mientras tanto.
+>    **Sigue vigente tras el apagado del 26-ago**, y a `ov-fov` y `ch-fov` les faltan puntos: si el
+>    vigilante está armado, volverá a alquilar.
 > 5. **Tres arreglos suyos que conviene conocer**: un run cortado a mitad entraba en la tabla como
 >    si fuera una medida; el pozo de máquinas se pedía una sola vez y tres estudios se quedaban a
 >    cero; y `estudio-informe` se rompía cuando el eje no era un número (`channels`).

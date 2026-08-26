@@ -77,23 +77,25 @@
           32
         ]
       },
-      "value": 0.9258872634946133,
-      "n_seeds": 3,
+      "value": 0.9298141618871343,
+      "n_seeds": 4,
       "seeds": [
         1,
         2,
+        3,
         4
       ],
       "value_min": 0.9193994330311832,
-      "value_max": 0.9325975288074414,
-      "value_std": 0.0066018589031038135,
-      "value_sem": 0.0038115850148589146,
+      "value_max": 0.9415948570646971,
+      "value_std": 0.009525675020266472,
+      "value_sem": 0.004762837510133236,
       "runs": [
+        "ch-fov-0017-channels32x32x32x32_seed3",
         "ch-fov-0018-channels32x32x32x32_seed4",
         "ch-fov-0015-channels32x32x32x32_seed1",
         "ch-fov-0016-channels32x32x32x32_seed2"
       ],
-      "seconds_per_epoch": 71.97333333333333
+      "seconds_per_epoch": 70.94425
     },
     {
       "point": {
@@ -128,6 +130,23 @@
     }
   ],
   "detalle": [
+    {
+      "run": "ch-fov-0017-channels32x32x32x32_seed3",
+      "punto": {
+        "channels": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "seed": 3
+      },
+      "valor": 0.9415948570646971,
+      "epocas": 63,
+      "mejor_epoca": 53,
+      "paro_patience": true,
+      "s_por_epoca": 67.857
+    },
     {
       "run": "ch-fov-0008-channels16x16x16x16_seed4",
       "punto": {
@@ -436,7 +455,50 @@
     }
   ],
   "truncados": [],
-  "contrastes": [],
+  "contrastes": [
+    {
+      "valor": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "diff": -0.0031467021938560436,
+      "p": 0.3968253968253968,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "diff": -0.0036519355148471044,
+      "p": 0.47619047619047616,
+      "arrangements": 126,
+      "n": 4,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "diff": -0.03133904399934728,
+      "p": 0.007936507936507936,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    }
+  ],
   "pendientes": [],
   "sugerido": {
     "channels": [
