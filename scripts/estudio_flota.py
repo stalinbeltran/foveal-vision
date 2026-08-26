@@ -251,6 +251,12 @@ _disco = threading.Lock()         # escribir el libro de a bordo en runs/
 _destinos = threading.Lock()
 _git = threading.Lock()
 
+# Tras cuantos push fallidos seguidos se avisa por Telegram. 5 vueltas del
+# libro (~5 min) es tiempo de sobra para un parpadeo de red, y muy poco
+# comparado con las 51 vueltas que estuvo roto sin que nadie se enterara
+# el 2026-08-26.
+AVISAR_TRAS_N_PUSH = 5
+
 
 def log(msg: str = "") -> None:
     with _impresion:
@@ -520,11 +526,103 @@ class Libro:
         if self.activo:
             self.commit(mensaje)
 
+    def _fusion_a_medias(self) -> str:
+        """Motivo por el que NO se puede commitear ahora, o "" si se puede.
+
+        MEDIDO el 2026-08-26: mientras se resolvia a mano una divergencia, el
+        `git add -- runs sweeps` de aqui se trago CUATRO status.json a medio
+        fusionar y los commiteo **con los marcadores `<<<<<<<` dentro**. Un
+        status.json con marcadores no parsea, asi que ese run desaparece de
+        `estudio_progreso.py` y de `estudio_informe.py` -- el libro de a bordo
+        deja de ser libro justo cuando mas falta hace.
+
+        `git add` no distingue: si el fichero esta en conflicto, lo estadea tal
+        cual. Asi que la comprobacion va antes, y no se commitea nada mientras
+        haya una fusion abierta.
+        """
+        if (ROOT / ".git" / "MERGE_HEAD").exists():
+            return "hay una fusion abierta (MERGE_HEAD)"
+        u = subprocess.run(["git", "ls-files", "--unmerged", "--", "runs", "sweeps"],
+                           cwd=str(ROOT), capture_output=True, text=True, timeout=60)
+        if u.stdout.strip():
+            n = len({l.split("\t")[-1] for l in u.stdout.strip().splitlines()})
+            return f"{n} fichero(s) sin fusionar en runs/sweeps"
+        return ""
+
+    def _reconciliar(self) -> bool:
+        """Trae lo del remoto y lo fusiona, para que el push vuelva a entrar.
+
+        Por que hace falta: este bucle empuja pero NUNCA fusiona, asi que en
+        cuanto la rama local diverge -- basta un commit hecho desde otro clon --
+        el push falla **para siempre**, y solo se entera un log que nadie abre.
+
+        MEDIDO el 2026-08-26: 51 push seguidos rechazados. Los runs terminados
+        estaban commiteados aqui y **no llegaron a origin**; desde otro clon se
+        vieron como huerfanos y se marcaron `interrupted` cuatro medidas que
+        eran validas. Un push roto no se lee como un fallo: se lee como datos
+        que se contradicen entre maquinas.
+
+        Si la fusion da conflicto se ABORTA y se deja como estaba: la flota no
+        puede pararse a resolverlo, y un merge a medias en `runs/` es peor que
+        un push pendiente (ver `_fusion_a_medias`).
+        """
+        try:
+            r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "@{u}"],
+                               cwd=str(ROOT), capture_output=True, text=True, timeout=60)
+            if r.returncode != 0:
+                return False                       # sin rama de seguimiento
+            arriba = r.stdout.strip()
+            f = subprocess.run(["git", "fetch", "--quiet"], cwd=str(ROOT),
+                               capture_output=True, text=True, timeout=300)
+            if f.returncode != 0:
+                return False
+            m = subprocess.run(["git", "merge", "--no-edit", arriba], cwd=str(ROOT),
+                               capture_output=True, text=True, timeout=300)
+            if m.returncode != 0:
+                subprocess.run(["git", "merge", "--abort"], cwd=str(ROOT),
+                               capture_output=True, timeout=120)
+                log(f"    [git] la fusion con {arriba} da conflicto; abortada. "
+                    f"Hay que resolverla a mano: el libro sigue commiteando en "
+                    f"local, pero NO llega a origin.")
+                return False
+            log(f"    [git] fusionado {arriba}: reintento el push")
+            return True
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            log(f"    [git] no pude reconciliar: {type(exc).__name__}: {exc}")
+            return False
+
+    def _avisar_push_roto(self) -> None:
+        """Un fallo silencioso para siempre es el peor de los dos (CLAUDE.md).
+
+        Se avisa UNA vez al cruzar el umbral, no en cada vuelta: el aviso existe
+        para que alguien mire, no para llenar el hilo.
+        """
+        coord = Path(os.environ.get("COORD_HOME",
+                                    Path.home() / "src" / "telegram-coordinator"))
+        notify = coord / "scripts" / "notify.mjs"
+        texto = (f"AVISO: el libro de a bordo lleva {self.fallos_push} push seguidos "
+                 f"fallando. Los runs se estan commiteando en local pero NO llegan a "
+                 f"GitHub, asi que desde otra maquina se veran como si no existieran. "
+                 f"Ultimo error: {self.ultimo_error}")
+        log(f"    [git] {texto}")
+        if not notify.exists():
+            return
+        try:
+            subprocess.run(["node", str(notify), texto], timeout=60, capture_output=True)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
     def commit(self, mensaje: str) -> bool:
         if not self.activo:
             return False
         with _git:
             try:
+                atasco = self._fusion_a_medias()
+                if atasco:
+                    self.ultimo_error = atasco
+                    log(f"    [git] NO commiteo: {atasco}. Se resuelve a mano; "
+                        f"mientras tanto los datos siguen en runs/ sin perderse.")
+                    return False
                 subprocess.run(["git", "add", "--", "runs", "sweeps"], cwd=str(ROOT),
                                capture_output=True, timeout=120)
                 hay = subprocess.run(["git", "diff", "--cached", "--quiet"],
@@ -543,11 +641,16 @@ class Libro:
                     return True
                 p = subprocess.run(["git", "push"], cwd=str(ROOT), capture_output=True,
                                    text=True, timeout=300)
+                if p.returncode != 0 and self._reconciliar():
+                    p = subprocess.run(["git", "push"], cwd=str(ROOT),
+                                       capture_output=True, text=True, timeout=300)
                 if p.returncode != 0:
                     self.fallos_push += 1
                     self.ultimo_error = (p.stderr or p.stdout or "?").strip()[:200]
                     log(f"    [git] commit {self.commits} hecho pero el push fallo "
                         f"({self.fallos_push} seguidos): {self.ultimo_error}")
+                    if self.fallos_push == AVISAR_TRAS_N_PUSH:
+                        self._avisar_push_roto()
                     return True
                 self.fallos_push = 0
                 return True
