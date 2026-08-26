@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from fv.metrics import permutation_test            # noqa: E402
-from fv.sweeps.runner import sweep_trials          # noqa: E402
+from fv.sweeps.runner import es_medida, sweep_trials  # noqa: E402
 from fv.sweeps.store import SweepStore             # noqa: E402
 from fv.sweeps.winner import (aggregate_seeds, hashable, suggest_winner,  # noqa: E402
                               tie_delta)
@@ -57,8 +57,12 @@ def main() -> int:
     store, runs = SweepStore(), RunStore()
     spec = store.spec(args.sweep)
     tabla = sweep_trials(args.sweep, store=store, run_store=runs)
-    scored = [t for t in tabla["trials"] if t["value"] is not None]
+    # Un run a medias NO es una medida: trae valor (lo mejor hasta donde llego)
+    # pero no ha convergido, asi que hunde su punto. Ver ESTADOS_MEDIBLES.
+    scored = [t for t in tabla["trials"] if es_medida(t)]
     pendientes = [t for t in tabla["trials"] if t["value"] is None]
+    a_medias = [t for t in tabla["trials"]
+                if t["value"] is not None and not es_medida(t)]
     if not scored:
         print(f"El recorrido '{args.sweep}' no tiene ningun punto medido todavia.")
         return 1
@@ -109,7 +113,10 @@ def main() -> int:
         f"## Resultado de `{args.sweep}`",
         "",
         f"{len(scored)}/{len(tabla['trials'])} puntos medidos"
-        + (f" ({len(pendientes)} sin terminar)" if pendientes else "")
+        + (f" ({len(pendientes)} sin empezar)" if pendientes else "")
+        + (f", **{len(a_medias)} A MEDIAS y EXCLUIDOS** (la maquina murio antes "
+           f"de que convergieran: tienen valor pero no es una medida)"
+           if a_medias else "")
         + f", dataset `{spec['window_dataset']}`, objetivo `{tabla['objective']}` "
           f"del checkpoint.",
         "",

@@ -214,6 +214,31 @@ def delete_sweep(name: str, store: SweepStore | None = None,
     return {"deleted": name, "runs_deleted": children}
 
 
+# Que estados cuentan como una MEDIDA. Solo `done`, y la razon merece quedar
+# escrita porque el fallo era silencioso: un run `interrupted` -- la maquina
+# alquilada se murio a mitad -- SI tiene metrics.jsonl y SI tiene un mejor valor
+# hasta donde llego, asi que `value is not None` lo dejaba pasar y aterrizaba en
+# la tabla como si fuera una medida terminada. Y no lo es: al no haber
+# convergido, su f1 esta SISTEMATICAMENTE por debajo del que habria dado, o sea
+# que hunde justo el punto que le tocara.
+#
+# MEDIDO el 2026-08-26: al morir las maquinas de la flota de prioridades, los 5
+# runs de `ov-fov` con overlap_fovea_px=2 -- que es la RED VIGENTE -- quedaron
+# interrumpidos y el informe los promedio en 0,9229, contra el 0,9341 que esa
+# misma red da terminada en `pw-fov`. La tabla salia igual de creible y decia
+# que el vigente era peor de lo que es.
+#
+# Y R1 no lo cazaba: comprueba `stopped_early is False`, que sale de summary.json,
+# y un run interrumpido NO tiene summary.json -- asi que el chequeo miraba None y
+# lo dejaba pasar. Un run a medias no es un run malo: es un run que no esta.
+ESTADOS_MEDIBLES = {"done"}
+
+
+def es_medida(trial: dict) -> bool:
+    """¿Este punto es una medida terminada, y no un run a medias?"""
+    return trial.get("value") is not None and trial.get("status") in ESTADOS_MEDIBLES
+
+
 def sweep_trials(name: str, store: SweepStore | None = None,
                  run_store: RunStore | None = None,
                  objective: str | None = None) -> dict:

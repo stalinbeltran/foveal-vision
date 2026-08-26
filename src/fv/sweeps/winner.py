@@ -18,7 +18,7 @@ import math
 import statistics
 
 from fv.models.builder import network_trace
-from fv.sweeps.runner import sweep_trials
+from fv.sweeps.runner import es_medida, sweep_trials
 from fv.sweeps.spec import NETWORK_PARAMS, SweepError
 from fv.sweeps.store import SweepStore
 from fv.training.registry import RunStore
@@ -60,7 +60,9 @@ def suggest_winner(name: str, delta: float | None = None,
                          f"métrica de coste '{cost_metric}' no existe",
                          f"usa una de {list(COST_METRICS)}")
     trials = sweep_trials(name, store, run_store, objective=objective)
-    scored = [dict(t) for t in trials["trials"] if t["value"] is not None]
+    # solo runs TERMINADOS: uno interrumpido trae valor y no es una medida
+    # (ver ESTADOS_MEDIBLES en runner.py, con el caso que lo destapo)
+    scored = [dict(t) for t in trials["trials"] if es_medida(t)]
     if not scored:
         raise SweepError("no_scored_trials",
                          f"el recorrido '{name}' no tiene puntos con valor aún",

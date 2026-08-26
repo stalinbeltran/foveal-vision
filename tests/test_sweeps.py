@@ -353,3 +353,19 @@ def test_couple_cannot_hang_from_the_replica_axis():
                                                          "values": [1, 2]}},
                             "strategy": "grid", "objective": "f1"})
     assert "couple_axis_is_seed" in [p["code"] for p in problems]
+
+
+def test_an_interrupted_run_is_not_a_measurement(world):
+    """Un run cortado a mitad TIENE valor (lo mejor hasta donde llego) y NO es
+    una medida: no convergio, asi que hunde su punto y la tabla sale creible.
+
+    Medido el 2026-08-26: al morir las maquinas alquiladas, los 5 runs de la RED
+    VIGENTE en `ov-fov` quedaron `interrupted` y el informe los promedio en
+    0,9229 contra el 0,9341 que esa misma red da terminada. R1 no lo cazaba
+    porque mira `stopped_early` de summary.json, y un run interrumpido no tiene
+    summary.json."""
+    from fv.sweeps.runner import es_medida
+    assert es_medida({"value": 0.9, "status": "done"})
+    for estado in ("interrupted", "running", "error", "queued", "cancelled", None):
+        assert not es_medida({"value": 0.9, "status": estado}), estado
+    assert not es_medida({"value": None, "status": "done"})

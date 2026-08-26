@@ -53,6 +53,18 @@ STRIDES = [2, 4, 8]
 NMS = [4, 8, 12, 16, 20]
 DEFAULTS = {"threshold": 0.5, "stride": 8, "nms_radius": 8}   # n=16 -> n/2, n/2
 
+# Suelo para que un run cuente como "modelo malo" y no como "entrenamiento
+# MUERTO". No es lo mismo y la diferencia rompe el estudio: el proyecto tiene
+# runs con f1 EXACTAMENTE 0,0000 -- el fallo bimodal que plan-plana.md §6.1
+# documenta, y que en `pl-t-lr` dejo una semilla colapsada en lr=0,0028. Ese run
+# no es un modelo de baja calidad, es una red que no aprendio nada: su "optimo
+# de knobs" es el que mejor ordena ruido, y meterlo en la comparacion contesta
+# la pregunta con un punto que no significa nada.
+# Medido el 2026-08-26: sin este suelo, el "malo" elegido era justamente ese
+# colapsado, con optimo 0,0437 en threshold=0,1 -- o sea el knob que mas detecta,
+# porque cualquier cosa es mejor que nada.
+F1_MINIMO_UTIL = 0.05
+
 
 def runs_con_checkpoint(store: RunStore) -> list:
     fuera = []
@@ -69,12 +81,23 @@ def runs_con_checkpoint(store: RunStore) -> list:
     return fuera
 
 
-def f1_por_defecto(run: str, split: str) -> float | None:
+# El f1 de tarea vive en `macro.f1` (parrafo por imagen, promediado por imagen),
+# que es el que reporta metrica-de-tarea.md y el que trae su `sem`. NO hay un
+# "f1" en la raiz: leerlo de ahi da None en silencio para TODOS los runs, y el
+# barrido concluye "no hay runs puntuables" sin que nada haya fallado.
+def f1_de(r: dict) -> float:
+    return r["macro"]["f1"]
+
+
+def f1_por_defecto(run: str, split: str) -> tuple:
+    """(f1, None) o (None, motivo). El motivo VIAJA: un run que no se puede
+    puntuar y se salta en silencio es un hueco que luego se lee como cero."""
     try:
-        r = task_score(run, split, **DEFAULTS)
-    except (RunError, Exception):                    # noqa: BLE001
-        return None
-    return r.get("f1")
+        return f1_de(task_score(run, split, **DEFAULTS)), None
+    except RunError as e:
+        return None, f"{e.code}: {e.message}"
+    except (KeyError, OSError, ValueError) as e:
+        return None, f"{type(e).__name__}: {e}"
 
 
 def main() -> int:
@@ -94,15 +117,30 @@ def main() -> int:
           f"para elegir {args.runs} de calidad distinta...", flush=True)
 
     t0 = time.time()
-    base = []
+    base, motivos = [], {}
     for r in candidatos:
-        v = f1_por_defecto(r, args.split)
-        if v is not None:
+        v, motivo = f1_por_defecto(r, args.split)
+        if v is None:
+            motivos[r] = motivo
+        else:
             base.append((v, r))
     base.sort()
+    muertos = [(v, r) for v, r in base if v < F1_MINIMO_UTIL]
+    base = [(v, r) for v, r in base if v >= F1_MINIMO_UTIL]
+    if muertos:
+        print(f"  ({len(muertos)} runs con f1 < {F1_MINIMO_UTIL} FUERA: son "
+              f"entrenamientos colapsados, no modelos malos. p.ej. "
+              f"{muertos[0][1]} con f1={muertos[0][0]:.4f})")
     if len(base) < args.runs:
-        print(f"solo {len(base)} runs puntuables; hacen falta {args.runs}")
+        print(f"solo {len(base)} runs puntuables de {len(candidatos)}; hacen "
+              f"falta {args.runs}. Las razones, que es lo que hace falta para "
+              f"arreglarlo:")
+        for r, m in list(motivos.items())[:8]:
+            print(f"    {r}: {m}")
         return 1
+    if motivos:
+        print(f"  ({len(motivos)} runs no puntuables, se saltan: "
+              f"{sorted(motivos.values())[0]} ...)")
     # el peor, el mediano y el mejor: la calidad tiene que ser DISTINTA a proposito
     elegidos = [base[0], base[len(base) // 2], base[-1]]
     etiquetas = ["malo", "medio", "bueno"]
@@ -121,11 +159,13 @@ def main() -> int:
                     try:
                         r = task_score(run, args.split, threshold=th, stride=st,
                                        nms_radius=nm)
-                    except Exception:                # noqa: BLE001
+                    except (RunError, KeyError, OSError, ValueError) as e:
+                        print(f"    (combo th={th} st={st} nms={nm} fallo: {e})")
                         continue
                     n += 1
-                    if mejor is None or r["f1"] > mejor["f1"]:
-                        mejor = {"f1": r["f1"], "threshold": th, "stride": st,
+                    v = f1_de(r)
+                    if mejor is None or v > mejor["f1"]:
+                        mejor = {"f1": v, "threshold": th, "stride": st,
                                  "nms_radius": nm}
         if mejor is None:
             print("  no se pudo puntuar")
