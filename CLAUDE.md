@@ -23,6 +23,33 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **⚠ 2026-08-26 — HAY TRABAJO EN VUELO QUE NO SALIÓ DE ESTA MÁQUINA. LÉELO ANTES DE TOCAR NADA.**
+> Al hacer merge a `main` apareció que `origin/main` **ya tenía** la reparametrización de abajo y
+> **había seguido construyendo encima** desde otra máquina (la flota). Esto NO lo midió esta
+> sesión; se registra aquí porque el aviso de «TODO PARADO» de más abajo **quedó obsoleto** y la
+> siguiente sesión lo leería como si nada corriera. Lo que hay, comprobado en el repo:
+> 1. **Mecanismo nuevo `couple` («ataduras»)** en `fv.sweeps.spec`: un campo que se mueve **con**
+>    el eje en vez de multiplicarse contra él — la **diagonal**, no el producto cartesiano. Existe
+>    exactamente para poder preguntar *«¿más área a coste constante?»*: barrer `border_px`
+>    [4,8,10,12,16] con `border_reduce` atado [2,4,5,6,8], de modo que el anillo se queda en **2
+>    celdas y N=20 en los cinco puntos**. Mismo tensor, mismos parámetros, mismo coste por época.
+> 2. **`docs/plan-prioridades-2026-08-25.md`**: cuatro estudios (E1 `borde-ancho`, E2 afinado de la
+>    plana, E3 foveada vs plana por métrica de tarea, E4 los knobs de F) **con el criterio escrito
+>    antes de mirar**, como manda protocolo.md §1.
+> 3. **18 recorridos en `queued`** en `sweeps/` (`borde-ancho`, `pw-fov`, `sch-fov`, `red-fov`,
+>    `ch-fov`, `kc-fov`, `mon-fov`, `ov-fov`, los `pl-t-*`…). **Ninguno tiene resultados todavía**
+>    en esta copia: `state.json` dice `queued` y no hay `.pt` ni `.npz` (artefactos ignorados).
+> 4. ⚠ **Hay automatización que ALQUILA MÁQUINAS**: el ejecutor `telegram/executors/vigilante.json`
+>    corre `scripts/vigilante_prioridades.py` cada hora, mira si a un estudio le faltan puntos y
+>    **relanza la flota sólo para lo que falte**. Se para con `/use vigilante -> parar`, y eso **no**
+>    detiene una flota ya viva (para eso está `/use apagar-vast`). Si vas a tocar `spec.py`,
+>    `runner.py` o la geometría, cuenta con que puede haber runs entrando mientras tanto.
+> 5. **Tres arreglos suyos que conviene conocer**: un run cortado a mitad entraba en la tabla como
+>    si fuera una medida; el pozo de máquinas se pedía una sola vez y tres estudios se quedaban a
+>    cero; y `estudio-informe` se rompía cuando el eje no era un número (`channels`).
+> **Esta sesión sólo integró su commit de verificación encima y comprobó que la suite sigue en
+> verde con todo junto.** Los resultados de esos estudios, cuando los haya, no están aquí.
+
 > **✅ 2026-08-25 — LA GEOMETRÍA SE DECLARA EN PÍXELES REALES. NINGUNA RED CAMBIÓ.**
 > Reparametrización pedida por el usuario y decidida con él (decisión **C14**). La geometría se
 > declaraba desde el lado equivocado: `N` y `c_frac` fijaban la fóvea **entre los dos**, así que
@@ -104,7 +131,8 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > directa; (b) la comparación foveada vs plana, que sigue siendo *la* pregunta del proyecto y sigue
 > sin contestar; (c) los knobs de F, gratis y sin aplicar (decisión F15 del usuario).
 
-> **✅ 2026-08-11 — TODO PARADO. Los dos procesos cerraron; no hay nada corriendo.**
+> **✅ 2026-08-11 — TODO PARADO** *(obsoleto: ver la nota del 2026-08-26 arriba — hay 18
+> recorridos en cola y un vigilante horario que puede alquilar máquinas)*.
 > `p40-lr-L4` terminó 20/20 (analizado en [docs/plan-lr-L4.md](docs/plan-lr-L4.md) §7: *el eje es
 > plano, `lr`=0,0014 se queda*), y **la cadena de la CNN plana corrió sola y completa** — arrancó
 > **23 min** después de que cerrara el recorrido, 41 runs, **22,5 h**. El watchdog
