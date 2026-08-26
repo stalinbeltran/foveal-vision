@@ -663,14 +663,57 @@ def construir_payload(sweeps: list, dataset: str) -> Path:
 class Maquinas:
     """Da ofertas de maquinas DISTINTAS, y nunca repite una ya usada.
 
-    Se pide un colchon de repuestos de una vez (una sola consulta al catalogo) y
-    se van entregando bajo cerrojo: asi un reintento tras un fallo no puede
-    volver a caer ni en la maquina que acaba de fallar ni en la de otro lote.
+    Se pide un colchon de repuestos y se van entregando bajo cerrojo: asi un
+    reintento tras un fallo no puede volver a caer ni en la maquina que acaba de
+    fallar ni en la de otro lote.
+
+    Y SE RELLENA cuando se agota, que es la parte que costo una tarde
+    ---------------------------------------------------------------------
+    MEDIDO el 2026-08-25 (flota de 10 recorridos, log en /tmp/estudio-prioridades.log):
+    el pozo se pedia UNA vez, dimensionado a `cuantas + repuestos`. Se pidieron 53
+    para 50 alquileres, **26 maquinas fallaron al preparar** (sshd que no contesta,
+    ofertas que se las lleva otro entre la busqueda y la compra) y el colchon de 3
+    se evaporo. Resultado: a los diez minutos, **20 lotes** -- `mon-fov` y
+    `sch-fov` enteros, `red-fov` entero y cuatro semillas de `kc-fov` -- se
+    encontraron con «no quedan maquinas distintas libres» y **murieron ahi**, sin
+    reintentar. Tres estudios completos se quedaron en 0 runs mientras el catalogo
+    tenia 99 maquinas alquilables.
+
+    Y el sintoma era de los malos: la flota siguio corriendo tan tranquila con los
+    24 lotes que si tenian maquina, termino «bien», y lo que faltaba solo se veia
+    contando runs. Un estudio a cero no se distingue de uno que nadie pidio.
+
+    Asi que el pozo vuelve al catalogo cuando se queda sin nada. Tres reglas:
+
+    1. **Se excluye lo ya entregado Y lo que tengo alquilado ahora mismo**, que es
+       lo que se re-consulta en cada relleno: una maquina que entregue hace diez
+       minutos ya esta ocupada, y el catalogo no lo sabe.
+    2. **Sin cache**: `buscar_ofertas_paginado` cachea 60 s, y aqui se pregunta
+       justamente porque la disponibilidad ha cambiado.
+    3. **Tope de rellenos** (`RELLENOS_MAX`). Si el catalogo ya no da mas, dos
+       rellenos seguidos que no traen nada nuevo devuelven None y el lote falla
+       con su razon -- que es lo correcto -- en vez de girar contra la API.
     """
+
+    RELLENOS_MAX = 12
 
     def __init__(self, cuantas: int, repuestos: int, cpus: int, max_cpus: int,
                  min_ram: float, max_price: float, cpu: str = "",
                  sin_cpu: str = ""):
+        self._busq = {"cpus": cpus, "max_cpus": max_cpus, "min_ram": min_ram,
+                      "max_price": max_price, "cpu": cpu, "sin_cpu": sin_cpu}
+        self._cuantas = cuantas
+        self._rellenos = 0
+        self.entregadas: list = []
+        self._vistas: set = set()          # machine_id ya entregados por este pozo
+        self.pool = self._pedir(cuantas + repuestos, primera=True)
+        if len(self.pool) < cuantas:
+            die(f"solo quedan {len(self.pool)} maquinas distintas y hacen falta "
+                f"{cuantas}.\n"
+                f"  O esperas a que termine la otra flota, o aflojas --cpu/--cpus, "
+                f"o subes --max-price.")
+
+    def _en_uso(self) -> set:
         # Nunca alquilar una maquina que YA estoy usando. Sin esto, dos flotas a
         # la vez -- un estudio corriendo y otro que se lanza -- eligen ambas por
         # precio, o sea que eligen las MISMAS ofertas, y la segunda se encuentra
@@ -678,42 +721,63 @@ class Maquinas:
         # la lista negra contra un host que estaba perfectamente: la cuarta
         # variante del mismo error de atribucion en este estudio.
         try:
-            en_uso = {int(i["machine_id"]) for i in V.instancias()
-                      if i.get("machine_id") is not None}
+            return {int(i["machine_id"]) for i in V.instancias()
+                    if i.get("machine_id") is not None}
         except Exception:                               # noqa: BLE001
-            en_uso = set()
-        margen = len(en_uso)
+            return set()
+
+    def _pedir(self, cuantas: int, primera: bool = False) -> list:
+        b = self._busq
+        en_uso = self._en_uso()
+        excluir = en_uso | self._vistas
         ofertas = V.elegir_ofertas_distintas(
-            cuantas + repuestos + margen, cpus=cpus, max_cpus=max_cpus,
-            min_ram_gb=min_ram, max_price=max_price, cpu=cpu)
-        self.pool = [o for o in ofertas if int(o.get("machine_id", -1)) not in en_uso]
+            cuantas + len(excluir), cpus=b["cpus"], max_cpus=b["max_cpus"],
+            min_ram_gb=b["min_ram"], max_price=b["max_price"], cpu=b["cpu"],
+            # en un relleno se acepta lo que haya: morir por no poder dar UN
+            # repuesto mataria la flota entera, que es peor que seguir con menos.
+            # La primera peticion si es estricta -- ahi si falta, falta de verdad.
+            estricto=primera,
+            # y sin cache, porque se pregunta justamente porque la
+            # disponibilidad ha cambiado desde hace un minuto
+            usar_cache=primera)
+        nuevas = [o for o in ofertas
+                  if int(o.get("machine_id", -1)) not in excluir]
         # `--cpu` es una SUBCADENA y no puede excluir: "E5-26" deja pasar las v2
         # (Ivy Bridge), que NO tienen AVX2 -- plan-lr-alto §7.6 lo dejo escrito
         # como el agujero del filtro, y el 2026-08-25 el catalogo entrego una
         # E5-2697 v2 que ademas fue la mas lenta de la cohorte (50 ms/paso contra
         # 24 de una v4). Para lo que decide hace falta poder decir que NO.
-        if sin_cpu:
-            fuera = [t.strip().lower() for t in sin_cpu.split(",") if t.strip()]
-            antes = len(self.pool)
-            self.pool = [o for o in self.pool
-                         if not any(t in (o.get("cpu_name") or "").lower()
-                                    for t in fuera)]
-            if antes != len(self.pool):
-                log(f"  ({antes - len(self.pool)} ofertas saltadas por CPU excluida "
-                    f"'{sin_cpu}')")
-        if en_uso:
-            log(f"  ({len(ofertas) - len(self.pool)} ofertas saltadas por estar YA "
-                f"alquiladas por mi: {sorted(en_uso)})")
-        if len(self.pool) < cuantas:
-            die(f"tras descartar las {len(en_uso)} maquinas que ya tengo alquiladas "
-                f"quedan {len(self.pool)} y hacen falta {cuantas}.\n"
-                f"  O esperas a que termine la otra flota, o aflojas --cpu/--cpus.")
-        self.entregadas: list = []
+        if b["sin_cpu"]:
+            fuera = [t.strip().lower() for t in b["sin_cpu"].split(",") if t.strip()]
+            antes = len(nuevas)
+            nuevas = [o for o in nuevas
+                      if not any(t in (o.get("cpu_name") or "").lower()
+                                 for t in fuera)]
+            if antes != len(nuevas):
+                log(f"  ({antes - len(nuevas)} ofertas saltadas por CPU excluida "
+                    f"'{b['sin_cpu']}')")
+        if en_uso and primera:
+            log(f"  ({len(en_uso)} maquinas saltadas por estar YA alquiladas por "
+                f"mi: {sorted(en_uso)})")
+        for o in nuevas:
+            self._vistas.add(int(o.get("machine_id", -1)))
+        return nuevas
 
     def siguiente(self) -> "dict | None":
         with _reparto:
             if not self.pool:
-                return None
+                if self._rellenos >= self.RELLENOS_MAX:
+                    log(f"  [pozo] agotado y ya van {self._rellenos} rellenos: "
+                        f"no se pide mas al catalogo")
+                    return None
+                self._rellenos += 1
+                nuevas = self._pedir(max(4, self._cuantas // 4))
+                log(f"  [pozo] vacio -> relleno {self._rellenos}/"
+                    f"{self.RELLENOS_MAX}: {len(nuevas)} maquinas nuevas del "
+                    f"catalogo")
+                if not nuevas:
+                    return None
+                self.pool.extend(nuevas)
             o = self.pool.pop(0)
             self.entregadas.append(o)
             return o
