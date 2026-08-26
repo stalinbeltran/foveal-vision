@@ -1,12 +1,5 @@
 {
-<<<<<<< HEAD
   "status": "done",
   "updated_at": 1787750991.4672089,
   "epoch": 48
-=======
-  "status": "interrupted",
-  "updated_at": 1787757171.3709033,
-  "epoch": 43,
-  "reason": "el proceso que lo entrenaba ya no existe (caida/reinicio/hibernacion)"
->>>>>>> origin/main
 }
