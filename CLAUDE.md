@@ -995,15 +995,23 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
   código (identificadores, docstrings) en inglés.
 - **Commits**: cada tarea terminada acaba en un commit descriptivo. Además, **cada cambio
   solicitado por el usuario, una vez completado, se cierra con su propio commit descriptivo.**
-- **Rama**: el trabajo va a la rama de desarrollo **`dev`**, y **cada cambio pedido se
-  empuja** (`git push -u origin dev`) cuando queda terminado y probado. No se trabaja
-  sobre `main` ni se le hace push directo: a `main` se llega por merge cuando el usuario
-  lo decida. Misma regla en el proyecto hermano `image-text-sample-generator`.
+- **Rama: TODO va a `main`. NO se usa `dev`.** *(Regla vigente desde 2026-08-26, por decisión
+  del usuario; invierte la convención anterior.)* Cada cambio que pida el usuario se commitea
+  **en `main`** y se **empuja a `main`** (`git push origin main`) en cuanto queda terminado y
+  probado. **No crees ramas `dev` ni empujes a `origin/dev`**, y no propongas un merge: no hay
+  paso intermedio que esperar.
+  **El porqué**: la máquina se rehace sin aviso y **un clon limpio saca `main`** — lo que se
+  quedaba en `dev` era invisible para la máquina siguiente, para la flota y para los ejecutores
+  de Telegram (que se descubren por `git pull` a `main`). La rama de desarrollo sólo añadía una
+  deuda de merge que ya se cobró: ver el bloque de «Servidores efímeros» de abajo, y el
+  desfase de **74 commits** que tenía `origin/dev` el 2026-08-26.
+  ⚠ **`origin/dev` sigue existiendo** y quedó al día ese día. Es historia: no se le empuja más.
+  Misma regla en el proyecto hermano `image-text-sample-generator`.
 - **Servidores efímeros: lo que no está empujado, no existe.** La máquina se rehace sin
   aviso, así que **todo cambio y toda documentación se empuja en cuanto queda terminado**,
-  no al final del encargo — y el merge a `main` pendiente es deuda visible, porque **un
-  clon limpio saca `main`** y lo que se quedó en `dev` es invisible para la máquina
-  siguiente. Medido el 2026-08-14: el droplet apareció restaurado y sin datos, y el
+  no al final del encargo. **Un clon limpio saca `main`**, y por eso hoy se trabaja
+  directamente ahí (ver la regla de rama de arriba): lo que se quedaba en `dev` era
+  invisible para la máquina siguiente. Medido el 2026-08-14: el droplet apareció restaurado y sin datos, y el
   procedimiento para reconstruir la fuente del benchmark estaba empujado **solo a `dev`**
   del generador; se dio por imposible lo que sí estaba escrito y se midió sobre la fuente
   equivocada. Aplica igual a los artefactos que sí se versionan (reportes de
@@ -1011,7 +1019,7 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
 - **Los comandos de este repo para el bot de Telegram van en `telegram/executors/*.json`.**
   El coordinador los **descubre** ahí con sólo estar el repo clonado (su `data/fuentes.json`
   escanea `~/src/*/telegram`): no hay que copiarlos a ninguna parte ni reiniciar nada, y
-  llegan con `git pull` **a `main`** — un clon limpio no ve lo que se quedó en `dev`. Se
+  llegan con `git pull` **a `main`** — que es donde se commitea todo (regla de rama). Se
   escriben como si estuvieras dentro de este repo (el cwd ya es su raíz: nada de
   `cd ~/src/foveal-vision &&`), con `descripcion` y `ejemplos` en el mismo fichero, y
   `$COORD_HOME` para llamar a algo del coordinador (`notify.mjs`, `desacoplar.sh`). Hoy hay
