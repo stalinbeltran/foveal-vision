@@ -133,23 +133,33 @@ ESTUDIOS = [
     # Cerrar overlap_fovea_px. MEDIDO el 2026-08-26: el eje es cost-neutral en
     # parametros (167.852 en todo el rango 0..7), asi que no hay coste que
     # sopesar contra la ganancia -- a diferencia de border_reduce.
+    #
+    # ⚠ EL EJE ENTERO, y no solo los puntos que faltaban: `repro-chk` demostro
+    # que el dato reconstruido NO es el r20260824 (ver el AVISO de abajo), asi
+    # que los 20 runs de `ov-fov` estan sobre OTRO dataset y no se pueden sumar.
+    # Volver a medir 0/1/2/4 no es repetir trabajo: es lo unico que hace
+    # comparables 5/6/7 con ellos.
+    #
+    # Y sale un ancla gratis: el punto 2 ES la configuracion vigente, asi que su
+    # media con 5 semillas mide CUANTO movio el dato respecto de los 0,9308 que
+    # dejo escritos el #13.
     {
-        "bloque": "A", "name": "ov-alto",
-        "que": "A1 - acotar overlap_fovea_px POR ARRIBA, hasta la pared legal (7)",
+        "bloque": "A", "name": "ov-r26",
+        "que": "A1 - overlap_fovea_px ENTERO sobre el dato nuevo, hasta la pared legal (7)",
         "axis": "overlap_fovea_px",
         # overlap_fovea_range(16) = [0..7]: 7 es el maximo que la geometria
         # admite (la rama del borde veria 14 de los 16 px de fovea). No hay
         # "mas alla": si gana 7, gana el extremo LEGAL, que es otra frase.
-        "range": [5, 6, 7],
+        "range": [0, 1, 2, 4, 5, 6, 7],
         "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 5,
     },
     {
-        "bloque": "A", "name": "ov-sig",
-        "que": "A2 - llevar 4-contra-2 a 10 semillas por punto (el techo del test)",
+        "bloque": "A", "name": "ov-sig26",
+        "que": "A2 - llevar el contraste decisivo a 10 semillas por punto (el techo del test)",
         "axis": "overlap_fovea_px",
         "range": [2, 4],
         "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 5,
-        "seed0": 6,             # <- las 1..5 ya estan en ov-fov: se SUMAN
+        "seed0": 6,             # <- las 1..5 las pone ov-r26, sobre ESTE dato
     },
 
     # ================================================================ bloque B
@@ -213,33 +223,34 @@ ESTUDIOS = [
     # Verificacion de 5 semillas. Estos tres no dependen del tanteo: ya estaban
     # pendientes. Los que salgan del bloque B se anaden despues, con --solo.
     {
-        "bloque": "C", "name": "bp-sig",
-        "que": "C1 - border_px 8 contra 4 a 10 semillas: cerrar la p=0,063 medida DOS veces",
+        "bloque": "C", "name": "bp-r26",
+        "que": "C1 - border_px 8 contra 4 a 10 semillas PROPIAS: cerrar la p=0,063 medida DOS veces",
         "axis": "border_px", "range": [4, 8],
         # El anillo se queda en 2 celdas -> N no se mueve -> mismos parametros.
         # Es la MISMA atadura de `borde-ancho`, y tiene que serlo: sin ella los
         # 10 runs nuevos no serian comparables con los 10 que ya hay.
         "couple": {"border_reduce": {"axis": "border_px", "values": [2, 4]}},
-        "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 5,
-        "seed0": 6,             # <- las 1..5 ya estan en borde-ancho
+        # 10 semillas AQUI, no 5 sumadas a `borde-ancho`: aquellas estan sobre
+        # el dato viejo. 10 contra 10 es el techo del test exacto.
+        "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 10,
     },
     {
         "bloque": "C", "name": "pl-f2-bs",
         "que": "C2 - plana fase 2, batch_size: el tanteo dejo 170 ganando POR DENTRO",
         "axis": "batch_size", "range": [85, 170, 340],
-        "hereda_de": "pl-t-bs",          # la MISMA red de la fase 1. Ver el aviso
-        # 3 y no 5: las semillas 1 y 2 de estos tres puntos YA estan `done` en
-        # pl-t-bs (comprobado 2026-08-26). Con la base heredada son la misma red
-        # y el mismo dato, asi que SUMAN hasta 5 en vez de repetirse. Son 6 runs
-        # menos aqui y otros 6 en pl-f2-nl.
-        "epochs": EPOCHS, "semillas": 3, "seed0": 3,
+        "hereda_de": "pl-t-bs",          # la RED de la fase 1; el DATO ya no
+        # 5 semillas propias. Se hereda la red (que no se puede re-derivar, ver
+        # el AVISO) pero NO las semillas: el tanteo esta sobre el dato viejo.
+        # Un estudio de 5 semillas declara solo, sin apoyarse en aquel -- el
+        # tanteo dijo DONDE mirar, y ese rango sigue valiendo.
+        "epochs": EPOCHS, "semillas": 5,
     },
     {
         "bloque": "C", "name": "pl-f2-nl",
         "que": "C3 - plana fase 2, n_layers: con 5 semillas se ve si el 0,0000 de L6 es bimodalidad",
         "axis": "n_layers", "range": [4, 5, 6],
-        "hereda_de": "pl-t-nl",          # la MISMA red de la fase 1. Ver el aviso
-        "epochs": EPOCHS, "semillas": 3, "seed0": 3,
+        "hereda_de": "pl-t-nl",          # la RED de la fase 1; el DATO ya no
+        "epochs": EPOCHS, "semillas": 5,
     },
 ]
 
@@ -259,12 +270,23 @@ def _hereda(name: str, est: dict, dataset: str, receta: dict,
     """
     padre = store.spec(est["hereda_de"])
     base = padre["base_network_value"]
-    if padre["window_dataset"] != dataset:
+    # Se hereda LA RED, no los numeros. Son dos cosas distintas y confundirlas es
+    # el fallo que este script existe para evitar:
+    #   - la RED puede venir de un recorrido sobre otro dataset sin problema: es
+    #     una definicion, no una medida.
+    #   - los RUNS no: sumar semillas exige el mismo dato, y por eso `seed0` y
+    #     `hereda_de` nunca se usan juntos.
+    # Se anota en el spec para que quede dicho de donde salio y sobre que dato se
+    # midio aquello, en vez de que el spec parezca derivado (U1.6).
+    otro_dato = padre["window_dataset"] != dataset
+    if otro_dato and est.get("seed0"):
         raise SweepError(
-            "hereda_otro_dataset",
+            "hereda_semillas_de_otro_dataset",
             f"'{est['hereda_de']}' se midio sobre '{padre['window_dataset']}' y "
-            f"aqui se pide '{dataset}'",
-            "dos medidas solo se comparan si coinciden en el dato: usa el mismo")
+            f"aqui se pide '{dataset}', pero se piden semillas desplazadas "
+            f"(seed0={est['seed0']}), o sea SUMAR a sus runs",
+            "dos medidas solo se comparan si coinciden en el dato: quita seed0 y "
+            "corre las semillas enteras sobre el dato nuevo")
     if padre["base_recipe"] != RECIPE:
         raise SweepError(
             "hereda_otra_receta",
@@ -289,6 +311,7 @@ def _hereda(name: str, est: dict, dataset: str, receta: dict,
         "derivation": padre.get("derivation", {}),
         "corrections": padre.get("corrections", []),
         "hereda_base_de": est["hereda_de"],
+        "hereda_base_medida_sobre": padre["window_dataset"],
         "space": espacio,
         "strategy": "grid",
         "objective": OBJECTIVE,
@@ -372,6 +395,11 @@ def main() -> int:
             continue
 
         n = len(spec["points"])
+        if spec.get("hereda_base_medida_sobre") not in (None, args.dataset):
+            print(f"      ⚠ {name}: hereda LA RED de '{spec['hereda_base_de']}', que se "
+                  f"midio sobre '{spec['hereda_base_medida_sobre']}'.\n"
+                  f"        La red viaja; los numeros de aquel recorrido NO. Este "
+                  f"declara solo, con sus 5 semillas.")
         semillas = spec["space"].get("seed", [receta["seed"]])
         desc = spec.get("discarded") or []
         print(f"  + [{est['bloque']}] {name:10s} {len(spec['space'][est['axis']])} valores "

@@ -1,5 +1,5 @@
 {
-  "window_dataset": "dirty1000-80px-16px-r20260824",
+  "window_dataset": "dirty1000-80px-16px-r20260826",
   "base_network": null,
   "base_label": "ws16-p4-d1-L4",
   "base_network_value": {
@@ -37,7 +37,7 @@
     "pos_weight": 1.0,
     "smooth_l1_beta": 0.08,
     "monitor": "val_loss",
-    "seed": 3
+    "seed": 1
   },
   "derivation": {
     "window_size": 16,
@@ -93,6 +93,7 @@
   },
   "corrections": [],
   "hereda_base_de": "pl-t-nl",
+  "hereda_base_medida_sobre": "dirty1000-80px-16px-r20260824",
   "space": {
     "n_layers": [
       4,
@@ -100,6 +101,8 @@
       6
     ],
     "seed": [
+      1,
+      2,
       3,
       4,
       5
@@ -111,13 +114,21 @@
     "epochs": 150
   },
   "device": "cpu",
-  "seed": 3,
-  "seeds": 3,
+  "seed": 1,
+  "seeds": 5,
   "study": "cierre-2026-08-26",
   "name": "pl-f2-nl",
   "points": [
     {
       "n_layers": 4,
+      "seed": 1
+    },
+    {
+      "n_layers": 4,
+      "seed": 2
+    },
+    {
+      "n_layers": 4,
       "seed": 3
     },
     {
@@ -130,6 +141,14 @@
     },
     {
       "n_layers": 5,
+      "seed": 1
+    },
+    {
+      "n_layers": 5,
+      "seed": 2
+    },
+    {
+      "n_layers": 5,
       "seed": 3
     },
     {
@@ -139,6 +158,14 @@
     {
       "n_layers": 5,
       "seed": 5
+    },
+    {
+      "n_layers": 6,
+      "seed": 1
+    },
+    {
+      "n_layers": 6,
+      "seed": 2
     },
     {
       "n_layers": 6,

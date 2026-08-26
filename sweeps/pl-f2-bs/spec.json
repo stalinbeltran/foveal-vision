@@ -1,5 +1,5 @@
 {
-  "window_dataset": "dirty1000-80px-16px-r20260824",
+  "window_dataset": "dirty1000-80px-16px-r20260826",
   "base_network": null,
   "base_label": "ws16-p4-d1-L4",
   "base_network_value": {
@@ -37,7 +37,7 @@
     "pos_weight": 1.0,
     "smooth_l1_beta": 0.08,
     "monitor": "val_loss",
-    "seed": 3
+    "seed": 1
   },
   "derivation": {
     "window_size": 16,
@@ -93,6 +93,7 @@
   },
   "corrections": [],
   "hereda_base_de": "pl-t-bs",
+  "hereda_base_medida_sobre": "dirty1000-80px-16px-r20260824",
   "space": {
     "batch_size": [
       85,
@@ -100,6 +101,8 @@
       340
     ],
     "seed": [
+      1,
+      2,
       3,
       4,
       5
@@ -111,13 +114,21 @@
     "epochs": 150
   },
   "device": "cpu",
-  "seed": 3,
-  "seeds": 3,
+  "seed": 1,
+  "seeds": 5,
   "study": "cierre-2026-08-26",
   "name": "pl-f2-bs",
   "points": [
     {
       "batch_size": 85,
+      "seed": 1
+    },
+    {
+      "batch_size": 85,
+      "seed": 2
+    },
+    {
+      "batch_size": 85,
       "seed": 3
     },
     {
@@ -130,6 +141,14 @@
     },
     {
       "batch_size": 170,
+      "seed": 1
+    },
+    {
+      "batch_size": 170,
+      "seed": 2
+    },
+    {
+      "batch_size": 170,
       "seed": 3
     },
     {
@@ -139,6 +158,14 @@
     {
       "batch_size": 170,
       "seed": 5
+    },
+    {
+      "batch_size": 340,
+      "seed": 1
+    },
+    {
+      "batch_size": 340,
+      "seed": 2
     },
     {
       "batch_size": 340,
