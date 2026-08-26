@@ -1,0 +1,275 @@
+{
+  "recorrido": "pl-t-nl",
+  "eje": "n_layers",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.00018421122360778863,
+  "delta_fuente": "1-SE: error estándar de las 2 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "n_layers": 5
+      },
+      "value": 0.9659000642131855,
+      "n_seeds": 2,
+      "seeds": [
+        1,
+        2
+      ],
+      "value_min": 0.9657158529895777,
+      "value_max": 0.9660842754367933,
+      "value_std": 0.00026051401076747756,
+      "value_sem": 0.00018421122360778863,
+      "runs": [
+        "pl-t-nl-0004-n_layers5_seed1",
+        "pl-t-nl-0005-n_layers5_seed2"
+      ],
+      "seconds_per_epoch": 52.5685
+    },
+    {
+      "point": {
+        "n_layers": 4
+      },
+      "value": 0.9614716220191817,
+      "n_seeds": 2,
+      "seeds": [
+        1,
+        2
+      ],
+      "value_min": 0.9603027175782594,
+      "value_max": 0.9626405264601041,
+      "value_std": 0.0016530805134705704,
+      "value_sem": 0.0011689044409223801,
+      "runs": [
+        "pl-t-nl-0000-n_layers4_seed1",
+        "pl-t-nl-0001-n_layers4_seed2"
+      ],
+      "seconds_per_epoch": 41.233999999999995
+    },
+    {
+      "point": {
+        "n_layers": 3
+      },
+      "value": 0.9520918703620365,
+      "n_seeds": 2,
+      "seeds": [
+        1,
+        2
+      ],
+      "value_min": 0.9493919454301166,
+      "value_max": 0.9547917952939562,
+      "value_std": 0.0038182704561102137,
+      "value_sem": 0.0026999249319197838,
+      "runs": [
+        "pl-t-nl-0003-n_layers3_seed2",
+        "pl-t-nl-0002-n_layers3_seed1"
+      ],
+      "seconds_per_epoch": 36.9975
+    },
+    {
+      "point": {
+        "n_layers": 2
+      },
+      "value": 0.9196082737610078,
+      "n_seeds": 2,
+      "seeds": [
+        1,
+        2
+      ],
+      "value_min": 0.9076734836567033,
+      "value_max": 0.9315430638653123,
+      "value_std": 0.016878342029583604,
+      "value_sem": 0.01193479010430448,
+      "runs": [
+        "pl-t-nl-0007-n_layers2_seed2",
+        "pl-t-nl-0006-n_layers2_seed1"
+      ],
+      "seconds_per_epoch": 27.823999999999998
+    },
+    {
+      "point": {
+        "n_layers": 6
+      },
+      "value": 0.4815206634133024,
+      "n_seeds": 2,
+      "seeds": [
+        1,
+        2
+      ],
+      "value_min": 0.0,
+      "value_max": 0.9630413268266048,
+      "value_std": 0.6809730527619825,
+      "value_sem": 0.4815206634133024,
+      "runs": [
+        "pl-t-nl-0009-n_layers6_seed2",
+        "pl-t-nl-0008-n_layers6_seed1"
+      ],
+      "seconds_per_epoch": 61.152
+    }
+  ],
+  "detalle": [
+    {
+      "run": "pl-t-nl-0004-n_layers5_seed1",
+      "punto": {
+        "n_layers": 5,
+        "seed": 1
+      },
+      "valor": 0.9660842754367933,
+      "epocas": 61,
+      "mejor_epoca": 51,
+      "paro_patience": true,
+      "s_por_epoca": 48.11
+    },
+    {
+      "run": "pl-t-nl-0005-n_layers5_seed2",
+      "punto": {
+        "n_layers": 5,
+        "seed": 2
+      },
+      "valor": 0.9657158529895777,
+      "epocas": 41,
+      "mejor_epoca": 31,
+      "paro_patience": true,
+      "s_por_epoca": 57.027
+    },
+    {
+      "run": "pl-t-nl-0009-n_layers6_seed2",
+      "punto": {
+        "n_layers": 6,
+        "seed": 2
+      },
+      "valor": 0.9630413268266048,
+      "epocas": 86,
+      "mejor_epoca": 76,
+      "paro_patience": true,
+      "s_por_epoca": 68.543
+    },
+    {
+      "run": "pl-t-nl-0000-n_layers4_seed1",
+      "punto": {
+        "n_layers": 4,
+        "seed": 1
+      },
+      "valor": 0.9626405264601041,
+      "epocas": 36,
+      "mejor_epoca": 26,
+      "paro_patience": true,
+      "s_por_epoca": 37.891
+    },
+    {
+      "run": "pl-t-nl-0001-n_layers4_seed2",
+      "punto": {
+        "n_layers": 4,
+        "seed": 2
+      },
+      "valor": 0.9603027175782594,
+      "epocas": 46,
+      "mejor_epoca": 36,
+      "paro_patience": true,
+      "s_por_epoca": 44.577
+    },
+    {
+      "run": "pl-t-nl-0003-n_layers3_seed2",
+      "punto": {
+        "n_layers": 3,
+        "seed": 2
+      },
+      "valor": 0.9547917952939562,
+      "epocas": 54,
+      "mejor_epoca": 44,
+      "paro_patience": true,
+      "s_por_epoca": 40.056
+    },
+    {
+      "run": "pl-t-nl-0002-n_layers3_seed1",
+      "punto": {
+        "n_layers": 3,
+        "seed": 1
+      },
+      "valor": 0.9493919454301166,
+      "epocas": 38,
+      "mejor_epoca": 28,
+      "paro_patience": true,
+      "s_por_epoca": 33.939
+    },
+    {
+      "run": "pl-t-nl-0007-n_layers2_seed2",
+      "punto": {
+        "n_layers": 2,
+        "seed": 2
+      },
+      "valor": 0.9315430638653123,
+      "epocas": 53,
+      "mejor_epoca": 43,
+      "paro_patience": true,
+      "s_por_epoca": 29.312
+    },
+    {
+      "run": "pl-t-nl-0006-n_layers2_seed1",
+      "punto": {
+        "n_layers": 2,
+        "seed": 1
+      },
+      "valor": 0.9076734836567033,
+      "epocas": 36,
+      "mejor_epoca": 26,
+      "paro_patience": true,
+      "s_por_epoca": 26.336
+    },
+    {
+      "run": "pl-t-nl-0008-n_layers6_seed1",
+      "punto": {
+        "n_layers": 6,
+        "seed": 1
+      },
+      "valor": 0.0,
+      "epocas": 20,
+      "mejor_epoca": 10,
+      "paro_patience": true,
+      "s_por_epoca": 53.761
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": 5,
+      "diff": 0.004428442194003845,
+      "p": 0.3333333333333333,
+      "arrangements": 6,
+      "n": 2,
+      "m": 2,
+      "exact": true
+    },
+    {
+      "valor": 3,
+      "diff": -0.009379751657145219,
+      "p": 0.3333333333333333,
+      "arrangements": 6,
+      "n": 2,
+      "m": 2,
+      "exact": true
+    },
+    {
+      "valor": 2,
+      "diff": -0.04186334825817384,
+      "p": 0.3333333333333333,
+      "arrangements": 6,
+      "n": 2,
+      "m": 2,
+      "exact": true
+    },
+    {
+      "valor": 6,
+      "diff": -0.4799509586058793,
+      "p": 1.0,
+      "arrangements": 6,
+      "n": 2,
+      "m": 2,
+      "exact": true
+    }
+  ],
+  "pendientes": [],
+  "sugerido": {
+    "n_layers": 5
+  }
+}

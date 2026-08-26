@@ -1,0 +1,76 @@
+{
+  "cuando": "2026-08-26T03:23:50Z",
+  "split": "val",
+  "defaults": {
+    "threshold": 0.5,
+    "stride": 8,
+    "nms_radius": 8
+  },
+  "rejilla": {
+    "threshold": [
+      0.1,
+      0.2,
+      0.25,
+      0.3,
+      0.4,
+      0.5,
+      0.6
+    ],
+    "stride": [
+      2,
+      4,
+      8
+    ],
+    "nms_radius": [
+      4,
+      8,
+      12,
+      16,
+      20
+    ]
+  },
+  "filas": [
+    {
+      "etiqueta": "malo",
+      "run": "pl-t-lr-0005-lr0p0028_seed2",
+      "f1_defecto": 0.0,
+      "f1_optimo": 0.04373015873015872,
+      "ganancia": 0.04373015873015872,
+      "optimo": {
+        "f1": 0.04373015873015872,
+        "threshold": 0.1,
+        "stride": 8,
+        "nms_radius": 16
+      },
+      "combinaciones": 105
+    },
+    {
+      "etiqueta": "medio",
+      "run": "bs-alto-fov-0002-batch_size384_seed1",
+      "f1_defecto": 0.7497857142857143,
+      "f1_optimo": 0.8209761904761905,
+      "ganancia": 0.07119047619047625,
+      "optimo": {
+        "f1": 0.8209761904761905,
+        "threshold": 0.25,
+        "stride": 2,
+        "nms_radius": 16
+      },
+      "combinaciones": 105
+    },
+    {
+      "etiqueta": "bueno",
+      "run": "pl-t-bs-0002-batch_size43_seed1",
+      "f1_defecto": 0.8100357142857143,
+      "f1_optimo": 0.8626666666666667,
+      "ganancia": 0.05263095238095239,
+      "optimo": {
+        "f1": 0.8626666666666667,
+        "threshold": 0.4,
+        "stride": 2,
+        "nms_radius": 16
+      },
+      "combinaciones": 105
+    }
+  ]
+}

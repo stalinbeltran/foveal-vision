@@ -1,0 +1,295 @@
+{
+  "recorrido": "red-fov",
+  "eje": "border_reduce",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.0017203779948499155,
+  "delta_fuente": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "border_reduce": 1
+      },
+      "value": 0.9574286014113371,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9547522145080201,
+      "value_max": 0.9640720609851982,
+      "value_std": 0.0038468821434791945,
+      "value_sem": 0.0017203779948499155,
+      "runs": [
+        "red-fov-0012-border_reduce1_seed3",
+        "red-fov-0011-border_reduce1_seed2",
+        "red-fov-0013-border_reduce1_seed4",
+        "red-fov-0010-border_reduce1_seed1",
+        "red-fov-0014-border_reduce1_seed5"
+      ],
+      "seconds_per_epoch": 69.8092
+    },
+    {
+      "point": {
+        "border_reduce": 2
+      },
+      "value": 0.9471850692163724,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9429031926202806,
+      "value_max": 0.9499004872692335,
+      "value_std": 0.0029864675005867574,
+      "value_sem": 0.0013355888687811765,
+      "runs": [
+        "red-fov-0007-border_reduce2_seed3",
+        "red-fov-0006-border_reduce2_seed2",
+        "red-fov-0005-border_reduce2_seed1",
+        "red-fov-0008-border_reduce2_seed4",
+        "red-fov-0009-border_reduce2_seed5"
+      ],
+      "seconds_per_epoch": 44.0724
+    },
+    {
+      "point": {
+        "border_reduce": 4
+      },
+      "value": 0.9407967647209201,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9333149247549358,
+      "value_max": 0.9445623160632401,
+      "value_std": 0.0047209206529714885,
+      "value_sem": 0.0021112598992853887,
+      "runs": [
+        "red-fov-0003-border_reduce4_seed4",
+        "red-fov-0001-border_reduce4_seed2",
+        "red-fov-0002-border_reduce4_seed3",
+        "red-fov-0000-border_reduce4_seed1",
+        "red-fov-0004-border_reduce4_seed5"
+      ],
+      "seconds_per_epoch": 39.4036
+    }
+  ],
+  "detalle": [
+    {
+      "run": "red-fov-0012-border_reduce1_seed3",
+      "punto": {
+        "border_reduce": 1,
+        "seed": 3
+      },
+      "valor": 0.9640720609851982,
+      "epocas": 56,
+      "mejor_epoca": 46,
+      "paro_patience": true,
+      "s_por_epoca": 68.401
+    },
+    {
+      "run": "red-fov-0011-border_reduce1_seed2",
+      "punto": {
+        "border_reduce": 1,
+        "seed": 2
+      },
+      "valor": 0.957430765012339,
+      "epocas": 44,
+      "mejor_epoca": 34,
+      "paro_patience": true,
+      "s_por_epoca": 69.281
+    },
+    {
+      "run": "red-fov-0013-border_reduce1_seed4",
+      "punto": {
+        "border_reduce": 1,
+        "seed": 4
+      },
+      "valor": 0.955538809344386,
+      "epocas": 36,
+      "mejor_epoca": 26,
+      "paro_patience": true,
+      "s_por_epoca": 69.318
+    },
+    {
+      "run": "red-fov-0010-border_reduce1_seed1",
+      "punto": {
+        "border_reduce": 1,
+        "seed": 1
+      },
+      "valor": 0.9553491572067424,
+      "epocas": 39,
+      "mejor_epoca": 29,
+      "paro_patience": true,
+      "s_por_epoca": 73.026
+    },
+    {
+      "run": "red-fov-0014-border_reduce1_seed5",
+      "punto": {
+        "border_reduce": 1,
+        "seed": 5
+      },
+      "valor": 0.9547522145080201,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 69.02
+    },
+    {
+      "run": "red-fov-0007-border_reduce2_seed3",
+      "punto": {
+        "border_reduce": 2,
+        "seed": 3
+      },
+      "valor": 0.9499004872692335,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 44.062
+    },
+    {
+      "run": "red-fov-0006-border_reduce2_seed2",
+      "punto": {
+        "border_reduce": 2,
+        "seed": 2
+      },
+      "valor": 0.9495379753357839,
+      "epocas": 73,
+      "mejor_epoca": 63,
+      "paro_patience": true,
+      "s_por_epoca": 44.217
+    },
+    {
+      "run": "red-fov-0005-border_reduce2_seed1",
+      "punto": {
+        "border_reduce": 2,
+        "seed": 1
+      },
+      "valor": 0.9482275635483314,
+      "epocas": 53,
+      "mejor_epoca": 43,
+      "paro_patience": true,
+      "s_por_epoca": 42.493
+    },
+    {
+      "run": "red-fov-0008-border_reduce2_seed4",
+      "punto": {
+        "border_reduce": 2,
+        "seed": 4
+      },
+      "valor": 0.9453561273082326,
+      "epocas": 59,
+      "mejor_epoca": 49,
+      "paro_patience": true,
+      "s_por_epoca": 45.054
+    },
+    {
+      "run": "red-fov-0003-border_reduce4_seed4",
+      "punto": {
+        "border_reduce": 4,
+        "seed": 4
+      },
+      "valor": 0.9445623160632401,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 40.813
+    },
+    {
+      "run": "red-fov-0001-border_reduce4_seed2",
+      "punto": {
+        "border_reduce": 4,
+        "seed": 2
+      },
+      "valor": 0.9440054728920814,
+      "epocas": 59,
+      "mejor_epoca": 49,
+      "paro_patience": true,
+      "s_por_epoca": 39.915
+    },
+    {
+      "run": "red-fov-0002-border_reduce4_seed3",
+      "punto": {
+        "border_reduce": 4,
+        "seed": 3
+      },
+      "valor": 0.9431201483822217,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 38.376
+    },
+    {
+      "run": "red-fov-0009-border_reduce2_seed5",
+      "punto": {
+        "border_reduce": 2,
+        "seed": 5
+      },
+      "valor": 0.9429031926202806,
+      "epocas": 56,
+      "mejor_epoca": 46,
+      "paro_patience": true,
+      "s_por_epoca": 44.536
+    },
+    {
+      "run": "red-fov-0000-border_reduce4_seed1",
+      "punto": {
+        "border_reduce": 4,
+        "seed": 1
+      },
+      "valor": 0.9389809615121216,
+      "epocas": 51,
+      "mejor_epoca": 41,
+      "paro_patience": true,
+      "s_por_epoca": 37.469
+    },
+    {
+      "run": "red-fov-0004-border_reduce4_seed5",
+      "punto": {
+        "border_reduce": 4,
+        "seed": 5
+      },
+      "valor": 0.9333149247549358,
+      "epocas": 35,
+      "mejor_epoca": 25,
+      "paro_patience": true,
+      "s_por_epoca": 40.445
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": 1,
+      "diff": 0.010243532194964766,
+      "p": 0.007936507936507936,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": 4,
+      "diff": -0.006388304495452246,
+      "p": 0.03968253968253968,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    }
+  ],
+  "pendientes": [],
+  "sugerido": {
+    "border_reduce": 1
+  }
+}

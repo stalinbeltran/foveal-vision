@@ -1,0 +1,200 @@
+{
+  "recorrido": "mon-fov",
+  "eje": "monitor",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.002313770352142773,
+  "delta_fuente": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "monitor": "val_f1"
+      },
+      "value": 0.9346141245494103,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9287611523530613,
+      "value_max": 0.9426795342926813,
+      "value_std": 0.005173747791714867,
+      "value_sem": 0.002313770352142773,
+      "runs": [
+        "mon-fov-0008-monitorval_f1_seed4",
+        "mon-fov-0006-monitorval_f1_seed2",
+        "mon-fov-0007-monitorval_f1_seed3",
+        "mon-fov-0009-monitorval_f1_seed5",
+        "mon-fov-0005-monitorval_f1_seed1"
+      ],
+      "seconds_per_epoch": 50.512
+    },
+    {
+      "point": {
+        "monitor": "val_loss"
+      },
+      "value": 0.9286941424928822,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.919522843686617,
+      "value_max": 0.9415945078828439,
+      "value_std": 0.009196107283878695,
+      "value_sem": 0.0041126242030267435,
+      "runs": [
+        "mon-fov-0003-monitorval_loss_seed4",
+        "mon-fov-0001-monitorval_loss_seed2",
+        "mon-fov-0002-monitorval_loss_seed3",
+        "mon-fov-0000-monitorval_loss_seed1",
+        "mon-fov-0004-monitorval_loss_seed5"
+      ],
+      "seconds_per_epoch": 47.9894
+    }
+  ],
+  "detalle": [
+    {
+      "run": "mon-fov-0008-monitorval_f1_seed4",
+      "punto": {
+        "monitor": "val_f1",
+        "seed": 4
+      },
+      "valor": 0.9426795342926813,
+      "epocas": 82,
+      "mejor_epoca": 72,
+      "paro_patience": true,
+      "s_por_epoca": 46.417
+    },
+    {
+      "run": "mon-fov-0003-monitorval_loss_seed4",
+      "punto": {
+        "monitor": "val_loss",
+        "seed": 4
+      },
+      "valor": 0.9415945078828439,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 40.36
+    },
+    {
+      "run": "mon-fov-0006-monitorval_f1_seed2",
+      "punto": {
+        "monitor": "val_f1",
+        "seed": 2
+      },
+      "valor": 0.9358640537207071,
+      "epocas": 51,
+      "mejor_epoca": 41,
+      "paro_patience": true,
+      "s_por_epoca": 42.178
+    },
+    {
+      "run": "mon-fov-0007-monitorval_f1_seed3",
+      "punto": {
+        "monitor": "val_f1",
+        "seed": 3
+      },
+      "valor": 0.9332040583122684,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 39.087
+    },
+    {
+      "run": "mon-fov-0009-monitorval_f1_seed5",
+      "punto": {
+        "monitor": "val_f1",
+        "seed": 5
+      },
+      "valor": 0.9325618240683337,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 79.003
+    },
+    {
+      "run": "mon-fov-0001-monitorval_loss_seed2",
+      "punto": {
+        "monitor": "val_loss",
+        "seed": 2
+      },
+      "valor": 0.93255579853518,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 40.669
+    },
+    {
+      "run": "mon-fov-0002-monitorval_loss_seed3",
+      "punto": {
+        "monitor": "val_loss",
+        "seed": 3
+      },
+      "valor": 0.929590235396687,
+      "epocas": 48,
+      "mejor_epoca": 38,
+      "paro_patience": true,
+      "s_por_epoca": 38.179
+    },
+    {
+      "run": "mon-fov-0005-monitorval_f1_seed1",
+      "punto": {
+        "monitor": "val_f1",
+        "seed": 1
+      },
+      "valor": 0.9287611523530613,
+      "epocas": 50,
+      "mejor_epoca": 40,
+      "paro_patience": true,
+      "s_por_epoca": 45.875
+    },
+    {
+      "run": "mon-fov-0000-monitorval_loss_seed1",
+      "punto": {
+        "monitor": "val_loss",
+        "seed": 1
+      },
+      "valor": 0.9202073269630832,
+      "epocas": 34,
+      "mejor_epoca": 24,
+      "paro_patience": true,
+      "s_por_epoca": 42.753
+    },
+    {
+      "run": "mon-fov-0004-monitorval_loss_seed5",
+      "punto": {
+        "monitor": "val_loss",
+        "seed": 5
+      },
+      "valor": 0.919522843686617,
+      "epocas": 28,
+      "mejor_epoca": 18,
+      "paro_patience": true,
+      "s_por_epoca": 77.986
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": "val_f1",
+      "diff": 0.005919982056528106,
+      "p": 0.21428571428571427,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    }
+  ],
+  "pendientes": [],
+  "sugerido": {
+    "monitor": "val_f1"
+  }
+}
