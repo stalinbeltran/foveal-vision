@@ -1,0 +1,17 @@
+{
+  "run": "pat-t-0000-patience5_seed1",
+  "epochs_run": 15,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.13119830909100447,
+  "best_epoch": 10,
+  "seconds_per_epoch": 43.52,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
