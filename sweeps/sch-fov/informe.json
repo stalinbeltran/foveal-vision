@@ -1,0 +1,200 @@
+{
+  "recorrido": "sch-fov",
+  "eje": "scheduler",
+  "objetivo": "f1",
+  "dataset": "dirty1000-80px-16px-r20260824",
+  "delta": 0.002182431543539775,
+  "delta_fuente": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "grupos": [
+    {
+      "point": {
+        "scheduler": "none"
+      },
+      "value": 0.9340627672774753,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.929590235396687,
+      "value_max": 0.9415945078828439,
+      "value_std": 0.0048800652875947296,
+      "value_sem": 0.002182431543539775,
+      "runs": [
+        "sch-fov-0003-schedulernone_seed4",
+        "sch-fov-0004-schedulernone_seed5",
+        "sch-fov-0001-schedulernone_seed2",
+        "sch-fov-0000-schedulernone_seed1",
+        "sch-fov-0002-schedulernone_seed3"
+      ],
+      "seconds_per_epoch": 68.55699999999999
+    },
+    {
+      "point": {
+        "scheduler": "cosine"
+      },
+      "value": 0.9328662278631361,
+      "n_seeds": 5,
+      "seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "value_min": 0.9177270048191936,
+      "value_max": 0.9400325270770614,
+      "value_std": 0.008723463164458956,
+      "value_sem": 0.0039012513269891303,
+      "runs": [
+        "sch-fov-0008-schedulercosine_seed4",
+        "sch-fov-0009-schedulercosine_seed5",
+        "sch-fov-0006-schedulercosine_seed2",
+        "sch-fov-0007-schedulercosine_seed3",
+        "sch-fov-0005-schedulercosine_seed1"
+      ],
+      "seconds_per_epoch": 40.0554
+    }
+  ],
+  "detalle": [
+    {
+      "run": "sch-fov-0003-schedulernone_seed4",
+      "punto": {
+        "scheduler": "none",
+        "seed": 4
+      },
+      "valor": 0.9415945078828439,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 35.97
+    },
+    {
+      "run": "sch-fov-0008-schedulercosine_seed4",
+      "punto": {
+        "scheduler": "cosine",
+        "seed": 4
+      },
+      "valor": 0.9400325270770614,
+      "epocas": 43,
+      "mejor_epoca": 33,
+      "paro_patience": true,
+      "s_por_epoca": 38.297
+    },
+    {
+      "run": "sch-fov-0009-schedulercosine_seed5",
+      "punto": {
+        "scheduler": "cosine",
+        "seed": 5
+      },
+      "valor": 0.9362687495679822,
+      "epocas": 56,
+      "mejor_epoca": 46,
+      "paro_patience": true,
+      "s_por_epoca": 46.648
+    },
+    {
+      "run": "sch-fov-0006-schedulercosine_seed2",
+      "punto": {
+        "scheduler": "cosine",
+        "seed": 2
+      },
+      "valor": 0.9361058601134215,
+      "epocas": 58,
+      "mejor_epoca": 48,
+      "paro_patience": true,
+      "s_por_epoca": 42.062
+    },
+    {
+      "run": "sch-fov-0004-schedulernone_seed5",
+      "punto": {
+        "scheduler": "none",
+        "seed": 5
+      },
+      "valor": 0.9360301679808022,
+      "epocas": 70,
+      "mejor_epoca": 60,
+      "paro_patience": true,
+      "s_por_epoca": 41.782
+    },
+    {
+      "run": "sch-fov-0007-schedulercosine_seed3",
+      "punto": {
+        "scheduler": "cosine",
+        "seed": 3
+      },
+      "valor": 0.9341969977380219,
+      "epocas": 52,
+      "mejor_epoca": 42,
+      "paro_patience": true,
+      "s_por_epoca": 38.89
+    },
+    {
+      "run": "sch-fov-0001-schedulernone_seed2",
+      "punto": {
+        "scheduler": "none",
+        "seed": 2
+      },
+      "valor": 0.93255579853518,
+      "epocas": 47,
+      "mejor_epoca": 37,
+      "paro_patience": true,
+      "s_por_epoca": 39.981
+    },
+    {
+      "run": "sch-fov-0000-schedulernone_seed1",
+      "punto": {
+        "scheduler": "none",
+        "seed": 1
+      },
+      "valor": 0.9305431265918633,
+      "epocas": 54,
+      "mejor_epoca": 44,
+      "paro_patience": true,
+      "s_por_epoca": 187.363
+    },
+    {
+      "run": "sch-fov-0002-schedulernone_seed3",
+      "punto": {
+        "scheduler": "none",
+        "seed": 3
+      },
+      "valor": 0.929590235396687,
+      "epocas": 48,
+      "mejor_epoca": 38,
+      "paro_patience": true,
+      "s_por_epoca": 37.689
+    },
+    {
+      "run": "sch-fov-0005-schedulercosine_seed1",
+      "punto": {
+        "scheduler": "cosine",
+        "seed": 1
+      },
+      "valor": 0.9177270048191936,
+      "epocas": 51,
+      "mejor_epoca": 41,
+      "paro_patience": true,
+      "s_por_epoca": 34.38
+    }
+  ],
+  "truncados": [],
+  "contrastes": [
+    {
+      "valor": "cosine",
+      "diff": -0.0011965394143391705,
+      "p": 0.8571428571428571,
+      "arrangements": 252,
+      "n": 5,
+      "m": 5,
+      "exact": true
+    }
+  ],
+  "pendientes": [],
+  "sugerido": {
+    "scheduler": "cosine"
+  }
+}

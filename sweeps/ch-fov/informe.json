@@ -46,7 +46,7 @@
           24
         ]
       },
-      "value": 0.9085718500956663,
+      "value": 0.9303193952081253,
       "n_seeds": 5,
       "seeds": [
         1,
@@ -55,18 +55,47 @@
         4,
         5
       ],
-      "value_min": 0.8257550614005974,
+      "value_min": 0.9209830130882762,
       "value_max": 0.9380305016907046,
-      "value_std": 0.047018968603018685,
-      "value_sem": 0.021027522005655618,
+      "value_std": 0.006797260580949169,
+      "value_sem": 0.003039827343956411,
       "runs": [
         "ch-fov-0010-channels24x24x24x24_seed1",
+        "ch-fov-0014-channels24x24x24x24_seed5",
         "ch-fov-0011-channels24x24x24x24_seed2",
         "ch-fov-0013-channels24x24x24x24_seed4",
-        "ch-fov-0012-channels24x24x24x24_seed3",
-        "ch-fov-0014-channels24x24x24x24_seed5"
+        "ch-fov-0012-channels24x24x24x24_seed3"
       ],
-      "seconds_per_epoch": null
+      "seconds_per_epoch": 55.15540000000001
+    },
+    {
+      "point": {
+        "channels": [
+          32,
+          32,
+          32,
+          32
+        ]
+      },
+      "value": 0.9298141618871343,
+      "n_seeds": 4,
+      "seeds": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "value_min": 0.9193994330311832,
+      "value_max": 0.9415948570646971,
+      "value_std": 0.009525675020266472,
+      "value_sem": 0.004762837510133236,
+      "runs": [
+        "ch-fov-0017-channels32x32x32x32_seed3",
+        "ch-fov-0018-channels32x32x32x32_seed4",
+        "ch-fov-0015-channels32x32x32x32_seed1",
+        "ch-fov-0016-channels32x32x32x32_seed2"
+      ],
+      "seconds_per_epoch": 70.94425
     },
     {
       "point": {
@@ -102,6 +131,23 @@
   ],
   "detalle": [
     {
+      "run": "ch-fov-0017-channels32x32x32x32_seed3",
+      "punto": {
+        "channels": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "seed": 3
+      },
+      "valor": 0.9415948570646971,
+      "epocas": 63,
+      "mejor_epoca": 53,
+      "paro_patience": true,
+      "s_por_epoca": 67.857
+    },
+    {
       "run": "ch-fov-0008-channels16x16x16x16_seed4",
       "punto": {
         "channels": [
@@ -130,10 +176,10 @@
         "seed": 1
       },
       "valor": 0.9380305016907046,
-      "epocas": null,
-      "mejor_epoca": null,
-      "paro_patience": null,
-      "s_por_epoca": null
+      "epocas": 44,
+      "mejor_epoca": 34,
+      "paro_patience": true,
+      "s_por_epoca": 48.519
     },
     {
       "run": "ch-fov-0009-channels16x16x16x16_seed5",
@@ -153,6 +199,23 @@
       "s_por_epoca": 51.671
     },
     {
+      "run": "ch-fov-0014-channels24x24x24x24_seed5",
+      "punto": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ],
+        "seed": 5
+      },
+      "valor": 0.9337595820013063,
+      "epocas": 48,
+      "mejor_epoca": 38,
+      "paro_patience": true,
+      "s_por_epoca": 70.153
+    },
+    {
       "run": "ch-fov-0011-channels24x24x24x24_seed2",
       "punto": {
         "channels": [
@@ -164,10 +227,27 @@
         "seed": 2
       },
       "valor": 0.9329261945244457,
-      "epocas": null,
-      "mejor_epoca": null,
-      "paro_patience": null,
-      "s_por_epoca": null
+      "epocas": 52,
+      "mejor_epoca": 42,
+      "paro_patience": true,
+      "s_por_epoca": 49.194
+    },
+    {
+      "run": "ch-fov-0018-channels32x32x32x32_seed4",
+      "punto": {
+        "channels": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "seed": 4
+      },
+      "valor": 0.9325975288074414,
+      "epocas": 30,
+      "mejor_epoca": 20,
+      "paro_patience": true,
+      "s_por_epoca": 86.857
     },
     {
       "run": "ch-fov-0006-channels16x16x16x16_seed2",
@@ -204,23 +284,6 @@
       "s_por_epoca": 41.913
     },
     {
-      "run": "ch-fov-0013-channels24x24x24x24_seed4",
-      "punto": {
-        "channels": [
-          24,
-          24,
-          24,
-          24
-        ],
-        "seed": 4
-      },
-      "valor": 0.9302485949729339,
-      "epocas": null,
-      "mejor_epoca": null,
-      "paro_patience": null,
-      "s_por_epoca": null
-    },
-    {
       "run": "ch-fov-0007-channels16x16x16x16_seed3",
       "punto": {
         "channels": [
@@ -236,6 +299,40 @@
       "mejor_epoca": 38,
       "paro_patience": true,
       "s_por_epoca": 41.404
+    },
+    {
+      "run": "ch-fov-0013-channels24x24x24x24_seed4",
+      "punto": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ],
+        "seed": 4
+      },
+      "valor": 0.9258976847358936,
+      "epocas": 37,
+      "mejor_epoca": 27,
+      "paro_patience": true,
+      "s_por_epoca": 67.391
+    },
+    {
+      "run": "ch-fov-0015-channels32x32x32x32_seed1",
+      "punto": {
+        "channels": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "seed": 1
+      },
+      "valor": 0.9256648286452154,
+      "epocas": 39,
+      "mejor_epoca": 29,
+      "paro_patience": true,
+      "s_por_epoca": 65.21
     },
     {
       "run": "ch-fov-0003-channels8x8x8x8_seed4",
@@ -272,6 +369,40 @@
       "s_por_epoca": 32.5
     },
     {
+      "run": "ch-fov-0012-channels24x24x24x24_seed3",
+      "punto": {
+        "channels": [
+          24,
+          24,
+          24,
+          24
+        ],
+        "seed": 3
+      },
+      "valor": 0.9209830130882762,
+      "epocas": 66,
+      "mejor_epoca": 56,
+      "paro_patience": true,
+      "s_por_epoca": 40.52
+    },
+    {
+      "run": "ch-fov-0016-channels32x32x32x32_seed2",
+      "punto": {
+        "channels": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "seed": 2
+      },
+      "valor": 0.9193994330311832,
+      "epocas": 52,
+      "mejor_epoca": 42,
+      "paro_patience": true,
+      "s_por_epoca": 63.853
+    },
+    {
       "run": "ch-fov-0002-channels8x8x8x8_seed3",
       "punto": {
         "channels": [
@@ -287,23 +418,6 @@
       "mejor_epoca": 40,
       "paro_patience": true,
       "s_por_epoca": 31.655
-    },
-    {
-      "run": "ch-fov-0012-channels24x24x24x24_seed3",
-      "punto": {
-        "channels": [
-          24,
-          24,
-          24,
-          24
-        ],
-        "seed": 3
-      },
-      "valor": 0.91589889788965,
-      "epocas": null,
-      "mejor_epoca": null,
-      "paro_patience": null,
-      "s_por_epoca": null
     },
     {
       "run": "ch-fov-0004-channels8x8x8x8_seed5",
@@ -338,23 +452,6 @@
       "mejor_epoca": 69,
       "paro_patience": true,
       "s_por_epoca": 29.833
-    },
-    {
-      "run": "ch-fov-0014-channels24x24x24x24_seed5",
-      "punto": {
-        "channels": [
-          24,
-          24,
-          24,
-          24
-        ],
-        "seed": 5
-      },
-      "valor": 0.8257550614005974,
-      "epocas": null,
-      "mejor_epoca": null,
-      "paro_patience": null,
-      "s_por_epoca": null
     }
   ],
   "truncados": [],
@@ -366,10 +463,24 @@
         24,
         24
       ],
-      "diff": -0.024894247306315065,
-      "p": 0.25396825396825395,
+      "diff": -0.0031467021938560436,
+      "p": 0.3968253968253968,
       "arrangements": 252,
       "n": 5,
+      "m": 5,
+      "exact": true
+    },
+    {
+      "valor": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "diff": -0.0036519355148471044,
+      "p": 0.47619047619047616,
+      "arrangements": 126,
+      "n": 4,
       "m": 5,
       "exact": true
     },
@@ -388,13 +499,7 @@
       "exact": true
     }
   ],
-  "pendientes": [
-    "ch-fov-0015-channels32x32x32x32_seed1",
-    "ch-fov-0016-channels32x32x32x32_seed2",
-    "ch-fov-0017-channels32x32x32x32_seed3",
-    "ch-fov-0018-channels32x32x32x32_seed4",
-    "ch-fov-0019-channels32x32x32x32_seed5"
-  ],
+  "pendientes": [],
   "sugerido": {
     "channels": [
       16,

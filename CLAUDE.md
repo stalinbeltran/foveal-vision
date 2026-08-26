@@ -23,6 +23,107 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **✅ 2026-08-26 — LA GEOMETRÍA NUEVA YA DIO RESULTADOS, Y SON LOS MÁS GRANDES DEL INVENTARIO.**
+> Los ocho recorridos de prioridad que corrió la flota, **leídos** en esta sesión desde los
+> artefactos del repo con `scripts/estudio_informe.py` (aplica R1–R6, escritas antes). Detalle
+> completo en
+> [reportes/2026/08-agosto/2026-08-26-geometria-nueva-primeros-resultados.md](reportes/2026/08-agosto/2026-08-26-geometria-nueva-primeros-resultados.md).
+> ⚠ **Nada de esto lo midió esta sesión**: los runs los produjo la flota.
+> 1. ⚠⚠ **`red-fov` es el resultado grande: a igual área, ver el borde SIN COMPRIMIR gana.** Con
+>    `border_px` fijo en 8, `border_reduce` 1 → **0,9574** contra 0,9472 (reduce 2) y 0,9408
+>    (reduce 4). Monótono, **bandas min–max disjuntas**, y +0,0102 sobre el siguiente con
+>    **p = 0,008 — el mínimo alcanzable** con 5 semillas. Contra el vigente del proyecto son
+>    **+0,0233**, la mejora más grande medida nunca aquí. **Es la pregunta que la reparametrización
+>    hizo formulable** y antes no se podía ni escribir.
+>    ⚠ **NO es gratis**: N pasa de 20 a **32**, la cabeza crece **+156 %** y el reloj **1,9×**
+>    (69,8 s/época contra 36,8). Citarlo sin esto es citarlo mal.
+> 2. **`borde-ancho` CIERRA el eje del ancho, que llevaba dos recorridos abierto por la derecha.**
+>    A coste constante (anillo atado a 2 celdas, N=20 en los cinco puntos): 4 → 0,9341 · **8 →
+>    0,9408** · 10 → 0,9385 · 12 → 0,9376 · 16 → **0,9321, peor que el vigente**. Óptimo
+>    **interior**, por fin. Y **cae justo donde el análisis físico predijo**: a 16 px el 26 % del
+>    anillo es relleno replicado (instructionsNewNN.md §2.2). ⚠ R4 ❌: 8 px da p = 0,063, así que
+>    **el vigente no se mueve** por la regla escrita antes.
+> 3. ⚠ **`ov-fov` NO declara nada y no hay que citarlo como si lo hiciera.** Incompleto (16/20, 3
+>    runs excluidos por morir a medias) y el punto de 4 px tiene **2 semillas**: con 2 contra 5 sólo
+>    hay 15 arreglos, o sea **p mínimo alcanzable 0,133** — R4 no puede declarar al 5 % pase lo que
+>    pase. Lo único decible: la tendencia es monótona a favor del solape, y **`0` (ramas disjuntas)
+>    es el peor de los cuatro**. Si se sostiene al completarlo, sería la primera evidencia directa a
+>    favor del solape contributivo de la spec §7. **Terminarlo antes de usarlo.**
+> 4. **Cuatro ejes se cierran EN CONTRA, con 5 semillas** — y eso también es información:
+>    `pos_weight` (4,0 pierde −0,0204 y 8,0 −0,0561, **ambos p = 0,008**), `k_center` (5 y 7 pierden
+>    con p = 0,024 y 0,008), `scheduler` (`cosine` −0,0012, **p = 0,857**: no hace nada) y `monitor`
+>    (`val_f1` +0,0059 con p = 0,214, no cruza). ⚠ **`pos_weight` duele**: era *la* hipótesis
+>    plausible del inventario para atacar el cuello de botella de detección, y **empeora**.
+> 5. ⚠ **El plano `(border_px, border_reduce)` NO está barrido**, sólo sus dos rectas por el punto
+>    vigente. El mejor punto medido (8 px sin comprimir) es **la esquina de las dos**, no un óptimo
+>    demostrado: con `border_reduce=1`, el `border_px` óptimo podría estar **por debajo** de 8 y
+>    salir más barato. Es lo siguiente que vale la pena preguntar.
+> 6. ⚠ **Todo esto es f1 de VENTANA, el proxy.** Ninguno se ha llevado a la métrica de tarea, y el
+>    proxy ya exageró una vez por un factor de dos en `n_layers`. Y si se adopta N=32, **la
+>    comparación con la plana hay que rehacerla**: `plana-24-single` se eligió para igualar
+>    parámetros con la foveada de N=20, contra una de N=32 ya no es coste equivalente.
+> **Arreglo hecho aquí**: `estudio_informe.py` tenía `--eje` con default **`"lr"` cableado**. Sin
+> pasar la bandera no fallaba: imprimía la tabla con el eje entero a `None` y un ganador llamado
+> `None` — creíble y falsa, peor que un error. Ahora **se deriva del `space` del recorrido**, y si
+> no hay un único eje se niega diciéndolo.
+
+> **✅ 2026-08-26 (15:12 UTC) — LA FLOTA SE APAGÓ A MANO. NO QUEDA NADA CORRIENDO.**
+> El usuario apagó la instancia de Vast (`estudio-c11` y las demás de su flota) mientras el
+> relanzamiento de los cuatro recorridos a medias estaba en marcha. Estado comprobado en el repo
+> justo después:
+> - **`sch-fov` 10/10 y `pw-fov` 20/20 se cerraron enteros** antes del apagado, y se leen en el
+>   punto 4 del bloque de arriba. Los dos dejan el vigente donde estaba.
+> - **`ch-fov` quedó en 19/20** (falta `channels`=32 semilla 5; la lectura no depende de ella) y
+>   **`ov-fov` en 16/20** (faltan 4, y ahí la falta **sí** bloquea el veredicto — punto 3 de arriba).
+> - **Cuatro runs murieron a mitad** (épocas 43–57). Al pasar `estudio_informe.py` después del
+>   apagado se detectaron solos y quedaron marcados **`interrupted`** con el motivo escrito, así que
+>   **están excluidos de todas las tablas**. No son medidas: pararon por la muerte de la máquina, no
+>   por `patience`, que es R1.
+> - ⚠ **El `flota.json` de ese relanzamiento NO llegó a escribirse**, porque lo escribe
+>   `estudio_flota.py` al terminar y la flota se apagó desde fuera. **Coste e instancias de esa
+>   corrida son irrecuperables** desde el repo; los `flota.json` que hay en esos cuatro directorios
+>   son de la corrida **anterior** (06:53 UTC) y atribuírselos sería contar dos veces 101 instancias
+>   y 3,2996 $. Reporte con el detalle:
+>   [telegram-coordinator/reportes/2026/08-agosto/2026-08-26-prioridad2-relanzamiento.md](https://github.com/stalinbeltran/telegram-coordinator/blob/main/reportes/2026/08-agosto/2026-08-26-prioridad2-relanzamiento.md).
+> - ⚠ **El vigilante horario sigue existiendo y PUEDE VOLVER A ALQUILAR MÁQUINAS** si está armado:
+>   mira si a un estudio le faltan puntos y relanza la flota sólo para lo que falte — y a `ov-fov` y
+>   `ch-fov` **les faltan**. Se para con `/use vigilante` → `parar`. Comprueba en qué estado está
+>   antes de dar por hecho que no va a gastar nada.
+
+> **⚠ 2026-08-26 — CÓMO LLEGÓ AQUÍ ESE TRABAJO (contexto; ya NO está en vuelo — ver el bloque de arriba).**
+> Al hacer merge a `main` apareció que `origin/main` **ya tenía** la reparametrización de abajo y
+> **había seguido construyendo encima** desde otra máquina (la flota). Esto NO lo midió aquella
+> sesión; se registra aquí porque el aviso de «TODO PARADO» de más abajo **quedó obsoleto** y la
+> siguiente sesión lo leería como si nada corriera. Lo que hay, comprobado en el repo:
+> 1. **Mecanismo nuevo `couple` («ataduras»)** en `fv.sweeps.spec`: un campo que se mueve **con**
+>    el eje en vez de multiplicarse contra él — la **diagonal**, no el producto cartesiano. Existe
+>    exactamente para poder preguntar *«¿más área a coste constante?»*: barrer `border_px`
+>    [4,8,10,12,16] con `border_reduce` atado [2,4,5,6,8], de modo que el anillo se queda en **2
+>    celdas y N=20 en los cinco puntos**. Mismo tensor, mismos parámetros, mismo coste por época.
+> 2. **`docs/plan-prioridades-2026-08-25.md`**: cuatro estudios (E1 `borde-ancho`, E2 afinado de la
+>    plana, E3 foveada vs plana por métrica de tarea, E4 los knobs de F) **con el criterio escrito
+>    antes de mirar**, como manda protocolo.md §1.
+> 3. **18 recorridos en `queued`** en `sweeps/` (`borde-ancho`, `pw-fov`, `sch-fov`, `red-fov`,
+>    `ch-fov`, `kc-fov`, `mon-fov`, `ov-fov`, los `pl-t-*`…). ~~Ninguno tiene resultados todavía~~
+>    **— desactualizado: los resultados llegaron después** (ver los dos bloques de arriba).
+>    ⚠ **Y el `state.json` de esos directorios sigue diciendo `queued` aunque los runs estén
+>    hechos**, porque lo escribe quien lanza el recorrido y aquí los runs llegaron por el libro de a
+>    bordo desde la flota. **No uses `state.json` para saber si un recorrido tiene datos**: cuenta
+>    `runs/<recorrido>-*/status.json`, o pasa `scripts/estudio_informe.py`, que además excluye los
+>    que murieron a medias.
+> 4. ⚠ **Hay automatización que ALQUILA MÁQUINAS**: el ejecutor `telegram/executors/vigilante.json`
+>    corre `scripts/vigilante_prioridades.py` cada hora, mira si a un estudio le faltan puntos y
+>    **relanza la flota sólo para lo que falte**. Se para con `/use vigilante -> parar`, y eso **no**
+>    detiene una flota ya viva (para eso está `/use apagar-vast`). Si vas a tocar `spec.py`,
+>    `runner.py` o la geometría, cuenta con que puede haber runs entrando mientras tanto.
+>    **Sigue vigente tras el apagado del 26-ago**, y a `ov-fov` y `ch-fov` les faltan puntos: si el
+>    vigilante está armado, volverá a alquilar.
+> 5. **Tres arreglos suyos que conviene conocer**: un run cortado a mitad entraba en la tabla como
+>    si fuera una medida; el pozo de máquinas se pedía una sola vez y tres estudios se quedaban a
+>    cero; y `estudio-informe` se rompía cuando el eje no era un número (`channels`).
+> **Esta sesión sólo integró su commit de verificación encima y comprobó que la suite sigue en
+> verde con todo junto.** Los resultados de esos estudios, cuando los haya, no están aquí.
+
 > **✅ 2026-08-25 — LA GEOMETRÍA SE DECLARA EN PÍXELES REALES. NINGUNA RED CAMBIÓ.**
 > Reparametrización pedida por el usuario y decidida con él (decisión **C14**). La geometría se
 > declaraba desde el lado equivocado: `N` y `c_frac` fijaban la fóvea **entre los dos**, así que
@@ -75,18 +176,37 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >    resolución?* — `border_reduce` con `border_px` fijo. **No es cost-neutral**: la cabeza es el
 >    97 % de los parámetros y crece con `N²` (+44 % al pasar de 2 a 4 celdas, +156 % a 8).
 >
-> ⚠ **Verificado, no razonado**: **183 tests en verde** (+33), `npm run build` limpio, los 5 configs
-> de red migrados a `format_version: 2` con la geometría comprobada idéntica uno a uno, y los
-> scripts de estudio/verificación reescritos. **Esta máquina se había rehecho**: no había `.venv`
-> ni Python 3.12 ni `node_modules`, así que se instaló Python 3.12, se recreó el entorno
-> (torch 2.13.0+cpu) y se hizo `npm install` — sin eso no se podía cumplir la regla del proyecto de
-> verificar ejecutando. **Cero entrenamiento, cero artefactos borrados.**
+> ⚠ **Verificado, no razonado**:
+> - **183 tests en verde** (+33) y `npm run build` limpio.
+> - **`verify_axes.py`: 28/28 ejes, 0 fallos** — los **cuatro ejes geométricos nuevos entrenan
+>   runs de verdad** (`border_px`, `border_reduce`, `overlap_fovea_px`, `overlap_border_px`), y los
+>   **cinco rechazos** salen en **las dos puertas** (`fovea_px` → `axis_breaks_window_size`;
+>   `N`/`c_frac`/`pen_frac`/`d` → `axis_renamed`).
+> - **`verify_spec.py --live`: 0 violadas**, 44 ok. ⚠ La cobertura sale **55 %** y no el 82 %
+>   documentado: **no es una regresión**, son 30 reglas «no aplicables» porque en esta máquina no
+>   hay recorridos ni runs con carga que ejercitarlas (ver el punto siguiente).
+> - **UI en la instancia real**: 12 pantallas **sin un error de consola**; Redes enseña los cinco
+>   campos nuevos y **ya no enseña `c_frac`/`pen_frac`**; el panel «lo que implica» reacciona en
+>   vivo (borde 4 px → N=20, recorte 24; borde 8 px → N=24, recorte 32) y un `border_px=5` con
+>   `border_reduce=2` sale como **`[border_not_divisible]` con razón y arreglo**. Backend y vite
+>   **se cerraron** al terminar.
+> - Los **5 configs de red migrados** a `format_version: 2`, con la geometría comprobada idéntica
+>   uno a uno.
+>
+> ⚠ **Esta máquina se había rehecho**: no había `.venv`, ni Python 3.12, ni `node_modules`, ni
+> **ningún `.npz` ni `.pt`** (son artefactos ignorados por git). Se instaló Python 3.12, se recreó
+> el entorno (torch 2.13.0+cpu), se hizo `npm install`, y para `verify_axes` se regeneró una fuente
+> sintética temporal que **se borró después**. Consecuencia a tener presente: **no se pudo cargar
+> ningún checkpoint histórico** porque no queda ninguno — la equivalencia de pesos se probó
+> construyendo y guardando (test permanente), que afirma lo mismo, pero no es lo mismo que abrir un
+> `best.pt` de agosto. **Cero entrenamiento, cero artefactos del usuario borrados.**
 >
 > **Lo siguiente, por valor**: (a) el estudio nº 1 de arriba, que es barato y tiene evidencia
 > directa; (b) la comparación foveada vs plana, que sigue siendo *la* pregunta del proyecto y sigue
 > sin contestar; (c) los knobs de F, gratis y sin aplicar (decisión F15 del usuario).
 
-> **✅ 2026-08-11 — TODO PARADO. Los dos procesos cerraron; no hay nada corriendo.**
+> **✅ 2026-08-11 — TODO PARADO** *(obsoleto: ver la nota del 2026-08-26 arriba — hay 18
+> recorridos en cola y un vigilante horario que puede alquilar máquinas)*.
 > `p40-lr-L4` terminó 20/20 (analizado en [docs/plan-lr-L4.md](docs/plan-lr-L4.md) §7: *el eje es
 > plano, `lr`=0,0014 se queda*), y **la cadena de la CNN plana corrió sola y completa** — arrancó
 > **23 min** después de que cerrara el recorrido, 41 runs, **22,5 h**. El watchdog
