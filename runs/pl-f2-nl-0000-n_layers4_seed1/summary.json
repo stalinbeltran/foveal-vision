@@ -1,0 +1,17 @@
+{
+  "run": "pl-f2-nl-0000-n_layers4_seed1",
+  "epochs_run": 48,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.05954454392194748,
+  "best_epoch": 38,
+  "seconds_per_epoch": 59.644,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
