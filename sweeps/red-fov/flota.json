@@ -2,33 +2,867 @@
   "recorridos": [
     "mon-fov",
     "sch-fov",
-    "red-fov"
+    "red-fov",
+    "kc-fov",
+    "pw-fov",
+    "ch-fov",
+    "ov-fov"
   ],
   "dataset": "dirty1000-80px-16px-r20260824",
-  "cuando": "2026-08-26T01:38:46+00:00",
+  "cuando": "2026-08-26T06:53:57+00:00",
   "reparto": "seed",
-  "maquinas": 15,
+  "maquinas": 35,
   "cpu": "E5-26",
-  "reloj_min": 4.3,
-  "usd": 0,
+  "reloj_min": 296.7,
+  "usd": 3.2996,
   "hilos": 8,
   "criba": {
     "umbral": 0.75,
-    "cohorte": 0,
-    "necesarias": 15
+    "cohorte": 16,
+    "necesarias": 35,
+    "mediana_s_paso": 0.02289,
+    "tope_s_paso": 0.03052,
+    "elegidas": [
+      {
+        "etiqueta": "c15",
+        "machine_id": 31857,
+        "s_paso": 0.01841,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz",
+        "usd_hora": 0.08222222222222222
+      },
+      {
+        "etiqueta": "c35",
+        "machine_id": 52447,
+        "s_paso": 0.02066,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz",
+        "usd_hora": 0.08222222222222222
+      },
+      {
+        "etiqueta": "c8",
+        "machine_id": 27535,
+        "s_paso": 0.02103,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "usd_hora": 0.06222222222222223
+      },
+      {
+        "etiqueta": "c36",
+        "machine_id": 139246,
+        "s_paso": 0.02122,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz",
+        "usd_hora": 0.08222222222222222
+      },
+      {
+        "etiqueta": "c37",
+        "machine_id": 139250,
+        "s_paso": 0.02149,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz",
+        "usd_hora": 0.08222222222222222
+      },
+      {
+        "etiqueta": "c0",
+        "machine_id": 92763,
+        "s_paso": 0.02161,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "usd_hora": 0.08222222222222222
+      },
+      {
+        "etiqueta": "c5",
+        "machine_id": 59153,
+        "s_paso": 0.02187,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz",
+        "usd_hora": 0.08222222222222222
+      },
+      {
+        "etiqueta": "c9",
+        "machine_id": 27930,
+        "s_paso": 0.02282,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "usd_hora": 0.06281481481481481
+      },
+      {
+        "etiqueta": "c17",
+        "machine_id": 141894,
+        "s_paso": 0.02296,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "usd_hora": 0.06829629629629631
+      },
+      {
+        "etiqueta": "c34",
+        "machine_id": 80440,
+        "s_paso": 0.02367,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2699 v3 @ 2.30GHz",
+        "usd_hora": 0.08148148148148149
+      },
+      {
+        "etiqueta": "c38",
+        "machine_id": 140182,
+        "s_paso": 0.02484,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2620 v3 @ 2.40GHz",
+        "usd_hora": 0.08222222222222222
+      },
+      {
+        "etiqueta": "c18",
+        "machine_id": 35071,
+        "s_paso": 0.02491,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2696 v3 @ 2.30GHz",
+        "usd_hora": 0.06888888888888889
+      },
+      {
+        "etiqueta": "c1",
+        "machine_id": 139059,
+        "s_paso": 0.02506,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz",
+        "usd_hora": 0.051555555555555556
+      },
+      {
+        "etiqueta": "c4",
+        "machine_id": 35929,
+        "s_paso": 0.02879,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "usd_hora": 0.058222222222222224
+      },
+      {
+        "etiqueta": "c16",
+        "machine_id": 13718,
+        "s_paso": 0.05767,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2690 0 @ 2.90GHz",
+        "usd_hora": 0.06755555555555555
+      },
+      {
+        "etiqueta": "c6",
+        "machine_id": 43380,
+        "s_paso": 0.40619,
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "usd_hora": 0.0597037037037037
+      }
+    ],
+    "descartadas": [],
+    "completadas_con_lentas": [
+      "c16",
+      "c6"
+    ],
+    "ganancia_vs_peor": 1.0
   },
-  "gasto_por_maquina": [],
-  "maquinas_alquiladas": 0,
+  "gasto_por_maquina": [
+    {
+      "etiqueta": "c0",
+      "machine_id": 53665,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.36,
+      "usd": 0.00436
+    },
+    {
+      "etiqueta": "c15",
+      "machine_id": 14891,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.44,
+      "usd": 0.00498
+    },
+    {
+      "etiqueta": "c5",
+      "machine_id": 52204,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.36,
+      "usd": 0.0052
+    },
+    {
+      "etiqueta": "c2",
+      "machine_id": 45389,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.69,
+      "usd": 0.00501
+    },
+    {
+      "etiqueta": "c7",
+      "machine_id": 146606,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.36,
+      "usd": 0.00534
+    },
+    {
+      "etiqueta": "c19",
+      "machine_id": 16357,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00543
+    },
+    {
+      "etiqueta": "c20",
+      "machine_id": 31013,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00541
+    },
+    {
+      "etiqueta": "c21",
+      "machine_id": 147777,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00543
+    },
+    {
+      "etiqueta": "c12",
+      "machine_id": 11086,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.36,
+      "usd": 0.00581
+    },
+    {
+      "etiqueta": "c22",
+      "machine_id": 21544,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.74,
+      "usd": 0.00545
+    },
+    {
+      "etiqueta": "c23",
+      "machine_id": 56107,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.77,
+      "usd": 0.00548
+    },
+    {
+      "etiqueta": "c24",
+      "machine_id": 68005,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00555
+    },
+    {
+      "etiqueta": "c25",
+      "machine_id": 29051,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00552
+    },
+    {
+      "etiqueta": "c10",
+      "machine_id": 137844,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.72,
+      "usd": 0.00615
+    },
+    {
+      "etiqueta": "c11",
+      "machine_id": 142755,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.69,
+      "usd": 0.00616
+    },
+    {
+      "etiqueta": "c26",
+      "machine_id": 131228,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.74,
+      "usd": 0.00562
+    },
+    {
+      "etiqueta": "c27",
+      "machine_id": 48183,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00561
+    },
+    {
+      "etiqueta": "c13",
+      "machine_id": 30031,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.69,
+      "usd": 0.00628
+    },
+    {
+      "etiqueta": "c28",
+      "machine_id": 138345,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00565
+    },
+    {
+      "etiqueta": "c14",
+      "machine_id": 140134,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.69,
+      "usd": 0.00628
+    },
+    {
+      "etiqueta": "c29",
+      "machine_id": 32261,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00578
+    },
+    {
+      "etiqueta": "c30",
+      "machine_id": 45558,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00594
+    },
+    {
+      "etiqueta": "c31",
+      "machine_id": 93452,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00614
+    },
+    {
+      "etiqueta": "c32",
+      "machine_id": 142564,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00634
+    },
+    {
+      "etiqueta": "c3",
+      "machine_id": 28729,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 8.01,
+      "usd": 0.00741
+    },
+    {
+      "etiqueta": "c7",
+      "machine_id": 57869,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00645
+    },
+    {
+      "etiqueta": "c2",
+      "machine_id": 24533,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00647
+    },
+    {
+      "etiqueta": "c19",
+      "machine_id": 33261,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00652
+    },
+    {
+      "etiqueta": "c20",
+      "machine_id": 31390,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.0066
+    },
+    {
+      "etiqueta": "c21",
+      "machine_id": 141134,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00658
+    },
+    {
+      "etiqueta": "c12",
+      "machine_id": 33747,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00657
+    },
+    {
+      "etiqueta": "c22",
+      "machine_id": 144085,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00427
+    },
+    {
+      "etiqueta": "c23",
+      "machine_id": 31615,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00436
+    },
+    {
+      "etiqueta": "c24",
+      "machine_id": 53859,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.74,
+      "usd": 0.00451
+    },
+    {
+      "etiqueta": "c25",
+      "machine_id": 35927,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00458
+    },
+    {
+      "etiqueta": "c10",
+      "machine_id": 28707,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00457
+    },
+    {
+      "etiqueta": "c11",
+      "machine_id": 54912,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00475
+    },
+    {
+      "etiqueta": "c26",
+      "machine_id": 145588,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00489
+    },
+    {
+      "etiqueta": "c27",
+      "machine_id": 142752,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.0049
+    },
+    {
+      "etiqueta": "c13",
+      "machine_id": 34898,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00593
+    },
+    {
+      "etiqueta": "c28",
+      "machine_id": 31856,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00596
+    },
+    {
+      "etiqueta": "c14",
+      "machine_id": 33169,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.006
+    },
+    {
+      "etiqueta": "c29",
+      "machine_id": 143798,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00637
+    },
+    {
+      "etiqueta": "c30",
+      "machine_id": 14965,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.0065
+    },
+    {
+      "etiqueta": "c31",
+      "machine_id": 33545,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00657
+    },
+    {
+      "etiqueta": "c32",
+      "machine_id": 68100,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00657
+    },
+    {
+      "etiqueta": "c33",
+      "machine_id": 39235,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 9.92,
+      "usd": 0.01343
+    },
+    {
+      "etiqueta": "c33",
+      "machine_id": 32076,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00663
+    },
+    {
+      "etiqueta": "c3",
+      "machine_id": 47022,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 9.38,
+      "usd": 0.01321
+    },
+    {
+      "etiqueta": "sch-fov-s3",
+      "machine_id": 133085,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00695
+    },
+    {
+      "etiqueta": "sch-fov-s4",
+      "machine_id": 31822,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00698
+    },
+    {
+      "etiqueta": "sch-fov-s5",
+      "machine_id": 137647,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.007
+    },
+    {
+      "etiqueta": "pw-fov-s4",
+      "machine_id": 39901,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00712
+    },
+    {
+      "etiqueta": "pw-fov-s5",
+      "machine_id": 59321,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00712
+    },
+    {
+      "etiqueta": "pw-fov-s3",
+      "machine_id": 68130,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.79,
+      "usd": 0.00722
+    },
+    {
+      "etiqueta": "ch-fov-s2",
+      "machine_id": 17957,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00715
+    },
+    {
+      "etiqueta": "ch-fov-s1",
+      "machine_id": 41824,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.0072
+    },
+    {
+      "etiqueta": "ch-fov-s3",
+      "machine_id": 56231,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.74,
+      "usd": 0.00747
+    },
+    {
+      "etiqueta": "ch-fov-s4",
+      "machine_id": 135622,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00747
+    },
+    {
+      "etiqueta": "ch-fov-s5",
+      "machine_id": 59570,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.0075
+    },
+    {
+      "etiqueta": "ov-fov-s3",
+      "machine_id": 146997,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.0075
+    },
+    {
+      "etiqueta": "ov-fov-s4",
+      "machine_id": 145093,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.0075
+    },
+    {
+      "etiqueta": "pw-fov-s1",
+      "machine_id": 138981,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00809
+    },
+    {
+      "etiqueta": "ov-fov-s2",
+      "machine_id": 22775,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00743
+    },
+    {
+      "etiqueta": "pw-fov-s2",
+      "machine_id": 15371,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00842
+    },
+    {
+      "etiqueta": "ov-fov-s1",
+      "machine_id": 141155,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.0085
+    },
+    {
+      "etiqueta": "ov-fov-s5",
+      "machine_id": 51857,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00851
+    },
+    {
+      "etiqueta": "sch-fov-s3",
+      "machine_id": 42617,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00855
+    },
+    {
+      "etiqueta": "sch-fov-s4",
+      "machine_id": 144567,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00855
+    },
+    {
+      "etiqueta": "sch-fov-s5",
+      "machine_id": 14563,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00854
+    },
+    {
+      "etiqueta": "pw-fov-s4",
+      "machine_id": 91962,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00332
+    },
+    {
+      "etiqueta": "pw-fov-s5",
+      "machine_id": 53669,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00384
+    },
+    {
+      "etiqueta": "ch-fov-s2",
+      "machine_id": 68196,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00437
+    },
+    {
+      "etiqueta": "ch-fov-s1",
+      "machine_id": 31003,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00436
+    },
+    {
+      "etiqueta": "ch-fov-s3",
+      "machine_id": 141052,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00459
+    },
+    {
+      "etiqueta": "ch-fov-s4",
+      "machine_id": 143817,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00475
+    },
+    {
+      "etiqueta": "ch-fov-s5",
+      "machine_id": 56747,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.73,
+      "usd": 0.00491
+    },
+    {
+      "etiqueta": "ov-fov-s3",
+      "machine_id": 29260,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00537
+    },
+    {
+      "etiqueta": "ov-fov-s4",
+      "machine_id": 143815,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00541
+    },
+    {
+      "etiqueta": "pw-fov-s1",
+      "machine_id": 144095,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00557
+    },
+    {
+      "etiqueta": "ov-fov-s2",
+      "machine_id": 15410,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.72,
+      "usd": 0.00595
+    },
+    {
+      "etiqueta": "pw-fov-s2",
+      "machine_id": 143726,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 4.71,
+      "usd": 0.00645
+    },
+    {
+      "etiqueta": "c38",
+      "machine_id": 140182,
+      "por_que": "lote terminado",
+      "minutos": 79.3,
+      "usd": 0.10867
+    },
+    {
+      "etiqueta": "c18",
+      "machine_id": 35071,
+      "por_que": "lote terminado",
+      "minutos": 85.7,
+      "usd": 0.09839
+    },
+    {
+      "etiqueta": "c1",
+      "machine_id": 139059,
+      "por_que": "lote terminado",
+      "minutos": 87.29,
+      "usd": 0.075
+    },
+    {
+      "etiqueta": "sch-fov-s2",
+      "machine_id": 29249,
+      "por_que": "lote terminado",
+      "minutos": 76.94,
+      "usd": 0.11304
+    },
+    {
+      "etiqueta": "c4",
+      "machine_id": 35929,
+      "por_que": "lote terminado",
+      "minutos": 120.91,
+      "usd": 0.11733
+    },
+    {
+      "etiqueta": "c0",
+      "machine_id": 92763,
+      "por_que": "lote terminado",
+      "minutos": 120.85,
+      "usd": 0.16561
+    },
+    {
+      "etiqueta": "c5",
+      "machine_id": 59153,
+      "por_que": "lote terminado",
+      "minutos": 124.49,
+      "usd": 0.1706
+    },
+    {
+      "etiqueta": "c17",
+      "machine_id": 141894,
+      "por_que": "lote terminado",
+      "minutos": 128.97,
+      "usd": 0.1468
+    },
+    {
+      "etiqueta": "c16",
+      "machine_id": 13718,
+      "por_que": "lote terminado",
+      "minutos": 129.98,
+      "usd": 0.14635
+    },
+    {
+      "etiqueta": "c15",
+      "machine_id": 31857,
+      "por_que": "lote terminado",
+      "minutos": 130.16,
+      "usd": 0.17836
+    },
+    {
+      "etiqueta": "c37",
+      "machine_id": 139250,
+      "por_que": "lote terminado",
+      "minutos": 135.46,
+      "usd": 0.18563
+    },
+    {
+      "etiqueta": "c36",
+      "machine_id": 139246,
+      "por_que": "lote terminado",
+      "minutos": 136.38,
+      "usd": 0.18689
+    },
+    {
+      "etiqueta": "c9",
+      "machine_id": 27930,
+      "por_que": "lote terminado",
+      "minutos": 144.07,
+      "usd": 0.15083
+    },
+    {
+      "etiqueta": "c8",
+      "machine_id": 27535,
+      "por_que": "lote terminado",
+      "minutos": 148.3,
+      "usd": 0.15379
+    },
+    {
+      "etiqueta": "c35",
+      "machine_id": 52447,
+      "por_que": "lote terminado",
+      "minutos": 159.99,
+      "usd": 0.21925
+    },
+    {
+      "etiqueta": "c34",
+      "machine_id": 80440,
+      "por_que": "lote terminado",
+      "minutos": 187.54,
+      "usd": 0.25468
+    },
+    {
+      "etiqueta": "c6",
+      "machine_id": 43380,
+      "por_que": "lote terminado",
+      "minutos": 257.55,
+      "usd": 0.25628
+    },
+    {
+      "etiqueta": "sch-fov-s1",
+      "machine_id": 68090,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.35,
+      "usd": 0.00753
+    },
+    {
+      "etiqueta": "sch-fov-s1",
+      "machine_id": 29150,
+      "por_que": "lote terminado",
+      "minutos": 33.37,
+      "usd": 0.04943
+    }
+  ],
+  "maquinas_alquiladas": 101,
   "git": {
     "activo": true,
-    "commits": 0,
+    "commits": 204,
     "fallos_push": 0,
     "ultimo_error": null
   },
-  "peaje_min": 0.0,
-  "trabajo_min": 0.0,
-  "maquina_min": 0.0,
-  "peaje_pct": null,
+  "peaje_min": 91.4,
+  "trabajo_min": 1783.2,
+  "maquina_min": 2029.7,
+  "peaje_pct": 4.5,
   "lotes": [
     {
       "lote": "red-fov-s1",
@@ -38,8 +872,65 @@
         5,
         10
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "red-fov semilla 1 (3 puntos)",
+      "oferta": 18968452,
+      "machine_id": 31857,
+      "maquina": {
+        "vcpu": 16.0,
+        "cpu": "Xeon E5-2697A v4",
+        "ram_gb": 31.3,
+        "ghz": 3.6,
+        "gpu": "RTX 3060",
+        "ubicacion": "Norway, NO",
+        "host": 31857,
+        "fiabilidad": 0.9993
+      },
+      "usd_hora": 0.08222,
+      "ok": true,
+      "error": null,
+      "epocas": 143,
+      "s_por_epoca": 49.4,
+      "instancia": 48719676,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.01841,
+        "s_paso_min": 0.01736,
+        "s_paso_max": 0.01989,
+        "pasos_s": 54.311,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 18.2,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz",
+        "nucleos": 32,
+        "carga": [
+          1.74,
+          1.26,
+          0.76
+        ],
+        "arranque_s": 2.4,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 178.3,
+      "subida_s": 4.0,
+      "instalacion_s": 46.8,
+      "peaje_s": 229.1,
+      "sonda_s": 5.7,
+      "entrenamiento_s": 7059.4,
+      "runs": [
+        "red-fov-0000-border_reduce4_seed1",
+        "red-fov-0005-border_reduce2_seed1",
+        "red-fov-0010-border_reduce1_seed1"
+      ],
+      "segundos_vivida": 7809.4,
+      "usd": 0.17836,
+      "intento": 1
     },
     {
       "lote": "red-fov-s2",
@@ -49,8 +940,65 @@
         6,
         11
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "red-fov semilla 2 (3 puntos)",
+      "oferta": 45169471,
+      "machine_id": 52447,
+      "maquina": {
+        "vcpu": 10.0,
+        "cpu": "Xeon E5-2630 v4",
+        "ram_gb": 15.7,
+        "ghz": 3.1,
+        "gpu": "GTX 1660 S",
+        "ubicacion": "South Korea, KR",
+        "host": 52447,
+        "fiabilidad": 0.997
+      },
+      "usd_hora": 0.08222,
+      "ok": true,
+      "error": null,
+      "epocas": 176,
+      "s_por_epoca": 49.1,
+      "instancia": 48719416,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02066,
+        "s_paso_min": 0.01779,
+        "s_paso_max": 0.02634,
+        "pasos_s": 48.401,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 20.4,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz",
+        "nucleos": 40,
+        "carga": [
+          1.29,
+          0.99,
+          0.53
+        ],
+        "arranque_s": 2.6,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 311.3,
+      "subida_s": 9.0,
+      "instalacion_s": 53.0,
+      "peaje_s": 373.3,
+      "sonda_s": 7.6,
+      "entrenamiento_s": 8646.6,
+      "runs": [
+        "red-fov-0001-border_reduce4_seed2",
+        "red-fov-0006-border_reduce2_seed2",
+        "red-fov-0011-border_reduce1_seed2"
+      ],
+      "segundos_vivida": 9599.7,
+      "usd": 0.21925,
+      "intento": 1
     },
     {
       "lote": "red-fov-s3",
@@ -60,8 +1008,65 @@
         7,
         12
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "red-fov semilla 3 (3 puntos)",
+      "oferta": 48474937,
+      "machine_id": 27535,
+      "maquina": {
+        "vcpu": 9.333333333333332,
+        "cpu": "Xeon E5-2680 v4",
+        "ram_gb": 10.5,
+        "ghz": 3.3,
+        "gpu": "Titan Xp",
+        "ubicacion": "South Korea, KR",
+        "host": 27535,
+        "fiabilidad": 0.9964
+      },
+      "usd_hora": 0.06222,
+      "ok": true,
+      "error": null,
+      "epocas": 153,
+      "s_por_epoca": 51.3,
+      "instancia": 48719196,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02103,
+        "s_paso_min": 0.01909,
+        "s_paso_max": 0.02303,
+        "pasos_s": 47.549,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 20.8,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "nucleos": 56,
+        "carga": [
+          0.99,
+          0.54,
+          0.32
+        ],
+        "arranque_s": 2.5,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 44.0,
+      "subida_s": 14.0,
+      "instalacion_s": 99.2,
+      "peaje_s": 157.1,
+      "sonda_s": 7.8,
+      "entrenamiento_s": 7844.9,
+      "runs": [
+        "red-fov-0002-border_reduce4_seed3",
+        "red-fov-0007-border_reduce2_seed3",
+        "red-fov-0012-border_reduce1_seed3"
+      ],
+      "segundos_vivida": 8898.0,
+      "usd": 0.15379,
+      "intento": 1
     },
     {
       "lote": "red-fov-s4",
@@ -71,8 +1076,65 @@
         8,
         13
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "red-fov semilla 4 (3 puntos)",
+      "oferta": 47465907,
+      "machine_id": 139246,
+      "maquina": {
+        "vcpu": 10.0,
+        "cpu": "Xeon E5-2630 v4",
+        "ram_gb": 15.7,
+        "ghz": 3.1,
+        "gpu": "RTX 3080",
+        "ubicacion": "South Korea, KR",
+        "host": 139246,
+        "fiabilidad": 0.9904
+      },
+      "usd_hora": 0.08222,
+      "ok": true,
+      "error": null,
+      "epocas": 145,
+      "s_por_epoca": 49.9,
+      "instancia": 48719423,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02122,
+        "s_paso_min": 0.01893,
+        "s_paso_max": 0.02228,
+        "pasos_s": 47.124,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 21.0,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz",
+        "nucleos": 40,
+        "carga": [
+          2.01,
+          1.08,
+          0.55
+        ],
+        "arranque_s": 2.6,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 302.4,
+      "subida_s": 7.9,
+      "instalacion_s": 53.3,
+      "peaje_s": 363.5,
+      "sonda_s": 7.5,
+      "entrenamiento_s": 7236.8,
+      "runs": [
+        "red-fov-0003-border_reduce4_seed4",
+        "red-fov-0008-border_reduce2_seed4",
+        "red-fov-0013-border_reduce1_seed4"
+      ],
+      "segundos_vivida": 8182.7,
+      "usd": 0.18689,
+      "intento": 1
     },
     {
       "lote": "red-fov-s5",
@@ -82,8 +1144,405 @@
         9,
         14
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "red-fov semilla 5 (3 puntos)",
+      "oferta": 45173971,
+      "machine_id": 139250,
+      "maquina": {
+        "vcpu": 10.0,
+        "cpu": "Xeon E5-2630 v4",
+        "ram_gb": 15.7,
+        "ghz": 3.1,
+        "gpu": "RTX 3080",
+        "ubicacion": "South Korea, KR",
+        "host": 139250,
+        "fiabilidad": 0.9957
+      },
+      "usd_hora": 0.08222,
+      "ok": true,
+      "error": null,
+      "epocas": 138,
+      "s_por_epoca": 52.0,
+      "instancia": 48719435,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02149,
+        "s_paso_min": 0.01936,
+        "s_paso_max": 0.02548,
+        "pasos_s": 46.541,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 21.2,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz",
+        "nucleos": 40,
+        "carga": [
+          0.82,
+          0.37,
+          0.22
+        ],
+        "arranque_s": 2.6,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 288.0,
+      "subida_s": 8.0,
+      "instalacion_s": 54.6,
+      "peaje_s": 350.6,
+      "sonda_s": 7.6,
+      "entrenamiento_s": 7179.4,
+      "runs": [
+        "red-fov-0004-border_reduce4_seed5",
+        "red-fov-0009-border_reduce2_seed5",
+        "red-fov-0014-border_reduce1_seed5"
+      ],
+      "segundos_vivida": 8127.4,
+      "usd": 0.18563,
+      "intento": 1
+    },
+    {
+      "lote": "kc-fov-s1",
+      "sweep": "kc-fov",
+      "puntos": [
+        0,
+        5,
+        10
+      ],
+      "que": "kc-fov semilla 1 (3 puntos)",
+      "oferta": 35934068,
+      "machine_id": 92763,
+      "maquina": {
+        "vcpu": 14.0,
+        "cpu": "Xeon E5-2680 v4",
+        "ram_gb": 31.3,
+        "ghz": 3.3,
+        "gpu": "RTX 3060",
+        "ubicacion": "Quebec, CA",
+        "host": 92763,
+        "fiabilidad": 0.9977
+      },
+      "usd_hora": 0.08222,
+      "ok": true,
+      "error": null,
+      "epocas": 156,
+      "s_por_epoca": 41.7,
+      "instancia": 48719670,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02161,
+        "s_paso_min": 0.01961,
+        "s_paso_max": 0.02718,
+        "pasos_s": 46.277,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 21.4,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "nucleos": 28,
+        "carga": [
+          1.91,
+          2.08,
+          1.55
+        ],
+        "arranque_s": 2.5,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 342.7,
+      "subida_s": 1.6,
+      "instalacion_s": 49.9,
+      "peaje_s": 394.2,
+      "sonda_s": 5.2,
+      "entrenamiento_s": 6500.5,
+      "runs": [
+        "kc-fov-0000-k_center3_seed1",
+        "kc-fov-0005-k_center5_seed1",
+        "kc-fov-0010-k_center7_seed1"
+      ],
+      "segundos_vivida": 7251.2,
+      "usd": 0.16561,
+      "intento": 1
+    },
+    {
+      "lote": "kc-fov-s2",
+      "sweep": "kc-fov",
+      "puntos": [
+        1,
+        6,
+        11
+      ],
+      "que": "kc-fov semilla 2 (3 puntos)",
+      "oferta": 36067103,
+      "machine_id": 59153,
+      "maquina": {
+        "vcpu": 20.0,
+        "cpu": "Xeon E5-2673 v4",
+        "ram_gb": 23.6,
+        "ghz": 3.6,
+        "gpu": "RTX 4070S",
+        "ubicacion": "Hong Kong, HK",
+        "host": 59153,
+        "fiabilidad": 0.989
+      },
+      "usd_hora": 0.08222,
+      "ok": true,
+      "error": null,
+      "epocas": 149,
+      "s_por_epoca": 45.0,
+      "instancia": 48719682,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02187,
+        "s_paso_min": 0.01988,
+        "s_paso_max": 0.02472,
+        "pasos_s": 45.723,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 21.6,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz",
+        "nucleos": 80,
+        "carga": [
+          2.66,
+          1.96,
+          1.34
+        ],
+        "arranque_s": 2.4,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 207.1,
+      "subida_s": 13.1,
+      "instalacion_s": 183.7,
+      "peaje_s": 404.0,
+      "sonda_s": 10.0,
+      "entrenamiento_s": 6707.7,
+      "runs": [
+        "kc-fov-0001-k_center3_seed2",
+        "kc-fov-0006-k_center5_seed2",
+        "kc-fov-0011-k_center7_seed2"
+      ],
+      "segundos_vivida": 7469.6,
+      "usd": 0.1706,
+      "intento": 1
+    },
+    {
+      "lote": "kc-fov-s3",
+      "sweep": "kc-fov",
+      "puntos": [
+        2,
+        7,
+        12
+      ],
+      "que": "kc-fov semilla 3 (3 puntos)",
+      "oferta": 19958703,
+      "machine_id": 27930,
+      "maquina": {
+        "vcpu": 11.200000000000001,
+        "cpu": "Xeon E5-2680 v4",
+        "ram_gb": 25.2,
+        "ghz": 2.4,
+        "gpu": "RTX 3060",
+        "ubicacion": "British Columbia, CA",
+        "host": 27930,
+        "fiabilidad": 0.9924
+      },
+      "usd_hora": 0.06281,
+      "ok": true,
+      "error": null,
+      "epocas": 150,
+      "s_por_epoca": 50.7,
+      "instancia": 48719201,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02282,
+        "s_paso_min": 0.02113,
+        "s_paso_max": 0.02755,
+        "pasos_s": 43.814,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 22.6,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "nucleos": 56,
+        "carga": [
+          3.53,
+          3.11,
+          2.42
+        ],
+        "arranque_s": 3.2,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 212.6,
+      "subida_s": 3.6,
+      "instalacion_s": 59.7,
+      "peaje_s": 275.9,
+      "sonda_s": 6.7,
+      "entrenamiento_s": 7602.3,
+      "runs": [
+        "kc-fov-0002-k_center3_seed3",
+        "kc-fov-0007-k_center5_seed3",
+        "kc-fov-0012-k_center7_seed3"
+      ],
+      "segundos_vivida": 8644.1,
+      "usd": 0.15083,
+      "intento": 1
+    },
+    {
+      "lote": "kc-fov-s4",
+      "sweep": "kc-fov",
+      "puntos": [
+        3,
+        8,
+        13
+      ],
+      "que": "kc-fov semilla 4 (3 puntos)",
+      "oferta": 46442913,
+      "machine_id": 141894,
+      "maquina": {
+        "vcpu": 9.333333333333332,
+        "cpu": "Xeon E5-2680 v4",
+        "ram_gb": 15.6,
+        "ghz": 3.3,
+        "gpu": "RTX 3060 laptop",
+        "ubicacion": "New Zealand, NZ",
+        "host": 141894,
+        "fiabilidad": 0.9704
+      },
+      "usd_hora": 0.0683,
+      "ok": true,
+      "error": null,
+      "epocas": 160,
+      "s_por_epoca": 42.0,
+      "instancia": 48719273,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02296,
+        "s_paso_min": 0.01974,
+        "s_paso_max": 0.02632,
+        "pasos_s": 43.551,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 22.7,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "nucleos": 28,
+        "carga": [
+          2.03,
+          1.96,
+          1.02
+        ],
+        "arranque_s": 2.7,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 433.0,
+      "subida_s": 7.0,
+      "instalacion_s": 49.6,
+      "peaje_s": 489.6,
+      "sonda_s": 7.7,
+      "entrenamiento_s": 6722.1,
+      "runs": [
+        "kc-fov-0003-k_center3_seed4",
+        "kc-fov-0008-k_center5_seed4",
+        "kc-fov-0013-k_center7_seed4"
+      ],
+      "segundos_vivida": 7738.0,
+      "usd": 0.1468,
+      "intento": 1
+    },
+    {
+      "lote": "kc-fov-s5",
+      "sweep": "kc-fov",
+      "puntos": [
+        4,
+        9,
+        14
+      ],
+      "que": "kc-fov semilla 5 (3 puntos)",
+      "oferta": 47215723,
+      "machine_id": 80440,
+      "maquina": {
+        "vcpu": 16.0,
+        "cpu": "Xeon E5-2699 v3",
+        "ram_gb": 41.1,
+        "ghz": 2.299996,
+        "gpu": "RTX 3080 Ti",
+        "ubicacion": "Spain, ES",
+        "host": 80440,
+        "fiabilidad": 0.9976
+      },
+      "usd_hora": 0.08148,
+      "ok": true,
+      "error": null,
+      "epocas": 180,
+      "s_por_epoca": 57.3,
+      "instancia": 48719403,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02367,
+        "s_paso_min": 0.02077,
+        "s_paso_max": 0.03188,
+        "pasos_s": 42.254,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 23.4,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2699 v3 @ 2.30GHz",
+        "nucleos": 16,
+        "carga": [
+          1.03,
+          0.52,
+          0.36
+        ],
+        "arranque_s": 3.5,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 284.8,
+      "subida_s": 4.2,
+      "instalacion_s": 63.5,
+      "peaje_s": 352.5,
+      "sonda_s": 7.6,
+      "entrenamiento_s": 10311.3,
+      "runs": [
+        "kc-fov-0004-k_center3_seed5",
+        "kc-fov-0009-k_center5_seed5",
+        "kc-fov-0014-k_center7_seed5"
+      ],
+      "segundos_vivida": 11252.1,
+      "usd": 0.25468,
+      "intento": 1
     },
     {
       "lote": "mon-fov-s1",
@@ -92,8 +1551,64 @@
         0,
         5
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "mon-fov semilla 1 (2 puntos)",
+      "oferta": 47802092,
+      "machine_id": 140182,
+      "maquina": {
+        "vcpu": 12.0,
+        "cpu": "Xeon E5-2620 v3",
+        "ram_gb": 15.5,
+        "ghz": 3.2,
+        "gpu": "GTX TITAN X",
+        "ubicacion": "South Korea, KR",
+        "host": 140182,
+        "fiabilidad": 0.9943
+      },
+      "usd_hora": 0.08222,
+      "ok": true,
+      "error": null,
+      "epocas": 84,
+      "s_por_epoca": 45.3,
+      "instancia": 48719443,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02484,
+        "s_paso_min": 0.02383,
+        "s_paso_max": 0.02857,
+        "pasos_s": 40.261,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 24.6,
+        "hilos_torch": 6,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2620 v3 @ 2.40GHz",
+        "nucleos": 12,
+        "carga": [
+          0.83,
+          1.12,
+          0.61
+        ],
+        "arranque_s": 2.5,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 381.6,
+      "subida_s": 7.3,
+      "instalacion_s": 49.0,
+      "peaje_s": 438.0,
+      "sonda_s": 7.6,
+      "entrenamiento_s": 3807.8,
+      "runs": [
+        "mon-fov-0000-monitorval_loss_seed1",
+        "mon-fov-0005-monitorval_f1_seed1"
+      ],
+      "segundos_vivida": 4757.9,
+      "usd": 0.10867,
+      "intento": 1
     },
     {
       "lote": "mon-fov-s2",
@@ -102,8 +1617,64 @@
         1,
         6
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "mon-fov semilla 2 (2 puntos)",
+      "oferta": 23739082,
+      "machine_id": 35071,
+      "maquina": {
+        "vcpu": 9.0,
+        "cpu": "Xeon E5-2696 v3",
+        "ram_gb": 47.2,
+        "ghz": 3.8,
+        "gpu": "RTX 3060",
+        "ubicacion": "Vietnam, VN",
+        "host": 35071,
+        "fiabilidad": 0.9969
+      },
+      "usd_hora": 0.06889,
+      "ok": true,
+      "error": null,
+      "epocas": 98,
+      "s_por_epoca": 42.1,
+      "instancia": 48719280,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02491,
+        "s_paso_min": 0.02241,
+        "s_paso_max": 0.03033,
+        "pasos_s": 40.152,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 24.6,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2696 v3 @ 2.30GHz",
+        "nucleos": 72,
+        "carga": [
+          2.24,
+          3.21,
+          3.76
+        ],
+        "arranque_s": 2.6,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 286.5,
+      "subida_s": 8.5,
+      "instalacion_s": 57.3,
+      "peaje_s": 352.3,
+      "sonda_s": 8.0,
+      "entrenamiento_s": 4127.6,
+      "runs": [
+        "mon-fov-0001-monitorval_loss_seed2",
+        "mon-fov-0006-monitorval_f1_seed2"
+      ],
+      "segundos_vivida": 5141.7,
+      "usd": 0.09839,
+      "intento": 1
     },
     {
       "lote": "mon-fov-s3",
@@ -112,8 +1683,64 @@
         2,
         7
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "mon-fov semilla 3 (2 puntos)",
+      "oferta": 48715057,
+      "machine_id": 139059,
+      "maquina": {
+        "vcpu": 20.0,
+        "cpu": "Xeon E5-2630 v4",
+        "ram_gb": 15.5,
+        "ghz": 3.1,
+        "gpu": "RTX 3060 Ti",
+        "ubicacion": "South Korea, KR",
+        "host": 139059,
+        "fiabilidad": 0.9972
+      },
+      "usd_hora": 0.05156,
+      "ok": true,
+      "error": null,
+      "epocas": 106,
+      "s_por_epoca": 39.1,
+      "instancia": 48719161,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02506,
+        "s_paso_min": 0.023,
+        "s_paso_max": 0.03211,
+        "pasos_s": 39.904,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 24.8,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz",
+        "nucleos": 20,
+        "carga": [
+          3.56,
+          1.74,
+          1.04
+        ],
+        "arranque_s": 3.4,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 44.5,
+      "subida_s": 9.7,
+      "instalacion_s": 74.5,
+      "peaje_s": 128.7,
+      "sonda_s": 9.9,
+      "entrenamiento_s": 4150.6,
+      "runs": [
+        "mon-fov-0002-monitorval_loss_seed3",
+        "mon-fov-0007-monitorval_f1_seed3"
+      ],
+      "segundos_vivida": 5237.1,
+      "usd": 0.075,
+      "intento": 1
     },
     {
       "lote": "mon-fov-s4",
@@ -122,8 +1749,64 @@
         3,
         8
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "mon-fov semilla 4 (2 puntos)",
+      "oferta": 30445806,
+      "machine_id": 35929,
+      "maquina": {
+        "vcpu": 14.0,
+        "cpu": "Xeon E5-2680 v4",
+        "ram_gb": 15.6,
+        "ghz": 3.3,
+        "gpu": "GTX 1660 S",
+        "ubicacion": "Vietnam, VN",
+        "host": 35929,
+        "fiabilidad": 0.9961
+      },
+      "usd_hora": 0.05822,
+      "ok": true,
+      "error": null,
+      "epocas": 140,
+      "s_por_epoca": 44.2,
+      "instancia": 48719175,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02879,
+        "s_paso_min": 0.0276,
+        "s_paso_max": 0.03119,
+        "pasos_s": 34.732,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 28.5,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "nucleos": 28,
+        "carga": [
+          13.32,
+          11.19,
+          9.3
+        ],
+        "arranque_s": 3.0,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 234.9,
+      "subida_s": 8.6,
+      "instalacion_s": 66.8,
+      "peaje_s": 310.3,
+      "sonda_s": 9.1,
+      "entrenamiento_s": 6188.5,
+      "runs": [
+        "mon-fov-0003-monitorval_loss_seed4",
+        "mon-fov-0008-monitorval_f1_seed4"
+      ],
+      "segundos_vivida": 7254.6,
+      "usd": 0.11733,
+      "intento": 1
     },
     {
       "lote": "mon-fov-s5",
@@ -132,18 +1815,128 @@
         4,
         9
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "mon-fov semilla 5 (2 puntos)",
+      "oferta": 36656765,
+      "machine_id": 13718,
+      "maquina": {
+        "vcpu": 8.0,
+        "cpu": "Xeon E5-2690 0",
+        "ram_gb": 126.0,
+        "ghz": 3.8,
+        "gpu": "Quadro P4000",
+        "ubicacion": "Quebec, CA",
+        "host": 13718,
+        "fiabilidad": 0.9948
+      },
+      "usd_hora": 0.06756,
+      "ok": true,
+      "error": null,
+      "epocas": 86,
+      "s_por_epoca": 79.0,
+      "instancia": 48719264,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.05767,
+        "s_paso_min": 0.04712,
+        "s_paso_max": 0.07552,
+        "pasos_s": 17.342,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 57.0,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2690 0 @ 2.90GHz",
+        "nucleos": 32,
+        "carga": [
+          2.64,
+          2.44,
+          2.02
+        ],
+        "arranque_s": 3.8,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 319.3,
+      "subida_s": 1.4,
+      "instalacion_s": 75.7,
+      "peaje_s": 396.4,
+      "sonda_s": 8.7,
+      "entrenamiento_s": 6791.5,
+      "runs": [
+        "mon-fov-0004-monitorval_loss_seed5",
+        "mon-fov-0009-monitorval_f1_seed5"
+      ],
+      "segundos_vivida": 7798.9,
+      "usd": 0.14635,
+      "intento": 1
     },
     {
       "lote": "sch-fov-s1",
       "sweep": "sch-fov",
       "puntos": [
-        0,
         5
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "sch-fov semilla 1 (2 puntos)",
+      "oferta": 29292877,
+      "machine_id": 29150,
+      "maquina": {
+        "vcpu": 16.0,
+        "cpu": "Xeon E5-2697A v4",
+        "ram_gb": 31.4,
+        "ghz": 3.6,
+        "gpu": "GTX 1060",
+        "ubicacion": "Norway, NO",
+        "host": 29150,
+        "fiabilidad": 0.9994
+      },
+      "usd_hora": 0.08889,
+      "ok": true,
+      "error": null,
+      "epocas": 51,
+      "s_por_epoca": 34.5,
+      "instancia": 48738204,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02046,
+        "s_paso_min": 0.01756,
+        "s_paso_max": 0.02323,
+        "pasos_s": 48.875,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 20.2,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz",
+        "nucleos": 32,
+        "carga": [
+          1.62,
+          1.29,
+          0.61
+        ],
+        "arranque_s": 2.3,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 172.9,
+      "subida_s": 5.5,
+      "instalacion_s": 44.7,
+      "peaje_s": 223.1,
+      "sonda_s": 5.7,
+      "entrenamiento_s": 1763.2,
+      "runs": [
+        "sch-fov-0005-schedulercosine_seed1"
+      ],
+      "segundos_vivida": 2002.1,
+      "usd": 0.04943,
+      "intento": 2
     },
     {
       "lote": "sch-fov-s2",
@@ -152,8 +1945,64 @@
         1,
         6
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "sch-fov semilla 2 (2 puntos)",
+      "oferta": 13234297,
+      "machine_id": 29249,
+      "maquina": {
+        "vcpu": 16.0,
+        "cpu": "Xeon E5-2697A v4",
+        "ram_gb": 31.4,
+        "ghz": 2.6,
+        "gpu": "GTX 1060",
+        "ubicacion": "Norway, NO",
+        "host": 29249,
+        "fiabilidad": 0.9993
+      },
+      "usd_hora": 0.08815,
+      "ok": true,
+      "error": null,
+      "epocas": 105,
+      "s_por_epoca": 41.4,
+      "instancia": 48720507,
+      "sonda": {
+        "ok": true,
+        "sweep": "mon-fov",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.02206,
+        "s_paso_min": 0.02091,
+        "s_paso_max": 0.02385,
+        "pasos_s": 45.338,
+        "pasos_epoca": 989,
+        "s_epoca_estimada": 21.8,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz",
+        "nucleos": 32,
+        "carga": [
+          1.6,
+          0.96,
+          0.46
+        ],
+        "arranque_s": 2.9,
+        "ventanas_train": 84000,
+        "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+      },
+      "arranque_s": 188.5,
+      "subida_s": 4.1,
+      "instalacion_s": 55.0,
+      "peaje_s": 247.7,
+      "sonda_s": 6.6,
+      "entrenamiento_s": 4351.9,
+      "runs": [
+        "sch-fov-0001-schedulernone_seed2",
+        "sch-fov-0006-schedulercosine_seed2"
+      ],
+      "segundos_vivida": 4616.7,
+      "usd": 0.11304,
+      "intento": 1
     },
     {
       "lote": "sch-fov-s3",
@@ -181,6 +2030,154 @@
       "puntos": [
         4,
         9
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pw-fov-s3",
+      "sweep": "pw-fov",
+      "puntos": [
+        12,
+        17
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pw-fov-s4",
+      "sweep": "pw-fov",
+      "puntos": [
+        13,
+        18
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pw-fov-s5",
+      "sweep": "pw-fov",
+      "puntos": [
+        14,
+        19
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ch-fov-s1",
+      "sweep": "ch-fov",
+      "puntos": [
+        10,
+        15
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ch-fov-s2",
+      "sweep": "ch-fov",
+      "puntos": [
+        11,
+        16
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ch-fov-s3",
+      "sweep": "ch-fov",
+      "puntos": [
+        12,
+        17
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ch-fov-s4",
+      "sweep": "ch-fov",
+      "puntos": [
+        13,
+        18
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ch-fov-s5",
+      "sweep": "ch-fov",
+      "puntos": [
+        14,
+        19
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ov-fov-s1",
+      "sweep": "ov-fov",
+      "puntos": [
+        10,
+        15
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ov-fov-s2",
+      "sweep": "ov-fov",
+      "puntos": [
+        11,
+        16
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ov-fov-s3",
+      "sweep": "ov-fov",
+      "puntos": [
+        12,
+        17
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ov-fov-s4",
+      "sweep": "ov-fov",
+      "puntos": [
+        13,
+        18
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "ov-fov-s5",
+      "sweep": "ov-fov",
+      "puntos": [
+        14,
+        19
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pw-fov-s1",
+      "sweep": "pw-fov",
+      "puntos": [
+        15
+      ],
+      "ok": false,
+      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+    },
+    {
+      "lote": "pw-fov-s2",
+      "sweep": "pw-fov",
+      "puntos": [
+        16
       ],
       "ok": false,
       "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
