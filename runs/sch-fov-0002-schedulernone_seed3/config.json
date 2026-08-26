@@ -6,14 +6,14 @@
     "momentum": 0.9,
     "weight_decay": 0.0,
     "batch_size": 85,
-    "epochs": 150,
+    "epochs": 100,
     "scheduler": "none",
     "patience": 10,
     "lambda_pos": 1.0,
     "pos_weight": 1.0,
     "smooth_l1_beta": 0.08,
     "monitor": "val_loss",
-    "seed": 1
+    "seed": 3
   },
   "network": {
     "fovea_px": 16,
@@ -27,10 +27,10 @@
     "s_center": 1,
     "s_periph": 1,
     "channels": [
-      24,
-      24,
-      24,
-      24
+      16,
+      16,
+      16,
+      16
     ],
     "merge": "concat",
     "pool_mode": "avg",
@@ -60,10 +60,10 @@
         "s_center": 1,
         "s_periph": 1,
         "channels": [
-          24,
-          24,
-          24,
-          24
+          16,
+          16,
+          16,
+          16
         ],
         "merge": "concat",
         "pool_mode": "avg",
@@ -79,17 +79,17 @@
         "momentum": 0.9,
         "weight_decay": 0.0,
         "batch_size": 85,
-        "epochs": 150,
+        "epochs": 100,
         "scheduler": "none",
         "patience": 10,
         "lambda_pos": 1.0,
         "pos_weight": 1.0,
         "smooth_l1_beta": 0.08,
         "monitor": "val_loss",
-        "seed": 1
+        "seed": 3
       }
     },
-    "sweep": "ch-fov",
+    "sweep": "sch-fov",
     "git_commit": "unknown: not a git repository",
     "environment": {
       "python": "3.12.3",
