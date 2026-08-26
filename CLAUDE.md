@@ -23,6 +23,50 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **✅ 2026-08-26 — LA GEOMETRÍA NUEVA YA DIO RESULTADOS, Y SON LOS MÁS GRANDES DEL INVENTARIO.**
+> Los ocho recorridos de prioridad que corrió la flota, **leídos** en esta sesión desde los
+> artefactos del repo con `scripts/estudio_informe.py` (aplica R1–R6, escritas antes). Detalle
+> completo en
+> [reportes/2026/08-agosto/2026-08-26-geometria-nueva-primeros-resultados.md](reportes/2026/08-agosto/2026-08-26-geometria-nueva-primeros-resultados.md).
+> ⚠ **Nada de esto lo midió esta sesión**: los runs los produjo la flota.
+> 1. ⚠⚠ **`red-fov` es el resultado grande: a igual área, ver el borde SIN COMPRIMIR gana.** Con
+>    `border_px` fijo en 8, `border_reduce` 1 → **0,9574** contra 0,9472 (reduce 2) y 0,9408
+>    (reduce 4). Monótono, **bandas min–max disjuntas**, y +0,0102 sobre el siguiente con
+>    **p = 0,008 — el mínimo alcanzable** con 5 semillas. Contra el vigente del proyecto son
+>    **+0,0233**, la mejora más grande medida nunca aquí. **Es la pregunta que la reparametrización
+>    hizo formulable** y antes no se podía ni escribir.
+>    ⚠ **NO es gratis**: N pasa de 20 a **32**, la cabeza crece **+156 %** y el reloj **1,9×**
+>    (69,8 s/época contra 36,8). Citarlo sin esto es citarlo mal.
+> 2. **`borde-ancho` CIERRA el eje del ancho, que llevaba dos recorridos abierto por la derecha.**
+>    A coste constante (anillo atado a 2 celdas, N=20 en los cinco puntos): 4 → 0,9341 · **8 →
+>    0,9408** · 10 → 0,9385 · 12 → 0,9376 · 16 → **0,9321, peor que el vigente**. Óptimo
+>    **interior**, por fin. Y **cae justo donde el análisis físico predijo**: a 16 px el 26 % del
+>    anillo es relleno replicado (instructionsNewNN.md §2.2). ⚠ R4 ❌: 8 px da p = 0,063, así que
+>    **el vigente no se mueve** por la regla escrita antes.
+> 3. ⚠ **`ov-fov` NO declara nada y no hay que citarlo como si lo hiciera.** Incompleto (16/20, 3
+>    runs excluidos por morir a medias) y el punto de 4 px tiene **2 semillas**: con 2 contra 5 sólo
+>    hay 15 arreglos, o sea **p mínimo alcanzable 0,133** — R4 no puede declarar al 5 % pase lo que
+>    pase. Lo único decible: la tendencia es monótona a favor del solape, y **`0` (ramas disjuntas)
+>    es el peor de los cuatro**. Si se sostiene al completarlo, sería la primera evidencia directa a
+>    favor del solape contributivo de la spec §7. **Terminarlo antes de usarlo.**
+> 4. **Cuatro ejes se cierran EN CONTRA, con 5 semillas** — y eso también es información:
+>    `pos_weight` (4,0 pierde −0,0204 y 8,0 −0,0561, **ambos p = 0,008**), `k_center` (5 y 7 pierden
+>    con p = 0,024 y 0,008), `scheduler` (`cosine` −0,0012, **p = 0,857**: no hace nada) y `monitor`
+>    (`val_f1` +0,0059 con p = 0,214, no cruza). ⚠ **`pos_weight` duele**: era *la* hipótesis
+>    plausible del inventario para atacar el cuello de botella de detección, y **empeora**.
+> 5. ⚠ **El plano `(border_px, border_reduce)` NO está barrido**, sólo sus dos rectas por el punto
+>    vigente. El mejor punto medido (8 px sin comprimir) es **la esquina de las dos**, no un óptimo
+>    demostrado: con `border_reduce=1`, el `border_px` óptimo podría estar **por debajo** de 8 y
+>    salir más barato. Es lo siguiente que vale la pena preguntar.
+> 6. ⚠ **Todo esto es f1 de VENTANA, el proxy.** Ninguno se ha llevado a la métrica de tarea, y el
+>    proxy ya exageró una vez por un factor de dos en `n_layers`. Y si se adopta N=32, **la
+>    comparación con la plana hay que rehacerla**: `plana-24-single` se eligió para igualar
+>    parámetros con la foveada de N=20, contra una de N=32 ya no es coste equivalente.
+> **Arreglo hecho aquí**: `estudio_informe.py` tenía `--eje` con default **`"lr"` cableado**. Sin
+> pasar la bandera no fallaba: imprimía la tabla con el eje entero a `None` y un ganador llamado
+> `None` — creíble y falsa, peor que un error. Ahora **se deriva del `space` del recorrido**, y si
+> no hay un único eje se niega diciéndolo.
+
 > **⚠ 2026-08-26 — HAY TRABAJO EN VUELO QUE NO SALIÓ DE ESTA MÁQUINA. LÉELO ANTES DE TOCAR NADA.**
 > Al hacer merge a `main` apareció que `origin/main` **ya tenía** la reparametrización de abajo y
 > **había seguido construyendo encima** desde otra máquina (la flota). Esto NO lo midió esta

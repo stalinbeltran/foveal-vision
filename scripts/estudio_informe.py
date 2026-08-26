@@ -38,7 +38,9 @@ def num(v, d=4) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--sweep", required=True)
-    ap.add_argument("--eje", default="lr")
+    ap.add_argument("--eje", default=None,
+                    help="por defecto se DERIVA del spec (el unico eje que no es "
+                         "'seed'); pasalo solo para releer un recorrido por otro campo")
     ap.add_argument("--vigente", default=None,
                     help="valor vigente del eje, para el contraste de R4. Se lee "
                          "como JSON, asi que vale para los ejes que NO son "
@@ -56,6 +58,18 @@ def main() -> int:
 
     store, runs = SweepStore(), RunStore()
     spec = store.spec(args.sweep)
+    # El eje se DERIVA del espacio del recorrido. Tenia default "lr" cableado, y
+    # eso no fallaba: producia una tabla entera con el eje a `None` y un ganador
+    # llamado `None` -- creible y falsa, que es peor que un error. Es el mismo
+    # dato en dos sitios (el spec lo sabe; la bandera lo repetia).
+    if args.eje is None:
+        ejes = [k for k in (spec.get("space") or {}) if k != "seed"]
+        if len(ejes) != 1:
+            print(f"No puedo derivar el eje de '{args.sweep}': su espacio declara "
+                  f"{sorted(ejes) or 'ninguno'}.\n"
+                  f"  -> pasalo con --eje <campo>")
+            return 1
+        args.eje = ejes[0]
     tabla = sweep_trials(args.sweep, store=store, run_store=runs)
     # Un run a medias NO es una medida: trae valor (lo mejor hasta donde llego)
     # pero no ha convergido, asi que hunde su punto. Ver ESTADOS_MEDIBLES.
