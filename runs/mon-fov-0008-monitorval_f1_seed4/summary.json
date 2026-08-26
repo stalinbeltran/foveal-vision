@@ -1,0 +1,17 @@
+{
+  "run": "mon-fov-0008-monitorval_f1_seed4",
+  "epochs_run": 82,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_f1",
+  "best": 0.9426795342926813,
+  "best_epoch": 72,
+  "seconds_per_epoch": 46.417,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
