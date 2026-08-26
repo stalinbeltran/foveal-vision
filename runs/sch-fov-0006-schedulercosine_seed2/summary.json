@@ -1,0 +1,17 @@
+{
+  "run": "sch-fov-0006-schedulercosine_seed2",
+  "epochs_run": 58,
+  "epochs_requested": 100,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.09844303520565684,
+  "best_epoch": 48,
+  "seconds_per_epoch": 42.062,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
