@@ -1,0 +1,17 @@
+{
+  "run": "stride-16-0004-seed5",
+  "epochs_run": 19,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.17140450565652413,
+  "best_epoch": 9,
+  "seconds_per_epoch": 54.01,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
