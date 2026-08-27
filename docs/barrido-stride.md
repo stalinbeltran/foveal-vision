@@ -362,23 +362,33 @@ es un comentario.
 
 | Test | Afirma |
 |---|---|
-| `test_eval_stride_default_is_bit_identical` | extraer con `eval_stride=None` da el MISMO `windows.npz` (huella incluida) que sin el campo |
-| `test_windows_per_epoch_zero_keeps_loader` | con 0 no se construye sampler: mismos pesos que antes con la misma semilla |
-| `test_payload_one_dataset_unchanged` | el tar de una flota de un dataset lista exactamente las mismas entradas que hoy |
+| `test_eval_stride_default_is_bit_identical` | extraer con `eval_stride=None` da el MISMO `windows.npz` — **misma huella sha256, byte a byte** — que antes del campo |
+| `test_eval_stride_none_equals_explicit_same_value` | declararlo igual que el de train tampoco mueve nada (control) |
+| `test_windows_per_epoch_zero_keeps_the_old_loader` | con 0 la época recorre el pool entero, como siempre |
+| `test_recipe_accepts_old_specs_without_the_field` | `Recipe(**spec["base_recipe_value"])` sobre un spec ya escrito sigue construyendo: ausente = 0, no error |
+| `test_payload_accepts_a_bare_string` · `test_multi_dataset_payload_carries_all` | el tar de **un** dataset es el de siempre y no arrastra los demás |
 
 ### 7.2 El mecanismo nuevo
 
 | Test | Afirma |
 |---|---|
-| `test_eval_stride_splits_use_their_own_grid` | train sigue a `stride`, val/test siguen a `eval_stride`; los conteos por split son los de la tabla §3 |
-| `test_eval_stride_same_images_across_strides` | dos datasets con distinto `stride` y el mismo `seed` tienen **idéntico** `split.json` — misma imagen, mismo lado |
-| `test_windows_per_epoch_exact_count` | cada época consume exactamente `W` ventanas, con `W` mayor y menor que el pool |
-| `test_windows_per_epoch_no_replacement_within_pass` | con `W <= pool` ninguna ventana sale dos veces; con `W > pool` el reparto es por permutaciones completas, no con reemplazo |
-| `test_windows_per_epoch_is_reproducible` | misma semilla ⇒ misma secuencia de índices; semilla distinta ⇒ distinta (control) |
-| `test_multi_dataset_payload_carries_all` | el tar de N datasets los lleva los N, y cada recorrido apunta al suyo |
+| `test_eval_stride_splits_use_their_own_grid` | train sigue a `stride`, val/test a `eval_stride`; los conteos por split son los que dan las posiciones reales |
+| `test_eval_stride_same_images_across_strides` | dos brazos con distinto `stride` y el mismo `seed` tienen **idéntico** `split.json` — misma imagen, mismo lado |
+| `test_eval_stride_shared_grid_gives_same_eval_count` | los brazos se examinan del mismo número de ventanas aunque su train sea de tamaños muy distintos |
+| `test_eval_stride_invalid_is_refused_with_reason` · `test_eval_stride_travels_to_the_manifest` | un valor imposible se rechaza con razón y arreglo; el válido viaja al manifest |
+| `test_eval_stride_cannot_be_one_of_the_arms` | la rejilla de evaluación **no puede ser uno de los strides barridos**: ese brazo habría entrenado sobre las posiciones exactas del examen |
+| `test_windows_per_epoch_exact_count` · `_caps_the_epoch` · `_above_pool_repeats` | cada época consume exactamente `W` ventanas, con `W` mayor y menor que el pool, medido sobre el `DataLoader` de verdad |
+| `test_windows_per_epoch_no_replacement_within_pass` · `_repeats_by_whole_permutations` | con `W ≤ pool` ninguna sale dos veces; con `W > pool` el reparto va por permutaciones completas (cuentas 2 o 3, nunca 0 ni 5) |
+| `test_windows_per_epoch_is_reproducible` · `_advances_each_pass` | misma semilla ⇒ misma secuencia (contrato ⑪); semilla y época distintas ⇒ distinta (controles) |
+| `test_multi_dataset_payload_carries_all` | el tar de N datasets los lleva los N |
 | `test_multi_dataset_missing_npz_dies_before_renting` | falta un npz ⇒ error con su razón **antes** de tocar la API de Vast |
-| `test_stride_informe_groups_by_stride` | el comparador agrupa por valor de stride usando `aggregate_seeds`, y su media coincide con la calculada a mano sobre los mismos runs |
-| `test_stride_informe_refuses_mixed_study` | recorridos de estudios distintos en la misma llamada ⇒ error, no una tabla mezclada |
+| `test_vigilante_sobrantes_respects_ajena` · `test_vigilante_prefix_is_a_parameter` | los dos fallos de §6.2, cerrados: la rama de sobrantes respeta el veredicto de `juzgar`, y el prefijo es parámetro y se hereda al relanzar |
+| `test_stride_informe_groups_by_stride` | el comparador agrupa por valor de stride con `aggregate_seeds`, y la media coincide con la calculada a mano |
+| `test_stride_informe_refuses_mixed_eval_grid` · `_refuses_mixed_budget` | brazos con distinta rejilla o distinto presupuesto **no se juntan en una tabla** |
+| `test_stride_informe_refuses_a_sweep_without_the_label` · `_refuses_when_the_study_has_no_arms` · `_orders_arms_by_stride` | sin `eje_dataset` no se adivina el valor; sin brazos no se inventa una tabla; el orden es por stride |
+| `test_humo_sweeps_are_a_separate_study` | los recorridos de validación **no** se llaman como los del estudio: si lo hicieran, la flota los daría por hechos y el estudio quedaría «medido» con 3 épocas |
+
+**29 tests**, en `tests/test_stride.py`. La suite entera pasa de 192 a 221.
 
 ### 7.3 Lo que NO se testea
 
