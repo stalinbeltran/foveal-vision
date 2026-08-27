@@ -331,17 +331,21 @@ datasets distintos, esa llamada muere hoy en `cargar_sweeps` con «tienen que co
 o sea que **el relanzamiento automático no relanzaría nada**, y el síntoma sería el peor de los de
 este proyecto: un estudio que parece vivo y no avanza. Lo arregla §4.3.
 
-**(b) `pgrep -f estudio_flota.py` es global.** El vigilante no relanza si ve una flota viva
+**(b) `pgrep -f estudio_flota.py` era global.** El vigilante no relanza si ve una flota viva
 (regla 4, y es correcta: dos flotas alquilarían dos veces para los mismos puntos). Pero la
-comprobación no distingue **de qué estudio** es la flota que ve. Con una flota de otro estudio
-corriendo en la misma máquina —que es exactamente lo que pasa hoy en este servidor—, el vigilante
-de este estudio **nunca relanzaría**.
+comprobación no distinguía **de qué estudio** es la flota que ve. Con una flota de otro estudio
+corriendo en la misma máquina —que es exactamente lo que pasaba en este servidor el 2026-08-27—,
+el vigilante de este estudio **no habría relanzado nunca**: un estudio que parece vigilado y no
+avanza, sin un solo error.
 
-Es la razón de fondo por la que este estudio va a **una sola flota** en vez de cinco: con cinco,
-cada vigilante vería a las otras cuatro y ninguno relanzaría jamás.
+Es también la razón de fondo por la que este estudio va a **una sola flota** en vez de cinco: con
+cinco, cada vigilante vería a las otras cuatro.
 
-⚠ Mientras (b) no se arregle de raíz, **el vigilante de este estudio no se lanza a la vez que otra
-flota ajena**. Queda anotado en el plan §5 como condición de arranque, no como detalle.
+`flota_viva(sweeps)` mira ahora la línea de comandos y sólo cuenta la flota que menciona alguno de
+**sus** recorridos. Sin lista, se comporta como antes.
+
+Los dos arreglos son la misma pregunta en dos capas y hacen falta los dos: el prefijo dice de
+quién son las **máquinas**, y esto dice de quién es la **flota**.
 
 ### 6.3 El aviso, que no puede esperar dentro del turno
 
@@ -382,13 +386,15 @@ es un comentario.
 | `test_windows_per_epoch_is_reproducible` · `_advances_each_pass` | misma semilla ⇒ misma secuencia (contrato ⑪); semilla y época distintas ⇒ distinta (controles) |
 | `test_multi_dataset_payload_carries_all` | el tar de N datasets los lleva los N |
 | `test_multi_dataset_missing_npz_dies_before_renting` | falta un npz ⇒ error con su razón **antes** de tocar la API de Vast |
-| `test_vigilante_sobrantes_respects_ajena` · `test_vigilante_prefix_is_a_parameter` | los dos fallos de §6.2, cerrados: la rama de sobrantes respeta el veredicto de `juzgar`, y el prefijo es parámetro y se hereda al relanzar |
+| `test_vigilante_sobrantes_respects_ajena` · `test_vigilante_prefix_is_a_parameter` · `test_vigilante_only_sees_fleets_of_its_own_study` | los dos fallos de §6.2, cerrados: la rama de sobrantes respeta el veredicto de `juzgar`, el prefijo es parámetro y se hereda al relanzar, y `flota_viva` sólo cuenta la flota de sus propios recorridos |
+| `test_progreso_names_an_axis_that_lives_in_the_dataset` | el monitor de progreso sabe nombrar un eje que no está en `space` (imprimía «eje ?»), sin pisar el eje de un recorrido normal |
+| `test_sonda_projection_respects_the_budget` | la sonda proyecta s/época desde la época, no desde el pool: con el presupuesto igualado anunciaba 20,9× de más |
 | `test_stride_informe_groups_by_stride` | el comparador agrupa por valor de stride con `aggregate_seeds`, y la media coincide con la calculada a mano |
 | `test_stride_informe_refuses_mixed_eval_grid` · `_refuses_mixed_budget` | brazos con distinta rejilla o distinto presupuesto **no se juntan en una tabla** |
 | `test_stride_informe_refuses_a_sweep_without_the_label` · `_refuses_when_the_study_has_no_arms` · `_orders_arms_by_stride` | sin `eje_dataset` no se adivina el valor; sin brazos no se inventa una tabla; el orden es por stride |
 | `test_humo_sweeps_are_a_separate_study` | los recorridos de validación **no** se llaman como los del estudio: si lo hicieran, la flota los daría por hechos y el estudio quedaría «medido» con 3 épocas |
 
-**29 tests**, en `tests/test_stride.py`. La suite entera pasa de 192 a 221.
+**32 tests**, en `tests/test_stride.py`. La suite entera pasa de 192 a 224.
 
 ### 7.3 Lo que NO se testea
 

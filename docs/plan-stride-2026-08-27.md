@@ -234,8 +234,20 @@ este plan:
    El síntoma sería de los malos: runs cortados a media época, sin error propio, indistinguibles
    de una máquina que se murió sola.
 
-**El arreglo** es un prefijo de etiqueta por estudio, usado por los dos lados (`estudio_flota.py`
-lo pone, `vigilante_avance.py` lo filtra), y que `sobrantes` respete el veredicto de `juzgar`.
+3. **`flota_viva()` preguntaba por CUALQUIER `estudio_flota.py`.** La regla 4 del vigilante —no
+   relanzar si ya hay flota— es correcta, pero le faltaba «*sobre mis puntos*». Con la flota del
+   otro estudio viva en esta misma máquina, el vigilante de éste habría visto «hay una flota viva»
+   en cada vuelta y **no habría relanzado nunca**.
+
+**Los tres arreglos**, en el mismo commit que el código: un **prefijo de etiqueta por estudio**
+usado por los dos lados (`estudio_flota.py` lo pone, `vigilante_avance.py` lo filtra), que
+`sobrantes` **respete el veredicto de `juzgar`**, y que `flota_viva(sweeps)` sólo cuente la flota
+que menciona alguno de sus recorridos. Son la misma pregunta en tres capas —de quién es la
+máquina, de quién es la flota— y hacen falta las tres.
+
+**Comprobado en la validación del 2026-08-27**: las dos máquinas nacieron como
+`st-stride-h01-s1` y `st-stride-h16-s1`, fuera del espacio de nombres `estudio-*` del otro
+estudio, que en ese momento tenía 5-8 máquinas vivas.
 
 ---
 
