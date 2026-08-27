@@ -55,10 +55,23 @@ class RunStore:
         Si no esta en ningun sitio devuelve el destino de escritura."""
         return artefactos.resolver("runs", name, self.destino(name))
 
-    def destino(self, name: str) -> Path:
-        """Donde se ESCRIBE. Siempre la forma plana del repo de datos: crear en
-        el archivo fechado exigiria saber el recorrido y el mes, y `path()` solo
-        recibe el nombre."""
+    def destino(self, name: str, config: dict | None = None) -> Path:
+        """Donde se ESCRIBE.
+
+        Un run de un recorrido YA archivado se crea DENTRO de el
+        (`<mes>/sweeps/<rec>/runs/<run>`): asi la relacion recorrido-runs es
+        estructura de directorios y no un prefijo en el nombre, y el run hereda
+        el mes de su recorrido -- y con el, el de su estudio.
+
+        `path()` solo recibe el nombre y por eso no puede decidir esto; `create`
+        si, porque el config trae `provenance.sweep`. Sin recorrido (un
+        benchmark) o sin archivar, la forma plana.
+        """
+        sweep = ((config or {}).get("provenance") or {}).get("sweep")
+        if sweep:
+            d = artefactos.destino_agrupado("runs", name, recorrido=sweep)
+            if d is not None:
+                return d
         return self.root / name
 
     def exists(self, name: str) -> bool:
@@ -67,7 +80,7 @@ class RunStore:
     def create(self, name: str, config: dict) -> Path:
         # se crea en el DESTINO, no en `path()`: si el run ya estuviera archivado
         # `path()` devolveria el archivo y esto escribiria dentro de el.
-        d = self.destino(name)
+        d = self.destino(name, config)
         if d.exists():
             raise RunError("run_exists",
                            f"ya existe un run llamado '{name}'",
@@ -114,14 +127,15 @@ class RunStore:
         return read_json_retrying(p)
 
     def list(self) -> list[dict]:
-        if not self.root.exists():
-            return []
         out = []
+        # los tres sitios, sin repetir: lo nuevo (plano o agrupado), lo archivado
+        # y lo legado. Mirar solo `self.root` dejaba fuera los 851 runs migrados.
         # newest first: the run you just trained is the one you want to look at,
         # and it keeps the default selection on a current (loadable) checkpoint
         # instead of the alphabetically-first, possibly-stale one.
-        dirs = sorted(self.root.iterdir(),
-                      key=lambda d: d.stat().st_mtime, reverse=True)
+        dirs = sorted((self.path(n) for n in artefactos.nombres("runs", self.root)),
+                      key=lambda d: d.stat().st_mtime if d.exists() else 0,
+                      reverse=True)
         for d in dirs:
             if not (d / "config.json").exists():
                 continue

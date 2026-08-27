@@ -677,3 +677,97 @@ def test_every_run_on_disk_still_resolves_its_geometry():
         dims_of(net)          # raises if the old spelling stopped being readable
         seen += 1
     assert seen > 0
+
+
+# ------------------------------------- el agrupamiento por estudio al escribir
+#
+# Los artefactos de estudio viven en `foveal-vision-data` agrupados por mes. El
+# mes lo elige EL ESTUDIO al crearse y lo hereda todo lo suyo: el mes AGRUPA
+# para poder leer el directorio, no fecha cada run. Sin test esto es un
+# comentario, y es justo lo que se pidio.
+
+def test_a_study_keeps_its_sweeps_and_runs_in_one_month(monkeypatch, tmp_path):
+    """Un recorrido creado el mes SIGUIENTE se queda con su estudio.
+
+    Es la razon de ser del agrupamiento: un mismo estudio repartido en dos
+    carpetas por el mero paso de la medianoche seria lo que estas carpetas
+    existen para evitar.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv import artefactos
+    from fv.ioutils import write_json_atomic
+    from fv.studies.store import StudyStore
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+
+    # un estudio archivado en JULIO (como si lo hubiera dejado la migracion)
+    d = tmp_path / "datos" / "2026" / "07-julio" / "studies" / "viejo"
+    d.mkdir(parents=True)
+    write_json_atomic(d / "plan.json", {"axes": []})
+    assert artefactos.mes_del_estudio("viejo") == "2026/07-julio"
+
+    # ... cuyo recorrido se crea HOY (agosto): hereda julio, no el mes actual
+    SweepStore().create("viejo-s1-lr", {"study": "viejo", "window_dataset": "x"})
+    sw = SweepStore().path("viejo-s1-lr")
+    assert "07-julio" in str(sw), sw
+
+    # ... y su run vive DENTRO del recorrido, luego tambien en julio
+    RunStore().create("viejo-s1-lr-0000-a", {"provenance": {"sweep": "viejo-s1-lr"}})
+    run = RunStore().path("viejo-s1-lr-0000-a")
+    assert run.parent.parent == sw, run
+    assert "07-julio" in str(run), run
+
+    # y todo sigue siendo visible por su nombre, en los tres listados
+    assert "viejo" in [s["name"] for s in StudyStore().list()]
+    assert "viejo-s1-lr" in [s["name"] for s in SweepStore().list()]
+
+
+def test_a_run_of_a_sweep_is_stored_inside_it(monkeypatch, tmp_path):
+    """La relacion recorrido-runs es estructura, no un prefijo en el nombre."""
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv.studies.store import StudyStore
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    StudyStore().create("est", {"axes": []}, {"steps": []})
+    SweepStore().create("est-s0-lr", {"study": "est", "window_dataset": "x"})
+    d = RunStore().create("est-s0-lr-0000-a", {"provenance": {"sweep": "est-s0-lr"}})
+    assert d.parent.name == "runs" and d.parent.parent.name == "est-s0-lr"
+    # un run suelto (un benchmark) NO se inventa un recorrido ni un mes
+    loose = RunStore().create("bench-1", {"provenance": {}})
+    assert loose.parent.name == "runs" and loose.parent.parent.name != "est-s0-lr"
+
+
+def test_deleting_a_study_still_finds_its_grouped_sweeps(monkeypatch, tmp_path):
+    """La cascada de borrado ve los recorridos agrupados.
+
+    `used_by_study` miraba solo la raiz plana: con el recorrido agrupado bajo el
+    mes de su estudio, borrar el estudio los dejaba HUERFANOS — el bug que la
+    cascada existe para evitar.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv.studies.store import StudyStore
+    from fv.sweeps.store import SweepStore
+    StudyStore().create("est", {"axes": []}, {"steps": []})
+    SweepStore().create("est-s0-lr", {"study": "est", "window_dataset": "x"})
+    assert SweepStore().used_by_study("est") == ["est-s0-lr"]
+
+
+def test_the_archive_index_is_cached_per_root(monkeypatch, tmp_path):
+    """La cache del indice va por RAIZ, no global.
+
+    Cacheada sin argumentos, el primer repo mirado se quedaba pegado y un test
+    apuntando a un temporal seguia resolviendo contra el repo de datos REAL.
+    """
+    import json
+    from fv import artefactos
+    a, b = tmp_path / "a", tmp_path / "b"
+    for raiz, nombre in ((a, "run-de-a"), (b, "run-de-b")):
+        raiz.mkdir()
+        (raiz / "index.json").write_text(
+            json.dumps({"runs": {nombre: {"path": f"2026/08-agosto/runs/{nombre}"}}}),
+            encoding="utf-8")
+    monkeypatch.setenv("FV_DATA_ROOT", str(a))
+    assert "run-de-a" in artefactos.nombres("runs", a / "runs")
+    monkeypatch.setenv("FV_DATA_ROOT", str(b))
+    nombres_b = artefactos.nombres("runs", b / "runs")
+    assert "run-de-b" in nombres_b and "run-de-a" not in nombres_b

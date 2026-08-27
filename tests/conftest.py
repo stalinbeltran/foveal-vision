@@ -10,6 +10,23 @@ import pytest
 from PIL import Image
 
 
+@pytest.fixture(autouse=True)
+def _nunca_el_repo_de_datos_real(tmp_path, monkeypatch):
+    """Apunta el repo de datos a un temporal en TODOS los tests.
+
+    Desde que E/H/I se escriben en `foveal-vision-data`, un almacen construido
+    sin `root=` explicito resuelve al repo hermano REAL: un test que se olvide de
+    pasarlo lee -- y escribe -- medidas de verdad. Paso al integrar, y por eso la
+    proteccion es global y no una linea mas dentro de `world`: los tests que no
+    usan `world` son justo los que construyen almacenes a pelo.
+
+    Hace cierto por construccion lo que el docstring de arriba ya prometia
+    ("never touch real data/"). Un test que quiera otro sitio sigue poniendo
+    FV_DATA_ROOT el mismo; esto solo rellena el defecto.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "_repo-datos"))
+
+
 def make_source(root: Path, name: str, count: int = 10, W: int = 48, H: int = 36,
                 seed: int = 3) -> None:
     out = root / name

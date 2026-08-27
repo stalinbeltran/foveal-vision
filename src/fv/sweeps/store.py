@@ -28,15 +28,25 @@ class SweepStore:
         """Donde ESTA el recorrido: plano -> archivo fechado -> legado."""
         return artefactos.resolver("sweeps", name, self.destino(name))
 
-    def destino(self, name: str) -> Path:
-        """Donde se ESCRIBE: la forma plana del repo de datos."""
+    def destino(self, name: str, spec: dict | None = None) -> Path:
+        """Donde se ESCRIBE.
+
+        Si el recorrido pertenece a un estudio YA archivado, se crea bajo el mes
+        de ese estudio: un estudio no se reparte entre carpetas porque sus pasos
+        corran en meses distintos. Sin estudio (o sin archivar), la forma plana.
+        """
+        estudio = (spec or {}).get("study")
+        if estudio:
+            d = artefactos.destino_agrupado("sweeps", name, estudio=estudio)
+            if d is not None:
+                return d
         return self.root / name
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "spec.json").exists()
 
     def create(self, name: str, spec: dict) -> Path:
-        d = self.destino(name)
+        d = self.destino(name, spec)
         if d.exists():
             raise SweepStoreError("sweep_exists",
                                   f"ya existe un recorrido llamado '{name}'",
@@ -97,13 +107,14 @@ class SweepStore:
         """Sweeps that FIX this B (spec.window_dataset). A sweep retrains on it by
         name on resume, so deleting B would break the sweep later — even with no
         surviving child runs to catch it. Reads spec.json only (no reconcile)."""
-        if not self.root.exists():
-            return []
+        # los tres sitios: un recorrido agrupado o archivado tambien cuenta.
+        # Mirando solo `self.root`, borrar un estudio dejaba huerfanos sus
+        # recorridos (el bug que la cascada existe para evitar).
         out = []
-        for d in sorted(self.root.iterdir()):
-            p = d / "spec.json"
+        for nombre in artefactos.nombres("sweeps", self.root):
+            p = self.path(nombre) / "spec.json"
             if p.exists() and read_json_retrying(p).get("window_dataset") == dataset_name:
-                out.append(d.name)
+                out.append(nombre)
         return out
 
     def used_by_study(self, study_name: str) -> list[str]:
@@ -112,13 +123,14 @@ class SweepStore:
         without them, recreating it with the same name collides on the next
         advance (sweep_exists) — so study deletion must cascade here. Reads
         spec.json only (no reconcile)."""
-        if not self.root.exists():
-            return []
+        # los tres sitios: un recorrido agrupado o archivado tambien cuenta.
+        # Mirando solo `self.root`, borrar un estudio dejaba huerfanos sus
+        # recorridos (el bug que la cascada existe para evitar).
         out = []
-        for d in sorted(self.root.iterdir()):
-            p = d / "spec.json"
+        for nombre in artefactos.nombres("sweeps", self.root):
+            p = self.path(nombre) / "spec.json"
             if p.exists() and read_json_retrying(p).get("study") == study_name:
-                out.append(d.name)
+                out.append(nombre)
         return out
 
     def request_stop(self, name: str) -> None:

@@ -1053,15 +1053,33 @@ Lo ya medido está repartido en **tres formas** que no coinciden, así que
 |---|---|---|
 | 1 | `<data>/runs/<run>/` | **lo que se escribe de ahora en adelante** |
 | 2 | `<data>/<año>/<mes>/sweeps/<recorrido>/runs/<run>/` | el **archivo fechado** de la migración; `index.json` es el mapa |
-| 3 | `<foveal-vision>/runs/<run>/` | el **legado** que este repo todavía tiene |
+| 3 | `<foveal-vision>/runs/<run>/` | el **legado** — ⚠ **ya vaciado** (2026-08-27), pero la cascada lo sigue mirando por si un proceso lo recrea |
 
-- **`path(nombre)`** busca en ese orden — 1 → 2 → 3. Si (3) se mirara antes, un run migrado se
-  leería de la copia vieja y no de la buena.
-- **`destino(nombre)`** devuelve siempre (1). `create()` usa `destino()`, **nunca `path()`**: si un
-  run ya estuviera archivado, `path()` devolvería el archivo y se escribiría dentro de él.
+- **`path(nombre)`** busca en ese orden — 1 → 2 → **lo agrupado hoy** → 3. Si (3) se mirara antes,
+  un run migrado se leería de la copia vieja y no de la buena.
+- **`destino(...)`** devuelve dónde se CREA, y **agrupa por estudio** (ver abajo). `create()` usa
+  `destino()`, **nunca `path()`**: si un run ya estuviera archivado, `path()` devolvería el archivo
+  y se escribiría dentro de él.
 
-⚠ La cascada es **una escalera para migrar sin parar el mundo, no un diseño permanente**. Cuando
-(3) se vacíe, `legado()` se borra y quedan dos escalones.
+### El mes lo elige EL ESTUDIO, y lo hereda todo lo suyo
+
+Decisión del usuario, y es el motivo de que exista el agrupamiento: **no ver un mismo estudio
+disperso en varias carpetas de mes** sólo porque unos recorridos corrieron al día siguiente.
+
+- Un **estudio** estrena su carpeta de mes al crearse: es quien la elige.
+- Un **recorrido** hereda el mes de **su estudio** (`spec.study`), no el de hoy. Uno lanzado el día
+  1 del mes siguiente **se queda con su estudio**.
+- Un **run** vive **dentro** de su recorrido (`<mes>/sweeps/<rec>/runs/<run>`), vía
+  `provenance.sweep` — así la relación es estructura de directorios y no un prefijo en el nombre.
+- Sin estudio (un benchmark suelto), la forma plana. `destino_agrupado()` devuelve `None` cuando no
+  sabe a qué estudio pertenece: es la respuesta honesta, en vez de inventar una carpeta que
+  separaría lo que debería ir junto.
+
+⚠ **El mes AGRUPA para poder leer el directorio; no fecha cada run.** Fijado por
+`test_a_study_keeps_its_sweeps_and_runs_in_one_month`, **probado rompiéndolo**.
+
+⚠ La cascada es **una escalera para migrar sin parar el mundo, no un diseño permanente**. El legado
+ya está vacío; cuando se confirme que nada lo recrea, `legado()` se borra y quedan dos escalones.
 
 ⚠ El archivo fechado **no tiene la forma plana** `runs/<name>/` que usan los almacenes: un run vive
 dentro de su recorrido y de su mes. Por eso se lee por `index.json` y no intentando que una sola
@@ -1079,13 +1097,32 @@ raíz sirva para las dos formas.
    **directorio**. La primera versión de la comprobación decía «los datos siguen aquí» cuando ya
    estaban allá — la conclusión contraria a la verdadera.
 
+### Tres trampas más, encontradas al integrar (2026-08-27)
+
+3. ⚠ **`lru_cache` sin argumentos sobre `index.json`**: el primer repo mirado se quedaba pegado, así
+   que un test apuntando `FV_DATA_ROOT` a un temporal **seguía resolviendo contra el repo REAL**.
+   La caché va **por raíz**. Lo fija `test_the_archive_index_is_cached_per_root`.
+4. ⚠ **`used_by_study` miraba sólo la raíz plana**: con el recorrido agrupado bajo el mes de su
+   estudio, borrar el estudio **dejaba huérfanos sus recorridos** — justo el bug que la cascada de
+   borrado existe para evitar. Los tres listados (`list`, `used_by_dataset`, `used_by_study`) y
+   `RunStore.list` pasan ahora por `artefactos.nombres()`.
+5. ⚠ **Los tests podían escribir en el repo de datos real.** Un almacén sin `root=` explícito
+   resuelve al hermano de verdad. Hay un fixture **`autouse`** en `tests/conftest.py` que apunta
+   `FV_DATA_ROOT` a un temporal en **todos** los tests — global, porque los que no usan `world` son
+   justo los que construyen almacenes a pelo.
+
 ### Lo que queda pendiente
 
-- **Vaciar el legado**: `runs/`, `sweeps/` y `studies/` siguen en este repo y la cascada los sigue
-  leyendo. Borrarlos es el paso que cierra la separación, y sólo se puede **sin estudios en vuelo**:
-  el hilo de git de la flota hace `git add -- runs sweeps` cada sonda (~60 s) contra este repo.
-- **Commitear lo nuevo en el repo de datos**: la flota commitea el libro de a bordo contra
-  `foveal-vision`; con los datos fuera, ese `git add` hay que apuntarlo al otro repo.
+- ✅ ~~Vaciar el legado~~ **hecho (2026-08-27)**: `runs/`, `sweeps/` y `studies/` ya no están en este
+  repo, y el `.gitignore` los ignora para que no vuelvan a entrar si un proceso los recrea.
+  Comprobado que los 851 runs, 61 recorridos y 8 estudios **siguen resolviendo sin el legado**.
+- ⚠ **Commitear lo nuevo en el repo de datos**: la flota commitea el libro de a bordo con
+  `git add -- runs sweeps` contra **este** repo, y esas rutas ya no existen aquí. **Hay que
+  apuntarlo a `foveal-vision-data` antes de lanzar la siguiente flota**, o lo medido no se
+  commitea en ninguna parte.
+- **Los 5 JSON sueltos de `data/`** (`p40-*-task.json`, `proxy-c-d-3b.json`,
+  `stride-*-informe.json`): por criterio irían al repo de datos. `data/window-datasets/` **se queda
+  aquí**: es dominio B, entrada del experimento y no resultado.
 
 ## Varias sesiones a la vez: comprueba en qué copia estás
 

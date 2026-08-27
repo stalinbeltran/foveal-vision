@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fv import settings
+from fv import artefactos, settings
 from fv.ioutils import read_json_retrying, write_json_atomic
 
 
@@ -22,13 +22,23 @@ class StudyStore:
         self.root = Path(root) if root else settings.studies_root()
 
     def path(self, name: str) -> Path:
-        return self.root / name
+        """Donde ESTA el estudio: plano -> archivo fechado -> legado."""
+        return artefactos.resolver("studies", name, self.destino(name))
+
+    def destino(self, name: str) -> Path:
+        """Donde se ESCRIBE. Un estudio ESTRENA su carpeta de mes: es el que la
+        elige, y todo lo suyo -- sus recorridos y los runs de estos -- la
+        hereda. Por eso el mes se decide aqui y en ningun otro sitio."""
+        d = artefactos.destino_agrupado("studies", name)
+        return d if d is not None else self.root / name
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "plan.json").exists()
 
     def create(self, name: str, plan: dict, progress: dict) -> Path:
-        d = self.path(name)
+        # el DESTINO, no `path()`: si ya estuviera archivado, `path()` devolveria
+        # el archivo y esto escribiria dentro de el (misma razon que RunStore)
+        d = self.destino(name)
         if d.exists():
             raise StudyStoreError("study_exists",
                                   f"ya existe un estudio llamado '{name}'",
@@ -67,25 +77,23 @@ class StudyStore:
         write_json_atomic(self.path(name) / "progress.json", progress)
 
     def list(self) -> list[dict]:
-        if not self.root.exists():
-            return []
+        # los tres sitios, sin repetir: lo nuevo, lo archivado y lo legado
         out = []
-        for d in sorted(self.root.iterdir()):
+        for nombre in artefactos.nombres("studies", self.root):
+            d = self.path(nombre)
             if (d / "plan.json").exists():
-                out.append({"name": d.name,
+                out.append({"name": nombre,
                             "plan": read_json_retrying(d / "plan.json"),
-                            "progress": self.progress(d.name)})
+                            "progress": self.progress(nombre)})
         return out
 
     def _plans(self):
         """(name, plan) for every study, reading plan.json only — no progress
         self-heal side effect (this is called from delete-guards, a read)."""
-        if not self.root.exists():
-            return
-        for d in sorted(self.root.iterdir()):
-            p = d / "plan.json"
+        for nombre in artefactos.nombres("studies", self.root):
+            p = self.path(nombre) / "plan.json"
             if p.exists():
-                yield d.name, read_json_retrying(p)
+                yield nombre, read_json_retrying(p)
 
     def used_by_dataset(self, dataset_name: str) -> list[str]:
         """Studies that FIX this B (plan.window_dataset). A study retrains on it
