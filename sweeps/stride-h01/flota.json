@@ -7,48 +7,41 @@
     "dirty1000-80px-16px-st01"
   ],
   "prefijo": "st-",
-  "cuando": "2026-08-27T02:58:49+00:00",
+  "cuando": "2026-08-27T10:40:32+00:00",
   "reparto": "seed",
   "maquinas": 1,
-  "cpu": "E5-26",
-  "reloj_min": 14.3,
-  "usd": 0.012,
+  "cpu": null,
+  "reloj_min": 10.0,
+  "usd": 0.0083,
   "hilos": 8,
   "criba": null,
   "gasto_por_maquina": [
     {
       "etiqueta": "stride-h01-s1",
+      "machine_id": 137635,
+      "por_que": "fallo antes de estar lista",
+      "minutos": 5.36,
+      "usd": 0.00448
+    },
+    {
+      "etiqueta": "stride-h01-s1",
       "machine_id": 33176,
-      "por_que": "fallo antes de estar lista",
-      "minutos": 4.55,
-      "usd": 0.00381
-    },
-    {
-      "etiqueta": "stride-h01-s1",
-      "machine_id": 57860,
-      "por_que": "fallo antes de estar lista",
-      "minutos": 4.95,
-      "usd": 0.00415
-    },
-    {
-      "etiqueta": "stride-h01-s1",
-      "machine_id": 45421,
-      "por_que": "fallo antes de estar lista",
-      "minutos": 4.75,
-      "usd": 0.00408
+      "por_que": "lote terminado",
+      "minutos": 4.61,
+      "usd": 0.00385
     }
   ],
-  "maquinas_alquiladas": 3,
+  "maquinas_alquiladas": 2,
   "git": {
     "activo": true,
-    "commits": 0,
+    "commits": 1,
     "fallos_push": 0,
     "ultimo_error": null
   },
-  "peaje_min": 0.0,
-  "trabajo_min": 0.0,
-  "maquina_min": 0.0,
-  "peaje_pct": null,
+  "peaje_min": 2.0,
+  "trabajo_min": 2.2,
+  "maquina_min": 4.6,
+  "peaje_pct": 43.3,
   "lotes": [
     {
       "lote": "stride-h01-s1",
@@ -56,8 +49,66 @@
       "puntos": [
         0
       ],
-      "ok": false,
-      "error": "no quedan maquinas distintas libres; sube --repuestos o afloja las condiciones"
+      "que": "stride-h01 semilla 1 (1 puntos)",
+      "oferta": 48185487,
+      "machine_id": 33176,
+      "maquina": {
+        "vcpu": 9.333333333333332,
+        "cpu": "Xeon E5-2680 v4",
+        "ram_gb": 10.5,
+        "ghz": 3.3,
+        "gpu": "RTX 3060",
+        "ubicacion": "South Korea, KR",
+        "host": 33176,
+        "fiabilidad": 0.9906
+      },
+      "usd_hora": 0.05022,
+      "ok": true,
+      "error": null,
+      "epocas": 3,
+      "s_por_epoca": 42.8,
+      "instancia": 48880076,
+      "sonda": {
+        "ok": true,
+        "sweep": "stride-h01",
+        "punto": 0,
+        "batch_size": 85,
+        "n_layers": 4,
+        "pasos_medidos": 40,
+        "s_paso": 0.01852,
+        "s_paso_min": 0.01711,
+        "s_paso_max": 0.02001,
+        "pasos_s": 53.983,
+        "pasos_epoca": 989,
+        "ventanas_epoca": 84000,
+        "ventanas_pool": 1755000,
+        "windows_per_epoch": 84000,
+        "s_epoca_estimada": 18.3,
+        "hilos_torch": 8,
+        "omp": "8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+        "nucleos": 56,
+        "carga": [
+          2.97,
+          2.99,
+          3.33
+        ],
+        "arranque_s": 3.2,
+        "ventanas_train": 1755000,
+        "fingerprint": "sha256:3bd24e6c7516dff313f3be7d505d2ef77764cf89ac51fe73297052b9487daa94"
+      },
+      "arranque_s": 49.2,
+      "subida_s": 7.6,
+      "instalacion_s": 62.7,
+      "peaje_s": 119.6,
+      "sonda_s": 8.0,
+      "entrenamiento_s": 131.1,
+      "runs": [
+        "stride-h01-0000-seed1"
+      ],
+      "segundos_vivida": 276.3,
+      "usd": 0.00385,
+      "intento": 1
     }
   ]
 }
