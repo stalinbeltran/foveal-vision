@@ -900,6 +900,54 @@ dónde está.
 
 ---
 
+## Los datos de los estudios van a `foveal-vision-data`, no aquí
+
+**Desde 2026-08-27, por decisión del usuario: todo dato generado por un estudio se guarda en el
+repositorio hermano [`foveal-vision-data`](https://github.com/stalinbeltran/foveal-vision-data).**
+Este repo es **el código que mide**; aquel es **lo medido**. El objetivo es mantener los dos
+limpios: 3.256 ficheros JSON de resultados ahogaban el diff de cualquier cambio de código.
+
+**Qué va allá** — los artefactos de los dominios **E, H, I**: los runs (`runs/<name>/`: `config.json`,
+`metrics.jsonl`, `status.json`, `summary.json`), los recorridos (`sweeps/<name>/`: `spec.json`,
+`state.json`, `informe.json`, `flota.json`) y los estudios (`studies/<name>/plan.json`).
+
+**Qué se queda aquí** — todo lo que es código o criterio, no medida:
+- `configs/networks/` y `configs/recipes/` (**C** y **D**): son **fuente**, se editan a mano y
+  definen el experimento; no los genera un estudio.
+- `docs/plan-*.md`: se escriben **antes** de medir. Son criterio, no resultado (protocolo.md §1).
+- `reportes/<año>/<mes>-<nombre>/`: texto interpretativo, se lee junto al código que lo produjo.
+- `benchmarks/`: caracterizan **la máquina**, no un estudio.
+
+**La estructura de allá es `<año>/<NN>-<mes>/`** (`2026/08-agosto/`), fechada por la **fecha de
+generación leída del propio JSON** (`status.json.updated_at`) — **nunca por el mtime**, que en un
+clon limpio es la fecha del checkout y fecharía todo el mismo día. Dentro:
+`sweeps/<recorrido>/runs/<run>/` — **un run vive dentro de su recorrido**, para que la relación
+sea estructura de directorios y no un prefijo en el nombre que se pierde al renombrar. Un
+recorrido **no se parte por el mes**: sus runs heredan su fecha. `index.json` mapea
+run → ruta/recorrido/fecha y estudio → sus recorridos. El detalle y los criterios, en el README
+de aquel repo; el migrador que lo produjo, en su `scripts/migrar_data.py`.
+
+⚠ **Lo que esto NO cambia todavía, y hay que saberlo antes de tocar código:**
+1. **La migración fue una COPIA: `runs/`, `sweeps/` y `studies/` siguen en este repo**, y el
+   código sigue leyéndolos de aquí. Quitarlos es un segundo paso pendiente de hacer.
+2. **El paquete `fv` está limpio**: todas las rutas pasan por
+   [`src/fv/settings.py`](src/fv/settings.py), que ya tiene indirección por `FV_ROOT`. Separar de
+   verdad la lectura es añadir ahí una raíz de datos, **en un solo sitio**.
+3. ⚠ **9 scripts cablean las rutas a mano** (16 ocurrencias de `ROOT / "runs"` y similares) sin
+   pasar por `settings.py`: `estudio_informe.py`, `estudio_flota.py`, `estudio_cierre.py`,
+   `estudio_comparar.py`, `estudio_prioridades.py`, `estudio_progreso.py`, `comparar_repro.py`,
+   `knobs_f.py` y `vigilante_avance.py`. Cada uno hay que tocarlo, o romperá.
+4. ⚠⚠ **`vigilante_avance.py` PUEDE ALQUILAR MÁQUINAS** y decide qué relanzar mirando `runs/`. Si
+   se separa la data sin ajustarlo, verá los recorridos vacíos y **relanzará flota para puntos que
+   ya están medidos** — cuesta dinero. Es lo primero que hay que arreglar en ese segundo paso.
+
+**Mientras tanto, para todo dato nuevo**: cuando un estudio produzca resultados, su sitio final es
+`foveal-vision-data`, en el mes en que se generó, y **se commitea y se empuja allí** — un resultado
+que sólo existe en una máquina desaparece con ella (la regla de «servidores efímeros» de
+Convenciones aplica igual, y con más motivo).
+
+---
+
 ## Regla permanente: la organización por dominios manda
 
 **[docs/organizacion.md](docs/organizacion.md) es la fuente de verdad sobre cómo se organiza
@@ -1089,6 +1137,10 @@ Aquí queda sólo lo que se dispara **en este repo**, que es lo que cuesta diner
   que sólo existe en esta máquina desaparece con ella.
 - `data/`, `runs/` y `sweeps/` son artefactos: **se versiona la descripción (configs, métricas,
   manifests, specs), se ignora la carga (`.npz`, `.pt`, `optuna.db`)** — formatos.md §5.
+  ⚠ **Y desde 2026-08-27 la descripción de runs, recorridos y estudios se versiona en el repo
+  hermano `foveal-vision-data`, no aquí** — ver la sección «Los datos de los estudios van a
+  `foveal-vision-data`». La regla de qué se ignora (la carga) no cambia: sigue fuera de git en
+  los dos repos.
 - **Enlaces a ficheros en las respuestas**: siempre en formato markdown `[texto](ruta)` con la
   ruta **relativa a la raíz del workspace** (nunca backticks ni ruta pelada), para que sean
   clickeables en la extensión de VSCode. **No envuelvas el enlace entre paréntesis** ni pegues
