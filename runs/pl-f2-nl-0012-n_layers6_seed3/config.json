@@ -1,0 +1,105 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "lr": 0.0014,
+    "optimizer": "adam",
+    "momentum": 0.9,
+    "weight_decay": 0.0,
+    "batch_size": 85,
+    "epochs": 150,
+    "scheduler": "none",
+    "patience": 10,
+    "lambda_pos": 1.0,
+    "pos_weight": 1.0,
+    "smooth_l1_beta": 0.08,
+    "monitor": "val_loss",
+    "seed": 3
+  },
+  "network": {
+    "fovea_px": 16,
+    "border_px": 4,
+    "border_reduce": 1,
+    "overlap_fovea_px": 2,
+    "overlap_border_px": 0,
+    "n_layers": 6,
+    "k_center": 3,
+    "k_periph": 3,
+    "s_center": 1,
+    "s_periph": 1,
+    "channels": [
+      22,
+      22,
+      22,
+      22,
+      22,
+      22
+    ],
+    "merge": "concat",
+    "pool_mode": "avg",
+    "pad_mode": "edge",
+    "regions": "single"
+  },
+  "execution": {
+    "device": "cpu",
+    "num_workers": 0
+  },
+  "provenance": {
+    "window_dataset": {
+      "name": "dirty1000-80px-16px-r20260826",
+      "fingerprint": "sha256:ac875e22d538c4bb36390e30816da1189755440d1ce93dac30fc5af4ca94c669"
+    },
+    "network": {
+      "name": null,
+      "value": {
+        "fovea_px": 16,
+        "border_px": 4,
+        "border_reduce": 1,
+        "overlap_fovea_px": 2,
+        "overlap_border_px": 0,
+        "n_layers": 6,
+        "k_center": 3,
+        "k_periph": 3,
+        "s_center": 1,
+        "s_periph": 1,
+        "channels": [
+          22,
+          22,
+          22,
+          22,
+          22,
+          22
+        ],
+        "merge": "concat",
+        "pool_mode": "avg",
+        "pad_mode": "edge",
+        "regions": "single"
+      }
+    },
+    "recipe": {
+      "name": "plan40",
+      "value": {
+        "lr": 0.0014,
+        "optimizer": "adam",
+        "momentum": 0.9,
+        "weight_decay": 0.0,
+        "batch_size": 85,
+        "epochs": 150,
+        "scheduler": "none",
+        "patience": 10,
+        "lambda_pos": 1.0,
+        "pos_weight": 1.0,
+        "smooth_l1_beta": 0.08,
+        "monitor": "val_loss",
+        "seed": 3
+      }
+    },
+    "sweep": "pl-f2-nl",
+    "git_commit": "unknown: not a git repository",
+    "environment": {
+      "python": "3.12.3",
+      "torch": "2.13.0+cpu",
+      "platform": "linux",
+      "device": "cpu"
+    }
+  }
+}
