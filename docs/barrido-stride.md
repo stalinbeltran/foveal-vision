@@ -393,8 +393,14 @@ es un comentario.
 | `test_stride_informe_refuses_mixed_eval_grid` · `_refuses_mixed_budget` | brazos con distinta rejilla o distinto presupuesto **no se juntan en una tabla** |
 | `test_stride_informe_refuses_a_sweep_without_the_label` · `_refuses_when_the_study_has_no_arms` · `_orders_arms_by_stride` | sin `eje_dataset` no se adivina el valor; sin brazos no se inventa una tabla; el orden es por stride |
 | `test_humo_sweeps_are_a_separate_study` | los recorridos de validación **no** se llaman como los del estudio: si lo hicieran, la flota los daría por hechos y el estudio quedaría «medido» con 3 épocas |
+| `test_stride_informe_never_contradicts_itself_with_one_arm` | con un solo brazo, R1 decía a la vez «la densidad no compra nada» y «el eje no queda cerrado por arriba». Y es el caso **normal**: es lo que sale al mirar mientras la flota corre |
+| `test_stride_informe_says_when_there_is_no_noise_band` | sin réplicas δ = 0 y **cualquier** diferencia «supera» δ: R1 corona ganador y R3 marca ruptura por construcción. Un «δ = 0,0000» parece precisión y es ausencia |
+| `test_estudio_stride_refuses_a_missing_source_with_the_fix` | la fuente está en `.gitignore`: se comprueba **antes de nada** y el error dice el comando que la reconstruye, no sólo que falta |
 
-**32 tests**, en `tests/test_stride.py`. La suite entera pasa de 192 a 224.
+**35 tests**, en `tests/test_stride.py`. La suite entera pasa de 192 a **227**.
+
+⚠ Este recuento se queda viejo solo. Si no cuadra con
+`pytest tests/test_stride.py --collect-only`, manda el segundo.
 
 ### 7.3 Lo que NO se testea
 
