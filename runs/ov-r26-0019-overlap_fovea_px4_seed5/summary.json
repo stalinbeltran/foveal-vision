@@ -1,0 +1,17 @@
+{
+  "run": "ov-r26-0019-overlap_fovea_px4_seed5",
+  "epochs_run": 40,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.09784629368646579,
+  "best_epoch": 30,
+  "seconds_per_epoch": 36.43,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
