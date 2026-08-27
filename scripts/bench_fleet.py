@@ -39,10 +39,23 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+from fv import settings  # noqa: E402
+
+# El dataset del benchmark de vCPU. Tiene que coincidir con `bench_dataset.py`
+# (VENTANAS) y con `bench_speed.py`: si dejan de coincidir se mide sobre un dato
+# que no es el suyo y no se nota.
+VENTANAS = "bench-dirty1000-16"
+
+# Lo rellena `preparar_dataset()` antes de tocar ningun droplet: el directorio
+# del que se copia (una etapa temporal publicada desde git, o el volumen).
+FUENTE_DATOS: "Path | None" = None
+
 LANZADOR = Path.home() / "src" / "digital-ocean-dropplet-auto-launching"
 DO = LANZADOR / "scripts" / "do_droplet.py"
 
@@ -51,6 +64,18 @@ DO = LANZADOR / "scripts" / "do_droplet.py"
 TAG = "bench-efimero"
 
 VOLUMEN = os.environ.get("BENCH_VOLUME", "/mnt/bench-data")
+
+# De donde sale el dato que se les copia. Desde 2026-08-27 manda GIT: el
+# `windows.npz` se commitea en foveal-vision-data porque esta medido que
+# reconstruirlo da OTRO dato (`repro-chk`). El volumen queda de respaldo para
+# maquinas que lo tengan montado y no tengan el repo de datos.
+#
+# Importa que el orden sea este y no el contrario: el volumen es una copia que
+# alguien publico alguna vez, git es la fuente. Si divergen --y no hay nada que
+# lo impida-- la que vale es la que esta commiteada, que es la que puede
+# reproducir un tercero.
+ORIGEN_GIT = "git"
+ORIGEN_VOLUMEN = "volumen"
 REPO = "https://github.com/stalinbeltran/foveal-vision.git"
 
 # Torch desde el indice de CPU a proposito: el paquete por defecto de PyPI
@@ -175,9 +200,9 @@ def medir_uno(size: str, repeats: int, sufijo: str, mantener: bool) -> dict:
         log(f"{size}: copiando el dataset…")
         destino = "/root/foveal-vision/data"
         for rel in ("FINGERPRINT.json", "window-datasets"):
-            origen = Path(VOLUMEN) / rel
+            origen = FUENTE_DATOS / rel
             if not origen.exists():
-                raise RuntimeError(f"no está {origen}: ¿el volumen no está montado aquí?")
+                raise RuntimeError(f"no está {origen}: el dataset no está preparado")
             scp = [
                 "scp", "-P", str(puerto), "-r", "-q",
                 "-i", str(Path.home() / ".ssh" / "do_droplet"),
@@ -242,6 +267,34 @@ def medir_uno(size: str, repeats: int, sufijo: str, mantener: bool) -> dict:
 # ---------------------------------------------------------------------- flota
 
 
+def preparar_dataset() -> tuple:
+    """Deja el dato listo para copiar y dice de donde salio: (dir, origen).
+
+    Con el repo de datos clonado se PUBLICA desde git a un directorio temporal
+    --lo mismo que `publish` hace contra el volumen, y con el mismo
+    FINGERPRINT.json-- asi que los droplets reciben exactamente el dato
+    commiteado y su `verify --from data` sigue valiendo sin cambios.
+    """
+    npz = settings.window_datasets_root() / VENTANAS / "windows.npz"
+    if npz.exists():
+        etapa = Path(tempfile.mkdtemp(prefix="bench-git-"))
+        r = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "bench_dataset.py"),
+             "publish", "--to", str(etapa)],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=900)
+        if r.returncode != 0:
+            die(f"no pude preparar el dataset desde git:\n{r.stdout}\n{r.stderr}")
+        return etapa, ORIGEN_GIT
+    if (Path(VOLUMEN) / "FINGERPRINT.json").exists():
+        return Path(VOLUMEN), ORIGEN_VOLUMEN
+    die(f"No hay dataset ni en git ni en {VOLUMEN}.\n"
+        f"  Lo normal es que este en git: {settings.window_datasets_root() / VENTANAS}\n"
+        "  Si no esta, generalo y COMMITEALO (reconstruirlo da otro dato):\n"
+        "    python3 scripts/bench_dataset.py build\n"
+        f"    cd {settings.data_root()} && git add window-datasets && "
+        "git commit -m 'data: dataset' && git push")
+
+
 def comprobaciones() -> None:
     if not DO.exists():
         die(f"No está el lanzador en {DO}.\n"
@@ -252,10 +305,6 @@ def comprobaciones() -> None:
     if not (Path.home() / ".ssh" / "do_droplet").exists():
         die("No hay ~/.ssh/do_droplet: podrías crear droplets y no entrar en ellos.\n"
             "  node ~/src/telegram-coordinator/scripts/bench-preflight.mjs --fix")
-    if not (Path(VOLUMEN) / "FINGERPRINT.json").exists():
-        die(f"No está el dataset en {VOLUMEN}.\n"
-            "  python3 scripts/bench_dataset.py build && "
-            f"python3 scripts/bench_dataset.py publish --to {VOLUMEN}")
     if not shutil.which("scp"):
         die("Falta scp, que es como viaja el dataset a los droplets.")
 
@@ -286,11 +335,14 @@ def main() -> int:
         sizes = ["c-2", "c-4", "c-8"]
 
     comprobaciones()
-    huella = json.loads((Path(VOLUMEN) / "FINGERPRINT.json").read_text(encoding="utf-8"))
+    global FUENTE_DATOS
+    FUENTE_DATOS, origen = preparar_dataset()
+    huella = json.loads((FUENTE_DATOS / "FINGERPRINT.json").read_text(encoding="utf-8"))
     sufijo = time.strftime("%Y%m%d-%H%M%S")
 
     log(f"Flota: {len(sizes)} máquinas ({', '.join(sizes)}), {args.repeats} repeticiones cada una")
-    log(f"Dataset: {huella['window_dataset']} · huella {huella['sha256_windows_npz'][:16]}…")
+    log(f"Dataset: {huella['window_dataset']} · huella {huella['sha256_windows_npz'][:16]}… "
+        f"(de {origen})")
     log(f"Si esto se corta, barre con:  python3 {Path(__file__).name} --reap")
 
     t0 = time.monotonic()

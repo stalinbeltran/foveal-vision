@@ -1091,6 +1091,20 @@ Y por lo mismo `bench_dataset.py` (build/publish) resuelve por la indirección: 
 **sí** sigue escribiendo en `ROOT/data`, y es correcto: corre en el droplet de medición, que es
 justo el caso del fallback.
 
+**Los tres caminos por los que una máquina creada desde aquí recibe el dato**, y los tres salen de
+git:
+
+| Máquina | Cómo lo recibe |
+|---|---|
+| **Vast** (`estudio_flota.py`) | dentro del **payload tar**, leído de `DATASETS` |
+| **Droplet de medición** (`bench_fleet.py`) | `preparar_dataset()` **publica desde git** a una etapa temporal y copia de ahí |
+| **Droplet nuevo** (`lanzar launch dev`) | `types/dev.json` **clona `foveal-vision-data`** |
+
+⚠ En `bench_fleet.py` el orden es **git primero, volumen de respaldo**, y no al revés: el volumen es
+una copia que alguien publicó alguna vez, git es la fuente. Si divergen —y no hay nada que lo
+impida— vale la commiteada, que es la única que puede reproducir un tercero. `--reap`, que es el
+freno de gasto, no pasa por ahí: sigue funcionando sin dataset.
+
 ### Leer y escribir NO son lo mismo, y por eso hay dos métodos
 
 Lo ya medido está repartido en **tres formas** que no coinciden, así que
