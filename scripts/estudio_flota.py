@@ -251,6 +251,19 @@ _disco = threading.Lock()         # escribir el libro de a bordo en runs/
 _destinos = threading.Lock()
 _git = threading.Lock()
 
+# El espacio de nombres de las instancias en la cuenta. Va en una lista para
+# fijarlo desde main sin `global`, como GASTO y ULTIMO_ALQUILER.
+#
+# Por que es un parametro y no la constante "estudio-" que era: la cuenta es UNA
+# y puede haber dos estudios a la vez. COMPROBADO el 2026-08-27, con 8 maquinas
+# `estudio-c*` de otro estudio vivas a 0,5159 $/h: `vigilante_avance` filtra por
+# ese prefijo, asi que el vigilante de un estudio se cree dueno de las maquinas
+# del otro. Con un prefijo por estudio, cada vigilante ve solo lo suyo.
+#
+# ⚠ El default sigue siendo "estudio-": cambiarlo dejaria huerfanas las maquinas
+# de las flotas ya lanzadas, que es justo el fallo que esto viene a evitar.
+PREFIJO: list = ["estudio-"]
+
 # Tras cuantos push fallidos seguidos se avisa por Telegram. 5 vueltas del
 # libro (~5 min) es tiempo de sobra para un parpadeo de red, y muy poco
 # comparado con las 51 vueltas que estuvo roto sin que nadie se enterara
@@ -728,19 +741,27 @@ def particion(sweeps: list, modo: str) -> list:
 # ------------------------------------------------------------------- el payload
 
 
-def construir_payload(sweeps: list, dataset: str) -> Path:
-    """El tar que se sube: codigo + los recorridos + el dataset YA EXTRAIDO.
+def construir_payload(sweeps: list, datasets: list) -> Path:
+    """El tar que se sube: codigo + los recorridos + los datasets YA EXTRAIDOS.
 
     El dataset se extrae UNA VEZ aqui y se manda hecho, en vez de que cada
     maquina lo extraiga: asi las N maquinas entrenan sobre el MISMO fichero,
     byte a byte, y comparar entre maquinas significa algo. Extraerlo en cada una
     seria pedir que N extracciones coincidan: promesa mas fuerte, ganancia
     ninguna.
+
+    Pueden ir VARIOS (un barrido del stride de extraccion es uno por valor del
+    eje). Se comprueban TODOS antes de tocar Vast: descubrir a mitad que falta un
+    npz son maquinas ya alquiladas y facturando para nada.
     """
-    npz = ROOT / "data" / "window-datasets" / dataset / "windows.npz"
-    if not npz.exists():
-        die(f"falta {npz}.\n"
-            f"  El dataset de ventanas no esta extraido, y sin el no hay que entrenar.")
+    if isinstance(datasets, str):          # compatibilidad con la llamada de uno
+        datasets = [datasets]
+    faltan = [d for d in datasets
+              if not (ROOT / "data" / "window-datasets" / d / "windows.npz").exists()]
+    if faltan:
+        die("falta el windows.npz de: " + ", ".join(faltan) + ".\n"
+            "  El dataset de ventanas no esta extraido, y sin el no hay que entrenar.\n"
+            "  No se ha alquilado nada.")
     tmp = Path(tempfile.mkdtemp(prefix="flota-")) / "payload.tar.gz"
 
     def filtro(info: tarfile.TarInfo) -> "tarfile.TarInfo | None":
@@ -755,8 +776,9 @@ def construir_payload(sweeps: list, dataset: str) -> Path:
         for s in sweeps:
             tar.add(str(ROOT / "sweeps" / s["nombre"]),
                     arcname=f"sweeps/{s['nombre']}", filter=filtro)
-        tar.add(str(npz.parent), arcname=f"data/window-datasets/{dataset}",
-                filter=filtro)
+        for d in datasets:
+            tar.add(str(ROOT / "data" / "window-datasets" / d),
+                    arcname=f"data/window-datasets/{d}", filter=filtro)
     return tmp
 
 
@@ -971,7 +993,7 @@ def preparar(oferta: dict, payload: Path, etiqueta: str, hilos: int, disco_gb: f
         f"· {maquina.get('cpu') or '?'}")
     escalonar()
     t0 = time.time()
-    iid = V.alquilar(oferta, f"estudio-{etiqueta}", V.cfg("VAST_IMAGE"), disco_gb)
+    iid = V.alquilar(oferta, f"{PREFIJO[0]}{etiqueta}", V.cfg("VAST_IMAGE"), disco_gb)
     log(f"[{etiqueta}] instancia {iid} alquilada")
     try:
         info = V.esperar_estado(iid, int(V.cfg("VAST_BOOT_TIMEOUT")))
@@ -1087,7 +1109,7 @@ def preparar_con_reintentos(pool: Maquinas, payload: Path, etiqueta: str, hilos:
         except Exception as exc:                        # noqa: BLE001
             motivo = f"{type(exc).__name__}: {exc}"[:200]
             log(f"[{etiqueta}] FALLO preparando (intento {intento}/{intentos}): {motivo}")
-            apuntar_fallo(oferta, motivo, f"estudio-{etiqueta}")
+            apuntar_fallo(oferta, motivo, f"{PREFIJO[0]}{etiqueta}")
     return None
 
 
@@ -1468,7 +1490,7 @@ def lote_con_reintentos(lote: dict, pool: Maquinas, payload: Path,
         except Exception as exc:                        # noqa: BLE001
             motivo = f"{type(exc).__name__}: {exc}"[:200]
             log(f"[{tag}] FALLO en el intento {intento}/{intentos}: {motivo}")
-            apuntar_fallo(m.oferta, motivo, f"estudio-{tag}")
+            apuntar_fallo(m.oferta, motivo, f"{PREFIJO[0]}{tag}")
             ultimo = {"lote": tag, "sweep": lote["sweep"], "puntos": activo["puntos"],
                       "ok": False, "error": motivo, "oferta": m.oferta.get("id"),
                       "machine_id": m.mid, "intento": intento, "bloqueada": True}
@@ -1491,13 +1513,19 @@ def cargar_sweeps(nombres: list, store: SweepStore) -> tuple:
         sweeps.append({"nombre": nombre, "spec": spec, "valid": valid,
                        "pendientes": pendientes, "hechos": hechos})
         datasets.add(spec["window_dataset"])
-    if len(datasets) > 1:
-        die("los recorridos de una misma flota tienen que compartir dataset de "
-            f"ventanas, y hay {len(datasets)}: {sorted(datasets)}.\n"
-            "  El payload lleva UN windows.npz; mezclarlos entrenaria media flota\n"
-            "  sobre otro dato y la comparacion no significaria nada.\n"
-            "  Lanza una flota por dataset.")
-    return sweeps, datasets.pop()
+    # VARIOS datasets en una flota: el payload lleva un windows.npz por cada uno y
+    # cada recorrido entrena con el suyo, que ya declara su propio spec.json.
+    #
+    # Antes esto moria con "lanza una flota por dataset". Se levanto porque un
+    # barrido del stride de EXTRACCION es un dataset por valor del eje
+    # (docs/barrido-stride.md 1), y con una flota por brazo los dos monitores
+    # dejan de funcionar: `vigilante_avance.relanzar()` mete todos los recorridos
+    # en UNA llamada -- que moria justo aqui -- y su `pgrep -f estudio_flota.py`
+    # es global, asi que cada flota veria a las otras y ninguna relanzaria nunca.
+    #
+    # Lo que NO cambia: con un solo dataset, el tar y el comando remoto son los de
+    # siempre. Este script gasta dinero; una regresion aqui no se ve, se factura.
+    return sweeps, sorted(datasets)
 
 
 def main() -> int:
@@ -1558,20 +1586,29 @@ def main() -> int:
                     help="imprime tiempo y coste estimados y no alquila nada")
     ap.add_argument("--dry-run", action="store_true",
                     help="ensena que maquinas se cogerian y no alquila nada")
+    ap.add_argument("--prefijo", default="estudio-",
+                    help="espacio de nombres de las instancias en la cuenta. Dos "
+                         "estudios a la vez NO deben compartirlo: vigilante_avance "
+                         "filtra por el y se creeria dueno de las maquinas del otro")
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
 
     V.load_env()
     store = SweepStore()
-    sweeps, dataset = cargar_sweeps(args.sweep, store)
+    sweeps, datasets = cargar_sweeps(args.sweep, store)
+    PREFIJO[0] = args.prefijo
     lotes = particion(sweeps, args.reparto)
     for l in lotes:
         l["valid"] = next(s["valid"] for s in sweeps if s["nombre"] == l["sweep"])
 
     total_puntos = sum(len(s["valid"]) for s in sweeps)
     total_hechos = sum(len(s["hechos"]) for s in sweeps)
-    log(f"{len(sweeps)} recorrido(s) sobre {dataset}: {total_puntos} puntos, "
+    sobre = datasets[0] if len(datasets) == 1 else f"{len(datasets)} datasets"
+    log(f"{len(sweeps)} recorrido(s) sobre {sobre}: {total_puntos} puntos, "
         f"{total_hechos} ya en el libro, {total_puntos - total_hechos} pendientes")
+    if len(datasets) > 1:
+        for s in sweeps:
+            log(f"   {s['nombre']} -> {s['spec']['window_dataset']}")
     for s in sweeps:
         log(f"   {s['nombre']}: eje {json.dumps(s['spec']['space'])} · "
             f"{len(s['hechos'])}/{len(s['valid'])} hechos")
@@ -1618,9 +1655,12 @@ def main() -> int:
         log("Cancelado. No se ha alquilado nada.")
         return 1
 
-    payload = construir_payload(sweeps, dataset)
+    payload = construir_payload(sweeps, datasets)
+    # El tamano se imprime porque con varios datasets deja de ser despreciable
+    # y se sube a CADA maquina: si crece, hay que verlo en el log y no en la factura.
     log(f"Payload listo: {payload.stat().st_size / 1e6:.1f} MB "
-        f"(codigo + {len(sweeps)} recorridos + dataset ya extraido)")
+        f"(codigo + {len(sweeps)} recorridos + {len(datasets)} dataset(s) ya extraidos: "
+        f"{', '.join(datasets)})")
 
     libro = Libro(args.git, args.cada, empujar=not args.sin_push)
     libro.arrancar()
@@ -1683,7 +1723,9 @@ def main() -> int:
     trabajo = sum(float(r.get("entrenamiento_s") or 0) for r in resultados)
     vividas = sum(float(r.get("segundos_vivida") or 0) for r in resultados)
     reporte = {
-        "recorridos": [s["nombre"] for s in sweeps], "dataset": dataset,
+        "recorridos": [s["nombre"] for s in sweeps],
+        "dataset": datasets[0] if len(datasets) == 1 else None,
+        "datasets": datasets, "prefijo": PREFIJO[0],
         "cuando": V.ahora_iso(), "reparto": args.reparto, "maquinas": len(lotes),
         "cpu": args.cpu or None, "reloj_min": round(reloj / 60, 1),
         "usd": round(gasto, 4), "hilos": args.hilos,

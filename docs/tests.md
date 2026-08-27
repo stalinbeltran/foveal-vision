@@ -70,6 +70,26 @@ Además, del muestreo foveado (nacen con la fase 2, sin xfail largo):
 Si un test de contrato necesita entrenar para detectar la violación, la validación está en la
 capa equivocada. `test_contracts.py` por debajo de ~10 s.
 
+## 3 bis. El barrido del stride de extraccion (dominio B)
+
+Del mecanismo de [barrido-stride.md](barrido-stride.md). La lista completa, con lo que afirma
+cada uno, esta en su §7; aqui queda el **por que** de que sean esos y no otros.
+
+**La mitad que puede romperse es la compatibilidad, no la funcionalidad nueva.** `eval_stride` y
+`windows_per_epoch` son campos con default que preserva el comportamiento actual, y detras de
+ellos hay 700+ runs ya pagados y todas las tablas publicadas. Asi que el primer test no pregunta
+si la rejilla nueva funciona, sino si **la de siempre sigue dando el mismo `windows.npz` byte a
+byte** (huella incluida) y si un run con `windows_per_epoch=0` sigue dando **los mismos pesos**.
+Es la regla de §2 aplicada: se testea la costura entre lo viejo y lo nuevo.
+
+**Y la costura del examen.** Dos datasets con distinto `stride` y el mismo `seed` de B tienen que
+producir un `split.json` **identico**: misma imagen, mismo lado. Si eso se rompe, cada brazo del
+estudio se evalua sobre otras imagenes y la comparacion no significa nada — y no fallaria nada,
+solo saldrian numeros.
+
+**Lo que NO se testea aqui**: que un stride sea mejor que otro. Es resultado de investigacion
+(§5), y su veredicto vive en [plan-stride-2026-08-27.md](plan-stride-2026-08-27.md) §3.
+
 ## 4. Tests de arquitectura (⑦)
 
 Se testea leyendo imports. Capas objetivo:
