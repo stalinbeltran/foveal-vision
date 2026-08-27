@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+r"""El veredicto del barrido de stride de extraccion: la tabla y R1..R4.
+
+No inventa criterio: aplica el que `docs/plan-stride-2026-08-27.md` 3 dejo
+escrito ANTES de mirar, y usa las funciones del proyecto -- `sweep_trials` para
+leer cada brazo, `aggregate_seeds` para la media por valor con su banda,
+`tie_delta` para delta, `select_winner` para la frontera y `permutation_test`
+para el contraste. Un numero definido dos veces es un numero que acaba
+divergiendo (misma razon por la que existe `estudio_informe.py`).
+
+    .venv/bin/python scripts/estudio_stride_informe.py --estudio stride-2026-08-27
+
+Por que hace falta uno propio y no vale `estudio_informe.py`
+------------------------------------------------------------
+El eje de este estudio NO vive en `space`: vive en el DATASET, y por eso hay un
+recorrido por valor (docs/barrido-stride.md 1). `estudio_informe.py --eje` lee
+un recorrido y agrupa por un campo del punto; aqui hay que juntar N recorridos y
+agrupar por el valor que cada uno representa.
+
+La costura es exacta y no se reimplementa nada: `aggregate_seeds` agrupa por el
+punto SIN `seed`, asi que dandole `point = {"stride": s, "seed": k}` agrupa por
+stride sin tocar una linea de `winner.py`.
+
+LO QUE HAY QUE RESPETAR SI SE TOCA ESTO
+---------------------------------------
+1. **Se NIEGA si los brazos no comparten rejilla de evaluacion.** Seria la
+   trampa de barrido-stride.md 2.1 disfrazada de tabla: cada brazo examinado de
+   otra cosa, y el f1 comparado como si fuera el mismo numero.
+2. **Se NIEGA si los brazos no comparten presupuesto** (`windows_per_epoch`).
+   Entonces la tabla mide el presupuesto, no la densidad.
+3. **R4 es un CONTROL, no un resultado.** Si `seconds_per_epoch` se desvia entre
+   brazos, el igualado de presupuesto fallo y no se declara nada. Un control que
+   se reporta como un resultado mas es un control que nadie mira.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import statistics
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from fv.metrics import VAL_METRICS, permutation_test    # noqa: E402
+from fv.sweeps.runner import es_medida, sweep_trials    # noqa: E402
+from fv.sweeps.store import SweepStore                  # noqa: E402
+from fv.sweeps.winner import (aggregate_seeds, select_winner,  # noqa: E402
+                              tie_delta, tie_reason)
+from fv.training.registry import RunStore               # noqa: E402
+
+ESTUDIO = "stride-2026-08-27"
+DESVIO_MAX_R4 = 0.15      # plan 3, R4: 15 % sobre la mediana de s/epoca
+
+
+def num(v, d=4) -> str:
+    return "-" if v is None else f"{v:.{d}f}".replace(".", ",")
+
+
+def die(msg: str) -> "NoReturn":  # type: ignore[valid-type]
+    print(f"\nERROR: {msg}\n", file=sys.stderr, flush=True)
+    raise SystemExit(2)
+
+
+def brazos_del_estudio(store: SweepStore, estudio: str, nombres: list) -> list:
+    """(nombre, spec) por brazo, ordenados por el valor del stride."""
+    if nombres:
+        faltan = [n for n in nombres if not store.exists(n)]
+        if faltan:
+            die(f"no existen estos recorridos: {', '.join(faltan)}")
+        candidatos = list(nombres)
+    else:
+        candidatos = store.used_by_study(estudio)
+    if not candidatos:
+        die(f"no hay ningun recorrido del estudio '{estudio}'.\n"
+            f"  Crealos con: .venv/bin/python scripts/estudio_stride.py")
+
+    brazos = []
+    for n in candidatos:
+        spec = store.spec(n)
+        eje = spec.get("eje_dataset") or {}
+        if eje.get("campo") != "stride":
+            die(f"'{n}' no declara `eje_dataset.campo = stride`.\n"
+                f"  Un recorrido sin esa etiqueta no dice que valor representa, y\n"
+                f"  meterlo en la tabla seria inventarselo.")
+        brazos.append((n, spec, int(eje["valor"])))
+    brazos.sort(key=lambda b: b[2])
+
+    # Las dos cosas que harian incomparables los brazos. Se falla, no se avisa.
+    rejillas = {b[1]["eje_dataset"].get("eval_stride") for b in brazos}
+    if len(rejillas) > 1:
+        die(f"los brazos NO comparten rejilla de evaluacion: {sorted(rejillas)}.\n"
+            f"  Cada uno se ha examinado de un conjunto distinto, asi que sus f1\n"
+            f"  no son el mismo numero. Ver docs/barrido-stride.md 2.1.")
+    presupuestos = {(b[1].get("base_recipe_value") or {}).get("windows_per_epoch", 0)
+                    for b in brazos}
+    if len(presupuestos) > 1:
+        die(f"los brazos NO comparten presupuesto de ventanas por epoca: "
+            f"{sorted(presupuestos)}.\n"
+            f"  La tabla mediria el presupuesto y no la densidad de la rejilla.\n"
+            f"  Ver docs/barrido-stride.md 2.2.")
+    return brazos
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--estudio", default=ESTUDIO)
+    ap.add_argument("--sweep", action="append", default=[],
+                    help="brazos explicitos (por defecto, los del estudio)")
+    ap.add_argument("--objetivo", default=None,
+                    help="re-lee la tabla por otra metrica de val (no toca los specs)")
+    ap.add_argument("--json", default=None, help="donde dejar el JSON")
+    args = ap.parse_args()
+
+    store, run_store = SweepStore(), RunStore()
+    brazos = brazos_del_estudio(store, args.estudio, args.sweep)
+    objetivo = args.objetivo or brazos[0][1].get("objective", "f1")
+    if objetivo not in VAL_METRICS:
+        die(f"objetivo '{objetivo}' no existe; usa uno de {sorted(VAL_METRICS)}")
+    direccion = VAL_METRICS[objetivo]
+
+    scored, pendientes, por_brazo = [], [], []
+    for nombre, spec, stride in brazos:
+        tabla = sweep_trials(nombre, store, run_store, objective=objetivo)
+        medidas = [t for t in tabla["trials"] if es_medida(t)]
+        faltan = [t for t in tabla["trials"] if not es_medida(t)]
+        pendientes += [(nombre, t["run"], t.get("status")) for t in faltan]
+        por_brazo.append({"sweep": nombre, "stride": stride,
+                          "dataset": spec["window_dataset"],
+                          "medidas": len(medidas),
+                          "puntos": len(tabla["trials"])})
+        for t in medidas:
+            fila = dict(t)
+            # el punto que ve `aggregate_seeds`: el eje es el stride, la replica
+            # sigue siendo la semilla
+            fila["point"] = {"stride": stride,
+                             "seed": t["point"].get("seed", spec.get("seed", 1))}
+            scored.append(fila)
+
+    if not scored:
+        die("ningun brazo tiene medidas todavia. Mira como va con:\n"
+            "  .venv/bin/python scripts/estudio_progreso.py "
+            + " ".join(f"--sweep {b[0]}" for b in brazos))
+
+    scored.sort(key=lambda r: r["value"], reverse=(direccion == "max"))
+    grupos = aggregate_seeds(scored, direccion, "seconds_per_epoch")
+    delta, razon_delta = tie_delta(grupos)
+    mejor, sugerido, frontera = select_winner(grupos, direccion, delta,
+                                              "seconds_per_epoch")
+
+    por_stride = {g["point"]["stride"]: g for g in grupos}
+    strides = sorted(por_stride)
+
+    # ---- R1: saturacion = el stride MAS GRANDE dentro de delta del mejor
+    en_frontera = sorted(g["point"]["stride"] for g in frontera)
+    saturacion = max(en_frontera)
+    cerrado_por_arriba = saturacion != max(strides)
+
+    # ---- R2: mejor brazo contra el mas disperso
+    mas_disperso = max(strides)
+    a = [t["value"] for t in scored if t["point"]["stride"] == mejor["point"]["stride"]]
+    b = [t["value"] for t in scored if t["point"]["stride"] == mas_disperso]
+    contraste = permutation_test(a, b) if mejor["point"]["stride"] != mas_disperso else None
+
+    # ---- R3: monotonia al bajar el stride
+    orden_denso = sorted(strides, reverse=True)     # de disperso a denso
+    rupturas = []
+    for x, y in zip(orden_denso, orden_denso[1:]):
+        v0, v1 = por_stride[x]["value"], por_stride[y]["value"]
+        peor = (v1 < v0 - delta) if direccion == "max" else (v1 > v0 + delta)
+        if peor:
+            rupturas.append({"de": x, "a": y, "valor_de": v0, "valor_a": v1})
+
+    # ---- R4: el CONTROL de coste
+    segundos = {s: por_stride[s].get("seconds_per_epoch") for s in strides}
+    medidos = [v for v in segundos.values() if v]
+    mediana = statistics.median(medidos) if medidos else None
+    desviados = []
+    if mediana:
+        for s, v in segundos.items():
+            if v and abs(v - mediana) / mediana > DESVIO_MAX_R4:
+                desviados.append({"stride": s, "s_por_epoca": v,
+                                  "desvio": (v - mediana) / mediana})
+
+    # ------------------------------------------------------------------ salida
+    p = print
+    p(f"# Barrido de stride de extraccion — {args.estudio}")
+    p("")
+    p(f"Objetivo **{objetivo}** ({'mayor' if direccion == 'max' else 'menor'} es "
+      f"mejor) · rejilla de evaluacion FIJA "
+      f"(`eval_stride` = {brazos[0][1]['eje_dataset'].get('eval_stride')}) · "
+      f"presupuesto igualado "
+      f"(`windows_per_epoch` = "
+      f"{(brazos[0][1].get('base_recipe_value') or {}).get('windows_per_epoch', 0)})")
+    p("")
+    p("| stride | " + objetivo + " (media) | banda min–max | SEM | semillas | s/epoca | dataset |")
+    p("|---|---|---|---|---|---|---|")
+    for s in strides:
+        g = por_stride[s]
+        arm = next(x for x in por_brazo if x["stride"] == s)
+        p(f"| {s} | {num(g['value'])} | {num(g['value_min'])}–{num(g['value_max'])} "
+          f"| {num(g.get('value_sem'))} | {g['n_seeds']} "
+          f"| {num(g.get('seconds_per_epoch'), 1)} | `{arm['dataset']}` |")
+    p("")
+    if pendientes:
+        p(f"⚠ **{len(pendientes)} punto(s) sin medida** — la tabla es parcial:")
+        for sw, run, st in pendientes[:10]:
+            p(f"  - `{run}` ({sw}): {st or 'sin status'}")
+        if len(pendientes) > 10:
+            p(f"  - … (+{len(pendientes) - 10})")
+        p("")
+
+    p(f"**δ = {num(delta)}** — {razon_delta}")
+    p("")
+    p(f"**R1 · Saturación.** El mejor brazo es **stride "
+      f"{mejor['point']['stride']}** ({num(mejor['value'])}). Dentro de δ quedan "
+      f"{en_frontera}, así que el **punto de saturación es stride "
+      f"{saturacion}**: es el dato más barato que no pierde calidad.")
+    if not cerrado_por_arriba:
+        p("")
+        p(f"  ⚠ La saturación cae en el extremo más disperso del eje "
+          f"({saturacion}): la densidad no compra nada en este rango.")
+    if saturacion == min(strides):
+        p("")
+        p(f"  ⚠ La saturación cae en el extremo más denso ({saturacion}): el eje "
+          f"**no queda cerrado por arriba**. La frase correcta es «gana el "
+          f"extremo», no «satura en {saturacion}».")
+    p("")
+    if contraste is None:
+        p(f"**R2 · Significación.** El mejor brazo ES el más disperso "
+          f"(stride {mas_disperso}): no hay contraste que hacer.")
+    elif contraste is None or not contraste:
+        p(f"**R2 · Significación.** No se pudo contrastar (hacen falta ≥2 "
+          f"semillas en cada grupo).")
+    else:
+        pv = contraste.get("p")
+        dif = por_stride[mejor['point']['stride']]["value"] - por_stride[mas_disperso]["value"]
+        p(f"**R2 · Significación.** stride {mejor['point']['stride']} contra "
+          f"stride {mas_disperso}: diferencia **{num(abs(dif))}**, "
+          f"`p` = **{num(pv, 5)}** ({contraste.get('n_a')} vs "
+          f"{contraste.get('n_b')} semillas).")
+        if pv is not None and pv < 0.05 and abs(dif) > delta:
+            p("")
+            p("  → **la densidad de la rejilla mueve la calidad de predicción.**")
+        else:
+            p("")
+            p("  → **con estas semillas la densidad no separa.** No es «da igual»: "
+              "es que el efecto, si lo hay, cabe dentro del ruido de "
+              "reinicialización de este dataset.")
+    p("")
+    if rupturas:
+        p(f"**R3 · Monotonía.** ⚠ **{len(rupturas)} ruptura(s)** mayores que δ:")
+        for r in rupturas:
+            p(f"  - de stride {r['de']} ({num(r['valor_de'])}) a stride "
+              f"{r['a']} ({num(r['valor_a'])}): baja al hacerse más denso")
+        p("")
+        p("  No se suaviza ni se explica a posteriori: a igual cómputo no hay "
+          "mecanismo obvio para esto, así que **abre sospecha sobre R4**.")
+    else:
+        p("**R3 · Monotonía.** Sin rupturas mayores que δ: el objetivo no empeora "
+          "al hacer la rejilla más densa.")
+    p("")
+    if mediana is None:
+        p("**R4 · Control de coste.** ⚠ Ningún brazo reportó `seconds_per_epoch`: "
+          "**el control no se pudo aplicar**, así que el igualado de presupuesto "
+          "está sin comprobar.")
+    elif desviados:
+        p(f"**R4 · Control de coste.** ❌ **FALLA.** Mediana "
+          f"{num(mediana, 1)} s/época; se desvían más del "
+          f"{DESVIO_MAX_R4:.0%}:")
+        for d in desviados:
+            p(f"  - stride {d['stride']}: {num(d['s_por_epoca'], 1)} s/época "
+              f"({d['desvio']:+.0%})")
+        p("")
+        p("  **El estudio NO declara nada hasta explicarlo**: con el presupuesto "
+          "igualado los brazos hacen los mismos pasos por época, así que esta "
+          "tabla puede estar midiendo cómputo y no densidad.")
+    else:
+        p(f"**R4 · Control de coste.** ✅ Pasa. Mediana {num(mediana, 1)} s/época y "
+          f"ningún brazo se desvía más del {DESVIO_MAX_R4:.0%}: el presupuesto "
+          f"estaba igualado de verdad.")
+    p("")
+    p(f"*{tie_reason(frontera, delta)}*")
+
+    salida = {
+        "estudio": args.estudio, "objetivo": objetivo, "direccion": direccion,
+        "delta": delta, "razon_delta": razon_delta,
+        "brazos": por_brazo,
+        "tabla": [{"stride": s, "valor": por_stride[s]["value"],
+                   "min": por_stride[s]["value_min"],
+                   "max": por_stride[s]["value_max"],
+                   "sem": por_stride[s].get("value_sem"),
+                   "n_seeds": por_stride[s]["n_seeds"],
+                   "seconds_per_epoch": por_stride[s].get("seconds_per_epoch")}
+                  for s in strides],
+        "R1_saturacion": {"stride": saturacion, "frontera": en_frontera,
+                          "mejor": mejor["point"]["stride"],
+                          "cerrado_por_arriba": cerrado_por_arriba},
+        "R2_contraste": contraste,
+        "R3_rupturas": rupturas,
+        "R4_control": {"mediana_s_por_epoca": mediana, "desviados": desviados,
+                       "umbral": DESVIO_MAX_R4,
+                       "pasa": bool(mediana) and not desviados},
+        "pendientes": [{"sweep": s, "run": r, "status": st}
+                       for s, r, st in pendientes],
+    }
+    destino = Path(args.json) if args.json else ROOT / "data" / f"{args.estudio}-informe.json"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(json.dumps(salida, indent=2, ensure_ascii=False),
+                       encoding="utf-8")
+    p("")
+    p(f"JSON: {destino.relative_to(ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

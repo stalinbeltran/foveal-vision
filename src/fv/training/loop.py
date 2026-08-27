@@ -26,6 +26,7 @@ from fv.metrics import (corner_scores, detection_counts, monitor_improved,
 from fv.models.builder import build_model, full_config
 from fv.training.losses import corner_loss
 from fv.training.recipe import Recipe
+from fv.training.sampling import VentanasPorEpoca
 from fv.training.registry import RunError, RunStore, environment, git_commit
 from fv.validation import check_run
 from fv.windows.dataset import FoveatedWindowDataset
@@ -123,8 +124,18 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
                                    pool_mode=net["pool_mode"], pad_mode=net["pad_mode"])
     g = torch.Generator()
     g.manual_seed(recipe.seed)
-    train_loader = DataLoader(train_ds, batch_size=recipe.batch_size, shuffle=True,
-                              num_workers=0, generator=g)
+    # `windows_per_epoch` iguala el presupuesto entre datasets de distinto tamano
+    # (docs/barrido-stride.md 2.2). Con 0 -- el default y todo lo ya medido -- NO
+    # se construye sampler y la ruta es exactamente la de siempre: cambiar esto
+    # movería el f1 de todas las tablas publicadas.
+    por_epoca = int(getattr(recipe, "windows_per_epoch", 0) or 0)
+    if por_epoca > 0:
+        train_loader = DataLoader(
+            train_ds, batch_size=recipe.batch_size, num_workers=0, generator=g,
+            sampler=VentanasPorEpoca(len(train_ds), por_epoca, recipe.seed))
+    else:
+        train_loader = DataLoader(train_ds, batch_size=recipe.batch_size, shuffle=True,
+                                  num_workers=0, generator=g)
     val_loader = DataLoader(val_ds, batch_size=256, num_workers=0)
 
     model = build_model(net).to(device)

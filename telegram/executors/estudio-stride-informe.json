@@ -1,0 +1,13 @@
+{
+  "name": "estudio-stride-informe",
+  "descripcion": "El veredicto del barrido de stride: la tabla por brazo y R1 (saturacion), R2 (significacion), R3 (monotonia) y R4 (el CONTROL de coste). No reinventa el criterio: aplica el que docs/plan-stride-2026-08-27.md dejo escrito antes de mirar. No cuesta nada.",
+  "ejemplos": [
+    "--estudio stride-2026-08-27",
+    "--sweep stride-01 --sweep stride-16",
+    "--objetivo pos_err_px"
+  ],
+  "command": ".venv/bin/python scripts/estudio_stride_informe.py {{input}} 2>&1 | tail -c 3500",
+  "encargados": ["echo"],
+  "timeoutMs": 180000,
+  "requiere": ["python3"]
+}

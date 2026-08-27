@@ -106,7 +106,15 @@ COORD = Path(os.environ.get("COORD_HOME", Path.home() / "src" / "telegram-coordi
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-PREFIJO = "estudio-"          # la etiqueta que pone estudio_flota.py
+# El espacio de nombres de las instancias de ESTE estudio. Va en una lista para
+# que `--prefijo` pueda fijarlo sin `global`.
+#
+# Por que es parametro: la cuenta es UNA y puede haber dos estudios a la vez.
+# COMPROBADO el 2026-08-27 con 8 maquinas `estudio-c*` de otro estudio vivas: con
+# el prefijo cableado, este vigilante las cuenta como suyas. Tiene que coincidir
+# con el `--prefijo` de estudio_flota.py.
+PREFIJO_DEF = "estudio-"       # la etiqueta que pone estudio_flota.py
+PREFIJO: list = [PREFIJO_DEF]
 
 
 # ------------------------------------------------------------------ secretos
@@ -250,7 +258,7 @@ def latido(nombres: list) -> tuple:
 
 def juzgar(inst: dict, args, t: float) -> tuple:
     """(veredicto, motivo). Veredicto: ajena | arrancando | ok | danada."""
-    etiqueta = (inst.get("label") or "")[len(PREFIJO):]
+    etiqueta = (inst.get("label") or "")[len(PREFIJO[0]):]
     try:
         edad = (t - float(inst.get("start_date") or t)) / 60.0
     except (TypeError, ValueError):
@@ -331,7 +339,7 @@ def relanzar(nombres: list, args) -> None:
         cmd += ["--sweep", n]
     cmd += ["--reparto", "seed", "--cpu", args.cpu, "--max-price", str(args.max_price),
             "--criba", str(args.criba), "--git", "--horas-max", str(args.horas_max),
-            "--yes"]
+            "--prefijo", args.prefijo, "--yes"]
     log(f"  relanzando: {' '.join(cmd)}")
     log(f"  su log: {args.log_flota}")
     if args.dry_run:
@@ -354,15 +362,17 @@ def una_vuelta(args, V, estado: dict) -> str:
         return "seguir"
 
     t = time.time()
-    mias = [i for i in vivas if (i.get("label") or "").startswith(PREFIJO)]
+    mias = [i for i in vivas if (i.get("label") or "").startswith(PREFIJO[0])]
     ajenas = len(vivas) - len(mias)
     gasto = sum(float(i.get("dph_total") or 0) for i in vivas)
     log(f"  {len(vivas)} instancias vivas ({len(mias)} del estudio, {ajenas} ajenas), "
         f"{gasto:.4f} $/h")
 
-    danadas = []
+    danadas, ajenas_por_nombre = [], []
     for i in mias:
         v, motivo = juzgar(i, args, t)
+        if v == "ajena":
+            ajenas_por_nombre.append(i)
         marca = {"danada": "DAÑADA", "ok": "ok", "arrancando": "arrancando",
                  "ajena": "ajena"}[v]
         log(f"    [{i.get('label')}] {marca}: {motivo}")
@@ -404,7 +414,23 @@ def una_vuelta(args, V, estado: dict) -> str:
         total = sum(tot for _, tot in est.values())
         log(f"  todo terminado ({total} puntos).")
         # Nada que medir y máquinas vivas = huérfanas puras. Se cortan.
-        sobrantes = [i for i in mias if i not in danadas]
+        #
+        # ⚠ PERO sólo las que son SUYAS. `juzgar` ya declaró "ajena" a la que no
+        # resuelve a ningún recorrido de este vigilante ("no sé de qué recorrido
+        # es; no la toco") — y esta rama se saltaba ese veredicto y destruía TODA
+        # instancia con el prefijo, incluidas las de otro estudio que corriera a
+        # la vez. El síntoma habría sido de los peores: runs cortados a media
+        # época en el estudio del vecino, sin error propio, indistinguibles de
+        # una máquina que se muere sola.
+        #
+        # Encontrado el 2026-08-27 al preparar el barrido de stride, con 8
+        # máquinas de otro estudio vivas en la cuenta (docs/plan-stride-2026-08-27.md 5.3).
+        sobrantes = [i for i in mias
+                     if i not in danadas and i not in ajenas_por_nombre]
+        if ajenas_por_nombre:
+            log(f"    {len(ajenas_por_nombre)} instancia(s) con el prefijo pero de "
+                f"otro estudio: NO se tocan "
+                f"({', '.join(i.get('label') or '?' for i in ajenas_por_nombre)})")
         if sobrantes and not args.dry_run:
             for i in sobrantes:
                 try:
@@ -446,6 +472,9 @@ def una_vuelta(args, V, estado: dict) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--sweep", action="append", required=True)
+    ap.add_argument("--prefijo", default=PREFIJO_DEF,
+                    help="espacio de nombres de las instancias de este estudio. "
+                         "Tiene que coincidir con el --prefijo de estudio_flota.py")
     ap.add_argument("--cada", type=int, default=600,
                     help="segundos entre vueltas (tope 600: el encargo es "
                          "'cada 10 min o menos')")
@@ -468,6 +497,7 @@ def main() -> int:
     ap.add_argument("--log", default="/tmp/vigilante-avance.log",
                     help="sólo para citarlo en los avisos; la salida va a stdout")
     args = ap.parse_args()
+    PREFIJO[0] = args.prefijo
 
     if args.cada > 600:
         log(f"AVISO: --cada {args.cada}s es más de 10 min; lo bajo a 600.")

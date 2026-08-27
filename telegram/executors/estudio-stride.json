@@ -1,0 +1,14 @@
+{
+  "name": "estudio-stride",
+  "descripcion": "Crea los datasets y los recorridos del barrido de stride de EXTRACCION (docs/plan-stride-2026-08-27.md). NO alquila ni entrena: no cuesta nada. El de stride 1 son 2,9 M de ventanas, asi que va desacoplado y avisa al terminar. Para lanzarlo despues: /use estudio con --prefijo stride-",
+  "ejemplos": [
+    "",
+    "--strides 8,16 --semillas 2",
+    "--solo-datasets",
+    "--solo-recorridos --rehacer"
+  ],
+  "command": "\"$COORD_HOME/scripts/desacoplar.sh\" sh -c 'set -a; [ -f \"$COORD_HOME/.env\" ] && . \"$COORD_HOME/.env\"; [ -f \"$HOME/.config/dev-secrets.env\" ] && . \"$HOME/.config/dev-secrets.env\"; set +a; .venv/bin/python scripts/estudio_stride.py {{input}} > \"/tmp/estudio-stride-$COORD_SESSION.log\" 2>&1; node \"$COORD_HOME/scripts/notify.mjs\" \"estudio-stride: datasets y recorridos listos (o fallidos). Log: /tmp/estudio-stride-$COORD_SESSION.log. Nada se ha alquilado. Siguiente: /use estudio-estimar, y luego /use estudio con --prefijo stride-\"' >/dev/null 2>&1 & echo \"Creando datasets y recorridos en su propio cgroup. NO alquila nada. El de stride 1 son 2,9 M de ventanas y tarda unos minutos. Log: /tmp/estudio-stride-$COORD_SESSION.log -- avisara al terminar, pero el log es la fuente de verdad.\"",
+  "encargados": ["echo"],
+  "timeoutMs": 60000,
+  "requiere": ["python3"]
+}
