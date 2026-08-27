@@ -1021,6 +1021,69 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
 
 ---
 
+## Dónde caen los datos de un estudio: **compruébalo, no lo supongas**
+
+**Medido el 2026-08-27 corriendo un estudio de verdad: los datos siguen cayendo en ESTE repo.**
+`foveal-vision-data` existe y tiene una copia, pero **el código no escribe allí**.
+
+```bash
+.venv/bin/python scripts/prueba_destino_datos.py     # 0 = van al repo de datos · 1 = siguen aquí
+.venv/bin/python scripts/prueba_destino_datos.py --limpiar
+```
+
+### Por qué hay que comprobarlo y no basta con mirar
+
+La separación se hizo **en dos mitades**, y desde fuera se leen igual:
+
+| | estado |
+|---|---|
+| Los artefactos **copiados** a `foveal-vision-data` | ✅ hecho (4.367 ficheros, 54 recorridos) |
+| El **código** que los escribe | ❌ sigue apuntando aquí |
+
+Un repo de datos que existe y está lleno **parece** una separación terminada. Y la documentación
+que dice «los datos van allá» **parece** describir lo que pasa. Las dos cosas son ciertas por
+separado y la conclusión conjunta es falsa: es la clase de fallo que este proyecto llama *«las dos
+mitades desfasadas»*.
+
+### Lo que la prueba encontró, fichero a fichero
+
+Un recorrido real de 1 punto y 2 épocas, con el **mismo `run_sweep` que usa la flota** —no un
+mock, porque lo que se comprueba es la ruta que elige el código de verdad y un doble elegiría la
+suya— dejó **8 ficheros en `foveal-vision` y 0 en `foveal-vision-data`**:
+
+```
+sweeps/data-destino-chk/{spec,state}.json
+runs/data-destino-chk-0000-overlap_fovea_px2/{best.pt,last.pt,config.json,metrics.jsonl,status.json,summary.json}
+```
+
+⚠ **Y esto es DESPUÉS de fusionar `data-separation` a `main`.** Se repitió la medición sobre el
+`main` ya fusionado (169 ficheros de diferencia) y sale idéntico: 8 ficheros aquí, 0 allá.
+`settings.py` **no cambió**, `estudio_flota.py` sigue con `ROOT / "runs"` cableado, y el único
+`.py` que menciona `foveal-vision-data` es esta propia comprobación. La rama aporta la
+documentación y los datos copiados —que es un paso real— pero **no el que reconecta**.
+
+⚠⚠ **Y por eso mismo: que una rama llamada `data-separation` esté mergeada NO es evidencia de que
+los datos estén separados.** Es el atajo que hay que no tomar. La evidencia es correr la
+comprobación.
+
+### Qué haría falta para que fuera verdad, en orden
+
+1. **Una raíz de datos en `settings.py`**, junto a `FV_ROOT`. Es el único sitio por donde pasa el
+   paquete `fv`: `runs_root()` y `sweeps_root()` ya son funciones, así que **el paquete se separa
+   cambiando un fichero**.
+2. **Los 9 scripts que la puentean.** Cablean `ROOT / "runs"` sin pasar por `settings.py`
+   (16 ocurrencias): `estudio_informe`, `estudio_flota`, `estudio_cierre`, `estudio_comparar`,
+   `estudio_prioridades`, `estudio_progreso`, `comparar_repro`, `knobs_f` y `vigilante_avance`.
+3. ⚠⚠ **`vigilante_avance.py` PRIMERO, porque alquila máquinas.** Decide qué relanzar leyendo
+   `runs/`; si la data se mueve y él sigue mirando aquí, verá los recorridos vacíos y **relanzará
+   flota para puntos que ya están medidos**. Es el único de los nueve cuyo fallo cuesta dinero.
+4. **Y no se hace con un estudio en vuelo**: mientras una flota corre, su hilo de git hace
+   `git add -- runs sweeps` **cada sonda** (~60 s) contra este repo. Separar por debajo de una
+   flota viva es garantizar la divergencia.
+
+**Mientras tanto**: un resultado nuevo vive aquí, y su copia en `foveal-vision-data` es **de la
+fecha en que se copió**, no de ahora. No la trates como fuente de verdad sin mirar la fecha.
+
 ## Varias sesiones a la vez: comprueba en qué copia estás
 
 Desde 2026-08-27 hay **más de una sesión de Claude** trabajando sobre copias distintas de
