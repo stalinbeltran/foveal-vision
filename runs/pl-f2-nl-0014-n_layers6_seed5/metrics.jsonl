@@ -2,3 +2,4 @@
 {"epoch": 2, "train_loss": 0.8075608389924823, "val": {"loss": 0.814937089248137, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.137145042419434}, "lr": 0.0014, "seconds": 62.193}
 {"epoch": 3, "train_loss": 0.8068989847981652, "val": {"loss": 0.8099119348959489, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.083430767059326}, "lr": 0.0014, "seconds": 62.279}
 {"epoch": 4, "train_loss": 0.8061118918434312, "val": {"loss": 0.8135964014313438, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.117412567138672}, "lr": 0.0014, "seconds": 60.418}
+{"epoch": 5, "train_loss": 0.8061103741850241, "val": {"loss": 0.8100622366775166, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.069005012512207}, "lr": 0.0014, "seconds": 62.437}
