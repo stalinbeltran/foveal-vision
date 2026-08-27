@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -474,3 +475,48 @@ def test_progreso_names_an_axis_that_lives_in_the_dataset():
     assert 'eje, valor_del_dataset = eje_ds["campo"], eje_ds.get("valor")' in fuente
     # y el fallback no puede pisar a un eje de verdad: solo actua si no hay
     assert 'if eje is None and eje_ds.get("campo"):' in fuente
+
+
+def test_vigilante_only_sees_fleets_of_its_own_study():
+    """La regla 4 (no relanzar si hay flota) tiene que mirar «flota SOBRE MIS
+    recorridos», no «cualquier flota».
+
+    Con la flota de otro estudio viva en la misma maquina --lo normal en una
+    cuenta compartida-- el vigilante de este veria «hay una flota viva» en cada
+    vuelta y no relanzaria nunca: un estudio que parece vigilado y no avanza,
+    sin un solo error.
+    """
+    V = _modulo("vigilante_avance")
+    ajena = f"{os.getpid() + 1} python scripts/estudio_flota.py --sweep ov-r26 --git"
+    mia = f"{os.getpid() + 2} python scripts/estudio_flota.py --sweep stride-01 --git"
+
+    def con(salida):
+        import subprocess as sp
+        class R: stdout = salida
+        return lambda *a, **k: R()
+
+    import subprocess as sp
+    orig = sp.run
+    try:
+        sp.run = con(ajena)
+        assert V.flota_viva(["stride-01", "stride-02"]) == 0     # no es cosa mia
+        assert V.flota_viva() != 0                               # sin lista, como antes
+        sp.run = con(ajena + "\n" + mia)
+        assert V.flota_viva(["stride-01"]) == os.getpid() + 2     # esa SI es mia
+    finally:
+        sp.run = orig
+
+
+def test_sonda_projection_respects_the_budget():
+    """La sonda proyecta s/epoca a partir de los pasos de UNA epoca, y con
+    `windows_per_epoch` una epoca ya no es el pool entero.
+
+    MEDIDO el 2026-08-27 en la validacion en Vast: anuncio «~392 s/epoca» para un
+    brazo cuya epoca real son 988 pasos. La criba no se equivocaba -- ordena por
+    ms/paso -- pero el numero del log si, por 20,9x.
+    """
+    fuente = (Path(__file__).resolve().parents[1] / "scripts" /
+              "sonda_velocidad.py").read_text(encoding="utf-8")
+    assert 'por_epoca = int(getattr(receta, "windows_per_epoch", 0) or 0)' in fuente
+    assert "ventanas_epoca = por_epoca if por_epoca > 0 else len(ds)" in fuente
+    assert '"ventanas_pool": len(ds),' in fuente      # la procedencia viaja

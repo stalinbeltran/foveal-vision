@@ -294,21 +294,41 @@ def juzgar(inst: dict, args, t: float) -> tuple:
 # --------------------------------------------------------------------- acciones
 
 
-def flota_viva() -> int:
-    """PID de una flota ya corriendo, o 0. Ver la regla 4."""
+def flota_viva(sweeps: "list | None" = None) -> int:
+    """PID de una flota corriendo SOBRE MIS RECORRIDOS, o 0. Ver la regla 4.
+
+    La regla 4 -- no relanzar si ya hay una flota -- es correcta, y la razon
+    tambien: dos flotas alquilarian dos veces para los mismos puntos. Pero
+    «los mismos puntos» es la parte que faltaba: esto preguntaba por CUALQUIER
+    `estudio_flota.py`, y la cuenta puede tener dos estudios a la vez.
+
+    COMPROBADO el 2026-08-27: con la flota de otro estudio viva en esta misma
+    maquina, el vigilante de este habria visto «hay una flota viva» en cada
+    vuelta y **no habria relanzado nunca**. El sintoma es el peor de este
+    proyecto: un estudio que parece vigilado y no avanza, sin un solo error.
+
+    Asi que se mira la LINEA DE COMANDOS y solo cuenta la flota que menciona
+    alguno de mis recorridos. Sin `sweeps` se conserva el comportamiento de
+    antes (cualquier flota), que es lo prudente para cualquier otra llamada.
+    """
     try:
-        salida = subprocess.run(["pgrep", "-f", "estudio_flota.py"],
+        salida = subprocess.run(["pgrep", "-af", "estudio_flota.py"],
                                 capture_output=True, text=True, timeout=30).stdout
     except (OSError, subprocess.SubprocessError):
         return 0
     mios = {os.getpid(), os.getppid()}
-    for linea in salida.split():
+    for linea in salida.splitlines():
+        cabeza, _, resto = linea.strip().partition(" ")
         try:
-            pid = int(linea)
+            pid = int(cabeza)
         except ValueError:
             continue
-        if pid not in mios:
-            return pid
+        if pid in mios:
+            continue
+        if sweeps and not any(f"--sweep {s}" in resto or f"--sweep={s}" in resto
+                              for s in sweeps):
+            continue                      # flota de OTRO estudio: no es cosa mia
+        return pid
     return 0
 
 
@@ -443,7 +463,7 @@ def una_vuelta(args, V, estado: dict) -> str:
                f"reporte en reportes/. Log: {args.log}")
         return "fin"
 
-    pid = flota_viva()
+    pid = flota_viva(args.sweep)
     if pid:
         log(f"  hay una flota viva (pid {pid}): no se relanza. Reintentará ella "
             f"en las máquinas que acabo de liberar." if danadas else
