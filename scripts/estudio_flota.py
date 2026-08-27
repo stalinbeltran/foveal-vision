@@ -189,6 +189,7 @@ sys.path.insert(0, str(LANZADOR / "scripts"))
 
 import estudio_estimar as EST                       # noqa: E402
 import vast_instance as V                           # noqa: E402
+from fv import datarepo
 from fv.sweeps.runner import point_run_name         # noqa: E402
 from fv.sweeps.spec import expand_points            # noqa: E402
 from fv.sweeps.store import SweepStore              # noqa: E402
@@ -687,7 +688,7 @@ def puntos_pendientes(sweep: str, valid: list) -> tuple[list, list]:
     pendientes, hechos = [], []
     for i, p in enumerate(valid):
         nombre = point_run_name(sweep, i, p["overrides"])
-        st = ROOT / "runs" / nombre / "status.json"
+        st = datarepo.resolve("runs", nombre) / "status.json"
         estado = None
         if st.exists():
             try:
@@ -774,7 +775,7 @@ def construir_payload(sweeps: list, datasets: list) -> Path:
                 die(f"falta {origen}, que hace falta para entrenar")
             tar.add(str(origen), arcname=nombre, filter=filtro)
         for s in sweeps:
-            tar.add(str(ROOT / "sweeps" / s["nombre"]),
+            tar.add(str(datarepo.resolve("sweeps", s["nombre"])),
                     arcname=f"sweeps/{s['nombre']}", filter=filtro)
         for d in datasets:
             tar.add(str(ROOT / "data" / "window-datasets" / d),
@@ -1218,7 +1219,7 @@ def traer_libro(m: "Maquina", libro: Libro) -> list:
 
 def segundos_por_epoca(run: str) -> list:
     """Los tiempos por epoca que el propio entrenamiento ya escribio."""
-    p = ROOT / "runs" / run / "metrics.jsonl"
+    p = datarepo.resolve("runs", run) / "metrics.jsonl"
     if not p.exists():
         return []
     out = []
@@ -1742,7 +1743,7 @@ def main() -> int:
         "lotes": resultados,
     }
     for s in sweeps:
-        destino = ROOT / "sweeps" / s["nombre"] / "flota.json"
+        destino = datarepo.resolve("sweeps", s["nombre"]) / "flota.json"
         destino.write_text(json.dumps(reporte, indent=2, ensure_ascii=False) + "\n",
                            encoding="utf-8")
 

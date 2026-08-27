@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from fv import settings
+from fv import datarepo, settings
 from fv.ioutils import read_json_retrying, write_json_atomic
 from fv.proc import pid_alive
 
@@ -21,17 +21,33 @@ class SweepStoreError(ValueError):
 
 
 class SweepStore:
+    # `root` given = a flat directory (tests, and any caller pinning a layout).
+    # `root` omitted = the data repository, filed by month (fv.datarepo). A
+    # sweep is created under its STUDY's month, so one study stays in one
+    # folder even when its later sweeps run in the next month.
     def __init__(self, root: Path | None = None):
-        self.root = Path(root) if root else settings.sweeps_root()
+        self.root = Path(root) if root else None
 
-    def path(self, name: str) -> Path:
-        return self.root / name
+    def path(self, name: str, month: str | None = None) -> Path:
+        if self.root is not None:
+            return self.root / name
+        return datarepo.resolve("sweeps", name, month)
+
+    def _dirs(self) -> list[Path]:
+        if self.root is None:
+            return datarepo.iter_dirs("sweeps")
+        return sorted(self.root.iterdir()) if self.root.exists() else []
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "spec.json").exists()
 
     def create(self, name: str, spec: dict) -> Path:
-        d = self.path(name)
+        # A sweep belonging to a study is filed under THAT STUDY's month, not
+        # under today's: a study whose later steps run past the 1st would
+        # otherwise be split across two folders for no reason but the clock.
+        # A standalone sweep (no study) files under the current month.
+        month = datarepo.study_month(spec["study"]) if spec.get("study") else None
+        d = self.path(name, month)
         if d.exists():
             raise SweepStoreError("sweep_exists",
                                   f"ya existe un recorrido llamado '{name}'",
@@ -78,10 +94,8 @@ class SweepStore:
         return self.state(name)
 
     def list(self) -> list[dict]:
-        if not self.root.exists():
-            return []
         out = []
-        for d in sorted(self.root.iterdir()):
+        for d in self._dirs():
             if (d / "spec.json").exists():
                 spec = read_json_retrying(d / "spec.json")
                 st = self.reconcile(d.name)
@@ -92,10 +106,8 @@ class SweepStore:
         """Sweeps that FIX this B (spec.window_dataset). A sweep retrains on it by
         name on resume, so deleting B would break the sweep later — even with no
         surviving child runs to catch it. Reads spec.json only (no reconcile)."""
-        if not self.root.exists():
-            return []
         out = []
-        for d in sorted(self.root.iterdir()):
+        for d in self._dirs():
             p = d / "spec.json"
             if p.exists() and read_json_retrying(p).get("window_dataset") == dataset_name:
                 out.append(d.name)
@@ -107,10 +119,8 @@ class SweepStore:
         without them, recreating it with the same name collides on the next
         advance (sweep_exists) — so study deletion must cascade here. Reads
         spec.json only (no reconcile)."""
-        if not self.root.exists():
-            return []
         out = []
-        for d in sorted(self.root.iterdir()):
+        for d in self._dirs():
             p = d / "spec.json"
             if p.exists() and read_json_retrying(p).get("study") == study_name:
                 out.append(d.name)

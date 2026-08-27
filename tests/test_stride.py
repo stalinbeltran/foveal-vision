@@ -260,8 +260,12 @@ def test_multi_dataset_payload_carries_all(tmp_path, monkeypatch):
         p.mkdir(parents=True)
         (p / "windows.npz").write_bytes(b"npz")
         (p / "manifest.json").write_text("{}", encoding="utf-8")
-    (raiz / "sweeps" / "s1").mkdir(parents=True)
-    (raiz / "sweeps" / "s1" / "spec.json").write_text("{}", encoding="utf-8")
+    # el recorrido vive en el REPO DE DATOS (aislado a tmp por el conftest),
+    # no bajo ROOT: desde 2026-08-27 ROOT es solo el codigo
+    from fv import datarepo
+    s1 = datarepo.new_path("sweeps", "s1")
+    s1.mkdir(parents=True)
+    (s1 / "spec.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(F, "ROOT", raiz)
 
     import tarfile
@@ -300,8 +304,12 @@ def test_payload_accepts_a_bare_string(tmp_path, monkeypatch):
     p = raiz / "data" / "window-datasets" / "ds-a"
     p.mkdir(parents=True)
     (p / "windows.npz").write_bytes(b"npz")
-    (raiz / "sweeps" / "s1").mkdir(parents=True)
-    (raiz / "sweeps" / "s1" / "spec.json").write_text("{}", encoding="utf-8")
+    # el recorrido vive en el REPO DE DATOS (aislado a tmp por el conftest),
+    # no bajo ROOT: desde 2026-08-27 ROOT es solo el codigo
+    from fv import datarepo
+    s1 = datarepo.new_path("sweeps", "s1")
+    s1.mkdir(parents=True)
+    (s1 / "spec.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(F, "ROOT", raiz)
     assert F.construir_payload([{"nombre": "s1"}], "ds-a").exists()
 

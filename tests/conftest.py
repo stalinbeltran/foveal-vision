@@ -10,6 +10,20 @@ import pytest
 from PIL import Image
 
 
+@pytest.fixture(autouse=True)
+def _never_the_real_data_repo(tmp_path, monkeypatch):
+    """Point the data repository at a temp dir for EVERY test.
+
+    Since 2026-08-27 a store built with no explicit root resolves to the real
+    `foveal-vision-data` sibling — so a test that forgets to pass one would read
+    and write actual measurements. This makes the docstring above ("never touch
+    real data/") true by construction instead of by convention. A test that
+    wants a specific location still sets FV_DATA_ROOT itself; this only fills in
+    the default.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "_data-repo"))
+
+
 def make_source(root: Path, name: str, count: int = 10, W: int = 48, H: int = 36,
                 seed: int = 3) -> None:
     out = root / name
@@ -54,6 +68,10 @@ def world(tmp_path, monkeypatch):
     """An isolated project root with one source and one extracted dataset."""
     monkeypatch.setenv("FV_ROOT", str(tmp_path))
     monkeypatch.setenv("FV_DATASETS_ROOT", str(tmp_path / "no-external"))
+    # E/H/I now default to the DATA REPOSITORY, which is a real sibling repo on
+    # a developer's machine. Without this a test that builds a store with no
+    # explicit root would read — and write — actual measurements.
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "data-repo"))
     from fv import settings
     make_source(settings.local_sources_root(), "mini", count=10)
 

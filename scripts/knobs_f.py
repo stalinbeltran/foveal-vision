@@ -42,6 +42,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from fv import datarepo
 from fv.task import task_score                      # noqa: E402
 from fv.training.registry import RunError, RunStore  # noqa: E402
 
@@ -68,7 +69,7 @@ F1_MINIMO_UTIL = 0.05
 
 def runs_con_checkpoint(store: RunStore) -> list:
     fuera = []
-    for d in sorted((ROOT / "runs").iterdir()):
+    for d in sorted(datarepo.iter_dirs("runs"), key=lambda d: d.name):
         if not d.is_dir() or not (d / "best.pt").exists():
             continue
         try:

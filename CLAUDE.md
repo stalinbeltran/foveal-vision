@@ -927,24 +927,40 @@ recorrido **no se parte por el mes**: sus runs heredan su fecha. `index.json` ma
 run → ruta/recorrido/fecha y estudio → sus recorridos. El detalle y los criterios, en el README
 de aquel repo; el migrador que lo produjo, en su `scripts/migrar_data.py`.
 
-⚠ **Lo que esto NO cambia todavía, y hay que saberlo antes de tocar código:**
-1. **La migración fue una COPIA: `runs/`, `sweeps/` y `studies/` siguen en este repo**, y el
-   código sigue leyéndolos de aquí. Quitarlos es un segundo paso pendiente de hacer.
-2. **El paquete `fv` está limpio**: todas las rutas pasan por
-   [`src/fv/settings.py`](src/fv/settings.py), que ya tiene indirección por `FV_ROOT`. Separar de
-   verdad la lectura es añadir ahí una raíz de datos, **en un solo sitio**.
-3. ⚠ **9 scripts cablean las rutas a mano** (16 ocurrencias de `ROOT / "runs"` y similares) sin
-   pasar por `settings.py`: `estudio_informe.py`, `estudio_flota.py`, `estudio_cierre.py`,
-   `estudio_comparar.py`, `estudio_prioridades.py`, `estudio_progreso.py`, `comparar_repro.py`,
-   `knobs_f.py` y `vigilante_avance.py`. Cada uno hay que tocarlo, o romperá.
-4. ⚠⚠ **`vigilante_avance.py` PUEDE ALQUILAR MÁQUINAS** y decide qué relanzar mirando `runs/`. Si
-   se separa la data sin ajustarlo, verá los recorridos vacíos y **relanzará flota para puntos que
-   ya están medidos** — cuesta dinero. Es lo primero que hay que arreglar en ese segundo paso.
+✅ **HECHO (2026-08-27): el código escribe y lee del repo de datos. Ya no queda nada de esto
+pendiente.** Cómo funciona, que es lo que hay que saber antes de tocarlo:
+1. **`FV_DATA_ROOT` manda; sin ella, el repo hermano `../foveal-vision-data`**
+   ([`settings.data_root()`](src/fv/settings.py)) — mismo patrón que `external_datasets_root()`
+   para el generador, así que una máquina con los dos repos hermanos no configura nada y la
+   flota redirige con una variable.
+2. **[`src/fv/datarepo.py`](src/fv/datarepo.py) es la ÚNICA definición del layout.** Resuelve
+   nombre→ruta buscando en todas las carpetas de mes, y los tres stores pasan por él. Un store
+   construido **con `root=`** sigue usando un directorio plano (los tests, y quien fije un
+   layout); **sin `root=`**, el repo de datos.
+3. ⚠ **El mes lo elige EL ESTUDIO al crearse, y lo hereda todo lo suyo.** Un recorrido lanzado
+   el día 1 del mes siguiente **se queda con su estudio**; un run vive **dentro** de su
+   recorrido (`sweeps/<rec>/runs/<run>`). El mes **agrupa, no fecha**: es para poder leer el
+   directorio, no una línea temporal de cada run. Fijado por
+   `test_a_study_keeps_its_sweeps_and_runs_in_one_month`, **probado rompiéndolo**.
+4. ⚠ **`find()` casa por DIRECTORIO, no por el fichero marcador**, y es a propósito: el runner
+   borra `config.json`/`status.json` **antes** que el directorio al rehacer un punto, y con el
+   marcador ausente resolvía a otra ruta — borraba en un sitio y reconstruía en otro. Fue un
+   bug real, lo cazó `test_sweeps.py::test_resume_redoes_an_interrupted_point`.
+5. ⚠ **Los tests NO pueden tocar el repo de datos real**: un fixture `autouse` en
+   [`tests/conftest.py`](tests/conftest.py) apunta `FV_DATA_ROOT` a un temporal en **todos** los
+   tests. Sin él, un store sin `root=` explícito leía y **escribía medidas de verdad** — pasó, y
+   por eso la protección es global y no por fixture.
+6. **`runs_root()`/`sweeps_root()`/`studies_root()` quedan marcadas obsoletas** en `settings.py`:
+   describen el layout plano, pero **ningún store las llama ya**.
 
-**Mientras tanto, para todo dato nuevo**: cuando un estudio produzca resultados, su sitio final es
-`foveal-vision-data`, en el mes en que se generó, y **se commitea y se empuja allí** — un resultado
-que sólo existe en una máquina desaparece con ella (la regla de «servidores efímeros» de
-Convenciones aplica igual, y con más motivo).
+⚠ **Lo único que sigue pendiente**: 5 JSON de resultados sueltos en `data/`
+(`p40-*-task.json`, `proxy-c-d-3b.json`, `stride-*-informe.json`) que por criterio irían al repo
+de datos y no se han movido. `data/window-datasets/` **se queda aquí**: es dominio B, entrada del
+experimento y no resultado.
+
+**Para todo dato nuevo**: se escribe solo en `foveal-vision-data`, y **se commitea y se empuja
+allí** — un resultado que sólo existe en una máquina desaparece con ella (la regla de «servidores
+efímeros» de Convenciones aplica igual, y con más motivo).
 
 ---
 

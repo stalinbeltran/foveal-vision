@@ -33,6 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from fv import datarepo
 from fv.metrics import checkpoint_record             # noqa: E402
 from fv.sweeps.runner import point_run_name          # noqa: E402
 from fv.sweeps.spec import expand_points             # noqa: E402
@@ -40,7 +41,7 @@ from fv.sweeps.store import SweepStore               # noqa: E402
 
 
 def leer_run(nombre: str, monitor: str, objetivo: str) -> dict:
-    d = ROOT / "runs" / nombre
+    d = datarepo.resolve("runs", nombre)
     fila = {"run": nombre, "estado": None, "epocas": 0, "valor": None,
             "epoca_ckpt": None, "s_epoca": None, "paro_por": None}
     st = d / "status.json"

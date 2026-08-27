@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fv import settings
+from fv import datarepo, settings
 from fv.ioutils import read_json_retrying, write_json_atomic
 
 
@@ -18,11 +18,22 @@ class StudyStoreError(ValueError):
 
 
 class StudyStore:
+    # `root` given = a flat directory (tests, and any caller pinning a layout).
+    # `root` omitted = the data repository, filed by month (fv.datarepo). The
+    # study is what CHOOSES the month: it is picked once here, at create(), and
+    # every sweep and run of that study inherits it (see fv.datarepo).
     def __init__(self, root: Path | None = None):
-        self.root = Path(root) if root else settings.studies_root()
+        self.root = Path(root) if root else None
 
-    def path(self, name: str) -> Path:
-        return self.root / name
+    def path(self, name: str, month: str | None = None) -> Path:
+        if self.root is not None:
+            return self.root / name
+        return datarepo.resolve("studies", name, month)
+
+    def _dirs(self) -> list[Path]:
+        if self.root is None:
+            return datarepo.iter_dirs("studies")
+        return sorted(self.root.iterdir()) if self.root.exists() else []
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "plan.json").exists()
@@ -67,10 +78,8 @@ class StudyStore:
         write_json_atomic(self.path(name) / "progress.json", progress)
 
     def list(self) -> list[dict]:
-        if not self.root.exists():
-            return []
         out = []
-        for d in sorted(self.root.iterdir()):
+        for d in self._dirs():
             if (d / "plan.json").exists():
                 out.append({"name": d.name,
                             "plan": read_json_retrying(d / "plan.json"),
@@ -80,9 +89,7 @@ class StudyStore:
     def _plans(self):
         """(name, plan) for every study, reading plan.json only — no progress
         self-heal side effect (this is called from delete-guards, a read)."""
-        if not self.root.exists():
-            return
-        for d in sorted(self.root.iterdir()):
+        for d in self._dirs():
             p = d / "plan.json"
             if p.exists():
                 yield d.name, read_json_retrying(p)

@@ -73,6 +73,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from fv import datarepo
 from fv.sweeps.generate import generate_sweep       # noqa: E402
 from fv.sweeps.runner import prepare_sweep          # noqa: E402
 from fv.sweeps.spec import SweepError               # noqa: E402
@@ -392,7 +393,7 @@ def main() -> int:
     args = ap.parse_args()
 
     store = SweepStore()
-    existentes = {p.name for p in (ROOT / "sweeps").iterdir() if p.is_dir()}
+    existentes = {d.name for d in datarepo.iter_dirs("sweeps")}
     receta_base = RecipeStore().get(RECIPE).as_dict()
     bloques = set(args.bloque or ["0", "A", "B", "C", "D"])
     pedidos = set(args.solo or [])
@@ -413,7 +414,8 @@ def main() -> int:
             # gastado, asi que aqui se para en vez de avisar: `estudio_flota.py`
             # se salta los puntos ya `done`, o sea que borrarlos no es "empezar
             # de cero", es "volver a pagarlos". Fallo ruidoso antes que silencioso.
-            hechos = sorted((ROOT / "runs").glob(f"{name}-*"))
+            hechos = sorted((d for d in datarepo.iter_dirs("runs")
+                             if d.name.startswith(f"{name}-")), key=lambda d: d.name)
             if hechos:
                 print(f"  ! {name:10s} --rehacer NO se aplica: tiene {len(hechos)} "
                       f"runs en disco (p.ej. {hechos[0].name}).\n"

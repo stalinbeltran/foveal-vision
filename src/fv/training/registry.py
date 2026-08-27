@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-from fv import settings
+from fv import datarepo, settings
 from fv.ioutils import read_json_retrying, read_text_retrying, write_json_atomic
 from fv.proc import pid_alive
 
@@ -47,17 +47,37 @@ def environment(device: str) -> dict:
 
 
 class RunStore:
+    # `root` given = a flat directory (tests, and any caller pinning a layout).
+    # `root` omitted = the data repository, where artifacts are filed by month
+    # and a name is resolved across them (fv.datarepo).
     def __init__(self, root: Path | None = None):
-        self.root = Path(root) if root else settings.runs_root()
+        self.root = Path(root) if root else None
 
-    def path(self, name: str) -> Path:
-        return self.root / name
+    def path(self, name: str, month: str | None = None) -> Path:
+        if self.root is not None:
+            return self.root / name
+        return datarepo.resolve("runs", name, month)
+
+    def _create_path(self, name: str, config: dict) -> Path:
+        if self.root is not None:
+            return self.root / name
+        sweep = (config.get("provenance") or {}).get("sweep")
+        if sweep:
+            d = datarepo.find("sweeps", sweep)
+            if d is not None:
+                return d / "runs" / name
+        return datarepo.resolve("runs", name)
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "config.json").exists()
 
     def create(self, name: str, config: dict) -> Path:
-        d = self.path(name)
+        # A run that belongs to a sweep is stored INSIDE it
+        # (<month>/sweeps/<sweep>/runs/<run>), which is what keeps the sweep and
+        # the runs that measured it together — and gives the run its month for
+        # free, inherited from the sweep and hence from the study. A loose run
+        # (a benchmark) goes to <month>/runs/.
+        d = self._create_path(name, config)
         if d.exists():
             raise RunError("run_exists",
                            f"ya existe un run llamado '{name}'",
@@ -103,14 +123,17 @@ class RunStore:
                            "mira la lista en /runs")
         return read_json_retrying(p)
 
+    def _dirs(self) -> list[Path]:
+        if self.root is None:
+            return datarepo.iter_dirs("runs")
+        return list(self.root.iterdir()) if self.root.exists() else []
+
     def list(self) -> list[dict]:
-        if not self.root.exists():
-            return []
         out = []
         # newest first: the run you just trained is the one you want to look at,
         # and it keeps the default selection on a current (loadable) checkpoint
         # instead of the alphabetically-first, possibly-stale one.
-        dirs = sorted(self.root.iterdir(),
+        dirs = sorted(self._dirs(),
                       key=lambda d: d.stat().st_mtime, reverse=True)
         for d in dirs:
             if not (d / "config.json").exists():

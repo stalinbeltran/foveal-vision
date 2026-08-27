@@ -23,6 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from fv import datarepo
 from fv.metrics import permutation_test            # noqa: E402
 from fv.sweeps.runner import es_medida, sweep_trials  # noqa: E402
 from fv.sweeps.store import SweepStore             # noqa: E402
@@ -203,7 +204,7 @@ def main() -> int:
 
     texto = "\n".join(out)
     print(texto)
-    destino = ROOT / "sweeps" / args.sweep / "informe.json"
+    destino = datarepo.resolve("sweeps", args.sweep) / "informe.json"
     destino.write_text(json.dumps(
         {"recorrido": args.sweep, "eje": args.eje, "objetivo": tabla["objective"],
          "dataset": spec["window_dataset"], "delta": delta, "delta_fuente": fuente_delta,
@@ -211,7 +212,13 @@ def main() -> int:
          "contrastes": contrastes, "pendientes": [t["run"] for t in pendientes],
          "sugerido": ganador["suggested"]["point"]},
         indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"\n<!-- tambien en {destino.relative_to(ROOT)} -->")
+    # el destino vive en el REPO DE DATOS, fuera de ROOT: `relative_to` reventaria
+    # y tiraria un informe ya escrito (misma leccion que estudio_stride_informe.py)
+    try:
+        donde = destino.relative_to(ROOT)
+    except ValueError:
+        donde = destino
+    print(f"\n<!-- tambien en {donde} -->")
     return 0
 
 

@@ -35,6 +35,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from fv import datarepo
 from fv.sweeps.generate import generate_sweep       # noqa: E402
 from fv.sweeps.spec import SweepError               # noqa: E402
 from fv.sweeps.store import SweepStore              # noqa: E402
@@ -133,7 +134,7 @@ def main() -> int:
 
     store = SweepStore()
     existentes = set(store.list_names() if hasattr(store, "list_names")
-                     else [p.name for p in (ROOT / "sweeps").iterdir() if p.is_dir()])
+                     else [d.name for d in datarepo.iter_dirs("sweeps")])
     pedidos = set(args.solo or [])
     creados, saltados, fallidos = [], [], []
 

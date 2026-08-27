@@ -33,6 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from fv import datarepo
 from fv.sweeps.runner import sweep_trials         # noqa: E402
 from fv.sweeps.store import SweepStore            # noqa: E402
 from fv.sweeps.winner import aggregate_seeds      # noqa: E402
@@ -51,7 +52,7 @@ def leer_flota(sweep: str) -> dict:
     incluye la recogida de los runs. Se marca como deducido en vez de mezclarlo
     con el medido: un numero deducido y uno medido no son el mismo numero.
     """
-    d = json.loads((ROOT / "sweeps" / sweep / "flota.json").read_text(encoding="utf-8"))
+    d = json.loads((datarepo.resolve("sweeps", sweep) / "flota.json").read_text(encoding="utf-8"))
     maquinas = d.get("lotes") or d.get("semillas") or []
     vividas = sum(float(m.get("segundos_vivida") or 0) for m in maquinas)
     trabajo = sum(float(m.get("entrenamiento_s") or 0) for m in maquinas)
@@ -165,7 +166,7 @@ def main() -> int:
 
     texto = "\n".join(out)
     print(texto)
-    destino = ROOT / "sweeps" / args.b / "comparacion.json"
+    destino = datarepo.resolve("sweeps", args.b) / "comparacion.json"
     destino.write_text(json.dumps(
         {"a": {k: v for k, v in A.items() if k != "detalle"},
          "b": {k: v for k, v in B.items() if k != "detalle"},
@@ -174,7 +175,13 @@ def main() -> int:
          "grupos_a": {str(k): v for k, v in ga.items()},
          "grupos_b": {str(k): v for k, v in gb.items()}},
         indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"\n<!-- tambien en {destino.relative_to(ROOT)} -->")
+    # el destino vive en el REPO DE DATOS, fuera de ROOT: `relative_to` reventaria
+    # y tiraria una comparacion ya escrita (misma leccion que estudio_stride_informe.py)
+    try:
+        donde = destino.relative_to(ROOT)
+    except ValueError:
+        donde = destino
+    print(f"\n<!-- tambien en {donde} -->")
     return 0
 
 

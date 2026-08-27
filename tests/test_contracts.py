@@ -677,3 +677,86 @@ def test_every_run_on_disk_still_resolves_its_geometry():
         dims_of(net)          # raises if the old spelling stopped being readable
         seen += 1
     assert seen > 0
+
+
+# --------------------------------------------------- el repositorio de datos
+#
+# Desde 2026-08-27 los artefactos de E/H/I viven en `foveal-vision-data`,
+# agrupados por mes. El mes lo elige EL ESTUDIO al crearse y lo hereda todo lo
+# que cuelga de el: agrupa, no fecha. Lo que sigue fija esa promesa, porque sin
+# test es un comentario.
+
+def test_a_study_keeps_its_sweeps_and_runs_in_one_month(monkeypatch, tmp_path):
+    """Un recorrido lanzado el mes SIGUIENTE se queda con su estudio.
+
+    Es la razon de ser del agrupamiento: un mismo estudio disperso en dos
+    carpetas por el mero paso de la medianoche seria justo lo que estas
+    carpetas existen para evitar.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv import datarepo
+    from fv.ioutils import write_json_atomic
+    from fv.studies.store import StudyStore
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+
+    # un estudio archivado en JULIO
+    d = StudyStore().path("viejo", "2026/07-julio")
+    d.mkdir(parents=True)
+    write_json_atomic(d / "plan.json", {"axes": []})
+    assert datarepo.study_month("viejo") == "2026/07-julio"
+
+    # ... cuyo recorrido se crea HOY (agosto): hereda julio, no el mes actual
+    SweepStore().create("viejo-s1-lr", {"study": "viejo", "window_dataset": "x"})
+    sw = SweepStore().path("viejo-s1-lr")
+    assert "07-julio" in str(sw), sw
+
+    # ... y su run vive DENTRO del recorrido, luego tambien en julio
+    RunStore().create("viejo-s1-lr-0000-a", {"provenance": {"sweep": "viejo-s1-lr"}})
+    run = RunStore().path("viejo-s1-lr-0000-a")
+    assert run.parent.parent == sw, run
+    assert "07-julio" in str(run), run
+
+
+def test_a_run_of_a_sweep_is_stored_inside_it(monkeypatch, tmp_path):
+    """La relacion recorrido-runs es estructura, no un prefijo en el nombre."""
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    SweepStore().create("rec", {"window_dataset": "x"})
+    d = RunStore().create("rec-0000-a", {"provenance": {"sweep": "rec"}})
+    assert d.parent.name == "runs" and d.parent.parent.name == "rec"
+    # un run suelto (un benchmark) NO se inventa un recorrido
+    loose = RunStore().create("bench-1", {"provenance": {}})
+    assert loose.parent.name == "runs" and loose.parent.parent.name != "rec"
+
+
+def test_a_name_resolves_to_one_path_across_months(monkeypatch, tmp_path):
+    """Buscar por nombre encuentra el artefacto este en el mes que este.
+
+    Y sigue encontrandolo mientras se le quita el marcador: el runner borra
+    config.json/status.json ANTES del directorio al rehacer un punto, y si
+    `find` dejase de verlo ahi, borraria una ruta y reconstruiria en otra.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv import datarepo
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+    SweepStore().create("rec", {"window_dataset": "x"})
+    d = RunStore().create("rec-0000-a", {"provenance": {"sweep": "rec"}})
+    assert RunStore().path("rec-0000-a") == d
+    (d / "config.json").unlink()
+    assert RunStore().path("rec-0000-a") == d      # sigue siendo el mismo sitio
+    assert datarepo.find("runs", "no-existe") is None
+
+
+def test_the_data_root_is_redirectable_and_defaults_to_the_sibling(monkeypatch):
+    """FV_DATA_ROOT manda; sin ella, el repo hermano. Mismo patron que el
+    generador (`external_datasets_root`), para que la flota lo redirija sin
+    tocar codigo y una maquina con los dos repos hermanos no configure nada."""
+    from fv import settings
+    monkeypatch.setenv("FV_DATA_ROOT", r"X:\otro-sitio")
+    assert str(settings.data_root()) == r"X:\otro-sitio"
+    monkeypatch.delenv("FV_DATA_ROOT")
+    assert settings.data_root().name == "foveal-vision-data"
+    assert settings.data_root().parent == settings.project_root().parent

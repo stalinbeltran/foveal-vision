@@ -107,6 +107,8 @@ LANZADOR = ROOT.parent / "digital-ocean-dropplet-auto-launching"
 COORD = Path(os.environ.get("COORD_HOME", Path.home() / "src" / "telegram-coordinator"))
 
 sys.path.insert(0, str(ROOT / "src"))
+
+from fv import datarepo
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # El espacio de nombres de las instancias de ESTE estudio. Va en una lista para
@@ -237,7 +239,7 @@ def latido(nombres: list) -> tuple:
     """
     ultimo, pendientes = 0.0, 0
     for n in nombres:
-        st = ROOT / "runs" / n / "status.json"
+        st = datarepo.resolve("runs", n) / "status.json"
         if not st.exists():
             pendientes += 1
             continue
@@ -278,8 +280,8 @@ def ritmo(nombres: list) -> tuple:
     `estudio_flota.py`. Tres y no una: una epoca lenta suelta es ruido normal.
     """
     for n in nombres:
-        st = ROOT / "runs" / n / "status.json"
-        mj = ROOT / "runs" / n / "metrics.jsonl"
+        st = datarepo.resolve("runs", n) / "status.json"
+        mj = datarepo.resolve("runs", n) / "metrics.jsonl"
         if not st.exists() or not mj.exists():
             continue
         try:
