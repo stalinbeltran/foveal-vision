@@ -203,7 +203,7 @@ def main() -> int:
 
     texto = "\n".join(out)
     print(texto)
-    destino = ROOT / "sweeps" / args.sweep / "informe.json"
+    destino = SweepStore().destino(args.sweep) / "informe.json"
     destino.write_text(json.dumps(
         {"recorrido": args.sweep, "eje": args.eje, "objetivo": tabla["objective"],
          "dataset": spec["window_dataset"], "delta": delta, "delta_fuente": fuente_delta,

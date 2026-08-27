@@ -192,6 +192,14 @@ import vast_instance as V                           # noqa: E402
 from fv.sweeps.runner import point_run_name         # noqa: E402
 from fv.sweeps.spec import expand_points            # noqa: E402
 from fv.sweeps.store import SweepStore              # noqa: E402
+from fv.training.registry import RunStore            # noqa: E402
+
+# A nivel de modulo a proposito: los tests aislan la construccion del
+# payload apuntando estos almacenes a un tmpdir. Antes lo hacian parcheando
+# ROOT, y dejo de valer cuando los datos salieron de este repo.
+SWEEPS = SweepStore()
+RUNS = RunStore()
+
 
 # Lo que viaja a la maquina. Nada mas: son ordenadores de desconocidos alquilados
 # por minutos, y ahi no va ningun secreto (CLAUDE.md del lanzador, "Vast.ai").
@@ -687,7 +695,7 @@ def puntos_pendientes(sweep: str, valid: list) -> tuple[list, list]:
     pendientes, hechos = [], []
     for i, p in enumerate(valid):
         nombre = point_run_name(sweep, i, p["overrides"])
-        st = ROOT / "runs" / nombre / "status.json"
+        st = RUNS.path(nombre) / "status.json"
         estado = None
         if st.exists():
             try:
@@ -774,7 +782,7 @@ def construir_payload(sweeps: list, datasets: list) -> Path:
                 die(f"falta {origen}, que hace falta para entrenar")
             tar.add(str(origen), arcname=nombre, filter=filtro)
         for s in sweeps:
-            tar.add(str(ROOT / "sweeps" / s["nombre"]),
+            tar.add(str(SWEEPS.path(s["nombre"])),
                     arcname=f"sweeps/{s['nombre']}", filter=filtro)
         for d in datasets:
             tar.add(str(ROOT / "data" / "window-datasets" / d),
@@ -1218,7 +1226,7 @@ def traer_libro(m: "Maquina", libro: Libro) -> list:
 
 def segundos_por_epoca(run: str) -> list:
     """Los tiempos por epoca que el propio entrenamiento ya escribio."""
-    p = ROOT / "runs" / run / "metrics.jsonl"
+    p = RUNS.path(run) / "metrics.jsonl"
     if not p.exists():
         return []
     out = []
@@ -1742,7 +1750,7 @@ def main() -> int:
         "lotes": resultados,
     }
     for s in sweeps:
-        destino = ROOT / "sweeps" / s["nombre"] / "flota.json"
+        destino = SWEEPS.destino(s["nombre"]) / "flota.json"
         destino.write_text(json.dumps(reporte, indent=2, ensure_ascii=False) + "\n",
                            encoding="utf-8")
 

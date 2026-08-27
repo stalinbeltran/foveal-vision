@@ -133,7 +133,7 @@ def main() -> int:
 
     store = SweepStore()
     existentes = set(store.list_names() if hasattr(store, "list_names")
-                     else [p.name for p in (ROOT / "sweeps").iterdir() if p.is_dir()])
+                     else [p.name for p in SweepStore().root.iterdir() if p.is_dir()])
     pedidos = set(args.solo or [])
     creados, saltados, fallidos = [], [], []
 

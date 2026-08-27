@@ -50,7 +50,7 @@ def limpiar() -> None:
     if st.exists(NOMBRE):
         st.delete(NOMBRE)
         print(f"  borrado sweeps/{NOMBRE}")
-    for d in sorted((ROOT / "runs").glob(f"{NOMBRE}-*")):
+    for d in sorted(RunStore().root.glob(f"{NOMBRE}-*")):
         shutil.rmtree(d, ignore_errors=True)
         print(f"  borrado runs/{d.name}")
 
@@ -85,16 +85,21 @@ def main() -> int:
     print()
 
     print("3/3  dónde aterrizó cada artefacto:\n")
-    aqui, alla = [], []
-    for etiqueta, patron in (("recorrido", f"sweeps/{NOMBRE}/*"),
-                             ("runs", f"runs/{NOMBRE}-*/*")):
-        for f in sorted(ROOT.glob(patron)):
-            if f.is_file():
-                aqui.append(f.relative_to(ROOT))
-        if DATA_REPO.exists():
-            for f in sorted(DATA_REPO.rglob(f"*{NOMBRE}*")):
-                if f.is_file():
-                    alla.append(f.relative_to(DATA_REPO))
+    # ⚠ Se buscan los ficheros DENTRO del directorio del artefacto, no ficheros
+    # cuyo NOMBRE contenga el del recorrido: los artefactos se llaman
+    # `config.json`, `metrics.jsonl`... y el nombre del estudio esta en el
+    # DIRECTORIO. Un `rglob("*<nombre>*")` filtrado por `is_file()` devuelve cero
+    # y se lee como "no hay nada aqui", que es justo la conclusion contraria a la
+    # verdadera. (Paso en la primera version de esta comprobacion.)
+    def artefactos_en(raiz: Path) -> list:
+        if not raiz.exists():
+            return []
+        out = []
+        for d in list(raiz.glob(f"sweeps/{NOMBRE}")) + list(raiz.glob(f"runs/{NOMBRE}-*")):
+            out += [f.relative_to(raiz) for f in sorted(d.rglob("*")) if f.is_file()]
+        return out
+
+    aqui, alla = artefactos_en(ROOT), artefactos_en(DATA_REPO)
 
     print(f"  en foveal-vision (código): {len(aqui)} fichero(s)")
     for f in aqui[:8]:

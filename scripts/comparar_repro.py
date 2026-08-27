@@ -21,6 +21,14 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from fv.training.registry import RunStore                # noqa: E402
+
+# El almacen sabe donde estan los datos (fv.settings.data_root); este script ya
+# no lo supone.
+RUNS = RunStore()
+
 PARES = [("repro-chk-0000-overlap_fovea_px2_seed1",
           "ov-fov-0010-overlap_fovea_px2_seed1"),
          ("repro-chk-0001-overlap_fovea_px2_seed2",
@@ -32,7 +40,7 @@ CAMPOS = [("train_loss", lambda d: d["train_loss"]),
 
 
 def curva(run: str) -> list:
-    f = ROOT / "runs" / run / "metrics.jsonl"
+    f = RUNS.path(run) / "metrics.jsonl"
     if not f.exists():
         return []
     return [json.loads(l) for l in f.read_text().splitlines() if l.strip()]

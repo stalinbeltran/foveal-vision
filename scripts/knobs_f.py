@@ -68,7 +68,7 @@ F1_MINIMO_UTIL = 0.05
 
 def runs_con_checkpoint(store: RunStore) -> list:
     fuera = []
-    for d in sorted((ROOT / "runs").iterdir()):
+    for d in sorted(RunStore().root.iterdir()):
         if not d.is_dir() or not (d / "best.pt").exists():
             continue
         try:

@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from fv import settings
+from fv import artefactos, settings
 from fv.ioutils import read_json_retrying, write_json_atomic
 from fv.proc import pid_alive
 
@@ -25,13 +25,18 @@ class SweepStore:
         self.root = Path(root) if root else settings.sweeps_root()
 
     def path(self, name: str) -> Path:
+        """Donde ESTA el recorrido: plano -> archivo fechado -> legado."""
+        return artefactos.resolver("sweeps", name, self.destino(name))
+
+    def destino(self, name: str) -> Path:
+        """Donde se ESCRIBE: la forma plana del repo de datos."""
         return self.root / name
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "spec.json").exists()
 
     def create(self, name: str, spec: dict) -> Path:
-        d = self.path(name)
+        d = self.destino(name)
         if d.exists():
             raise SweepStoreError("sweep_exists",
                                   f"ya existe un recorrido llamado '{name}'",
@@ -78,14 +83,14 @@ class SweepStore:
         return self.state(name)
 
     def list(self) -> list[dict]:
-        if not self.root.exists():
-            return []
+        # los tres sitios, sin repetir: lo nuevo, lo archivado y lo legado
         out = []
-        for d in sorted(self.root.iterdir()):
+        for nombre in artefactos.nombres("sweeps", self.root):
+            d = self.path(nombre)
             if (d / "spec.json").exists():
                 spec = read_json_retrying(d / "spec.json")
-                st = self.reconcile(d.name)
-                out.append({"name": d.name, "spec": spec, "state": st})
+                out.append({"name": nombre, "spec": spec,
+                            "state": self.reconcile(nombre)})
         return out
 
     def used_by_dataset(self, dataset_name: str) -> list[str]:

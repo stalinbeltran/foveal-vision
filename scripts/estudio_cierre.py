@@ -78,6 +78,13 @@ from fv.sweeps.runner import prepare_sweep          # noqa: E402
 from fv.sweeps.spec import SweepError               # noqa: E402
 from fv.sweeps.store import SweepStore              # noqa: E402
 from fv.training.recipe import RecipeStore          # noqa: E402
+from fv.training.registry import RunStore          # noqa: E402
+
+# Los almacenes saben donde estan los datos (fv.settings.data_root);
+# este script ya no lo supone.
+RUNS = RunStore()
+SWEEPS = SweepStore()
+
 
 RECIPE = "plan40"
 OBJECTIVE = "f1"
@@ -392,7 +399,7 @@ def main() -> int:
     args = ap.parse_args()
 
     store = SweepStore()
-    existentes = {p.name for p in (ROOT / "sweeps").iterdir() if p.is_dir()}
+    existentes = {p.name for p in SWEEPS.root.iterdir() if p.is_dir()}
     receta_base = RecipeStore().get(RECIPE).as_dict()
     bloques = set(args.bloque or ["0", "A", "B", "C", "D"])
     pedidos = set(args.solo or [])
@@ -413,7 +420,7 @@ def main() -> int:
             # gastado, asi que aqui se para en vez de avisar: `estudio_flota.py`
             # se salta los puntos ya `done`, o sea que borrarlos no es "empezar
             # de cero", es "volver a pagarlos". Fallo ruidoso antes que silencioso.
-            hechos = sorted((ROOT / "runs").glob(f"{name}-*"))
+            hechos = sorted(RUNS.root.glob(f"{name}-*"))
             if hechos:
                 print(f"  ! {name:10s} --rehacer NO se aplica: tiene {len(hechos)} "
                       f"runs en disco (p.ej. {hechos[0].name}).\n"

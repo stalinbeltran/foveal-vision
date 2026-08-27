@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-from fv import settings
+from fv import artefactos, settings
 from fv.ioutils import read_json_retrying, read_text_retrying, write_json_atomic
 from fv.proc import pid_alive
 
@@ -51,13 +51,23 @@ class RunStore:
         self.root = Path(root) if root else settings.runs_root()
 
     def path(self, name: str) -> Path:
+        """Donde ESTA el run: plano -> archivo fechado -> legado (fv.artefactos).
+        Si no esta en ningun sitio devuelve el destino de escritura."""
+        return artefactos.resolver("runs", name, self.destino(name))
+
+    def destino(self, name: str) -> Path:
+        """Donde se ESCRIBE. Siempre la forma plana del repo de datos: crear en
+        el archivo fechado exigiria saber el recorrido y el mes, y `path()` solo
+        recibe el nombre."""
         return self.root / name
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "config.json").exists()
 
     def create(self, name: str, config: dict) -> Path:
-        d = self.path(name)
+        # se crea en el DESTINO, no en `path()`: si el run ya estuviera archivado
+        # `path()` devolveria el archivo y esto escribiria dentro de el.
+        d = self.destino(name)
         if d.exists():
             raise RunError("run_exists",
                            f"ya existe un run llamado '{name}'",

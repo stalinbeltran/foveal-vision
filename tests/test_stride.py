@@ -263,6 +263,9 @@ def test_multi_dataset_payload_carries_all(tmp_path, monkeypatch):
     (raiz / "sweeps" / "s1").mkdir(parents=True)
     (raiz / "sweeps" / "s1" / "spec.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(F, "ROOT", raiz)
+    # los recorridos ya no cuelgan de ROOT: viven en el repo de datos
+    # (fv.settings.data_root), asi que el aislamiento va por el almacen.
+    monkeypatch.setattr(F.SWEEPS, "root", raiz / "sweeps")
 
     import tarfile
     tar = F.construir_payload([{"nombre": "s1"}], ["ds-a", "ds-b"])
@@ -285,6 +288,9 @@ def test_multi_dataset_missing_npz_dies_before_renting(tmp_path, monkeypatch):
     (raiz / "data" / "window-datasets" / "ds-a").mkdir(parents=True)
     (raiz / "data" / "window-datasets" / "ds-a" / "windows.npz").write_bytes(b"n")
     monkeypatch.setattr(F, "ROOT", raiz)
+    # los recorridos ya no cuelgan de ROOT: viven en el repo de datos
+    # (fv.settings.data_root), asi que el aislamiento va por el almacen.
+    monkeypatch.setattr(F.SWEEPS, "root", raiz / "sweeps")
     with pytest.raises(SystemExit):
         F.construir_payload([{"nombre": "s1"}], ["ds-a", "ds-que-no-esta"])
 
@@ -303,6 +309,9 @@ def test_payload_accepts_a_bare_string(tmp_path, monkeypatch):
     (raiz / "sweeps" / "s1").mkdir(parents=True)
     (raiz / "sweeps" / "s1" / "spec.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(F, "ROOT", raiz)
+    # los recorridos ya no cuelgan de ROOT: viven en el repo de datos
+    # (fv.settings.data_root), asi que el aislamiento va por el almacen.
+    monkeypatch.setattr(F.SWEEPS, "root", raiz / "sweeps")
     assert F.construir_payload([{"nombre": "s1"}], "ds-a").exists()
 
 

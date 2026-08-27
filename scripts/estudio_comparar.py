@@ -51,7 +51,7 @@ def leer_flota(sweep: str) -> dict:
     incluye la recogida de los runs. Se marca como deducido en vez de mezclarlo
     con el medido: un numero deducido y uno medido no son el mismo numero.
     """
-    d = json.loads((ROOT / "sweeps" / sweep / "flota.json").read_text(encoding="utf-8"))
+    d = json.loads((SweepStore().path(sweep) / "flota.json").read_text(encoding="utf-8"))
     maquinas = d.get("lotes") or d.get("semillas") or []
     vividas = sum(float(m.get("segundos_vivida") or 0) for m in maquinas)
     trabajo = sum(float(m.get("entrenamiento_s") or 0) for m in maquinas)
@@ -165,7 +165,7 @@ def main() -> int:
 
     texto = "\n".join(out)
     print(texto)
-    destino = ROOT / "sweeps" / args.b / "comparacion.json"
+    destino = SweepStore().destino(args.b) / "comparacion.json"
     destino.write_text(json.dumps(
         {"a": {k: v for k, v in A.items() if k != "detalle"},
          "b": {k: v for k, v in B.items() if k != "detalle"},

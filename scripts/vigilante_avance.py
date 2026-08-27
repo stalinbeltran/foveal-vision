@@ -109,6 +109,13 @@ COORD = Path(os.environ.get("COORD_HOME", Path.home() / "src" / "telegram-coordi
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from fv.training.registry import RunStore  # noqa: E402
+
+# Los almacenes saben donde estan los datos (fv.settings.data_root);
+# este script ya no lo supone.
+RUNS = RunStore()
+
+
 # El espacio de nombres de las instancias de ESTE estudio. Va en una lista para
 # que `--prefijo` pueda fijarlo sin `global`.
 #
@@ -237,7 +244,7 @@ def latido(nombres: list) -> tuple:
     """
     ultimo, pendientes = 0.0, 0
     for n in nombres:
-        st = ROOT / "runs" / n / "status.json"
+        st = RUNS.path(n) / "status.json"
         if not st.exists():
             pendientes += 1
             continue
@@ -278,8 +285,8 @@ def ritmo(nombres: list) -> tuple:
     `estudio_flota.py`. Tres y no una: una epoca lenta suelta es ruido normal.
     """
     for n in nombres:
-        st = ROOT / "runs" / n / "status.json"
-        mj = ROOT / "runs" / n / "metrics.jsonl"
+        st = RUNS.path(n) / "status.json"
+        mj = RUNS.path(n) / "metrics.jsonl"
         if not st.exists() or not mj.exists():
             continue
         try:
