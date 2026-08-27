@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -329,3 +330,132 @@ def test_vigilante_prefix_is_a_parameter():
     # y la flota lo hereda al relanzar, o la flota nueva naceria con etiquetas
     # que este vigilante ya no reconoceria como suyas
     assert '"--prefijo", args.prefijo' in fuente
+
+
+# --------------------------------------------------------------- el comparador
+
+def _modulo(nombre: str):
+    import importlib.util
+    ruta = Path(__file__).resolve().parents[1] / "scripts" / f"{nombre}.py"
+    spec = importlib.util.spec_from_file_location(f"_{nombre}_test", ruta)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class _StoreFalso:
+    """Un SweepStore con specs en memoria: el comparador solo les pide `spec`."""
+
+    def __init__(self, specs: dict):
+        self._specs = specs
+
+    def exists(self, n): return n in self._specs
+    def spec(self, n): return self._specs[n]
+    def used_by_study(self, estudio):
+        return sorted(n for n, s in self._specs.items() if s.get("study") == estudio)
+
+
+def _brazo(stride: int, eval_stride: int = 5, por_epoca: int = 84_000,
+           estudio: str = "E") -> dict:
+    return {"study": estudio, "objective": "f1", "seed": 1,
+            "window_dataset": f"ds-st{stride:02d}",
+            "base_recipe_value": {"windows_per_epoch": por_epoca},
+            "eje_dataset": {"campo": "stride", "valor": stride,
+                            "eval_stride": eval_stride, "estudio": estudio}}
+
+
+def test_stride_informe_groups_by_stride():
+    """La costura de la que depende todo el comparador: `aggregate_seeds` agrupa
+    por el punto SIN `seed`, asi que dandole {"stride": s, "seed": k} agrupa por
+    stride. Si esto dejara de ser cierto, la tabla mezclaria brazos."""
+    from fv.sweeps.winner import aggregate_seeds
+    scored = [
+        {"run": "a1", "point": {"stride": 1, "seed": 1}, "value": 0.90,
+         "seconds_per_epoch": 40},
+        {"run": "a2", "point": {"stride": 1, "seed": 2}, "value": 0.80,
+         "seconds_per_epoch": 42},
+        {"run": "b1", "point": {"stride": 16, "seed": 1}, "value": 0.60,
+         "seconds_per_epoch": 41},
+        {"run": "b2", "point": {"stride": 16, "seed": 2}, "value": 0.50,
+         "seconds_per_epoch": 39},
+    ]
+    grupos = aggregate_seeds(scored, "max", "seconds_per_epoch")
+    por_stride = {g["point"]["stride"]: g for g in grupos}
+    assert set(por_stride) == {1, 16}
+    assert por_stride[1]["value"] == pytest.approx(0.85)     # calculado a mano
+    assert por_stride[16]["value"] == pytest.approx(0.55)
+    assert por_stride[1]["n_seeds"] == 2
+    assert "seed" not in por_stride[1]["point"]              # el eje es el stride
+
+
+def test_stride_informe_refuses_mixed_eval_grid():
+    """Brazos con rejillas de evaluacion distintas => se NIEGA.
+
+    Seria la trampa de barrido-stride.md 2.1 disfrazada de tabla: cada brazo
+    examinado de otra cosa y los f1 comparados como si fueran el mismo numero.
+    """
+    I = _modulo("estudio_stride_informe")
+    store = _StoreFalso({"a": _brazo(1, eval_stride=5),
+                         "b": _brazo(16, eval_stride=3)})
+    with pytest.raises(SystemExit):
+        I.brazos_del_estudio(store, "E", [])
+
+
+def test_stride_informe_refuses_mixed_budget():
+    """Brazos con distinto `windows_per_epoch` => se NIEGA: la tabla mediria el
+    presupuesto y no la densidad."""
+    I = _modulo("estudio_stride_informe")
+    store = _StoreFalso({"a": _brazo(1, por_epoca=84_000),
+                         "b": _brazo(16, por_epoca=0)})
+    with pytest.raises(SystemExit):
+        I.brazos_del_estudio(store, "E", [])
+
+
+def test_stride_informe_refuses_a_sweep_without_the_label():
+    """Un recorrido sin `eje_dataset` no dice que valor representa; meterlo en la
+    tabla seria inventarselo."""
+    I = _modulo("estudio_stride_informe")
+    otro = _brazo(2)
+    del otro["eje_dataset"]
+    otro["study"] = "E"
+    store = _StoreFalso({"a": _brazo(1), "b": otro})
+    with pytest.raises(SystemExit):
+        I.brazos_del_estudio(store, "E", [])
+
+
+def test_stride_informe_orders_arms_by_stride():
+    I = _modulo("estudio_stride_informe")
+    store = _StoreFalso({"z": _brazo(16), "a": _brazo(1), "m": _brazo(4)})
+    brazos = I.brazos_del_estudio(store, "E", [])
+    assert [b[2] for b in brazos] == [1, 4, 16]
+
+
+def test_stride_informe_refuses_when_the_study_has_no_arms():
+    I = _modulo("estudio_stride_informe")
+    with pytest.raises(SystemExit):
+        I.brazos_del_estudio(_StoreFalso({}), "no-existe", [])
+
+
+# ------------------------------------------------------------------- el humo
+
+def test_humo_sweeps_are_a_separate_study():
+    """Los recorridos de validacion NO pueden llamarse como los del estudio: si
+    se llamaran igual, la flota los daria por hechos y el estudio quedaria
+    'medido' con las 3 epocas de la prueba."""
+    E = _modulo("estudio_stride")
+    assert E.nombre_sweep(1) == "stride-01"
+    assert E.nombre_sweep(1, humo=True) == "stride-h01"
+    assert E.nombre_sweep(1) != E.nombre_sweep(1, humo=True)
+
+
+def test_eval_stride_cannot_be_one_of_the_arms():
+    """Si la rejilla de evaluacion fuera uno de los strides barridos, ese brazo
+    habria entrenado sobre las posiciones exactas del examen."""
+    import subprocess
+    r = subprocess.run(
+        [sys.executable, "scripts/estudio_stride.py",
+         "--strides", "1,4,16", "--eval-stride", "4", "--solo-recorridos"],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        capture_output=True, text=True, timeout=120)
+    assert r.returncode != 0
+    assert "esta ENTRE los strides barridos" in (r.stderr + r.stdout)

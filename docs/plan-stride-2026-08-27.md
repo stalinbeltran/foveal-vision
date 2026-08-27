@@ -155,6 +155,12 @@ extracción ayuda a la **tarea** (párrafos sobre la página). Todo es f1 de ven
 **Estimado, no medido** — se apoya en coeficientes medidos (`estudio_estimar.py` §1-§7) pero la
 composición es predicción. Se contrasta contra la factura real en el reporte.
 
+**Contraste con el estimador del proyecto** (`--dry-run` del 2026-08-27, 02:26 UTC, con los cinco
+recorridos ya creados): optimista **1,12 $** · central **1,21 $** · pesimista **1,53 $**, reloj
+0,6–0,8 h, 25 máquinas. Cae junto a los 1,35 $ de la fila de arriba, que se calcularon por otro
+camino ($/run medido). Dos estimaciones independientes que coinciden no la convierten en medida,
+pero descartan el error de bulto.
+
 ⚠ **El estimador no sabe de tamaños de dataset.** Comprobado el 2026-08-27: `estudio_estimar.py`
 no menciona `num_windows` ni el dataset en ninguna línea; su `S_EPOCA_REF` está atado
 implícitamente a un train de 84.000 ventanas. Para este estudio eso **es correcto por
