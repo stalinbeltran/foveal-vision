@@ -40,7 +40,7 @@ from fv.studies.store import StudyStore, StudyStoreError
 from fv.training.loop import train
 from fv.training.recipe import Recipe, RecipeStore, RecipeStoreError
 from fv.training.registry import RunError, RunStore
-from fv.validation import check_run
+from fv.validation import check_network, check_run
 from fv.windows.extract import ExtractConfig, ExtractError, extract_windows
 from fv.windows.store import WindowDatasetStore, WindowStoreError
 
@@ -225,16 +225,19 @@ def create_app() -> FastAPI:
             cfg = full_config(body)
         except FoveaError as e:
             raise HTTPException(400, e.as_dict())
-        problems = check_dims(normalize_geometry(cfg))
+        # the SAME validator every other door asks (R4): check_dims alone only
+        # covers the geometry, so a kernel that is even, an unknown merge or a
+        # dropout outside [0,1) used to be SAVED here and refused later, at the
+        # training door — a stored config that no run can ever use. Measured
+        # 2026-08-27 while adding `dropout`; the hole predates it.
+        problems = check_network(cfg)
         if problems:
-            p = problems[0]
-            raise HTTPException(400, p)
+            raise HTTPException(400, problems[0])
         nstore.save(name, cfg, overwrite=bool(body.get("overwrite")))
         return {"saved": name}
 
     @app.post("/networks/validate")
     def validate_network(body: dict):
-        from fv.validation import check_network
         try:
             cfg = full_config(body)
         except FoveaError as e:
