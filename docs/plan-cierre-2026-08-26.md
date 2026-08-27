@@ -57,6 +57,105 @@ un número redondo, es el techo.
 
 ---
 
+## 0 bis. La comprobación previa: **el dato NO reproduce** (medido, 2026-08-26)
+
+Esto se descubrió al preparar el plan y **cambia el diseño de tres bloques**, así que va antes que
+ellos.
+
+### El síntoma
+
+La máquina se rehízo y `data/` se perdió entera. El dataset se reconstruyó desde los specs
+congelados (`bench_dataset.py build`, 12,4 min) y:
+
+| dataset | stride | ¿reproduce su huella de git? |
+|---|---:|---|
+| `bench-dirty1000-16` (el del benchmark) | 8 | **SÍ** — `sha256:6268a2f5…`, igual a la de git |
+| `dirty1000-80px-16px-r20260824` (**el de los estudios**) | 5 | **NO** — git dice `3df67624…`, sale `ac875e22…` |
+
+Que el primero reproduzca dice que **la fuente es la buena**: los mil renders salen iguales. Y del
+segundo coinciden **campo a campo** `num_windows` (140.000), `windows_per_split`
+(84.000/28.000/28.000), `positives_per_corner` (17.043 · 17.564 · 19.198 · 18.575),
+`images.shape` y `source_id`; y `split.json` es **idéntico byte a byte**. Sólo cambia el sha256
+del `.npz`. La extracción además es determinista aquí (dos extracciones seguidas dan el mismo
+hash), así que la diferencia es real y no del momento en que se corrió.
+
+### Por qué no bastaba con eso, y por qué se decidió entrenando
+
+Una huella distinta con los mismos resúmenes admite **dos explicaciones que llevan a decisiones
+opuestas**, y la huella no las distingue:
+
+1. **misma información, otra compresión** → el dato sirve, todo el plan vale;
+2. **otra información** (posiciones de esquina movidas sub-píxel) → es **otro dataset**.
+
+Y no es una duda académica: `ov-sig`, `bp-sig` y `pl-f2-*` estaban diseñados para **sumar semillas
+a runs que ya existen**. Con la explicación (2), esos tres comparan peras con manzanas **y no dan
+ningún síntoma** — el `p` sale igual de creíble. Es exactamente el fallo silencioso que este
+proyecto evita por escrito.
+
+⚠ **El contraste local no vale**, y por eso no se usó: en esta máquina la época 1 dio
+`train_loss` 0,4923 contra 0,4850 y `val_f1` 0,6889 contra 0,6807 — pero **divergencia de CPU y
+divergencia de dato se confunden** (medido: cruzar de familia mueve el f1 hasta 0,0457). Un número
+que admite dos causas no decide.
+
+### La medida
+
+`repro-chk`: **el mismo punto** (`overlap_fovea_px` = 2), **la misma semilla** (2), **la misma
+familia de CPU** —E5-2630 v4 contra el E5-2683 v4 del original, los dos E5-26xx v4, donde está
+medido que el entrenamiento sale **idéntico bit a bit**— y **los mismos 8 hilos** de torch. Tres
+épocas, `patience` = 0. Coste: **0,0164 $**.
+
+| época 1 | `repro-chk` (dato de hoy) | `ov-fov-0011` (dato r20260824) | Δ |
+|---|---:|---:|---:|
+| `train_loss` | 0,4462163726167322 | 0,4484938883624737 | −2,28·10⁻³ |
+| `val_loss` | 0,2742790627208623 | 0,31479289938103067 | −4,05·10⁻² |
+| `val_f1` | 0,7813885915277565 | 0,6786845310596833 | **+1,03·10⁻¹** |
+| `pos_err_px` | 2,398193359375 | 2,409182548522949 | −1,10·10⁻² |
+
+Las tres épocas van en la misma dirección: **el dato de hoy es más fácil**.
+
+**El dato que cierra la pregunta es el `train_loss` de la época 1.** Con la misma inicialización y
+el mismo orden de ejemplos —los dos los fija la semilla—, y en una familia de CPU donde el
+entrenamiento es bit a bit idéntico, la primera época **no tiene de dónde sacar una diferencia**
+más que del dato. Ahí no ha habido tiempo de que se acumule ninguna divergencia numérica.
+
+**Veredicto: es OTRO dataset.** Se le pone nombre nuevo —`dirty1000-80px-16px-r20260826`— que es
+la convención que este repo ya usó dos veces (r20260823 → r20260824). El r20260824 **no se pisa**.
+
+### La causa, y por qué se creía descartada
+
+La misma de siempre en este repo, y **es reincidente**: la CDN de Playwright devuelve **403 desde
+este proveedor** («this service is not available in your location»). El 24-ago se resolvió
+rasterizando con `google-chrome-stable`; hoy se resolvió trayendo el Chromium que Playwright fija
+**desde otra CDN** (`registry.npmmirror.com`). Otro binario, otros píxeles.
+
+⚠ **Y la diferencia es más fina que la del 24-ago, que es lo que la hace peligrosa.** Aquella
+movió los `positives_per_corner` y por eso se vio a simple vista comparando manifests. Ésta **no
+los mueve** —coinciden los cuatro— así que **ningún campo del manifest la delata**. Sólo el
+`.npz`, y sólo si alguien compara la huella. Lección para el índice, escrita por la acción que la
+dispara: **al reconstruir un dataset, comparar la huella NO es opcional, y si no coincide, que los
+resúmenes sí coincidan no absuelve** — hay que entrenar un punto conocido y comparar la curva.
+
+### Lo que se lleva por delante
+
+| | antes | ahora |
+|---|---|---|
+| `ov-sig` | 5 semillas **sumadas** a las de `ov-fov` | **`ov-r26`**: el eje **entero** {0,1,2,4,5,6,7} × 5, sobre el dato nuevo (35 runs) |
+| — | — | **`ov-sig26`**: {2,4} × semillas 6–10, sobre el dato nuevo (10 runs) |
+| `bp-sig` | 5 semillas sumadas a `borde-ancho` | **`bp-r26`**: {4,8} × **10 semillas propias** (20 runs) |
+| `pl-f2-*` | 3 semillas sumadas al tanteo | **5 semillas propias**; del tanteo se hereda **la red**, no los números |
+| bloque B | — | **sin cambios**: son auto-contenidos |
+
+**Y sale un ancla gratis**: el punto `overlap` = 2 de `ov-r26` **es la configuración vigente**, así
+que su media con 5 semillas mide **cuánto movió el dato** respecto de los 0,9308 que dejó escritos
+el [#13]. Eso es justo lo que el commit del 24-ago prometía publicar y nunca se publicó.
+
+⚠ **Lo que esto le hace al inventario entero, y hay que decirlo**: los **630 runs** con curvas en
+disco están sobre datasets que **ya no se pueden reconstruir aquí**. La tabla resumen del
+coordinador sigue siendo el mejor mapa que hay, pero sus números y los de este plan **no se
+comparan entre sí**, sólo se leen en paralelo.
+
+---
+
 ## 1. Bloque A — cerrar `overlap_fovea_px`
 
 ### Qué se sabe ya (reporte [#13], 20/20 runs)
@@ -109,12 +208,13 @@ arriba aquí significa llegar a la pared.
 
 | recorrido | eje | rango | semillas | runs | para qué |
 |---|---|---|---|---:|---|
-| **`ov-alto`** | `overlap_fovea_px` | **{5, 6, 7}** | 1–5 | 15 | **acotar por arriba**, hasta la pared |
-| **`ov-sig`** | `overlap_fovea_px` | **{2, 4}** | **6–10** | 10 | llevar el contraste decisivo a **10 contra 10** |
+| **`ov-r26`** | `overlap_fovea_px` | **{0, 1, 2, 4, 5, 6, 7}** | 1–5 | 35 | el **eje entero** sobre el dato nuevo: acota por arriba hasta la pared **y** rehace la parte que ya no es comparable |
+| **`ov-sig26`** | `overlap_fovea_px` | **{2, 4}** | **6–10** | 10 | llevar el contraste decisivo a **10 contra 10** |
 
-`ov-sig` usa semillas 6–10 **a propósito**: los 5 runs que ya existen en `ov-fov` para esos dos
-puntos son las semillas 1–5, así que los 10 nuevos **se suman** en vez de repetirse. Cuesta 10
-runs y no 20.
+⚠ **`ov-r26` mide el eje entero y no sólo {5,6,7}, que era el plan original.** No es repetir
+trabajo: los 20 runs de `ov-fov` están sobre **otro dataset** (§0 bis), así que volver a medir
+0/1/2/4 es lo único que hace comparables 5/6/7 con ellos. `ov-sig26` sí puede usar semillas
+6–10 porque las 1–5 de esos dos puntos **las pone `ov-r26`, sobre este mismo dato**.
 
 ### Criterio, escrito antes de mirar
 
@@ -206,18 +306,19 @@ Se lanza **después** del tanteo, y su contenido depende de él: los ejes que pa
 
 | recorrido | eje | rango | semillas | runs | qué cierra |
 |---|---|---|---|---:|---|
-| **`bp-sig`** | `border_px` (con `border_reduce` atado) | {4, 8} ↔ {2, 4} | **6–10** | 10 | **La `p` = 0,063 medida dos veces.** Con las 5 que ya hay ⇒ **10 contra 10**. Es lo que el propio informe pide: *más semillas en esos dos puntos, no un rango más ancho* |
-| **`pl-f2-bs`** | `batch_size` (plana) | {85, 170, 340} | **3–5** | 9 | Fase 2 de la plana; el tanteo dejó 170 ganando **por dentro** |
-| **`pl-f2-nl`** | `n_layers` (plana) | {4, 5, 6} | **3–5** | 9 | Fase 2 de la plana. ⚠ **L6 dio f1 = 0,0000 en una de sus dos semillas**: con 5 se ve si es bimodalidad o una casualidad |
+| **`bp-r26`** | `border_px` (con `border_reduce` atado) | {4, 8} ↔ {2, 4} | **1–10** | 20 | **La `p` = 0,063 medida dos veces**, ahora con **10 semillas propias** ⇒ 10 contra 10. Es lo que el propio informe pide: *más semillas en esos dos puntos, no un rango más ancho* |
+| **`pl-f2-bs`** | `batch_size` (plana) | {85, 170, 340} | 1–5 | 15 | Fase 2 de la plana; el tanteo dejó 170 ganando **por dentro** |
+| **`pl-f2-nl`** | `n_layers` (plana) | {4, 5, 6} | 1–5 | 15 | Fase 2 de la plana. ⚠ **L6 dio f1 = 0,0000 en una de sus dos semillas**: con 5 se ve si es bimodalidad o una casualidad |
 
-Los dos usan **semillas 3–5 y no 1–5** por lo mismo que `ov-sig`: las semillas 1 y 2 de esos seis
-puntos ya están `done` en `pl-t-bs` / `pl-t-nl` (comprobado el 2026-08-26 leyendo sus
-`status.json`). Con la base heredada son la misma red sobre el mismo dato, así que **se suman
-hasta 5** en vez de repetirse. Son **12 runs menos**, ≈0,65 $.
+Los tres llevan **semillas propias y completas**, no sumadas: el tanteo y `borde-ancho` están sobre
+el dato viejo (§0 bis). De `pl-t-*` se hereda **la red** —que hoy no se puede re-derivar, ver el
+aviso de abajo— y **no los números**: un estudio de 5 semillas declara solo, y el tanteo ya cumplió
+su papel diciendo *dónde* mirar.
 | *(los que pase el bloque B)* | — | — | 1–5 | ~20–40 | según §2 |
 
-**Lo creado y listo para lanzar suma 105 runs** (A: 25 · B: 52 · C: 28), ≈**5,7 $** estimados a
-los 0,054 $/run medidos el 25-ago — *estimación, no medida*.
+**Lo creado y lanzado suma 147 runs** (A: 45 · B: 52 · C: 50). Estimación de `estudio_flota.py`
+antes de lanzar: **reloj 3,8 h · 86,3 máquina-horas · 7,57 $** en el escenario central (6,93 $
+optimista, 9,90 $ pesimista) — *estimación, no medida*. El coste real va en el reporte.
 
 
 ### ⚠ Hallazgo al preparar esto: la base de la plana **no se puede re-derivar hoy**
