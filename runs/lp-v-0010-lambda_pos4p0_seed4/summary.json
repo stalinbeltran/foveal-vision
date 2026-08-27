@@ -1,0 +1,17 @@
+{
+  "run": "lp-v-0010-lambda_pos4p0_seed4",
+  "epochs_run": 50,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.21469916701316832,
+  "best_epoch": 40,
+  "seconds_per_epoch": 36.137,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
