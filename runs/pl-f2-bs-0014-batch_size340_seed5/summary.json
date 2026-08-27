@@ -1,0 +1,17 @@
+{
+  "run": "pl-f2-bs-0014-batch_size340_seed5",
+  "epochs_run": 48,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.06467208571054718,
+  "best_epoch": 38,
+  "seconds_per_epoch": 59.16,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
