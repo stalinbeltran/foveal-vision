@@ -12,6 +12,9 @@ merge: 'concat' flattens both branches and concatenates (tolerates different
 strides); 'sum' adds aligned feature maps first (validator enforces equal
 strides).
 
+`dropout` (C, 0.0 = off) sits on the flattened features just before the head —
+regularisation from inside the net, the sibling of D's `weight_decay`.
+
 Only imports fv.fovea (contract (7)): the net does not know A exists.
 """
 
@@ -47,6 +50,14 @@ NETWORK_DEFAULTS = {
     "k_center": 3, "k_periph": 3, "s_center": 1, "s_periph": 1,
     "channels": None, "merge": "concat", "pool_mode": "avg",
     "pad_mode": "edge", "regions": "split",
+    # Regularisation inside C (the sibling of D's weight_decay). 0.0 = OFF, and
+    # OFF is the default because every artefact on disk was trained without it:
+    # a non-zero default would silently change what every stored config means.
+    # nn.Dropout with p=0.0 is the identity in both train and eval, so a net
+    # built with the default is bit-identical to one built before this field
+    # existed -- the module has no parameters, so checkpoints keep loading
+    # strict (tested).
+    "dropout": 0.0,
 }
 
 
@@ -110,6 +121,17 @@ class FoveatedRegionalNN(nn.Module):
 
         flat = self._infer_flat_features()
         self.flat_features = flat
+        # Dropout goes on the FLATTENED features, right before the head: that is
+        # where 97% of the parameters live (measured, plan-40h.md §2), so it is
+        # the only place regularisation has anything to bite on. It is NOT put
+        # between conv layers: those hold ~3% of the parameters, and dropping
+        # whole activations of a small spatial map would mostly add noise to a
+        # position head that has to say WHERE a corner is.
+        #
+        # It is a real module and not F.dropout(self.training) so that .eval()
+        # governs it through the one switch the training loop already flips,
+        # and so `p` is visible in repr() and in the module tree.
+        self.drop = nn.Dropout(float(cfg["dropout"]))
         self.head = nn.Linear(flat, 12)  # 4 corners x [exists, x, y]
 
     @staticmethod
@@ -158,7 +180,10 @@ class FoveatedRegionalNN(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         feat = self._merge(self._branches(x))
-        out = self.head(F.relu(feat))
+        # after the ReLU, so what is zeroed are the activations the head reads;
+        # with dropout=0.0 (the default) this is the identity in both modes and
+        # the forward is bit-identical to the pre-dropout one (tested).
+        out = self.head(self.drop(F.relu(feat)))
         return out.view(-1, 4, 3)
 
     # ------------------------------------------------------------------

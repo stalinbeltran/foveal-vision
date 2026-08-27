@@ -7,6 +7,10 @@ foveated geometry is sweepable without re-extracting (decision C1/D23).
 
 windows.npz arrays (formatos.md §4.1): y (N,4,3), sample_idx, window_xy,
 split, images (S,H,W), images_sample_idx. No baked X.
+
+`stride` corta las ventanas de TRAIN; `eval_stride` (opcional) las de val y
+test. Separarlos es lo que permite barrer la densidad de la rejilla midiendo
+siempre sobre el mismo examen -- ver docs/barrido-stride.md.
 """
 
 from __future__ import annotations
@@ -40,6 +44,7 @@ class ExtractConfig:
     val_frac: float = 0.15
     test_frac: float = 0.15
     seed: int = 1                          # the SPLIT seed (per image), not the training seed
+    eval_stride: "int | None" = None       # val/test grid; None = the same as train
 
 
 def _positions(length: int, n: int, stride: int) -> list[int]:
@@ -97,7 +102,25 @@ def extract_windows(cfg: ExtractConfig, out_dir: Path,
             "reduce la fuente o baja el numero de imagenes: no hay camino degradado")
 
     n = cfg.window_size
+    if cfg.eval_stride is not None and int(cfg.eval_stride) < 1:
+        raise ExtractError("eval_stride_invalid",
+                           f"eval_stride debe ser >= 1, y es {cfg.eval_stride}",
+                           "quitalo (None = la rejilla de train) o dale un paso en px")
     split_by_image = _assign_splits(len(samples), cfg.val_frac, cfg.test_frac, cfg.seed)
+
+    # La rejilla de val/test puede ser FIJA e independiente de la de train. Sin
+    # esto, barrer `stride` mueve tambien el conjunto sobre el que se mide: con
+    # stride 1 el val tendria 2925 ventanas por imagen y con stride 16 tendria 20,
+    # y comparar esos dos f1 es comparar dos EXAMENES distintos (los brazos de un
+    # barrido de stride dejarian de ser comparables sin que fallara nada).
+    # Ver docs/barrido-stride.md 2.1.
+    #
+    # `None` = la de train, que es el comportamiento de siempre: entonces las tres
+    # listas son la misma y el recorrido sale identico, en el mismo orden, asi que
+    # el windows.npz de un dataset ya extraido no se mueve ni un byte.
+    ev = cfg.stride if cfg.eval_stride is None else int(cfg.eval_stride)
+    pos_y = [_positions(H, n, cfg.stride)] + [_positions(H, n, ev)] * 2
+    pos_x = [_positions(W, n, cfg.stride)] + [_positions(W, n, ev)] * 2
 
     ys, sample_idxs, window_xys, splits = [], [], [], []
     images = np.zeros((len(samples), H, W), dtype=np.uint8)
@@ -112,8 +135,9 @@ def extract_windows(cfg: ExtractConfig, out_dir: Path,
                 continue
             for ci, pt in enumerate(_corners_of(b.bbox)):
                 corners_by_type[ci].append(pt)
-        for wy0 in _positions(H, n, cfg.stride):
-            for wx0 in _positions(W, n, cfg.stride):
+        destino = int(split_by_image[si])
+        for wy0 in pos_y[destino]:
+            for wx0 in pos_x[destino]:
                 y = np.zeros((4, 3), dtype=np.float32)
                 for ci in range(4):
                     inside = [(cx, cy) for cx, cy in corners_by_type[ci]

@@ -1,0 +1,69 @@
+{
+  "estudio": "stride-2026-08-27-humo",
+  "objetivo": "f1",
+  "direccion": "max",
+  "delta": 0.0,
+  "razon_delta": "una sola semilla en el mejor punto: no hay dispersión medida, así que no hay banda de ruido que descontar (sube `seeds` para poder declarar un empate)",
+  "brazos": [
+    {
+      "sweep": "stride-h01",
+      "stride": 1,
+      "dataset": "dirty1000-80px-16px-st01",
+      "medidas": 1,
+      "puntos": 1
+    },
+    {
+      "sweep": "stride-h16",
+      "stride": 16,
+      "dataset": "dirty1000-80px-16px-st16",
+      "medidas": 1,
+      "puntos": 1
+    }
+  ],
+  "tabla": [
+    {
+      "stride": 1,
+      "valor": 0.8037600994406464,
+      "min": 0.8037600994406464,
+      "max": 0.8037600994406464,
+      "sem": null,
+      "n_seeds": 1,
+      "seconds_per_epoch": 33.91
+    },
+    {
+      "stride": 16,
+      "valor": 0.8723626488406099,
+      "min": 0.8723626488406099,
+      "max": 0.8723626488406099,
+      "sem": null,
+      "n_seeds": 1,
+      "seconds_per_epoch": 39.41
+    }
+  ],
+  "R1_saturacion": {
+    "evaluable": true,
+    "stride": 16,
+    "frontera": [
+      16
+    ],
+    "mejor": 16,
+    "cerrado_por_arriba": false
+  },
+  "R2_contraste": null,
+  "R3_rupturas": [
+    {
+      "de": 16,
+      "a": 1,
+      "valor_de": 0.8723626488406099,
+      "valor_a": 0.8037600994406464
+    }
+  ],
+  "sin_banda_de_ruido": true,
+  "R4_control": {
+    "mediana_s_por_epoca": 36.66,
+    "desviados": [],
+    "umbral": 0.15,
+    "pasa": true
+  },
+  "pendientes": []
+}

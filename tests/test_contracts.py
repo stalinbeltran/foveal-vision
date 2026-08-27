@@ -560,6 +560,100 @@ def test_the_reparameterisation_does_not_move_a_single_weight():
         assert torch.equal(a(x), b(x))
 
 
+def test_dropout_off_is_the_net_that_was_already_on_disk():
+    """`dropout` (2026-08-27) is a NEW field of C, and every config, checkpoint
+    and run already on disk was written without it. Off (the default) it must
+    therefore be a no-op in every sense that can be observed: the state_dict is
+    the same set of tensors with the same shapes and the same count, a checkpoint
+    saved before the field existed loads `strict`, and the forward is bit
+    identical in BOTH modes. nn.Dropout holds no parameters, so this holds by
+    construction — it is asserted because 'by construction' is what silently
+    stops being true.
+
+    The golden number is the same 168652 of the L4 base above: adding the field
+    must not add a weight."""
+    import io
+    import torch
+    from fv.models.builder import build_model, full_config
+    base = {"fovea_px": 16, "border_px": 4, "border_reduce": 2,
+            "overlap_fovea_px": 2, "overlap_border_px": 0, "n_layers": 4,
+            "channels": [16, 16, 16, 16]}
+    torch.manual_seed(0); a = build_model(full_config(base))               # no field
+    torch.manual_seed(0); b = build_model(full_config(base | {"dropout": 0.0}))
+    assert full_config(base)["dropout"] == 0.0        # absent == off, never invented
+    assert {k: tuple(v.shape) for k, v in a.state_dict().items()} ==            {k: tuple(v.shape) for k, v in b.state_dict().items()}
+    assert sum(v.numel() for v in b.state_dict().values()) == 168652
+    buf = io.BytesIO(); torch.save(a.state_dict(), buf); buf.seek(0)
+    b.load_state_dict(torch.load(buf, weights_only=True), strict=True)
+    x = torch.randn(4, 1, 20, 20)
+    for mode in (True, False):
+        a.train(mode); b.train(mode)
+        torch.manual_seed(7); ya = a(x)
+        torch.manual_seed(7); yb = b(x)
+        assert torch.equal(ya, yb), f"dropout=0.0 no es identidad en train={mode}"
+
+
+def test_dropout_on_acts_in_train_and_never_in_eval():
+    """The other half: a non-zero dropout has to actually do something, and has
+    to do it ONLY while training. A dropout still active at eval would make every
+    val number — and therefore best.pt and every sweep ranking — depend on a coin
+    flip, which is the kind of failure that produces a perfectly credible table.
+
+    The training loop already flips model.train()/model.eval() around each epoch
+    (loop.py), so asserting the module honours the mode is asserting the seam."""
+    import torch
+    from fv.models.builder import build_model, full_config
+    cfg = full_config({"fovea_px": 16, "border_px": 4, "border_reduce": 2,
+                       "overlap_fovea_px": 2, "overlap_border_px": 0,
+                       "n_layers": 2, "dropout": 0.5})
+    torch.manual_seed(0)
+    model = build_model(cfg)
+    x = torch.randn(8, 1, 20, 20)
+    model.train()
+    torch.manual_seed(1); y1 = model(x)
+    torch.manual_seed(2); y2 = model(x)
+    assert not torch.equal(y1, y2), "dropout=0.5 no cambia nada en train"
+    model.eval()
+    with torch.no_grad():
+        assert torch.equal(model(x), model(x)), "dropout sigue activo en eval"
+
+
+def test_dropout_out_of_range_is_refused_at_the_gate():
+    """R4: a probability outside [0, 1) is refused with reason and hint BEFORE a
+    run name is reserved, not by a torch exception inside the job. 1.0 is the one
+    that matters: nn.Dropout accepts it and zeroes EVERYTHING, so the net would
+    train on nothing and still write a perfectly normal-looking run."""
+    from fv.validation import check_network
+    ok = {"fovea_px": 16, "border_px": 4, "border_reduce": 2,
+          "overlap_fovea_px": 2, "overlap_border_px": 0, "n_layers": 2}
+    assert check_network(ok) == []
+    assert check_network(ok | {"dropout": 0.25}) == []
+    for bad in (1.0, -0.1, 1.5, "mucho"):
+        problems = check_network(ok | {"dropout": bad})
+        assert any(p["code"] == "dropout_out_of_range" for p in problems), bad
+        assert all(p.get("hint") for p in problems)
+
+
+def test_dropout_is_a_sweepable_axis_of_c():
+    """The reason this was implemented at all: it had to become an axis. Before
+    2026-08-27 `dropout` was in three documents and in no dict, so `full_config`
+    dropped it and the N points of a sweep would have trained the SAME net while
+    the table said otherwise. Assert the axis both passes the gate and produces
+    points that actually differ."""
+    from fv.sweeps.spec import check_sweep, expand_points
+    from fv.models.builder import full_config
+    base = full_config({"fovea_px": 16, "border_px": 4, "border_reduce": 2,
+                        "overlap_fovea_px": 2, "overlap_border_px": 0,
+                        "n_layers": 2})
+    spec = {"space": {"dropout": [0.0, 0.1, 0.25]}, "objective": "f1"}
+    assert check_sweep(spec) == []
+    valid, discarded = expand_points(spec, base)
+    assert discarded == []
+    assert [p["network"]["dropout"] for p in valid] == [0.0, 0.1, 0.25]
+    # and it is C, not D: it must not leak into the recipe overrides
+    assert all(p["recipe_overrides"] == {} for p in valid)
+
+
 def test_every_run_on_disk_still_resolves_its_geometry():
     """The migration's other half: 478 runs were written with the old spelling
     and their provenance is the only record of the net that made them. A reader

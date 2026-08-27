@@ -140,7 +140,18 @@ def main() -> int:
         return 1
 
     s_paso = statistics.median(tiempos)
-    pasos_epoca = int(np.ceil(len(ds) / receta.batch_size))
+    # Una epoca NO es siempre el pool entero: con `windows_per_epoch` > 0 son
+    # exactamente esas ventanas, sea el pool grande o pequeno (D, ver
+    # docs/barrido-stride.md 2.2). Sin esto, la proyeccion salia del tamano del
+    # dataset y en un barrido de stride se equivocaba por el factor entre pools:
+    # MEDIDO el 2026-08-27 en la validacion, la sonda anuncio "~392 s/epoca" para
+    # un brazo cuya epoca real son 988 pasos -- 20,9x de mas. La CRIBA no se
+    # equivocaba (ordena por ms/paso, no por esto), pero el numero del log si, y
+    # un numero equivocado por 20 en un log que nadie desconfia es peor que
+    # ninguno.
+    por_epoca = int(getattr(receta, "windows_per_epoch", 0) or 0)
+    ventanas_epoca = por_epoca if por_epoca > 0 else len(ds)
+    pasos_epoca = int(np.ceil(ventanas_epoca / receta.batch_size))
     salida = {
         "ok": True,
         "sweep": args.sweep, "punto": args.punto,
@@ -151,6 +162,11 @@ def main() -> int:
         "s_paso_max": round(max(tiempos), 5),
         "pasos_s": round(1.0 / s_paso, 3) if s_paso else None,
         "pasos_epoca": pasos_epoca,
+        # de donde salio ese numero de pasos, para que la proyeccion no haya que
+        # deducirla: el pool o el presupuesto
+        "ventanas_epoca": ventanas_epoca,
+        "ventanas_pool": len(ds),
+        "windows_per_epoch": por_epoca,
         # extrapolacion DECLARADA: solo el tramo de entrenamiento, sin validacion
         "s_epoca_estimada": round(s_paso * pasos_epoca, 1),
         "hilos_torch": torch.get_num_threads(),

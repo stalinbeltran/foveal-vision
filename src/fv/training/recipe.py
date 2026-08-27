@@ -27,6 +27,7 @@ class Recipe:
     weight_decay: float = 0.0
     batch_size: int = 64             # D, not X: changing it changes the result
     epochs: int = 5
+    windows_per_epoch: int = 0   # 0 = el pool entero (comportamiento de siempre)
     scheduler: str = "none"          # none | cosine
     patience: int = 0                # early stop epochs without improvement; 0 = off
     lambda_pos: float = 1.0          # weight of the position term vs existence

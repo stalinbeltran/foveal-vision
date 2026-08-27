@@ -109,7 +109,15 @@ COORD = Path(os.environ.get("COORD_HOME", Path.home() / "src" / "telegram-coordi
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-PREFIJO = "estudio-"          # la etiqueta que pone estudio_flota.py
+# El espacio de nombres de las instancias de ESTE estudio. Va en una lista para
+# que `--prefijo` pueda fijarlo sin `global`.
+#
+# Por que es parametro: la cuenta es UNA y puede haber dos estudios a la vez.
+# COMPROBADO el 2026-08-27 con 8 maquinas `estudio-c*` de otro estudio vivas: con
+# el prefijo cableado, este vigilante las cuenta como suyas. Tiene que coincidir
+# con el `--prefijo` de estudio_flota.py.
+PREFIJO_DEF = "estudio-"       # la etiqueta que pone estudio_flota.py
+PREFIJO: list = [PREFIJO_DEF]
 
 
 # ------------------------------------------------------------------ secretos
@@ -294,7 +302,7 @@ def ritmo(nombres: list) -> tuple:
 
 def juzgar(inst: dict, args, t: float) -> tuple:
     """(veredicto, motivo). Veredicto: ajena | arrancando | ok | danada."""
-    etiqueta = (inst.get("label") or "")[len(PREFIJO):]
+    etiqueta = (inst.get("label") or "")[len(PREFIJO[0]):]
     try:
         edad = (t - float(inst.get("start_date") or t)) / 60.0
     except (TypeError, ValueError):
@@ -356,8 +364,30 @@ def juzgar(inst: dict, args, t: float) -> tuple:
 # --------------------------------------------------------------------- acciones
 
 
-def flota_viva() -> int:
-    """PID de una flota ya corriendo, o 0. Ver la regla 4."""
+def flota_viva(sweeps: "list | None" = None) -> int:
+    """PID de una flota corriendo SOBRE MIS RECORRIDOS, o 0. Ver la regla 4.
+
+    Tres condiciones, y las tres hacen falta. Cada una tapa un fallo MEDIDO:
+
+    1. **Tiene que SER el script, no mencionarlo.** `pgrep -f estudio_flota.py`
+       casa con cualquier proceso que lleve esa cadena en su linea de comando --
+       incluido el propio `pgrep`, un `while pgrep ...` de un avisador, o el
+       comando de quien esta mirando. MEDIDO el 2026-08-27: un avisador armado
+       con `while pgrep -f "estudio_flota.py --sweep stride-01"` se conto como
+       flota, y este vigilante paso **19 vueltas (~3 h) sin relanzar** los 14
+       puntos que faltaban, diciendo en cada una "hay una flota viva". Es
+       exactamente el sintoma que la regla existe para evitar: un estudio que
+       parece vigilado y no avanza. Asi que se exige que `argv[0]` sea un python
+       y que algun argumento SEA el script.
+    2. **De quien es lo dice el CWD**, no la linea de comando (CLAUDE.md del
+       coordinador). La flota se lanza con ruta relativa, asi que su linea no
+       contiene el workspace por ningun lado.
+    3. **Y que sea de MIS recorridos**: la cuenta puede tener dos estudios, y
+       "no relanzar si hay flota" solo vale si es flota de los mismos puntos.
+
+    Sin `sweeps` se conserva el comportamiento de antes para el resto de
+    llamadas: cualquier flota de este workspace.
+    """
     try:
         salida = subprocess.run(["pgrep", "-f", "estudio_flota.py"],
                                 capture_output=True, text=True, timeout=30).stdout
@@ -369,8 +399,25 @@ def flota_viva() -> int:
             pid = int(linea)
         except ValueError:
             continue
-        if pid not in mios:
-            return pid
+        if pid in mios:
+            continue
+        try:
+            crudo = Path(f"/proc/{pid}/cmdline").read_bytes()
+            argv = [a.decode("utf-8", "replace") for a in crudo.split(b"\0") if a]
+            cwd = os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            continue                      # murio entre el pgrep y esto
+        if not argv:
+            continue
+        if "python" not in Path(argv[0]).name:
+            continue                      # (1) un envoltorio que solo lo menciona
+        if not any(a.endswith("estudio_flota.py") for a in argv):
+            continue                      # (1) lo lleva de argumento suelto
+        if cwd != str(ROOT):
+            continue                      # (2) es de otro workspace
+        if sweeps and not any(s in argv for s in sweeps):
+            continue                      # (3) es de otro estudio
+        return pid
     return 0
 
 
@@ -401,7 +448,7 @@ def relanzar(nombres: list, args) -> None:
         cmd += ["--sweep", n]
     cmd += ["--reparto", "seed", "--cpu", args.cpu, "--max-price", str(args.max_price),
             "--criba", str(args.criba), "--git", "--horas-max", str(args.horas_max),
-            "--yes"]
+            "--prefijo", args.prefijo, "--yes"]
     log(f"  relanzando: {' '.join(cmd)}")
     log(f"  su log: {args.log_flota}")
     if args.dry_run:
@@ -424,15 +471,17 @@ def una_vuelta(args, V, estado: dict) -> str:
         return "seguir"
 
     t = time.time()
-    mias = [i for i in vivas if (i.get("label") or "").startswith(PREFIJO)]
+    mias = [i for i in vivas if (i.get("label") or "").startswith(PREFIJO[0])]
     ajenas = len(vivas) - len(mias)
     gasto = sum(float(i.get("dph_total") or 0) for i in vivas)
     log(f"  {len(vivas)} instancias vivas ({len(mias)} del estudio, {ajenas} ajenas), "
         f"{gasto:.4f} $/h")
 
-    danadas = []
+    danadas, ajenas_por_nombre = [], []
     for i in mias:
         v, motivo = juzgar(i, args, t)
+        if v == "ajena":
+            ajenas_por_nombre.append(i)
         marca = {"danada": "DAÑADA", "ok": "ok", "arrancando": "arrancando",
                  "ajena": "ajena"}[v]
         log(f"    [{i.get('label')}] {marca}: {motivo}")
@@ -474,7 +523,23 @@ def una_vuelta(args, V, estado: dict) -> str:
         total = sum(tot for _, tot in est.values())
         log(f"  todo terminado ({total} puntos).")
         # Nada que medir y máquinas vivas = huérfanas puras. Se cortan.
-        sobrantes = [i for i in mias if i not in danadas]
+        #
+        # ⚠ PERO sólo las que son SUYAS. `juzgar` ya declaró "ajena" a la que no
+        # resuelve a ningún recorrido de este vigilante ("no sé de qué recorrido
+        # es; no la toco") — y esta rama se saltaba ese veredicto y destruía TODA
+        # instancia con el prefijo, incluidas las de otro estudio que corriera a
+        # la vez. El síntoma habría sido de los peores: runs cortados a media
+        # época en el estudio del vecino, sin error propio, indistinguibles de
+        # una máquina que se muere sola.
+        #
+        # Encontrado el 2026-08-27 al preparar el barrido de stride, con 8
+        # máquinas de otro estudio vivas en la cuenta (docs/plan-stride-2026-08-27.md 5.3).
+        sobrantes = [i for i in mias
+                     if i not in danadas and i not in ajenas_por_nombre]
+        if ajenas_por_nombre:
+            log(f"    {len(ajenas_por_nombre)} instancia(s) con el prefijo pero de "
+                f"otro estudio: NO se tocan "
+                f"({', '.join(i.get('label') or '?' for i in ajenas_por_nombre)})")
         if sobrantes and not args.dry_run:
             for i in sobrantes:
                 try:
@@ -487,7 +552,7 @@ def una_vuelta(args, V, estado: dict) -> str:
                f"reporte en reportes/. Log: {args.log}")
         return "fin"
 
-    pid = flota_viva()
+    pid = flota_viva(args.sweep)
     if pid:
         log(f"  hay una flota viva (pid {pid}): no se relanza. Reintentará ella "
             f"en las máquinas que acabo de liberar." if danadas else
@@ -516,6 +581,9 @@ def una_vuelta(args, V, estado: dict) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--sweep", action="append", required=True)
+    ap.add_argument("--prefijo", default=PREFIJO_DEF,
+                    help="espacio de nombres de las instancias de este estudio. "
+                         "Tiene que coincidir con el --prefijo de estudio_flota.py")
     ap.add_argument("--cada", type=int, default=600,
                     help="segundos entre vueltas (tope 600: el encargo es "
                          "'cada 10 min o menos')")
@@ -538,6 +606,7 @@ def main() -> int:
     ap.add_argument("--log", default="/tmp/vigilante-avance.log",
                     help="sólo para citarlo en los avisos; la salida va a stdout")
     args = ap.parse_args()
+    PREFIJO[0] = args.prefijo
 
     if args.cada > 600:
         log(f"AVISO: --cada {args.cada}s es más de 10 min; lo bajo a 600.")

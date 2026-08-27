@@ -1,0 +1,127 @@
+{
+  "estudio": "stride-2026-08-27",
+  "objetivo": "f1",
+  "direccion": "max",
+  "delta": 0.0026075430854049825,
+  "razon_delta": "1-SE: error estándar de las 5 semillas del mejor punto",
+  "brazos": [
+    {
+      "sweep": "stride-01",
+      "stride": 1,
+      "dataset": "dirty1000-80px-16px-st01",
+      "medidas": 5,
+      "puntos": 5
+    },
+    {
+      "sweep": "stride-02",
+      "stride": 2,
+      "dataset": "dirty1000-80px-16px-st02",
+      "medidas": 5,
+      "puntos": 5
+    },
+    {
+      "sweep": "stride-04",
+      "stride": 4,
+      "dataset": "dirty1000-80px-16px-st04",
+      "medidas": 5,
+      "puntos": 5
+    },
+    {
+      "sweep": "stride-08",
+      "stride": 8,
+      "dataset": "dirty1000-80px-16px-st08",
+      "medidas": 5,
+      "puntos": 5
+    },
+    {
+      "sweep": "stride-16",
+      "stride": 16,
+      "dataset": "dirty1000-80px-16px-st16",
+      "medidas": 5,
+      "puntos": 5
+    }
+  ],
+  "tabla": [
+    {
+      "stride": 1,
+      "valor": 0.9382955970179042,
+      "min": 0.9283128167994207,
+      "max": 0.9430388497165768,
+      "sem": 0.0026075430854049825,
+      "n_seeds": 5,
+      "seconds_per_epoch": 35.5882
+    },
+    {
+      "stride": 2,
+      "valor": 0.9327570543228101,
+      "min": 0.9208014266233087,
+      "max": 0.9442148760330579,
+      "sem": 0.004242821816236386,
+      "n_seeds": 5,
+      "seconds_per_epoch": 48.8234
+    },
+    {
+      "stride": 4,
+      "valor": 0.9276661995011928,
+      "min": 0.9195164075993091,
+      "max": 0.9380927746163132,
+      "sem": 0.003672191745672544,
+      "n_seeds": 5,
+      "seconds_per_epoch": 46.214800000000004
+    },
+    {
+      "stride": 8,
+      "valor": 0.9158852874609487,
+      "min": 0.9078053902695136,
+      "max": 0.9281482502066685,
+      "sem": 0.0034935617205921307,
+      "n_seeds": 5,
+      "seconds_per_epoch": 37.5736
+    },
+    {
+      "stride": 16,
+      "valor": 0.8900900112827529,
+      "min": 0.8747119212235492,
+      "max": 0.898969633080559,
+      "sem": 0.004498357309935065,
+      "n_seeds": 5,
+      "seconds_per_epoch": 54.4966
+    }
+  ],
+  "R1_saturacion": {
+    "evaluable": true,
+    "stride": 1,
+    "frontera": [
+      1
+    ],
+    "mejor": 1,
+    "cerrado_por_arriba": true
+  },
+  "R2_contraste": {
+    "diff": 0.048205585735151324,
+    "p": 0.007936507936507936,
+    "arrangements": 252,
+    "n": 5,
+    "m": 5,
+    "exact": true
+  },
+  "R3_rupturas": [],
+  "sin_banda_de_ruido": false,
+  "R4_control": {
+    "pasos_por_epoca": [
+      989
+    ],
+    "runs_sin_config": [],
+    "runs_con_pool_entero": [],
+    "mediana_s_por_epoca": 46.214800000000004,
+    "dispersion_dentro_de_brazo": {
+      "1": 1.1233069894526546,
+      "2": 1.9456257774092283,
+      "4": 1.611665366179913,
+      "8": 1.1581228907250087,
+      "16": 2.499623858140785
+    },
+    "pasa": true
+  },
+  "pendientes": []
+}
