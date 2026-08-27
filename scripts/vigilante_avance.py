@@ -297,37 +297,56 @@ def juzgar(inst: dict, args, t: float) -> tuple:
 def flota_viva(sweeps: "list | None" = None) -> int:
     """PID de una flota corriendo SOBRE MIS RECORRIDOS, o 0. Ver la regla 4.
 
-    La regla 4 -- no relanzar si ya hay una flota -- es correcta, y la razon
-    tambien: dos flotas alquilarian dos veces para los mismos puntos. Pero
-    «los mismos puntos» es la parte que faltaba: esto preguntaba por CUALQUIER
-    `estudio_flota.py`, y la cuenta puede tener dos estudios a la vez.
+    Tres condiciones, y las tres hacen falta. Cada una tapa un fallo MEDIDO:
 
-    COMPROBADO el 2026-08-27: con la flota de otro estudio viva en esta misma
-    maquina, el vigilante de este habria visto «hay una flota viva» en cada
-    vuelta y **no habria relanzado nunca**. El sintoma es el peor de este
-    proyecto: un estudio que parece vigilado y no avanza, sin un solo error.
+    1. **Tiene que SER el script, no mencionarlo.** `pgrep -f estudio_flota.py`
+       casa con cualquier proceso que lleve esa cadena en su linea de comando --
+       incluido el propio `pgrep`, un `while pgrep ...` de un avisador, o el
+       comando de quien esta mirando. MEDIDO el 2026-08-27: un avisador armado
+       con `while pgrep -f "estudio_flota.py --sweep stride-01"` se conto como
+       flota, y este vigilante paso **19 vueltas (~3 h) sin relanzar** los 14
+       puntos que faltaban, diciendo en cada una "hay una flota viva". Es
+       exactamente el sintoma que la regla existe para evitar: un estudio que
+       parece vigilado y no avanza. Asi que se exige que `argv[0]` sea un python
+       y que algun argumento SEA el script.
+    2. **De quien es lo dice el CWD**, no la linea de comando (CLAUDE.md del
+       coordinador). La flota se lanza con ruta relativa, asi que su linea no
+       contiene el workspace por ningun lado.
+    3. **Y que sea de MIS recorridos**: la cuenta puede tener dos estudios, y
+       "no relanzar si hay flota" solo vale si es flota de los mismos puntos.
 
-    Asi que se mira la LINEA DE COMANDOS y solo cuenta la flota que menciona
-    alguno de mis recorridos. Sin `sweeps` se conserva el comportamiento de
-    antes (cualquier flota), que es lo prudente para cualquier otra llamada.
+    Sin `sweeps` se conserva el comportamiento de antes para el resto de
+    llamadas: cualquier flota de este workspace.
     """
     try:
-        salida = subprocess.run(["pgrep", "-af", "estudio_flota.py"],
+        salida = subprocess.run(["pgrep", "-f", "estudio_flota.py"],
                                 capture_output=True, text=True, timeout=30).stdout
     except (OSError, subprocess.SubprocessError):
         return 0
     mios = {os.getpid(), os.getppid()}
-    for linea in salida.splitlines():
-        cabeza, _, resto = linea.strip().partition(" ")
+    for linea in salida.split():
         try:
-            pid = int(cabeza)
+            pid = int(linea)
         except ValueError:
             continue
         if pid in mios:
             continue
-        if sweeps and not any(f"--sweep {s}" in resto or f"--sweep={s}" in resto
-                              for s in sweeps):
-            continue                      # flota de OTRO estudio: no es cosa mia
+        try:
+            crudo = Path(f"/proc/{pid}/cmdline").read_bytes()
+            argv = [a.decode("utf-8", "replace") for a in crudo.split(b"\0") if a]
+            cwd = os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            continue                      # murio entre el pgrep y esto
+        if not argv:
+            continue
+        if "python" not in Path(argv[0]).name:
+            continue                      # (1) un envoltorio que solo lo menciona
+        if not any(a.endswith("estudio_flota.py") for a in argv):
+            continue                      # (1) lo lleva de argumento suelto
+        if cwd != str(ROOT):
+            continue                      # (2) es de otro workspace
+        if sweeps and not any(s in argv for s in sweeps):
+            continue                      # (3) es de otro estudio
         return pid
     return 0
 

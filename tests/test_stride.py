@@ -477,34 +477,126 @@ def test_progreso_names_an_axis_that_lives_in_the_dataset():
     assert 'if eje is None and eje_ds.get("campo"):' in fuente
 
 
-def test_vigilante_only_sees_fleets_of_its_own_study():
-    """La regla 4 (no relanzar si hay flota) tiene que mirar «flota SOBRE MIS
-    recorridos», no «cualquier flota».
+def test_vigilante_only_sees_fleets_of_its_own_study(tmp_path):
+    """`flota_viva` exige LAS TRES: ser el script, del workspace, y de mis puntos.
 
-    Con la flota de otro estudio viva en la misma maquina --lo normal en una
-    cuenta compartida-- el vigilante de este veria «hay una flota viva» en cada
-    vuelta y no relanzaria nunca: un estudio que parece vigilado y no avanza,
-    sin un solo error.
+    Se prueba con un proceso de VERDAD, no simulando `pgrep`: la version anterior
+    de este test devolvia PIDs inventados, y eso dejo de valer en cuanto la
+    comprobacion paso a mirar `/proc` -- que es justo lo que la hace fiable.
     """
+    import subprocess
+    import time
     V = _modulo("vigilante_avance")
-    ajena = f"{os.getpid() + 1} python scripts/estudio_flota.py --sweep ov-r26 --git"
-    mia = f"{os.getpid() + 2} python scripts/estudio_flota.py --sweep stride-01 --git"
+    raiz = Path(__file__).resolve().parents[1]
+    falso = tmp_path / "estudio_flota.py"
+    falso.write_text("import time\ntime.sleep(8)\n", encoding="utf-8")
 
-    def con(salida):
-        import subprocess as sp
-        class R: stdout = salida
-        return lambda *a, **k: R()
-
-    import subprocess as sp
-    orig = sp.run
+    proc = subprocess.Popen([sys.executable, str(falso), "--sweep", "stride-01"],
+                            cwd=str(raiz))
     try:
-        sp.run = con(ajena)
-        assert V.flota_viva(["stride-01", "stride-02"]) == 0     # no es cosa mia
-        assert V.flota_viva() != 0                               # sin lista, como antes
-        sp.run = con(ajena + "\n" + mia)
-        assert V.flota_viva(["stride-01"]) == os.getpid() + 2     # esa SI es mia
+        time.sleep(0.7)
+        # (1) es un python ejecutando el script, (2) su cwd es el workspace y
+        # (3) menciona mi recorrido -> ES mi flota
+        assert V.flota_viva(["stride-01", "stride-02"]) == proc.pid
+        # (3) falla: mismo proceso, otro estudio -> no es cosa mia
+        assert V.flota_viva(["otro-recorrido"]) != proc.pid
     finally:
-        sp.run = orig
+        proc.kill()
+        proc.wait()
+
+
+def test_vigilante_ignores_a_fleet_from_another_workspace(tmp_path):
+    """(2) el CWD: la misma flota lanzada desde OTRO workspace no es mia.
+
+    La flota se lanza con ruta relativa, asi que su linea de comando no contiene
+    el workspace por ningun lado (CLAUDE.md del coordinador). Sin mirar el cwd,
+    dos copias del repo se pisarian la regla 4.
+    """
+    import subprocess
+    import time
+    V = _modulo("vigilante_avance")
+    falso = tmp_path / "estudio_flota.py"
+    falso.write_text("import time\ntime.sleep(8)\n", encoding="utf-8")
+    otro = tmp_path / "otro-workspace"
+    otro.mkdir()
+
+    proc = subprocess.Popen([sys.executable, str(falso), "--sweep", "stride-01"],
+                            cwd=str(otro))
+    try:
+        time.sleep(0.7)
+        assert V.flota_viva(["stride-01"]) != proc.pid
+        assert V.flota_viva() != proc.pid
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def test_stride_informe_says_when_there_is_no_noise_band():
+    """Sin replicas, delta = 0 y CUALQUIER diferencia «supera» delta: R1 corona
+    un ganador y R3 marca rupturas por construccion. Un «delta = 0,0000» parece
+    precision y es ausencia, asi que se dice con todas las letras."""
+    import subprocess
+    r = subprocess.run(
+        [sys.executable, "scripts/estudio_stride_informe.py",
+         "--estudio", "stride-2026-08-27-humo", "--json", "/tmp/informe-banda.json"],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        pytest.skip("el estudio de humo no tiene medidas en este arbol")
+    if "| 1 |" in r.stdout and "| 16 |" in r.stdout:      # los dos brazos, 1 semilla
+        assert "no hay banda de ruido medida" in r.stdout
+        assert "Nada de lo de abajo declara nada" in r.stdout
+        assert "R3 · Monotonía.** ⚠ **No evaluable sin banda" in r.stdout
+
+
+def test_flota_viva_ignores_processes_that_only_mention_the_script():
+    """Un proceso que MENCIONA `estudio_flota.py` no es una flota.
+
+    MEDIDO el 2026-08-27, y es el fallo mas caro de esta tanda: un avisador
+    armado con `while pgrep -f "estudio_flota.py --sweep stride-01"` llevaba esa
+    cadena en su propia linea de comando, asi que `pgrep -f` lo devolvia y el
+    vigilante lo conto como flota. Resultado: **19 vueltas (~3 h) diciendo "hay
+    una flota viva" sin relanzar los 14 puntos que faltaban** -- un estudio que
+    parece vigilado y no avanza, que es justo el sintoma que la regla 4 existe
+    para evitar.
+
+    (El mismo `pgrep` casaba tambien con el propio avisador, asi que ademas nunca
+    salio el aviso: se esperaba a si mismo.)
+    """
+    import subprocess
+    import time
+    V = _modulo("vigilante_avance")
+    raiz = Path(__file__).resolve().parents[1]
+    señuelo = subprocess.Popen(
+        ["sh", "-c", "sleep 8 # estudio_flota.py --sweep stride-01"], cwd=str(raiz))
+    try:
+        time.sleep(0.5)
+        # el señuelo SI sale en pgrep -- si no, el test no estaria probando nada
+        salida = subprocess.run(["pgrep", "-f", "estudio_flota.py"],
+                                capture_output=True, text=True).stdout.split()
+        assert str(señuelo.pid) in salida, "el señuelo no aparece en pgrep"
+        # ...y aun asi no cuenta como flota
+        assert V.flota_viva(["stride-01"]) != señuelo.pid
+        assert V.flota_viva() != señuelo.pid
+    finally:
+        señuelo.kill()
+        señuelo.wait()
+
+
+def test_estudio_stride_refuses_a_missing_source_with_the_fix():
+    """La fuente esta en .gitignore: un clon limpio no la trae. Se comprueba
+    ANTES de nada y con el comando que la reconstruye al lado -- lo que se
+    descubre a mitad se resuelve improvisando."""
+    import subprocess
+    r = subprocess.run(
+        [sys.executable, "scripts/estudio_stride.py",
+         "--fuente", "local/no-existe-seguro", "--strides", "16", "--solo-datasets"],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        capture_output=True, text=True, timeout=180)
+    assert r.returncode != 0
+    salida = r.stderr + r.stdout
+    assert "no encuentro la fuente" in salida
+    assert "bench_dataset.py build" in salida          # el arreglo, no solo el fallo
 
 
 def test_sonda_projection_respects_the_budget():
@@ -548,37 +640,3 @@ def test_stride_informe_never_contradicts_itself_with_one_arm():
     if salida.count("| stride |") and salida.count("`dirty1000") == 1:
         assert "R1 · Saturación.** ⚠ **No evaluable" in salida
         assert "R3 · Monotonía.** ⚠ **No evaluable" in salida
-
-
-def test_estudio_stride_refuses_a_missing_source_with_the_fix():
-    """La fuente esta en .gitignore: un clon limpio no la trae. Se comprueba
-    ANTES de nada y con el comando que la reconstruye al lado -- lo que se
-    descubre a mitad se resuelve improvisando."""
-    import subprocess
-    r = subprocess.run(
-        [sys.executable, "scripts/estudio_stride.py",
-         "--fuente", "local/no-existe-seguro", "--strides", "16", "--solo-datasets"],
-        cwd=str(Path(__file__).resolve().parents[1]),
-        capture_output=True, text=True, timeout=180)
-    assert r.returncode != 0
-    salida = r.stderr + r.stdout
-    assert "no encuentro la fuente" in salida
-    assert "bench_dataset.py build" in salida          # el arreglo, no solo el fallo
-
-
-def test_stride_informe_says_when_there_is_no_noise_band():
-    """Sin replicas, delta = 0 y CUALQUIER diferencia «supera» delta: R1 corona
-    un ganador y R3 marca rupturas por construccion. Un «delta = 0,0000» parece
-    precision y es ausencia, asi que se dice con todas las letras."""
-    import subprocess
-    r = subprocess.run(
-        [sys.executable, "scripts/estudio_stride_informe.py",
-         "--estudio", "stride-2026-08-27-humo", "--json", "/tmp/informe-banda.json"],
-        cwd=str(Path(__file__).resolve().parents[1]),
-        capture_output=True, text=True, timeout=300)
-    if r.returncode != 0:
-        pytest.skip("el estudio de humo no tiene medidas en este arbol")
-    if "| 1 |" in r.stdout and "| 16 |" in r.stdout:      # los dos brazos, 1 semilla
-        assert "no hay banda de ruido medida" in r.stdout
-        assert "Nada de lo de abajo declara nada" in r.stdout
-        assert "R3 · Monotonía.** ⚠ **No evaluable sin banda" in r.stdout
