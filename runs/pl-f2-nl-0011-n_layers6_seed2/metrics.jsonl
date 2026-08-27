@@ -5,3 +5,4 @@
 {"epoch": 5, "train_loss": 0.8056622788204583, "val": {"loss": 0.8092384625564922, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.067327499389648}, "lr": 0.0014, "seconds": 83.145}
 {"epoch": 6, "train_loss": 0.8060579307761544, "val": {"loss": 0.8099955060265281, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.07230806350708}, "lr": 0.0014, "seconds": 72.237}
 {"epoch": 7, "train_loss": 0.8056646254595418, "val": {"loss": 0.8164975697344, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.132039546966553}, "lr": 0.0014, "seconds": 82.44}
+{"epoch": 8, "train_loss": 0.8059278124504552, "val": {"loss": 0.8104111682284962, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.095216751098633}, "lr": 0.0014, "seconds": 72.339}
