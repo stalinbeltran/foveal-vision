@@ -163,16 +163,50 @@ def main() -> int:
                          "cerrado por evidencia sino por la geometria."
                          if mejor == 7 else
                          "⚠ Sin punto peor por arriba entre los medidos."))
+            # A-3 (§1 del plan): el ganador REAL contra el vigente. Existe
+            # porque el plan no podia saber cual seria: se escribio con el 4 como
+            # candidato --era el ganador nominal sobre el dato viejo-- y el dato
+            # nuevo puede mover el maximo a otro punto, como de hecho lo movio.
+            # Sin esto, el informe contrastaria un punto que ya no es el mejor.
+            mejor_f = max(filas, key=lambda f: f["media"])
+            if not mejor_f["es_vigente"] and mejor_f["p"] is not None:
+                mueve = mejor_f["p"] < 0.05 and (mejor_f["diff"] or 0) > (delta or 0)
+                print(f"\n**A-3**: el mejor punto es `{mejor_f['valor']}` con "
+                      f"{mejor_f['n']} semillas: `p` = {n(mejor_f['p'],3)}, "
+                      f"Δ = {n(mejor_f['diff'])}, δ = {n(delta)} → el vigente "
+                      f"**{'PASA A ' + str(mejor_f['valor']) if mueve else 'SE QUEDA EN 2'}**.")
+                if mueve:
+                    print("   Y es **aplicable sin pagar nada**: el eje es "
+                          "cost-neutral (167.852 parámetros en todo el rango, "
+                          "medido 2026-08-26) y el s/época no ordena con el eje.")
+
             # A-2: 10 contra 10, combinando
-            if err_b:
-                print(f"\n**A-2**: `ov-sig26` aun no tiene medidas ({err_b}).")
+            c, err_c = medidos("ov-sig7", store, runs)
+            if err_b and err_c:
+                print(f"\n**A-2**: ni `ov-sig26` ni `ov-sig7` tienen medidas todavia.")
             elif malos:
                 print(f"\n**A-2**: NO se combinan: difieren en {malos}.")
             else:
-                junto = a["scored"] + b["scored"]
+                # Los TRES: ov-r26 pone las semillas 1-5 de todos los puntos,
+                # ov-sig26 las 6-10 del 2 y el 4, ov-sig7 las 6-10 del 7. Cada
+                # uno se comprueba contra ov-r26 antes de entrar.
+                junto = list(a["scored"])
+                for extra, nom in ((b, "ov-sig26"), (c, "ov-sig7")):
+                    if extra is None:
+                        continue
+                    m = compatibles(sa, store.spec(nom))
+                    if m:
+                        print(f"   ⚠ `{nom}` NO se combina: difiere en {m}")
+                        continue
+                    junto += extra["scored"]
+                # El punto a contrastar es el GANADOR medido, no un valor
+                # cableado: el plan se escribio esperando que fuera el 4 y el
+                # dato nuevo lo movio. Se contrasta contra el vigente (2).
+                campeon = max(filas, key=lambda f: f["media"])["valor"]
                 filas2, delta2, fuente2 = tabla(
                     [t for t in junto
-                     if hashable(t["point"].get("overlap_fovea_px")) in (2, 4)],
+                     if hashable(t["point"].get("overlap_fovea_px"))
+                     in (2, hashable(campeon))],
                     "overlap_fovea_px", a["direction"], 2)
                 # El titulo dice las semillas QUE HAY, no las que se pidieron:
                 # "10 contra 10" con 3 medidas es una afirmacion falsa, y este
@@ -182,12 +216,14 @@ def main() -> int:
                       "(`ov-r26` + `ov-sig26`)", filas2, delta2, fuente2,
                       nota="Combinados tras comprobar que comparten dataset, red "
                            "base, receta, tope de épocas y objetivo.")
-                f4 = next((f for f in filas2 if f["valor"] == 4), None)
+                f4 = next((f for f in filas2 if not f["es_vigente"]), None)
                 if f4 and f4["p"] is not None:
                     mueve = f4["p"] < 0.05 and (f4["diff"] or 0) > (delta2 or 0)
-                    print(f"\n**A-2**: `p` = {n(f4['p'],3)}, Δ = {n(f4['diff'])}, "
+                    print(f"\n**A-2**: `{f4['valor']}` contra el vigente `2` con "
+                          f"{f4['n']} y {filas2[-1]['n']} semillas: "
+                          f"`p` = {n(f4['p'],3)}, Δ = {n(f4['diff'])}, "
                           f"δ = {n(delta2)} → el vigente "
-                          f"**{'PASA A 4' if mueve else 'SE QUEDA EN 2'}**.")
+                          f"**{'PASA A ' + str(f4['valor']) if mueve else 'SE QUEDA EN 2'}**.")
                     if not mueve:
                         print("   Con 10 contra 10 el suelo del test es 1,08·10⁻⁵, "
                               "así que un `p` alto aquí **es una medida, no una "

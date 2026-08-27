@@ -162,6 +162,26 @@ ESTUDIOS = [
         "seed0": 6,             # <- las 1..5 las pone ov-r26, sobre ESTE dato
     },
 
+    {
+        "bloque": "A", "name": "ov-sig7",
+        "que": "A3 - el GANADOR REAL (7) a 10 semillas contra el vigente",
+        "axis": "overlap_fovea_px",
+        # Solo el 7: las semillas 6-10 del punto 2 ya las pone `ov-sig26`, y las
+        # 1-5 de los dos las pone `ov-r26`. Asi el contraste 7-contra-2 llega a
+        # 10 contra 10 con 5 runs en vez de 20.
+        #
+        # Existe porque el plan NO podia saber cual seria el ganador: se escribio
+        # con el 4 como candidato -- era el ganador nominal sobre el dato viejo --
+        # y sobre el dato nuevo el eje sube monotono hasta la pared legal y gana
+        # el 7 (p = 0,008 con 5 semillas, el suelo alcanzable con 5 contra 5).
+        # Llevar a 10 contra 10 el punto que YA declara no es redundante: es lo
+        # que pidio el encargo -- "verificar que el resultado sea significativo"--
+        # y con 10 contra 10 el suelo del test baja a 1,08e-5.
+        "range": [7],
+        "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 5,
+        "seed0": 6,
+    },
+
     # ================================================================ bloque B
     # Tanteo de 2 semillas de lo que nunca se midio. ACOTA, no declara.
     {
