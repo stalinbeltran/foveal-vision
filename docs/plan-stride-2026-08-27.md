@@ -170,11 +170,25 @@ estimador, no como que esté bien.
 
 ### El coste que no es alquiler: extraer los datasets
 
-Los cinco `windows.npz` se extraen **una vez, en local**, y viajan en el payload. El brazo de
-stride 1 tiene 2.925.000 ventanas: se mide su tiempo, su tamaño en disco y el pico de memoria
-antes de lanzar nada, y el número va al reporte. `extract_windows` acumula hoy las ventanas en
-listas de Python antes de `np.stack`, así que el pico de memoria del brazo 1 es la primera cosa
-que puede fallar, y falla **en local**, que es donde no cuesta dinero.
+Los cinco `windows.npz` se extraen **una vez, en local**, y viajan en el payload.
+
+**MEDIDO el 2026-08-27** en este droplet (2 vCPU, 3,8 GB), extrayendo de grande a pequeño:
+
+| brazo | ventanas | `windows.npz` | tiempo |
+|---|---:|---:|---:|
+| st16 | 68.000 | 2,2 MB | < 6 s |
+| st08 | 93.800 | 2,3 MB | 0,1 min |
+| st04 | 178.400 | 2,5 MB | 0,1 min |
+| st02 | 511.400 | 3,1 MB | 0,1 min |
+| **st01** | **1.811.000** | **6,6 MB** | **0,4 min** |
+
+Los cinco: **28.000 de val y 28.000 de test**, la rejilla fija funcionando. Total en disco 16,6 MB.
+
+Era el riesgo que había que descartar y quedó descartado: `extract_windows` acumula las ventanas
+en listas de Python antes de `np.stack`, así que el brazo de stride 1 era el candidato a quedarse
+sin memoria — el proceso llegó a ~460 MB de RSS (observado con `ps`, no instrumentado) sobre 3,8
+GB y terminó en 24 s. El `npz` comprime muy bien porque `y` es casi todo ceros, así que el payload
+tampoco es un problema: **6,7 MB** el tar con los dos datasets de la validación.
 
 ---
 
