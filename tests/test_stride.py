@@ -315,6 +315,105 @@ def test_payload_accepts_a_bare_string(tmp_path, monkeypatch):
     assert F.construir_payload([{"nombre": "s1"}], "ds-a").exists()
 
 
+# --------------------------------------------- el libro de a bordo y su repo
+
+
+def _repo_datos_git(tmp_path, monkeypatch):
+    """Un repo de datos de mentira, ya inicializado.
+
+    Va ANTES de `_flota()`: el script lee `settings.data_root()` al importarse,
+    asi que si se apunta despues, `DATOS` ya se quedo con el de antes.
+    """
+    import subprocess
+    d = tmp_path / "datos"
+    d.mkdir()
+    for cmd in (["init", "-q"], ["config", "user.email", "t@t"],
+                ["config", "user.name", "t"]):
+        subprocess.run(["git", *cmd], cwd=str(d), check=True, capture_output=True)
+    monkeypatch.setenv("FV_DATA_ROOT", str(d))
+    return d
+
+
+def test_el_libro_deja_cada_run_dentro_de_su_recorrido(tmp_path, monkeypatch):
+    """El tar que trae una maquina se coloca AGRUPADO en el repo de datos.
+
+    Extraerlo tal cual --lo que se hacia contra ROOT-- deja la forma plana
+    `runs/<run>/`, que `RunStore.path()` no mira cuando el recorrido esta
+    agrupado bajo el mes de su estudio. Los ficheros estarian en disco y el
+    estudio los daria por no medidos: relanzaria maquinas para repetir puntos ya
+    pagados, que es la forma cara de perder datos.
+    """
+    import subprocess
+    import tarfile
+    datos = _repo_datos_git(tmp_path, monkeypatch)
+    F = _flota()
+    from fv.studies.store import StudyStore
+    StudyStore().create("e", {"name": "e"}, {})
+    F.SWEEPS.create("rec", {"name": "rec", "study": "e", "points": []})
+
+    origen = tmp_path / "traido" / "runs" / "rec-0000-x"
+    origen.mkdir(parents=True)
+    (origen / "config.json").write_text(
+        json.dumps({"provenance": {"sweep": "rec"}}), encoding="utf-8")
+    (origen / "status.json").write_text(
+        json.dumps({"status": "done"}), encoding="utf-8")
+    (origen / "pesos.pt").write_bytes(b"carga")      # no es del libro
+    tar = tmp_path / "libro.tar.gz"
+    with tarfile.open(tar, "w:gz") as t:
+        t.add(str(tmp_path / "traido" / "runs"), arcname="runs")
+
+    libro = F.Libro(True, 20, empujar=False)
+    assert libro.activo, libro.motivo
+    assert libro.guardar(tar) == ["rec-0000-x"]
+
+    destino = F.RUNS.path("rec-0000-x")
+    assert destino.exists()
+    # dentro de SU recorrido, no en la raiz plana ni en el repo de codigo
+    assert destino.parent.parent == F.SWEEPS.path("rec")
+    assert not (datos / "runs").exists()
+    assert F.ROOT not in destino.parents
+    # y la carga se queda en la maquina: el libro es solo texto
+    assert not (destino / "pesos.pt").exists()
+
+    assert libro.commit("prueba") is True
+    seguidos = subprocess.run(["git", "ls-files"], cwd=str(datos),
+                              capture_output=True, text=True).stdout
+    assert "rec-0000-x/status.json" in seguidos
+
+
+def test_el_libro_se_niega_si_los_datos_caen_en_el_repo_de_codigo(tmp_path,
+                                                                 monkeypatch):
+    """Sin el repo de datos clonado, `data_root()` cae al de CODIGO -- donde
+    runs/ y sweeps/ estan en .gitignore desde que se vacio el legado. El libro
+    no commitearia nada, asi que lo dice y se apaga en vez de fingir.
+    """
+    _repo_datos_git(tmp_path, monkeypatch)
+    F = _flota()
+    monkeypatch.setattr(F, "DATOS", F.ROOT)
+    motivo = F.motivo_sin_libro()
+    assert motivo and "git clone" in motivo
+    assert F.Libro(True, 20).activo is False
+
+
+def test_un_git_add_que_falla_no_se_lee_como_nada_que_commitear(tmp_path,
+                                                               monkeypatch):
+    """El fallo original, del derecho: el `rc` del `add` SI se mira.
+
+    Antes se ignoraba, y como un `add` fallido deja el indice vacio, el
+    `git diff --cached --quiet` de la linea siguiente devolvia 0 y el libro
+    concluia "nada que commitear, y no es un fallo". Se callaba para siempre --
+    que es justo lo que paso al mover los datos de repo.
+    """
+    datos = _repo_datos_git(tmp_path, monkeypatch)
+    F = _flota()
+    (datos / "algo.json").write_text("{}", encoding="utf-8")
+    (datos / ".git" / "index.lock").write_text("", encoding="utf-8")
+    libro = F.Libro(True, 20, empujar=False)
+    assert libro.commit("prueba") is False
+    assert libro.commits == 0
+    assert libro.ultimo_error                       # lo DICE
+
+
 # ------------------------------------------------------------- el vigilante
 
 def test_vigilante_sobrantes_respects_ajena():

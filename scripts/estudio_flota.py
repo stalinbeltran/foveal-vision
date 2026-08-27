@@ -111,6 +111,13 @@ Que compra eso, exactamente:
   empujado no existe (CLAUDE.md). El libro en el remoto es la unica copia que
   aguanta que se rehaga el servidor.
 
+⚠ Se commitea en el REPO DE DATOS (`foveal-vision-data`), no aqui: desde la
+separacion del 2026-08-27 `runs/` y `sweeps/` ni existen en este repo ni saldrian
+de su `.gitignore`. Si no esta clonado, `--git` **aborta antes de alquilar nada**
+y dice como clonarlo. Antes no: commiteaba contra ROOT, el `git add` fallaba con
+"pathspec did not match any files", nadie miraba ese `rc` y la vuelta se leia como
+"nada que commitear". Un libro mudo no se distingue de un estudio sin resultados.
+
 ⚠ Hasta donde llega: se reanuda por PUNTO, no por epoca. Un run cortado a mitad
 se repite entero. Reanudar a media epoca pediria llevarse los pesos y el estado
 de Adam, y ademas **cambiaria el experimento**: el flujo de numeros aleatorios del
@@ -165,6 +172,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import statistics
 import subprocess
 import sys
@@ -189,6 +197,7 @@ sys.path.insert(0, str(LANZADOR / "scripts"))
 
 import estudio_estimar as EST                       # noqa: E402
 import vast_instance as V                           # noqa: E402
+from fv import settings                             # noqa: E402
 from fv.sweeps.runner import point_run_name         # noqa: E402
 from fv.sweeps.spec import expand_points            # noqa: E402
 from fv.sweeps.store import SweepStore              # noqa: E402
@@ -199,6 +208,15 @@ from fv.training.registry import RunStore            # noqa: E402
 # ROOT, y dejo de valer cuando los datos salieron de este repo.
 SWEEPS = SweepStore()
 RUNS = RunStore()
+
+# Donde se COMMITEA el libro de a bordo. Desde la separacion de datos
+# (2026-08-27) los artefactos de estudio no viven bajo ROOT, asi que el libro
+# tampoco commitea ahi: `git add -- runs sweeps` contra ROOT falla con "pathspec
+# did not match any files" y, como el `rc` no se miraba, la linea siguiente
+# (`git diff --cached --quiet`) lo leia como "nada que commitear, y no es un
+# fallo". Un libro que no escribe nada y ademas no lo dice es peor que no tener
+# libro: se descubre al rehacer la maquina, que es cuando ya no hay remedio.
+DATOS = settings.data_root()
 
 
 # Lo que viaja a la maquina. Nada mas: son ordenadores de desconocidos alquilados
@@ -481,6 +499,80 @@ def comprobar_sello(host: str, port: int, nonce: str) -> None:
 # ------------------------------------------------- el libro de a bordo (git)
 
 
+def motivo_sin_libro() -> str:
+    """Por que el libro NO puede commitear, o "" si puede.
+
+    Se pregunta ANTES de alquilar nada, y con `--git` aborta. El libro existe
+    para que lo medido sobreviva a esta maquina, asi que enterarse al final de
+    que no commiteaba es enterarse cuando ya no hay remedio y con la factura
+    pagada: el freno va en el mismo sitio que el acelerador (CLAUDE.md).
+
+    El caso que de verdad pasa es el primero. `settings.data_root()` cae al repo
+    de CODIGO cuando el de datos no esta clonado -- un fallback deliberado para
+    que nada se rompa-- pero ahi `runs/` y `sweeps/` estan en `.gitignore` desde
+    que se vacio el legado, asi que "no se rompe nada" incluye "no se commitea
+    nada".
+    """
+    if DATOS == ROOT:
+        return (f"el repo de datos no esta clonado, asi que los artefactos caen "
+                f"en {ROOT}, donde runs/ y sweeps/ estan en .gitignore y NO se "
+                f"commitean. Clonalo:\n"
+                f"  git clone https://github.com/stalinbeltran/foveal-vision-data"
+                f".git {ROOT.parent / 'foveal-vision-data'}")
+    if not DATOS.exists():
+        return f"{DATOS} no existe (¿FV_DATA_ROOT apunta a donde no hay nada?)"
+    r = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                       cwd=str(DATOS), capture_output=True, text=True, timeout=60)
+    if r.returncode != 0:
+        return f"{DATOS} no es un repo de git: no hay donde commitear el libro"
+    return ""
+
+
+def _destino_de_run(nombre: str, config_json: Path) -> Path:
+    """Donde va `nombre` dentro del repo de datos.
+
+    `RunStore.destino()` AGRUPA el run dentro de su recorrido y del mes de su
+    estudio, pero para saber de que recorrido es necesita el `config.json`
+    (`provenance.sweep`) -- que viaja en el mismo tar. Sin el se cae a `path()`,
+    que resuelve donde el run YA este.
+    """
+    if config_json.exists():
+        try:
+            cfg = json.loads(config_json.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cfg = None
+        if cfg:
+            return RUNS.destino(nombre, cfg)
+    return RUNS.path(nombre)
+
+
+def _colocar_runs(origen: Path) -> list:
+    """Copia `<origen>/<run>/...` a su sitio en el repo de datos. Devuelve los
+    runs tocados.
+
+    ⚠ No vale extraer el tar y ya, que es lo que se hacia contra ROOT: el tar
+    trae la forma PLANA `runs/<run>/`, y desde el agrupamiento por estudio un run
+    vive en `<mes>/sweeps/<recorrido>/runs/<run>/`. Dejarlo plano pondria los
+    ficheros en un sitio que `RunStore.path()` no mira: medidos, en disco, y
+    invisibles para el estudio -- que es la forma cara de perder datos, porque
+    los puntos se relanzarian como si no estuvieran hechos.
+    """
+    tocados = []
+    if not origen.is_dir():
+        return tocados
+    for d in sorted(origen.iterdir()):
+        if not d.is_dir():
+            continue
+        destino = _destino_de_run(d.name, d / "config.json")
+        for f in sorted(d.rglob("*")):
+            if f.is_file():
+                fin = destino / f.relative_to(d)
+                fin.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, fin)
+        tocados.append(d.name)
+    return tocados
+
+
 class Libro:
     """Los ficheros pequenos de cada run, traidos de las maquinas y commiteados.
 
@@ -496,7 +588,13 @@ class Libro:
     """
 
     def __init__(self, activo: bool, cada_s: int, empujar: bool = True):
-        self.activo = activo
+        # `main` ya aborta con --git si no se puede, pero la clase no se fia de
+        # su llamante: un Libro que se cree activo y no commitea es exactamente
+        # el fallo silencioso que esto viene a quitar.
+        self.motivo = motivo_sin_libro() if activo else ""
+        if self.motivo:
+            log(f"⚠ el libro de a bordo queda APAGADO: {self.motivo}")
+        self.activo = activo and not self.motivo
         self.cada_s = max(20, cada_s)
         self.empujar = empujar
         self.sucio = threading.Event()
@@ -506,21 +604,29 @@ class Libro:
         self.ultimo_error = None
         self._hilo = None
 
-    # -- lado de las maquinas: dejar ficheros en runs/ ------------------------
+    # -- lado de las maquinas: dejar ficheros en el repo de datos -------------
 
     def guardar(self, tar_local: Path) -> list:
-        """Extrae en el repo el tar que trajo una maquina. Devuelve los runs
-        tocados. Los nombres se leen del TAR y no del directorio, porque `runs/`
-        acumula los de todos los estudios anteriores."""
+        """Coloca en el repo de datos el tar que trajo una maquina. Devuelve los
+        runs tocados.
+
+        Se extrae a un temporal y se coloca despues (`_colocar_runs`) en vez de
+        extraer directamente: el tar trae la forma plana y el destino de cada run
+        depende de su recorrido. Los nombres salen del TAR y no de un directorio,
+        porque `runs/` acumula los de todos los estudios anteriores.
+        """
         with _disco:
             with tarfile.open(tar_local, "r:gz") as tar:
                 miembros = [m for m in tar.getmembers()
                             if m.isfile() and Path(m.name).name in LIBRO]
                 if not miembros:
                     return []
-                tar.extractall(ROOT, members=miembros)
-                tocados = sorted({Path(m.name).parts[1] for m in miembros
-                                  if len(Path(m.name).parts) > 1})
+                tmp = Path(tempfile.mkdtemp(prefix="libro-colocar-"))
+                try:
+                    tar.extractall(tmp, members=miembros)
+                    tocados = _colocar_runs(tmp / "runs")
+                finally:
+                    shutil.rmtree(tmp, ignore_errors=True)
         if tocados:
             self.sucio.set()
         return tocados
@@ -561,13 +667,19 @@ class Libro:
         cual. Asi que la comprobacion va antes, y no se commitea nada mientras
         haya una fusion abierta.
         """
-        if (ROOT / ".git" / "MERGE_HEAD").exists():
+        # Se pregunta a git en vez de mirar `<repo>/.git/MERGE_HEAD`: la raiz
+        # sale de un ajuste (`FV_DATA_ROOT`) y puede ser un worktree, donde
+        # `.git` es un FICHERO y la comprobacion por ruta diria "no hay fusion"
+        # justo cuando la hay.
+        m = subprocess.run(["git", "rev-parse", "--verify", "--quiet", "MERGE_HEAD"],
+                           cwd=str(DATOS), capture_output=True, text=True, timeout=60)
+        if m.returncode == 0:
             return "hay una fusion abierta (MERGE_HEAD)"
-        u = subprocess.run(["git", "ls-files", "--unmerged", "--", "runs", "sweeps"],
-                           cwd=str(ROOT), capture_output=True, text=True, timeout=60)
+        u = subprocess.run(["git", "ls-files", "--unmerged"],
+                           cwd=str(DATOS), capture_output=True, text=True, timeout=60)
         if u.stdout.strip():
             n = len({l.split("\t")[-1] for l in u.stdout.strip().splitlines()})
-            return f"{n} fichero(s) sin fusionar en runs/sweeps"
+            return f"{n} fichero(s) sin fusionar en {DATOS.name}"
         return ""
 
     def _reconciliar(self) -> bool:
@@ -589,18 +701,18 @@ class Libro:
         """
         try:
             r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "@{u}"],
-                               cwd=str(ROOT), capture_output=True, text=True, timeout=60)
+                               cwd=str(DATOS), capture_output=True, text=True, timeout=60)
             if r.returncode != 0:
                 return False                       # sin rama de seguimiento
             arriba = r.stdout.strip()
-            f = subprocess.run(["git", "fetch", "--quiet"], cwd=str(ROOT),
+            f = subprocess.run(["git", "fetch", "--quiet"], cwd=str(DATOS),
                                capture_output=True, text=True, timeout=300)
             if f.returncode != 0:
                 return False
-            m = subprocess.run(["git", "merge", "--no-edit", arriba], cwd=str(ROOT),
+            m = subprocess.run(["git", "merge", "--no-edit", arriba], cwd=str(DATOS),
                                capture_output=True, text=True, timeout=300)
             if m.returncode != 0:
-                subprocess.run(["git", "merge", "--abort"], cwd=str(ROOT),
+                subprocess.run(["git", "merge", "--abort"], cwd=str(DATOS),
                                capture_output=True, timeout=120)
                 log(f"    [git] la fusion con {arriba} da conflicto; abortada. "
                     f"Hay que resolverla a mano: el libro sigue commiteando en "
@@ -642,16 +754,30 @@ class Libro:
                 if atasco:
                     self.ultimo_error = atasco
                     log(f"    [git] NO commiteo: {atasco}. Se resuelve a mano; "
-                        f"mientras tanto los datos siguen en runs/ sin perderse.")
+                        f"mientras tanto los datos siguen en {DATOS} sin "
+                        f"perderse.")
                     return False
-                subprocess.run(["git", "add", "--", "runs", "sweeps"], cwd=str(ROOT),
-                               capture_output=True, timeout=120)
+                # `-A` y no una lista de directorios: el repo de datos no
+                # contiene otra cosa que artefactos, y desde el agrupamiento las
+                # rutas son `<anio>/<mes>/...`. Un `-- runs sweeps` cableado es
+                # justo la suposicion que se rompio al mover los datos.
+                a = subprocess.run(["git", "add", "-A"], cwd=str(DATOS),
+                                   capture_output=True, text=True, timeout=120)
+                if a.returncode != 0:
+                    # El rc del `add` SI se mira. Cuando no se miraba, un `add`
+                    # fallido dejaba el indice vacio y el `diff --cached` de
+                    # abajo lo leia como "nada que commitear": el libro se
+                    # quedaba callado para siempre.
+                    self.ultimo_error = (a.stderr or a.stdout or "?").strip()[:200]
+                    log(f"    [git] no pude estadear en {DATOS}: "
+                        f"{self.ultimo_error}")
+                    return False
                 hay = subprocess.run(["git", "diff", "--cached", "--quiet"],
-                                     cwd=str(ROOT), timeout=60)
+                                     cwd=str(DATOS), timeout=60)
                 if hay.returncode == 0:
                     return False           # nada que commitear, y no es un fallo
                 c = subprocess.run(["git", "commit", "-q", "-m", mensaje],
-                                   cwd=str(ROOT), capture_output=True, text=True,
+                                   cwd=str(DATOS), capture_output=True, text=True,
                                    timeout=120)
                 if c.returncode != 0:
                     self.ultimo_error = (c.stderr or c.stdout or "?").strip()[:200]
@@ -660,10 +786,10 @@ class Libro:
                 self.commits += 1
                 if not self.empujar:
                     return True
-                p = subprocess.run(["git", "push"], cwd=str(ROOT), capture_output=True,
+                p = subprocess.run(["git", "push"], cwd=str(DATOS), capture_output=True,
                                    text=True, timeout=300)
                 if p.returncode != 0 and self._reconciliar():
-                    p = subprocess.run(["git", "push"], cwd=str(ROOT),
+                    p = subprocess.run(["git", "push"], cwd=str(DATOS),
                                        capture_output=True, text=True, timeout=300)
                 if p.returncode != 0:
                     self.fallos_push += 1
@@ -1429,11 +1555,15 @@ def recoger_runs(m: "Maquina") -> list:
         raise RuntimeError("no pude traerme los runs de la maquina")
     with _disco:
         with tarfile.open(local, "r:gz") as tar:
-            tar.extractall(ROOT)
-            # Los nombres se leen del TAR, no del directorio local: `runs/`
-            # acumula los de todos los estudios anteriores.
-            return sorted({Path(x.name).parts[1] for x in tar.getmembers()
-                           if len(Path(x.name).parts) > 1})
+            # Al repo de DATOS y agrupado, igual que el libro: si esto extrajera
+            # a ROOT, el tiron final dejaria los runs en un sitio distinto del
+            # que uso el libro durante toda la corrida.
+            tmp = Path(tempfile.mkdtemp(prefix="recoger-colocar-"))
+            try:
+                tar.extractall(tmp)
+                return _colocar_runs(tmp / "runs")
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
 
 
 def lote_con_reintentos(lote: dict, pool: Maquinas, payload: Path,
@@ -1601,6 +1731,17 @@ def main() -> int:
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
 
+    # Antes de mirar nada mas: si se pidio libro y el libro no puede commitear,
+    # se para aqui -- sin alquilar, sin gastar y diciendo como se arregla.
+    if args.git:
+        motivo = motivo_sin_libro()
+        if motivo:
+            log(f"\nERROR: pediste --git y el libro de a bordo no puede "
+                f"commitear.\n  {motivo}\n\nSin libro, lo que midan las maquinas "
+                f"vive solo en este servidor, que es efimero. Corrige eso o "
+                f"lanza sin --git a sabiendas.")
+            return 2
+
     V.load_env()
     store = SweepStore()
     sweeps, datasets = cargar_sweeps(args.sweep, store)
@@ -1673,8 +1814,8 @@ def main() -> int:
     libro = Libro(args.git, args.cada, empujar=not args.sin_push)
     libro.arrancar()
     if args.git:
-        log("Libro de a bordo ACTIVO: cada sonda baja metrics/status de cada "
-            "maquina y un hilo aparte los commitea"
+        log(f"Libro de a bordo ACTIVO en {DATOS}: cada sonda baja "
+            f"metrics/status de cada maquina y un hilo aparte los commitea"
             + ("" if libro.empujar else " (sin push, --sin-push)"))
 
     # La sonda mide con la config del primer punto pendiente del primer recorrido:
@@ -1740,8 +1881,11 @@ def main() -> int:
         "criba": criba_informe,
         "gasto_por_maquina": GASTO,
         "maquinas_alquiladas": len(GASTO),
-        "git": {"activo": args.git, "commits": libro.commits,
-                "fallos_push": libro.fallos_push, "ultimo_error": libro.ultimo_error},
+        # `repo` no es adorno: un reporte que dice "12 commits" sin decir
+        # donde no permite ir a buscarlos desde otra maquina.
+        "git": {"activo": libro.activo, "repo": str(DATOS),
+                "commits": libro.commits, "fallos_push": libro.fallos_push,
+                "ultimo_error": libro.ultimo_error, "motivo_apagado": libro.motivo},
         # El desglose que decide si un reparto compensa: el peaje se paga entero
         # por maquina (crece al repartir mas fino), el trabajo no.
         "peaje_min": round(peaje / 60, 1), "trabajo_min": round(trabajo / 60, 1),

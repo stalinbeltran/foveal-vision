@@ -1044,6 +1044,14 @@ clonado > **este repo**.
 funcionando como antes. Una separación que rompe al que no ha clonado nada es una separación que
 nadie adopta.
 
+⚠⚠ **Pero «como antes» ya no incluye «y se commitea».** Desde que se vació el legado, `runs/`,
+`sweeps/` y `studies/` están en el `.gitignore` de **este** repo. Así que el fallback escribe en
+un sitio que git ignora: los datos existen en disco y desaparecen con el servidor, sin un solo
+error por el camino. Por eso `estudio_flota.py --git` **aborta antes de alquilar nada** si
+`data_root()` resuelve a este repo, y dice el `git clone` que lo arregla. Medido el 2026-08-27:
+la máquina apareció recién rehecha, sin el repo de datos clonado, y la separación llevaba así
+desde el commit que la aplicó.
+
 ### Leer y escribir NO son lo mismo, y por eso hay dos métodos
 
 Lo ya medido está repartido en **tres formas** que no coinciden, así que
@@ -1111,15 +1119,40 @@ raíz sirva para las dos formas.
    `FV_DATA_ROOT` a un temporal en **todos** los tests — global, porque los que no usan `world` son
    justo los que construyen almacenes a pelo.
 
+### El libro de a bordo commitea allá (2026-08-27)
+
+`estudio_flota.py --git` se trae de cada máquina, en cada sonda, los ficheros pequeños de cada
+run y los commitea. Ahora contra `foveal-vision-data`, y con tres cosas que hay que respetar:
+
+1. **Se COLOCA, no se extrae.** El tar viene en la forma plana `runs/<run>/`, pero un run vive
+   dentro de su recorrido y del mes de su estudio. `_colocar_runs()` lee el `provenance.sweep`
+   del `config.json` que viaja en el mismo tar y pregunta a `RunStore.destino()`. Extraer tal
+   cual dejaría los ficheros donde `path()` no mira: **medidos, en disco, y contados como
+   pendientes** — o sea, máquinas alquiladas otra vez para repetir puntos ya pagados.
+2. **El `rc` del `git add` se mira.** Cuando no se miraba, un `add` fallido dejaba el índice
+   vacío y el `git diff --cached --quiet` de la línea siguiente lo leía como *«nada que
+   commitear, y no es un fallo»*. Es exactamente cómo esto pasó desapercibido: `git add --
+   runs sweeps` contra este repo devolvía `fatal: pathspec 'sweeps' did not match any files`,
+   y el libro se quedaba mudo. Y por eso se estadea con `-A` y no con una lista de directorios:
+   el repo de datos no contiene otra cosa que artefactos, y desde el agrupamiento las rutas son
+   `<año>/<mes>/…` — un `-- runs sweeps` cableado es justo la suposición que se rompió.
+3. **El freno va antes del acelerador.** `--git` sin un repo de datos donde commitear **aborta
+   con código 2 antes de alquilar**, no avisa a mitad. Un libro que no commitea no se nota hasta
+   que se rehace la máquina, que es cuando ya no hay remedio.
+
+Los tres, con test en `tests/test_stride.py` (`test_el_libro_deja_cada_run_dentro_de_su_recorrido`,
+`test_el_libro_se_niega_si_los_datos_caen_en_el_repo_de_codigo`,
+`test_un_git_add_que_falla_no_se_lee_como_nada_que_commitear`), y los dos primeros **probados
+rompiéndolos**.
+
 ### Lo que queda pendiente
 
 - ✅ ~~Vaciar el legado~~ **hecho (2026-08-27)**: `runs/`, `sweeps/` y `studies/` ya no están en este
   repo, y el `.gitignore` los ignora para que no vuelvan a entrar si un proceso los recrea.
   Comprobado que los 851 runs, 61 recorridos y 8 estudios **siguen resolviendo sin el legado**.
-- ⚠ **Commitear lo nuevo en el repo de datos**: la flota commitea el libro de a bordo con
-  `git add -- runs sweeps` contra **este** repo, y esas rutas ya no existen aquí. **Hay que
-  apuntarlo a `foveal-vision-data` antes de lanzar la siguiente flota**, o lo medido no se
-  commitea en ninguna parte.
+- ✅ ~~Commitear lo nuevo en el repo de datos~~ **hecho (2026-08-27)**: el libro de a bordo de
+  `estudio_flota.py` coloca y commitea en `foveal-vision-data`. Ver «El libro de a bordo commitea
+  allá» abajo.
 - **Los 5 JSON sueltos de `data/`** (`p40-*-task.json`, `proxy-c-d-3b.json`,
   `stride-*-informe.json`): por criterio irían al repo de datos. `data/window-datasets/` **se queda
   aquí**: es dominio B, entrada del experimento y no resultado.
