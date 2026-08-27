@@ -214,6 +214,17 @@ def main() -> int:
         p("")
 
     p(f"**δ = {num(delta)}** — {razon_delta}")
+    # Sin replicas no hay banda de ruido, y entonces CUALQUIER diferencia -por
+    # pequena que sea- pasa el filtro de delta: R1 corona un ganador y R3 marca
+    # ruptura, los dos por ruido. Se dice una vez, arriba, en vez de dejar que el
+    # lector lo deduzca de un "delta = 0,0000" que parece precision y es ausencia.
+    sin_banda = delta == 0 and all(g["n_seeds"] < 2 for g in grupos)
+    if sin_banda:
+        p("")
+        p("⚠ **Ningún brazo tiene réplicas, así que δ = 0 y no hay banda de ruido "
+          "medida.** Con eso, cualquier diferencia «supera» δ: R1 corona un "
+          "ganador y R3 marca rupturas **por construcción**. Nada de lo de abajo "
+          "declara nada; para eso hacen falta las semillas del plan §2.3.")
     p("")
     # Con un solo brazo medido NO hay eje que leer, y hay que decirlo asi.
     # Antes se aplicaban R1 y R3 igual, y como min(strides) == max(strides) se
@@ -264,6 +275,10 @@ def main() -> int:
     p("")
     if un_solo_brazo:
         p("**R3 · Monotonía.** ⚠ **No evaluable** con un solo brazo.")
+    elif sin_banda:
+        p(f"**R3 · Monotonía.** ⚠ **No evaluable sin banda de ruido**: con δ = 0 "
+          f"saldrían {len(rupturas)} «ruptura(s)», pero cualquier diferencia lo "
+          f"sería.")
     elif rupturas:
         p(f"**R3 · Monotonía.** ⚠ **{len(rupturas)} ruptura(s)** mayores que δ:")
         for r in rupturas:
@@ -317,7 +332,7 @@ def main() -> int:
                            "mejor": mejor["point"]["stride"],
                            "cerrado_por_arriba": cerrado_por_arriba}),
         "R2_contraste": contraste,
-        "R3_rupturas": rupturas,
+        "R3_rupturas": rupturas, "sin_banda_de_ruido": sin_banda,
         "R4_control": {"mediana_s_por_epoca": mediana, "desviados": desviados,
                        "umbral": DESVIO_MAX_R4,
                        "pasa": bool(mediana) and not desviados},

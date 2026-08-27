@@ -564,3 +564,21 @@ def test_estudio_stride_refuses_a_missing_source_with_the_fix():
     salida = r.stderr + r.stdout
     assert "no encuentro la fuente" in salida
     assert "bench_dataset.py build" in salida          # el arreglo, no solo el fallo
+
+
+def test_stride_informe_says_when_there_is_no_noise_band():
+    """Sin replicas, delta = 0 y CUALQUIER diferencia «supera» delta: R1 corona
+    un ganador y R3 marca rupturas por construccion. Un «delta = 0,0000» parece
+    precision y es ausencia, asi que se dice con todas las letras."""
+    import subprocess
+    r = subprocess.run(
+        [sys.executable, "scripts/estudio_stride_informe.py",
+         "--estudio", "stride-2026-08-27-humo", "--json", "/tmp/informe-banda.json"],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        pytest.skip("el estudio de humo no tiene medidas en este arbol")
+    if "| 1 |" in r.stdout and "| 16 |" in r.stdout:      # los dos brazos, 1 semilla
+        assert "no hay banda de ruido medida" in r.stdout
+        assert "Nada de lo de abajo declara nada" in r.stdout
+        assert "R3 · Monotonía.** ⚠ **No evaluable sin banda" in r.stdout

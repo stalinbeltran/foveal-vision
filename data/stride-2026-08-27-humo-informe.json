@@ -9,7 +9,7 @@
       "sweep": "stride-h01",
       "stride": 1,
       "dataset": "dirty1000-80px-16px-st01",
-      "medidas": 0,
+      "medidas": 1,
       "puntos": 1
     },
     {
@@ -22,6 +22,15 @@
   ],
   "tabla": [
     {
+      "stride": 1,
+      "valor": 0.8037600994406464,
+      "min": 0.8037600994406464,
+      "max": 0.8037600994406464,
+      "sem": null,
+      "n_seeds": 1,
+      "seconds_per_epoch": 33.91
+    },
+    {
       "stride": 16,
       "valor": 0.8723626488406099,
       "min": 0.8723626488406099,
@@ -32,22 +41,29 @@
     }
   ],
   "R1_saturacion": {
-    "evaluable": false,
-    "motivo": "un solo brazo con medidas"
+    "evaluable": true,
+    "stride": 16,
+    "frontera": [
+      16
+    ],
+    "mejor": 16,
+    "cerrado_por_arriba": false
   },
   "R2_contraste": null,
-  "R3_rupturas": [],
+  "R3_rupturas": [
+    {
+      "de": 16,
+      "a": 1,
+      "valor_de": 0.8723626488406099,
+      "valor_a": 0.8037600994406464
+    }
+  ],
+  "sin_banda_de_ruido": true,
   "R4_control": {
-    "mediana_s_por_epoca": 39.41,
+    "mediana_s_por_epoca": 36.66,
     "desviados": [],
     "umbral": 0.15,
     "pasa": true
   },
-  "pendientes": [
-    {
-      "sweep": "stride-h01",
-      "run": "stride-h01-0000-seed1",
-      "status": null
-    }
-  ]
+  "pendientes": []
 }

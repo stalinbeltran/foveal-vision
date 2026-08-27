@@ -8,17 +8,17 @@ mismos `window-datasets` que usará el estudio.
 | | |
 |---|---|
 | **Inicio (UTC)** | 2026-08-27 **02:29:43** (corrida 1) |
-| **Fin (UTC)** | 2026-08-27 **02:42:39** (c1) · **02:58:49** (c2) · c3 en curso al escribir |
-| **Instancias ALQUILADAS** | **7** (4 en c1 + 3 en c2), de las que **1** entrenó hasta el final |
-| **Coste real** | **0,0300 $** (0,0180 + 0,0120) |
-| **Reloj** | 12,8 min (c1) + 14,3 min (c2) |
+| **Fin (UTC)** | 2026-08-27 **02:42:39** (c1) · **02:58:49** (c2) · **10:40:32** (c3) |
+| **Instancias ALQUILADAS** | **9** (4 en c1 + 3 en c2 + 2 en c3), de las que **2** entrenaron hasta el final |
+| **Coste real** | **0,0383 $** (0,0180 + 0,0120 + 0,0083) |
+| **Reloj** | 12,8 + 14,3 + 10,0 = **37,1 min** de flota |
 | Recorridos | `stride-h01`, `stride-h16` · estudio `stride-2026-08-27-humo` |
 | Prefijo de etiqueta | `st-` (a propósito: ver §3) |
 | Logs | `/tmp/stride-humo.log`, `/tmp/stride-humo2.log`, `/tmp/stride-humo3.log` — **`/tmp` no sobrevive a rehacer la máquina**; lo que importa está aquí |
 | Informe de flota | `sweeps/stride-h01/flota.json`, `sweeps/stride-h16/flota.json` |
 
-⚠ **«Instancias» son las alquiladas, no las que trabajaron.** 7 alquiladas, 1 entrenó. Las otras 6
-también facturaron, y por eso están en la cuenta de arriba.
+⚠ **«Instancias» son las alquiladas, no las que trabajaron.** 9 alquiladas, 2 entrenaron. Las otras
+7 también facturaron, y por eso están en la cuenta de arriba.
 
 ---
 
@@ -101,7 +101,45 @@ No es el estudio. No hay veredicto de stride: son 3 épocas y 1 semilla, y el pr
 niega a leer un eje con un solo brazo. El estudio de verdad son 25 runs y su criterio está escrito
 en `docs/plan-stride-2026-08-27.md` §3, **antes de mirar**.
 
-## 5. Resultado de la tercera corrida
+## 5. La tercera corrida cerró el hueco: el brazo de stride 1 SÍ entrena
 
-*(pendiente al escribir esto — se rellena al terminar; log en `/tmp/stride-humo3.log`, y la fuente
-de verdad es `runs/stride-h01-0000-seed1/` y `sweeps/stride-h01/flota.json`)*
+**10:30:23 → 10:40:32 UTC · 2 máquinas alquiladas · 0,0083 $ · 1/1 lotes.** Lanzada **sin
+`--cpu`**, que es lo que cambió: para una prueba de humo la familia de CPU es irrelevante —no se
+compara nada entre máquinas— y el catálogo pasó de 12 ofertas a 14.
+
+| | |
+|---|---|
+| dataset | `dirty1000-80px-16px-st01`, huella `sha256:3bd24e6c…` (distinta de la de st16) |
+| ventanas de train en el pool | **1.755.000** |
+| `windows_per_epoch` en su `config.json` | **84000** |
+| f1 por época | 0,6037 → 0,7494 → **0,8038** |
+| `val_loss` | 0,3551 → 0,2836 → **0,2261** |
+| s/época | **33,91** |
+
+Con eso quedan validados **los dos extremos del eje**, que era el objetivo: el brazo con 1.755.000
+ventanas de train y el brazo con 12.000 entrenan igual de bien sobre la misma rejilla de examen.
+
+### El control R4, medido en la misma máquina física
+
+Las dos corridas buenas cayeron —por casualidad— en la máquina `33176` (Xeon E5-2680 v4). Con el
+presupuesto igualado, dos brazos cuyos pools se llevan **146,2×** midieron **39,41 y 33,91
+s/época**: ±7,5 % sobre la mediana, dentro del 15 % que exige R4.
+
+Sin igualar, el brazo denso habría hecho **20,9×** más trabajo por época —unos 700 s en vez de 34—
+y la tabla habría medido eso en vez de la densidad. Es la mejor prueba de que el diseño hace lo
+que dice.
+
+### ⚠ Y lo que estos dos f1 NO son
+
+Un adelanto del resultado. A 3 épocas, el brazo de stride 16 ha vuelto a ver su pool de 12.000
+ventanas **21 veces** y el de stride 1 ha visto 252.000 ventanas distintas **una vez cada una**. Al
+principio del entrenamiento la repetición converge antes; eso no dice nada de dónde acaban a 150
+épocas, que es lo que el estudio pregunta. El propio informe lo dice: sin réplicas δ = 0, y con
+δ = 0 cualquier diferencia «supera» δ, así que **nada de esa tabla declara nada**.
+
+## 6. Un séptimo fallo, encontrado al publicar estos números
+
+Correr `estudio_stride_informe.py` sobre los dos brazos destapó que **con una sola semilla δ = 0**,
+y entonces R1 corona un ganador y R3 marca «ruptura» ante cualquier diferencia — mientras R4 pasa,
+o sea que el informe se contradecía consigo mismo. Un «δ = 0,0000» parece precisión y es ausencia.
+Ahora lo dice con todas las letras y R3 se declara no evaluable. Arreglado con test.
