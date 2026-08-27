@@ -7,3 +7,5 @@
 {"epoch": 7, "train_loss": 0.8054949464041012, "val": {"loss": 0.8102956495501779, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.085427761077881}, "lr": 0.0014, "seconds": 61.001}
 {"epoch": 8, "train_loss": 0.8061671818712965, "val": {"loss": 0.8121415647593412, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.111737251281738}, "lr": 0.0014, "seconds": 59.984}
 {"epoch": 9, "train_loss": 0.805730944757394, "val": {"loss": 0.8122969313101335, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.098234176635742}, "lr": 0.0014, "seconds": 59.006}
+{"epoch": 10, "train_loss": 0.8055626418520635, "val": {"loss": 0.8134086988189003, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.1002888679504395}, "lr": 0.0014, "seconds": 59.147}
+{"epoch": 11, "train_loss": 0.8057400107504263, "val": {"loss": 0.8118912149559367, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.1146464347839355}, "lr": 0.0014, "seconds": 58.961}
