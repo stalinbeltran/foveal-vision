@@ -39,6 +39,9 @@ congela, deja de actualizarse. No hace falta entrar por SSH ni preguntar nada.
   B. **Congelada**: tiene runs, pero el último latido es más viejo que
      `--sin-avance`.
   C. **Huérfana**: su lote está entero `done` y la máquina sigue facturando.
+  D. **No llega**: avanza, pero a un ritmo que no termina antes de su propio
+     plazo (`--horas-max`). Es la que A, B y C no ven: escribe su latido
+     puntualmente y por eso parece sana.
 
 Los umbrales salen de lo medido el 2026-08-26 en ese mismo log:
 
@@ -248,6 +251,47 @@ def latido(nombres: list) -> tuple:
     return ultimo, pendientes
 
 
+# Mediana de epocas hasta parar, MEDIDA el 2026-08-27 sobre los 767 runs con
+# summary.json en disco: mediana 41, p90 66, max 150, min 3. Se usa la MEDIANA y
+# no el p90 a proposito: aqui sirve para decidir si una maquina NO llega, y el
+# error hay que pagarlo esperando de mas (regla 3), asi que se estima el trabajo
+# que queda por lo BAJO. Si ni siquiera el caso optimista cabe, no cabe.
+EPOCAS_TIPICAS = 41
+# Suelo de epocas que le quedan a un run ya empezado: con patience=10 no puede
+# parar en la siguiente, asi que estimar "le quedan 0" seria falso.
+EPOCAS_MINIMAS = 5
+
+
+def ritmo(nombres: list) -> tuple:
+    """(epoca actual, s/epoca reciente) del run que la maquina tiene a medias.
+
+    El s/epoca sale del propio `metrics.jsonl` -- que ya esta ahi y no cuesta
+    nada-- y de las 3 ultimas epocas, igual que la vigilancia de degradacion de
+    `estudio_flota.py`. Tres y no una: una epoca lenta suelta es ruido normal.
+    """
+    for n in nombres:
+        st = ROOT / "runs" / n / "status.json"
+        mj = ROOT / "runs" / n / "metrics.jsonl"
+        if not st.exists() or not mj.exists():
+            continue
+        try:
+            d = json.loads(st.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if d.get("status") in ("done", "cancelled"):
+            continue
+        try:
+            filas = [json.loads(x) for x in mj.read_text().splitlines() if x.strip()]
+        except (OSError, json.JSONDecodeError):
+            continue
+        segs = [f.get("seconds") for f in filas[-3:] if f.get("seconds")]
+        if not segs:
+            continue
+        segs.sort()
+        return int(d.get("epoch") or len(filas)), segs[len(segs) // 2]
+    return 0, 0.0
+
+
 def juzgar(inst: dict, args, t: float) -> tuple:
     """(veredicto, motivo). Veredicto: ajena | arrancando | ok | danada."""
     etiqueta = (inst.get("label") or "")[len(PREFIJO):]
@@ -280,7 +324,33 @@ def juzgar(inst: dict, args, t: float) -> tuple:
     if quieta > args.sin_avance:
         return "danada", (f"sin avance desde hace {quieta:.0f} min "
                           f"(tope {args.sin_avance} min), {pendientes} runs a medias")
-    return "ok", f"último avance hace {quieta:.0f} min, {pendientes} runs a medias"
+
+    # D. NO LLEGA: avanza, pero tan despacio que no termina antes de su propio
+    # plazo. MEDIDO el 2026-08-27: una maquina de `bp-r26` fue a 238 s/epoca
+    # contra los 35-50 normales; a las 5,5 h de sus 6 iba por la epoca 19 y le
+    # faltaban ~87 min de trabajo para 26 de plazo. Los sintomas A, B y C no la
+    # veian -- escribia su latido puntualmente-- asi que habria seguido
+    # facturando hasta que el plazo la matara con el run a medias, y el punto
+    # habria que rehacerlo igual. Destruirla ANTES no pierde nada y libera el
+    # dinero y la ranura.
+    #
+    # Se estima por lo BAJO (ver EPOCAS_TIPICAS) y ademas se exige margen: solo
+    # se declara si NI SIQUIERA el caso optimista cabe en el plazo. Una maquina
+    # lenta que llega justo se deja en paz.
+    epoca, s_epoca = ritmo(nombres)
+    if s_epoca > 0 and args.horas_max:
+        quedan_epocas = max(EPOCAS_MINIMAS, EPOCAS_TIPICAS - epoca)
+        falta_min = quedan_epocas * s_epoca / 60.0
+        plazo_min = args.horas_max * 60.0 - edad
+        if falta_min > plazo_min:
+            return "danada", (
+                f"NO LLEGA: va por la época {epoca} a {s_epoca:.0f} s/época, o sea "
+                f"~{falta_min:.0f} min mas de trabajo (y eso siendo optimista: "
+                f"{quedan_epocas} épocas), pero solo le quedan {plazo_min:.0f} min "
+                f"de sus {args.horas_max} h de plazo")
+
+    return "ok", (f"último avance hace {quieta:.0f} min, {pendientes} runs a medias"
+                  + (f", época {epoca} a {s_epoca:.0f} s/época" if s_epoca else ""))
 
 
 # --------------------------------------------------------------------- acciones
