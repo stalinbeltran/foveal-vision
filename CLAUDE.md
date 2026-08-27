@@ -972,6 +972,47 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
 
 ---
 
+## Varias sesiones a la vez: comprueba en qué copia estás
+
+Desde 2026-08-27 hay **más de una sesión de Claude** trabajando sobre copias distintas de
+este repo (`~/ws/<linea>/foveal-vision/`), cada una en su rama. **La regla y la estructura
+completas están en el coordinador**, que es quien descubre los repos y por eso es donde se
+dispara:
+[`telegram-coordinator/CLAUDE.md` § «Varias sesiones a la vez»](https://github.com/stalinbeltran/telegram-coordinator/blob/main/CLAUDE.md#varias-sesiones-a-la-vez-un-workspace-por-línea-de-trabajo).
+
+Aquí queda sólo lo que se dispara **en este repo**, que es lo que cuesta dinero:
+
+1. **`--prefijo <pfx>` en TODA flota, siempre.** Es lo único que separa tus máquinas de las
+   de otra sesión en una cuenta que es una sola. `vigilante_avance.py` sólo toca instancias
+   cuya etiqueta reconoce y dice *«ajena: no la toco»* del resto — **medido el 2026-08-27**,
+   con `st-` y `estudio-` conviviendo sin pisarse. Sin prefijos distintos, un vigilante
+   destruye las máquinas de otro creyéndolas huérfanas suyas.
+
+2. **No mates flotas por nombre.** `pkill -f estudio_flota` mata las de **todos** los
+   workspaces: casa por cadena de comando, no por ruta. Saca el PID por `/proc/<pid>/cwd` y
+   mata **ese PID**. Desde el coordinador, `node scripts/workspace.mjs` te dice cuáles son
+   tuyos y cuáles no.
+
+3. **⚠ `flota_viva()` no distingue copias, y eso silencia relanzamientos.**
+   `vigilante_avance.py:362` usa `pgrep -f "estudio_flota.py"` sin filtrar por ruta, así que
+   el vigilante de un workspace ve la flota de otro y aplica su regla 4 («hay una flota viva:
+   no se relanza»). Consecuencia: **los puntos que le faltan no se relanzan nunca y nadie
+   avisa** — un barrido incompleto que parece terminado, que es justo lo que `reportes/`
+   existe para evitar. Arreglo: mirar `/proc/<pid>/cwd` de cada PID y quedarse con los que
+   cuelguen de `ROOT`. ⚠ **No** filtrar por la línea de `ps`: la flota se lanza con ruta
+   relativa (`.venv/bin/python scripts/estudio_flota.py`), así que el workspace no aparece
+   en ella y el filtro daría por ajenos **tus propios procesos**.
+
+4. **Los repos hermanos se resuelven por `ROOT.parent`** (`bench_dataset.py:46`,
+   `estudio_flota.py:179`, `vigilante_avance.py:106`). Copiar este repo **solo** deja esas
+   referencias apuntando a un padre que puede no tener el generador ni el lanzador: no falla
+   al empezar, falla a mitad. Se copia el workspace entero o no se copia.
+
+5. **Un recorrido con el mismo nombre en dos copias alquila dos veces.** Los cerrojos de
+   `estudio_flota.py` son `threading.Lock`, o sea **dentro del proceso**: dos procesos no se
+   ven, y cada copia tiene su propio `runs/`, así que ninguna de las dos sabe que la otra ya
+   pagó esos puntos. Antes de lanzar, mira que nadie más esté corriendo ese recorrido.
+
 ## Contexto de trabajo
 
 - **Hoy solo CPU (esta máquina). Habrá un server con GPU** para los recorridos largos. Por eso X
