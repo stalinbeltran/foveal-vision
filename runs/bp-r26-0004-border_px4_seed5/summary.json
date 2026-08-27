@@ -1,0 +1,17 @@
+{
+  "run": "bp-r26-0004-border_px4_seed5",
+  "epochs_run": 43,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.1025062099437822,
+  "best_epoch": 33,
+  "seconds_per_epoch": 37.809,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
