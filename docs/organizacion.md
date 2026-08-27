@@ -110,6 +110,9 @@ s_periph: 1
 channels: [16, 32]  # canales POR CAPA (longitud = n_layers). Lee ch1/ch2 viejo (D-C3)
 merge: concat    # sum | concat  (§7 de instructionsNewNN.md; concat si strides difieren)
 pool_mode: avg   # avg | max  para reducir la periferia (decisión abierta, se barre)
+dropout: 0.0     # regularización DENTRO de C: fracción de features apagadas al azar
+                 # justo antes de la cabeza. 0.0 = apagado, y apagado es el default
+                 # porque todo lo que hay en disco se entrenó sin él (2026-08-27)
 head: corners    # 4×[exists, x, y] por tipo TL/TR/BR/BL (C9, decisiones.md)
 ```
 

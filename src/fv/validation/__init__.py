@@ -74,6 +74,19 @@ def check_network(net: dict) -> list[dict]:
                 "code": "channels_must_be_positive",
                 "message": f"channels={channels} tiene un valor < 1",
                 "hint": "cada capa necesita al menos 1 canal"})
+    # dropout: a probability. nn.Dropout raises on p outside [0, 1), and p=1.0
+    # zeroes EVERYTHING — a net that trains on nothing and still writes a run.
+    # Refused here, with the reason, before the name is reserved (R4).
+    try:
+        dropout = float(net.get("dropout", 0.0))
+    except (TypeError, ValueError):
+        dropout = None
+    if dropout is None or not (0.0 <= dropout < 1.0):
+        problems.append({
+            "code": "dropout_out_of_range",
+            "message": f"dropout={net.get('dropout')!r} no es una probabilidad en [0, 1)",
+            "hint": "usa 0.0 (apagado) hasta 0.9; 1.0 apagaria TODAS las neuronas "
+                    "y la cabeza no veria nada"})
     if not problems and not single:
         dims = dims_of(net)
         if int(net.get("k_periph", 3)) > 2 * dims.periph_band + 1:

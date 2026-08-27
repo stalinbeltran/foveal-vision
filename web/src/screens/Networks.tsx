@@ -155,6 +155,7 @@ export default function Networks() {
             <select value={form.pool_mode} onChange={(e) => setForm({ ...form, pool_mode: e.target.value })}>
               <option>avg</option><option>max</option>
             </select></Field>
+          {num("dropout", 0.05, "regularización: fracción de features apagadas al azar antes de la cabeza (0 = apagado)")}
           {exists ? (
             <button onClick={() => setConfirming(true)} data-testid="update-btn"
               disabled={!form.name || !validation?.valid}>Actualizar «{form.name}»</button>
