@@ -218,13 +218,23 @@ __marimo__/
 .streamlit/secrets.toml
 
 # --- foveal-vision: se versiona la descripcion, se ignora la carga
-# (docs/formatos.md §5). Los manifests y split.json de los datasets de ventanas
-# (dominio B) SI van a git: son la definicion de que se etiqueta, entrada del
-# experimento y no resultado.
+# (docs/formatos.md §5).
 /data/cache/
 /data/sources/
 /data/ui-shots/
-/data/window-datasets/*/windows.npz
+
+# Los datasets de ventanas ENTEROS --manifest, split y el `windows.npz`-- se
+# fueron al repo de datos el 2026-08-27, y alli el npz SI se commitea: esta
+# medido que NO se puede re-derivar (`repro-chk`), asi que guardarlo es la unica
+# forma de que un estudio mida siempre sobre el mismo dato.
+#
+# Esta ruta sigue existiendo, y por eso sigue ignorada: es donde el payload de
+# la flota y el `scp` de `bench_fleet` DESEMPAQUETAN el dataset en las maquinas
+# alquiladas, que no tienen repo de datos (es el fallback de
+# `settings.window_datasets_root()`). Ahi es una copia de trabajo, nunca la
+# fuente: si un proceso la crea en local, tiene que quedar fuera de git en vez
+# de volver a entrar por accidente y resucitar la mitad que se acaba de quitar.
+/data/window-datasets/
 
 # --- los datos de los estudios viven en el repo hermano foveal-vision-data
 # (desde 2026-08-27; ver CLAUDE.md). runs/, sweeps/ y studies/ ya no se

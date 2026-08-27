@@ -255,17 +255,23 @@ def test_multi_dataset_payload_carries_all(tmp_path, monkeypatch):
         (raiz / sub).mkdir(parents=True)
         (raiz / sub / "x.py").write_text("x = 1", encoding="utf-8")
     (raiz / "pyproject.toml").write_text("[project]", encoding="utf-8")
+    # Los datasets ya no cuelgan de ROOT: viven en el repo de datos, con el
+    # `windows.npz` commiteado. El aislamiento va por DATASETS, como el de los
+    # recorridos va por el almacen.
+    datasets = tmp_path / "datos" / "window-datasets"
     for d in ("ds-a", "ds-b"):
-        p = raiz / "data" / "window-datasets" / d
+        p = datasets / d
         p.mkdir(parents=True)
         (p / "windows.npz").write_bytes(b"npz")
         (p / "manifest.json").write_text("{}", encoding="utf-8")
     (raiz / "sweeps" / "s1").mkdir(parents=True)
     (raiz / "sweeps" / "s1" / "spec.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(F, "ROOT", raiz)
-    # los recorridos ya no cuelgan de ROOT: viven en el repo de datos
-    # (fv.settings.data_root), asi que el aislamiento va por el almacen.
+    # ni los recorridos ni los datasets cuelgan de ROOT: viven en el repo de
+    # datos (fv.settings), asi que el aislamiento va por el almacen y por
+    # DATASETS, no parcheando ROOT.
     monkeypatch.setattr(F.SWEEPS, "root", raiz / "sweeps")
+    monkeypatch.setattr(F, "DATASETS", datasets)
 
     import tarfile
     tar = F.construir_payload([{"nombre": "s1"}], ["ds-a", "ds-b"])
@@ -280,14 +286,72 @@ def test_multi_dataset_payload_carries_all(tmp_path, monkeypatch):
     assert not any("ds-b" in n for n in solo)
 
 
+def test_el_dataset_vive_en_el_repo_de_datos_si_esta_clonado(tmp_path, monkeypatch):
+    """El `windows.npz` se guarda, no se re-deriva: vive donde se commitea.
+
+    Esta medido que un dataset reconstruido NO es el mismo dato (`repro-chk`,
+    2026-08-26), asi que la unica forma de medir dos veces sobre el mismo es
+    tenerlo guardado. Si esto se revierte, los estudios vuelven a depender de
+    una reconstruccion que no reproduce.
+    """
+    from fv import settings
+    codigo = tmp_path / "foveal-vision"
+    datos = tmp_path / "foveal-vision-data"
+    datos.mkdir(parents=True)
+    monkeypatch.setenv("FV_ROOT", str(codigo))
+    monkeypatch.delenv("FV_DATA_ROOT", raising=False)
+    assert settings.window_datasets_root() == datos / "window-datasets"
+
+
+def test_sin_repo_de_datos_el_dataset_cae_donde_lo_deja_el_payload(tmp_path,
+                                                                  monkeypatch):
+    """El fallback NO es cosmetico: es el contrato con la maquina alquilada.
+
+    Alli no hay repo de datos --y no debe haberlo: recibe el dato hecho-- asi
+    que `window_datasets_root()` tiene que caer EXACTAMENTE en la ruta con la
+    que `construir_payload` mete los datasets en el tar
+    (`data/window-datasets/<n>`). Si las dos dejan de coincidir, la flota
+    alquila, sube el dato y cada maquina lo busca donde no esta: se descubre con
+    la factura corriendo.
+    """
+    from fv import settings
+    codigo = tmp_path / "bench"          # como /root/bench en la maquina Vast
+    monkeypatch.setenv("FV_ROOT", str(codigo))
+    monkeypatch.delenv("FV_DATA_ROOT", raising=False)
+    assert settings.window_datasets_root() == codigo / "data" / "window-datasets"
+
+    # y el tar escribe con ese mismo prefijo, leyendo de otro sitio
+    F = _flota()
+    datasets = tmp_path / "datos" / "window-datasets"
+    (datasets / "ds-a").mkdir(parents=True)
+    (datasets / "ds-a" / "windows.npz").write_bytes(b"npz")
+    raiz = tmp_path / "repo"
+    for sub in ("src", "scripts", "configs"):
+        (raiz / sub).mkdir(parents=True)
+        (raiz / sub / "x.py").write_text("x = 1", encoding="utf-8")
+    (raiz / "pyproject.toml").write_text("[project]", encoding="utf-8")
+    (raiz / "sweeps" / "s1").mkdir(parents=True)
+    (raiz / "sweeps" / "s1" / "spec.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(F, "ROOT", raiz)
+    monkeypatch.setattr(F.SWEEPS, "root", raiz / "sweeps")
+    monkeypatch.setattr(F, "DATASETS", datasets)
+
+    import tarfile
+    with tarfile.open(F.construir_payload([{"nombre": "s1"}], ["ds-a"])) as t:
+        nombres = t.getnames()
+    assert any(n.endswith("data/window-datasets/ds-a/windows.npz") for n in nombres)
+
+
 def test_multi_dataset_missing_npz_dies_before_renting(tmp_path, monkeypatch):
     """Falta un npz => muere con su razon ANTES de tocar Vast. Descubrirlo a
     mitad son maquinas ya alquiladas y facturando para nada."""
     F = _flota()
     raiz = tmp_path / "repo"
-    (raiz / "data" / "window-datasets" / "ds-a").mkdir(parents=True)
-    (raiz / "data" / "window-datasets" / "ds-a" / "windows.npz").write_bytes(b"n")
+    datasets = tmp_path / "datos" / "window-datasets"
+    (datasets / "ds-a").mkdir(parents=True)
+    (datasets / "ds-a" / "windows.npz").write_bytes(b"n")
     monkeypatch.setattr(F, "ROOT", raiz)
+    monkeypatch.setattr(F, "DATASETS", datasets)
     # los recorridos ya no cuelgan de ROOT: viven en el repo de datos
     # (fv.settings.data_root), asi que el aislamiento va por el almacen.
     monkeypatch.setattr(F.SWEEPS, "root", raiz / "sweeps")
@@ -303,15 +367,18 @@ def test_payload_accepts_a_bare_string(tmp_path, monkeypatch):
         (raiz / sub).mkdir(parents=True)
         (raiz / sub / "x.py").write_text("x = 1", encoding="utf-8")
     (raiz / "pyproject.toml").write_text("[project]", encoding="utf-8")
-    p = raiz / "data" / "window-datasets" / "ds-a"
+    datasets = tmp_path / "datos" / "window-datasets"
+    p = datasets / "ds-a"
     p.mkdir(parents=True)
     (p / "windows.npz").write_bytes(b"npz")
     (raiz / "sweeps" / "s1").mkdir(parents=True)
     (raiz / "sweeps" / "s1" / "spec.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(F, "ROOT", raiz)
-    # los recorridos ya no cuelgan de ROOT: viven en el repo de datos
-    # (fv.settings.data_root), asi que el aislamiento va por el almacen.
+    # ni los recorridos ni los datasets cuelgan de ROOT: viven en el repo de
+    # datos (fv.settings), asi que el aislamiento va por el almacen y por
+    # DATASETS, no parcheando ROOT.
     monkeypatch.setattr(F.SWEEPS, "root", raiz / "sweeps")
+    monkeypatch.setattr(F, "DATASETS", datasets)
     assert F.construir_payload([{"nombre": "s1"}], "ds-a").exists()
 
 
@@ -393,6 +460,40 @@ def test_el_libro_se_niega_si_los_datos_caen_en_el_repo_de_codigo(tmp_path,
     motivo = F.motivo_sin_libro()
     assert motivo and "git clone" in motivo
     assert F.Libro(True, 20).activo is False
+
+
+def test_un_dataset_sin_commitear_se_ve_antes_de_alquilar(tmp_path, monkeypatch):
+    """Estar en disco no es estar guardado, y la diferencia costo el r20260824.
+
+    El npz se mide, la maquina se rehace y el dato se va -- y reconstruirlo da
+    OTRO dato (`repro-chk`). Asi que se pregunta antes de gastar: el que esta
+    commiteado no sale, el que solo esta en disco si.
+    """
+    import subprocess
+    datos = _repo_datos_git(tmp_path, monkeypatch)
+    F = _flota()
+    for d in ("guardado", "solo-en-disco"):
+        (datos / "window-datasets" / d).mkdir(parents=True)
+        (datos / "window-datasets" / d / "windows.npz").write_bytes(b"npz")
+    subprocess.run(["git", "add", "window-datasets/guardado"], cwd=str(datos),
+                   check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "x"], cwd=str(datos), check=True,
+                   capture_output=True)
+
+    assert F.datasets_sin_guardar(["guardado"]) == []
+    assert F.datasets_sin_guardar(["guardado", "solo-en-disco"]) == ["solo-en-disco"]
+
+
+def test_sin_repo_de_datos_ningun_dataset_cuenta_como_guardado(tmp_path,
+                                                               monkeypatch):
+    """Sin repo de datos no hay donde guardar, asi que no se puede decir que si.
+
+    Es la misma regla que el resto del proyecto: ante la duda, el fallo ruidoso.
+    Devolver "todo guardado" porque no hay donde mirar seria el silencioso.
+    """
+    F = _flota()
+    monkeypatch.setattr(F, "DATOS", F.ROOT)
+    assert F.datasets_sin_guardar(["a", "b"]) == ["a", "b"]
 
 
 def test_un_git_add_que_falla_no_se_lee_como_nada_que_commitear(tmp_path,

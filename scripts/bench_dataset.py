@@ -45,6 +45,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GENERADOR = ROOT.parent / "image-text-sample-generator"
 
+# `fv.settings` es la UNICA que sabe donde vive el dato, y desde que el
+# `windows.npz` se commitea eso ya no es `ROOT/data`. Se importa aunque este
+# script sea stdlib a proposito (ver `cmd_install`): `settings` tambien lo es
+# --solo `os` y `pathlib`--, asi que `install` sigue corriendo en un droplet
+# recien hecho, sin venv ni dependencias.
+sys.path.insert(0, str(ROOT / "src"))
+from fv import settings  # noqa: E402
+
 # Todo esto tiene que coincidir con scripts/bench_speed.py. Si alguna vez deja
 # de coincidir, el benchmark medira sobre un dato que no es el suyo y no se
 # notara: por eso build lo comprueba contra el propio bench_speed.py al final.
@@ -59,6 +67,22 @@ EXTRACCION = {"window_size": 16, "stride": 8, "seed": 1}
 # 640x480 no, que son 234 MB de cache regenerable (README, "la copia grande es
 # desechable").
 ARTEFACTOS = [f"window-datasets/{VENTANAS}", f"sources/{FUENTE}"]
+
+
+def raiz_local(rel: str) -> Path:
+    """Donde esta `rel` EN ESTA MAQUINA.
+
+    El volumen y los droplets de medicion usan la forma plana `data/<rel>`, pero
+    aqui los dos artefactos ya no viven bajo la misma raiz: las ventanas se
+    fueron al repo de datos (se commitean) y las fuentes no (234 MB de renders
+    regenerables). Por eso se resuelve uno a uno en vez de con un prefijo.
+    """
+    familia, _, nombre = rel.partition("/")
+    if familia == "window-datasets":
+        return settings.window_datasets_root() / nombre
+    if familia == "sources":
+        return settings.local_sources_root() / nombre
+    return ROOT / "data" / rel
 HUELLA = "FINGERPRINT.json"
 
 
@@ -126,7 +150,7 @@ def humano(n: int) -> str:
 
 
 def npz_local() -> Path:
-    return ROOT / "data" / "window-datasets" / VENTANAS / "windows.npz"
+    return settings.window_datasets_root() / VENTANAS / "windows.npz"
 
 
 # ------------------------------------------------------------------------ build
@@ -204,7 +228,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # es comparable con los anteriores. Mejor parar que publicar eso.
     log(f"4/4 ventanas: {EXTRACCION}")
     destino_v = npz_local().parent
-    tmp = ROOT / "data" / "window-datasets" / f".{VENTANAS}.tmp"
+    tmp = settings.window_datasets_root() / f".{VENTANAS}.tmp"
     shutil.rmtree(tmp, ignore_errors=True)
     correr(
         [str(py), "-c",
@@ -277,7 +301,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
 
     log(f"Publicando en {destino}…")
     for rel in ARTEFACTOS:
-        origen = ROOT / "data" / rel
+        origen = raiz_local(rel)
         if not origen.exists():
             log(f"  (falta {rel}, se omite)")
             continue

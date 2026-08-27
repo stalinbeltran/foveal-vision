@@ -1052,6 +1052,45 @@ error por el camino. Por eso `estudio_flota.py --git` **aborta antes de alquilar
 la máquina apareció recién rehecha, sin el repo de datos clonado, y la separación llevaba así
 desde el commit que la aplicó.
 
+### El **dataset de ventanas** también va allí — y su `windows.npz` **se commitea**
+
+**Aplicado el 2026-08-27.** `data/window-datasets/` salió de este repo: los 16 datasets
+(manifest, `split.json` **y el `windows.npz`**) viven en `foveal-vision-data/window-datasets/`.
+La indirección es **`settings.window_datasets_root()`**, que cuelga de `data_root()`.
+
+**Por qué se guarda la carga, si la regla de siempre es que la carga no entra en git.** Porque la
+regla tenía una premisa —«son artefactos regenerables»— y **está medido que es falsa**. `repro-chk`,
+el 2026-08-26: mismo punto, misma semilla, misma familia de CPU (donde el entrenamiento sale
+idéntico bit a bit), y las curvas salieron **distintas**. Veredicto escrito antes de mirar: *es otro
+dataset*. Por eso el de hoy se llama `r20260826` y no `r20260824`.
+
+Lo que costó tratarlo como regenerable: al rehacer la máquina, el `r20260824` **desapareció** —no
+estaba en ningún git— y con él la comparabilidad de **20 runs ya pagados**, que hubo que volver a
+medir enteros (#14). Un dato que no se puede re-derivar y no se guarda, se pierde; y se descubre
+cuando ya no hay remedio.
+
+Cuesta poco: **~3-6 MB por dataset**, y sólo se añaden — dato nuevo = nombre nuevo, nunca se
+reescribe uno.
+
+⚠ **El fallback aquí no es cosmético: es el contrato con la máquina alquilada.** Sin repo de datos,
+`window_datasets_root()` cae a `<código>/data/window-datasets`, que es **exactamente** donde
+`construir_payload()` mete los datasets en el tar y donde `bench_fleet.py` los copia por `scp`. Las
+máquinas de Vast y los droplets de medición **no tienen ni deben tener** el repo de datos: reciben
+el dato hecho, no lo buscan. Origen y destino del tar son distintos **a propósito** — igualarlos
+(que es la simplificación que parece obvia) rompe uno de los dos lados, y se descubre con la flota
+alquilada y facturando. Tiene test: `test_sin_repo_de_datos_el_dataset_cae_donde_lo_deja_el_payload`.
+
+⚠ **Estar en disco no es estar guardado.** `estudio_flota.py` pregunta antes de alquilar si cada
+dataset está **commiteado** (`datasets_sin_guardar()`), avisa si no, y **con `--git` aborta**: pedir
+`--git` es decir «esto tiene que sobrevivir». Es la misma regla que el libro de a bordo, aplicada al
+dato en vez de a lo medido. Sin repo de datos, **ninguno** cuenta como guardado — ante la duda, el
+fallo ruidoso.
+
+Y por lo mismo `bench_dataset.py` (build/publish) resuelve por la indirección: si escribiera en
+`ROOT/data` mientras el resto lee del repo de datos, saldrían las dos mitades que divergen. `install`
+**sí** sigue escribiendo en `ROOT/data`, y es correcto: corre en el droplet de medición, que es
+justo el caso del fallback.
+
 ### Leer y escribir NO son lo mismo, y por eso hay dos métodos
 
 Lo ya medido está repartido en **tres formas** que no coinciden, así que

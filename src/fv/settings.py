@@ -56,7 +56,24 @@ def local_sources_root() -> Path:
 
 
 def window_datasets_root() -> Path:
-    return project_root() / "data" / "window-datasets"
+    """Donde viven los datasets de ventanas -- CON su `windows.npz`.
+
+    Desde 2026-08-27 en el repo de DATOS, y el npz se COMMITEA. El motivo es que
+    lo contrario esta medido y salio mal: el `.gitignore` de `foveal-vision-data`
+    excluia `*.npz` como "artefacto regenerable", y `repro-chk` demostro el
+    2026-08-26 que un `windows.npz` reconstruido NO es el mismo dato (curvas
+    distintas con el mismo punto, la misma semilla y la misma CPU). Un dato que
+    no se puede re-derivar y no se guarda es un dato que se pierde: se perdio el
+    `r20260824`, y con el la comparabilidad de 20 runs ya pagados.
+
+    Sin repo de datos clonado cae a `<codigo>/data/window-datasets`, que es
+    donde el payload de la flota desempaqueta los datasets en las maquinas
+    alquiladas. Alli NO hay repo de datos y no debe haberlo: reciben el dato
+    hecho, no lo buscan (ver `estudio_flota.construir_payload`).
+    """
+    d = data_root()
+    return (d / "window-datasets") if d != project_root() \
+        else project_root() / "data" / "window-datasets"
 
 
 def networks_root() -> Path:

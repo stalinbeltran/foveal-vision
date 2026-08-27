@@ -218,6 +218,12 @@ RUNS = RunStore()
 # libro: se descubre al rehacer la maquina, que es cuando ya no hay remedio.
 DATOS = settings.data_root()
 
+# Los datasets tampoco cuelgan de ROOT desde que el `windows.npz` se commitea en
+# el repo de datos (settings.window_datasets_root). A nivel de modulo por lo
+# mismo que SWEEPS/RUNS: los tests apuntan esto a un tmpdir en vez de parchear
+# ROOT, que ya no manda sobre donde estan los datos.
+DATASETS = settings.window_datasets_root()
+
 
 # Lo que viaja a la maquina. Nada mas: son ordenadores de desconocidos alquilados
 # por minutos, y ahi no va ningun secreto (CLAUDE.md del lanzador, "Vast.ai").
@@ -526,6 +532,31 @@ def motivo_sin_libro() -> str:
     if r.returncode != 0:
         return f"{DATOS} no es un repo de git: no hay donde commitear el libro"
     return ""
+
+
+def datasets_sin_guardar(datasets: list) -> list:
+    """Cuales de `datasets` NO estan commiteados en el repo de datos.
+
+    Existir en disco no basta, y esa diferencia es justo la que costo el
+    `r20260824`: estaba, se midio con el, y desaparecio al rehacer la maquina
+    porque no estaba en ningun git. Un `windows.npz` sin commitear es un dato
+    con fecha de caducidad desconocida.
+
+    Se pregunta ANTES de alquilar, como todo lo que puede invalidar una medida.
+    No aborta por si solo --se puede querer un tanteo sobre dato de usar y
+    tirar-- pero con `--git`, que es decir "esto tiene que sobrevivir", si.
+    """
+    if DATOS == ROOT or not DATOS.exists():
+        return list(datasets)          # sin repo de datos no hay donde guardar
+    fuera = []
+    for d in datasets:
+        npz = DATASETS / d / "windows.npz"
+        r = subprocess.run(["git", "ls-files", "--error-unmatch", "--", str(npz)],
+                           cwd=str(DATOS), capture_output=True, text=True,
+                           timeout=60)
+        if r.returncode != 0:
+            fuera.append(d)
+    return fuera
 
 
 def _destino_de_run(nombre: str, config_json: Path) -> Path:
@@ -891,7 +922,7 @@ def construir_payload(sweeps: list, datasets: list) -> Path:
     if isinstance(datasets, str):          # compatibilidad con la llamada de uno
         datasets = [datasets]
     faltan = [d for d in datasets
-              if not (ROOT / "data" / "window-datasets" / d / "windows.npz").exists()]
+              if not (DATASETS / d / "windows.npz").exists()]
     if faltan:
         die("falta el windows.npz de: " + ", ".join(faltan) + ".\n"
             "  El dataset de ventanas no esta extraido, y sin el no hay que entrenar.\n"
@@ -911,7 +942,12 @@ def construir_payload(sweeps: list, datasets: list) -> Path:
             tar.add(str(SWEEPS.path(s["nombre"])),
                     arcname=f"sweeps/{s['nombre']}", filter=filtro)
         for d in datasets:
-            tar.add(str(ROOT / "data" / "window-datasets" / d),
+            # Se lee de donde este (repo de datos) y se escribe SIEMPRE en
+            # `data/window-datasets/`: es la ruta a la que cae el fallback de
+            # `window_datasets_root()` en la maquina alquilada, que no tiene ni
+            # tendra el repo de datos. Origen y destino son distintos a
+            # proposito; igualarlos rompe uno de los dos lados.
+            tar.add(str(DATASETS / d),
                     arcname=f"data/window-datasets/{d}", filter=filtro)
     return tmp
 
@@ -1745,6 +1781,21 @@ def main() -> int:
     V.load_env()
     store = SweepStore()
     sweeps, datasets = cargar_sweeps(args.sweep, store)
+
+    # El dato tambien tiene que sobrevivir a esta maquina, no solo lo medido.
+    sin_guardar = datasets_sin_guardar(datasets)
+    if sin_guardar:
+        log(f"\n⚠ dataset SIN COMMITEAR: {', '.join(sin_guardar)}")
+        log(f"  Esta en disco, pero no en git: si se rehace esta maquina se "
+            f"pierde, y esta MEDIDO que reconstruirlo da OTRO dato "
+            f"(`repro-chk`, 2026-08-26) -- o sea que lo que midas hoy no se "
+            f"podra comparar con lo de manana.")
+        log(f"  Guardalo:  cd {DATOS} && git add window-datasets && "
+            f"git commit -m 'data: dataset de ventanas' && git push")
+        if args.git:
+            log("\nERROR: pediste --git, que es decir que esto tiene que "
+                "sobrevivir. No se ha alquilado nada.")
+            return 2
     PREFIJO[0] = args.prefijo
     lotes = particion(sweeps, args.reparto)
     for l in lotes:
