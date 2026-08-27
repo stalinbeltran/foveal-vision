@@ -218,15 +218,21 @@ __marimo__/
 .streamlit/secrets.toml
 
 # --- foveal-vision: se versiona la descripcion, se ignora la carga
-# (docs/formatos.md §5). Manifests, split.json, config/metrics de runs y
-# spec.json de sweeps SI van a git.
+# (docs/formatos.md §5). Los manifests y split.json de los datasets de
+# ventanas (dominio B) SI van a git: son la definicion de que se etiqueta,
+# entrada del experimento y no resultado.
 /data/cache/
 /data/sources/
 /data/ui-shots/
 /data/window-datasets/*/windows.npz
-/runs/*/*.pt
-/studies/*/progress.json
-# studies/*/plan.json SI va a git (la descripcion del estudio; progress.json es estado vivo)
+
+# --- los datos de los estudios viven en el repo hermano foveal-vision-data
+# (desde 2026-08-27; ver CLAUDE.md). runs/, sweeps/ y studies/ ya no se
+# versionan aqui: si un proceso los recrea en local, quedan fuera de git para
+# que no vuelvan a entrar por accidente.
+/runs/
+/sweeps/
+/studies/
 
 /web/node_modules/
 /web/.vite/
