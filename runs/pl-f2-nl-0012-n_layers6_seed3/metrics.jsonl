@@ -24,3 +24,4 @@
 {"epoch": 24, "train_loss": 0.804547590059506, "val": {"loss": 0.8097111588174647, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.074167251586914}, "lr": 0.0014, "seconds": 100.222}
 {"epoch": 25, "train_loss": 0.8050055564112804, "val": {"loss": 0.8103992277925665, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.084738254547119}, "lr": 0.0014, "seconds": 102.409}
 {"epoch": 26, "train_loss": 0.8044148860132008, "val": {"loss": 0.8094358893958005, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.078773498535156}, "lr": 0.0014, "seconds": 98.853}
+{"epoch": 27, "train_loss": 0.8044636546661447, "val": {"loss": 0.81026460907676, "f1": 0.0, "precision": 0.0, "recall": 0.0, "pos_err_px": 6.091506004333496}, "lr": 0.0014, "seconds": 99.32}
