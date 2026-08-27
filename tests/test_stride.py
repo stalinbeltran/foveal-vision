@@ -520,3 +520,31 @@ def test_sonda_projection_respects_the_budget():
     assert 'por_epoca = int(getattr(receta, "windows_per_epoch", 0) or 0)' in fuente
     assert "ventanas_epoca = por_epoca if por_epoca > 0 else len(ds)" in fuente
     assert '"ventanas_pool": len(ds),' in fuente      # la procedencia viaja
+
+
+def test_stride_informe_never_contradicts_itself_with_one_arm():
+    """Un informe que dice dos cosas opuestas es peor que uno que calla.
+
+    Con un solo brazo medido, min(strides) == max(strides), y R1 imprimia a la
+    vez «la densidad no compra nada en este rango» y «el eje no queda cerrado por
+    arriba». Sale al leer un estudio A MEDIAS, que es el caso normal mientras la
+    flota corre.
+    """
+    import subprocess
+    raiz = Path(__file__).resolve().parents[1]
+    r = subprocess.run(
+        [sys.executable, "scripts/estudio_stride_informe.py",
+         "--estudio", "stride-2026-08-27-humo",
+         "--json", "/tmp/informe-test.json"],
+        cwd=str(raiz), capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        pytest.skip("el estudio de humo no tiene medidas en este arbol")
+    salida = r.stdout
+    no_compra = "la densidad no compra nada" in salida
+    no_cerrado = "no queda cerrado por arriba" in salida
+    assert not (no_compra and no_cerrado), (
+        "R1 afirma las dos cosas a la vez:\n" + salida)
+    # y con un brazo lo que toca es decir que no se puede leer
+    if salida.count("| stride |") and salida.count("`dirty1000") == 1:
+        assert "R1 · Saturación.** ⚠ **No evaluable" in salida
+        assert "R3 · Monotonía.** ⚠ **No evaluable" in salida

@@ -152,6 +152,7 @@ def main() -> int:
 
     por_stride = {g["point"]["stride"]: g for g in grupos}
     strides = sorted(por_stride)
+    un_solo_brazo = len(strides) < 2
 
     # ---- R1: saturacion = el stride MAS GRANDE dentro de delta del mejor
     en_frontera = sorted(g["point"]["stride"] for g in frontera)
@@ -214,19 +215,30 @@ def main() -> int:
 
     p(f"**δ = {num(delta)}** — {razon_delta}")
     p("")
-    p(f"**R1 · Saturación.** El mejor brazo es **stride "
-      f"{mejor['point']['stride']}** ({num(mejor['value'])}). Dentro de δ quedan "
-      f"{en_frontera}, así que el **punto de saturación es stride "
-      f"{saturacion}**: es el dato más barato que no pierde calidad.")
-    if not cerrado_por_arriba:
-        p("")
-        p(f"  ⚠ La saturación cae en el extremo más disperso del eje "
-          f"({saturacion}): la densidad no compra nada en este rango.")
-    if saturacion == min(strides):
-        p("")
-        p(f"  ⚠ La saturación cae en el extremo más denso ({saturacion}): el eje "
-          f"**no queda cerrado por arriba**. La frase correcta es «gana el "
-          f"extremo», no «satura en {saturacion}».")
+    # Con un solo brazo medido NO hay eje que leer, y hay que decirlo asi.
+    # Antes se aplicaban R1 y R3 igual, y como min(strides) == max(strides) se
+    # imprimian los DOS avisos a la vez: «la densidad no compra nada» y «el eje no
+    # queda cerrado por arriba», que se contradicen. Un informe que dice dos cosas
+    # opuestas es peor que uno que calla. Sale al leer un estudio a medias, que es
+    # el caso normal mientras la flota corre.
+    if un_solo_brazo:
+        p(f"**R1 · Saturación.** ⚠ **No evaluable**: sólo hay medidas de un brazo "
+          f"(stride {strides[0]}, {num(por_stride[strides[0]]['value'])}). La "
+          f"saturación es una comparación y necesita al menos dos brazos.")
+    else:
+        p(f"**R1 · Saturación.** El mejor brazo es **stride "
+          f"{mejor['point']['stride']}** ({num(mejor['value'])}). Dentro de δ quedan "
+          f"{en_frontera}, así que el **punto de saturación es stride "
+          f"{saturacion}**: es el dato más barato que no pierde calidad.")
+        if saturacion == max(strides):
+            p("")
+            p(f"  ⚠ La saturación cae en el extremo más disperso del eje "
+              f"({saturacion}): la densidad no compra nada en este rango.")
+        elif saturacion == min(strides):
+            p("")
+            p(f"  ⚠ La saturación cae en el extremo más denso ({saturacion}): el eje "
+              f"**no queda cerrado por arriba**. La frase correcta es «gana el "
+              f"extremo», no «satura en {saturacion}».")
     p("")
     if contraste is None:
         p(f"**R2 · Significación.** El mejor brazo ES el más disperso "
@@ -250,7 +262,9 @@ def main() -> int:
               "es que el efecto, si lo hay, cabe dentro del ruido de "
               "reinicialización de este dataset.")
     p("")
-    if rupturas:
+    if un_solo_brazo:
+        p("**R3 · Monotonía.** ⚠ **No evaluable** con un solo brazo.")
+    elif rupturas:
         p(f"**R3 · Monotonía.** ⚠ **{len(rupturas)} ruptura(s)** mayores que δ:")
         for r in rupturas:
             p(f"  - de stride {r['de']} ({num(r['valor_de'])}) a stride "
@@ -281,8 +295,9 @@ def main() -> int:
         p(f"**R4 · Control de coste.** ✅ Pasa. Mediana {num(mediana, 1)} s/época y "
           f"ningún brazo se desvía más del {DESVIO_MAX_R4:.0%}: el presupuesto "
           f"estaba igualado de verdad.")
-    p("")
-    p(f"*{tie_reason(frontera, delta)}*")
+    if not un_solo_brazo:
+        p("")
+        p(f"*{tie_reason(frontera, delta)}*")
 
     salida = {
         "estudio": args.estudio, "objetivo": objetivo, "direccion": direccion,
@@ -295,9 +310,12 @@ def main() -> int:
                    "n_seeds": por_stride[s]["n_seeds"],
                    "seconds_per_epoch": por_stride[s].get("seconds_per_epoch")}
                   for s in strides],
-        "R1_saturacion": {"stride": saturacion, "frontera": en_frontera,
-                          "mejor": mejor["point"]["stride"],
-                          "cerrado_por_arriba": cerrado_por_arriba},
+        "R1_saturacion": ({"evaluable": False,
+                           "motivo": "un solo brazo con medidas"} if un_solo_brazo else
+                          {"evaluable": True, "stride": saturacion,
+                           "frontera": en_frontera,
+                           "mejor": mejor["point"]["stride"],
+                           "cerrado_por_arriba": cerrado_por_arriba}),
         "R2_contraste": contraste,
         "R3_rupturas": rupturas,
         "R4_control": {"mediana_s_por_epoca": mediana, "desviados": desviados,
@@ -311,7 +329,16 @@ def main() -> int:
     destino.write_text(json.dumps(salida, indent=2, ensure_ascii=False),
                        encoding="utf-8")
     p("")
-    p(f"JSON: {destino.relative_to(ROOT)}")
+    # `relative_to` LANZA si el destino esta fuera del repo, y estaba en la ultima
+    # linea: el informe salia entero y el proceso moria con codigo 1 justo despues.
+    # Un fallo que deja el trabajo hecho y devuelve error hace que quien llama
+    # descarte un resultado bueno. Encontrado por su propio test, que pasaba
+    # --json /tmp/... (2026-08-27).
+    try:
+        donde = destino.relative_to(ROOT)
+    except ValueError:
+        donde = destino
+    p(f"JSON: {donde}")
     return 0
 
 

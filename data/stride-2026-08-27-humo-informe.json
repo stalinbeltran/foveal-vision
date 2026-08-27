@@ -1,0 +1,53 @@
+{
+  "estudio": "stride-2026-08-27-humo",
+  "objetivo": "f1",
+  "direccion": "max",
+  "delta": 0.0,
+  "razon_delta": "una sola semilla en el mejor punto: no hay dispersión medida, así que no hay banda de ruido que descontar (sube `seeds` para poder declarar un empate)",
+  "brazos": [
+    {
+      "sweep": "stride-h01",
+      "stride": 1,
+      "dataset": "dirty1000-80px-16px-st01",
+      "medidas": 0,
+      "puntos": 1
+    },
+    {
+      "sweep": "stride-h16",
+      "stride": 16,
+      "dataset": "dirty1000-80px-16px-st16",
+      "medidas": 1,
+      "puntos": 1
+    }
+  ],
+  "tabla": [
+    {
+      "stride": 16,
+      "valor": 0.8723626488406099,
+      "min": 0.8723626488406099,
+      "max": 0.8723626488406099,
+      "sem": null,
+      "n_seeds": 1,
+      "seconds_per_epoch": 39.41
+    }
+  ],
+  "R1_saturacion": {
+    "evaluable": false,
+    "motivo": "un solo brazo con medidas"
+  },
+  "R2_contraste": null,
+  "R3_rupturas": [],
+  "R4_control": {
+    "mediana_s_por_epoca": 39.41,
+    "desviados": [],
+    "umbral": 0.15,
+    "pasa": true
+  },
+  "pendientes": [
+    {
+      "sweep": "stride-h01",
+      "run": "stride-h01-0000-seed1",
+      "status": null
+    }
+  ]
+}
