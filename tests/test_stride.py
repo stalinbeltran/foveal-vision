@@ -459,3 +459,18 @@ def test_eval_stride_cannot_be_one_of_the_arms():
         capture_output=True, text=True, timeout=120)
     assert r.returncode != 0
     assert "esta ENTRE los strides barridos" in (r.stderr + r.stdout)
+
+
+def test_progreso_names_an_axis_that_lives_in_the_dataset():
+    """El monitor tiene que saber decir QUE esta mirando.
+
+    Con el eje en el dataset, `space` solo trae la replica y `estudio_progreso`
+    imprimia «eje ?» y «media PARCIAL por ?». Un monitor que no nombra lo que
+    muestra es medio monitor.
+    """
+    fuente = (Path(__file__).resolve().parents[1] / "scripts" /
+              "estudio_progreso.py").read_text(encoding="utf-8")
+    assert 'eje_ds = spec.get("eje_dataset") or {}' in fuente
+    assert 'eje, valor_del_dataset = eje_ds["campo"], eje_ds.get("valor")' in fuente
+    # y el fallback no puede pisar a un eje de verdad: solo actua si no hay
+    assert 'if eje is None and eje_ds.get("campo"):' in fuente

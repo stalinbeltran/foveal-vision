@@ -92,7 +92,18 @@ def main() -> int:
         valid, _ = expand_points(spec, spec["base_network_value"])
         monitor = (spec.get("base_recipe_value") or {}).get("monitor", "val_loss")
         objetivo = spec.get("objective", "f1")
-        eje = next((k for k in spec["space"] if k != "seed"), "?")
+        # El eje puede vivir en el DATASET y no en `space` (barrido del stride de
+        # extraccion: un dataset por valor, docs/barrido-stride.md 1). Entonces
+        # `space` solo tiene la replica y esto imprimia "eje ?" y "media por ?",
+        # que es un monitor que no sabe decir que esta mirando. El valor es el
+        # mismo para todos los puntos del recorrido, asi que la tabla sale de una
+        # fila por brazo -- que es justo lo que se quiere ver mientras corre.
+        eje = next((k for k in spec["space"] if k != "seed"), None)
+        eje_ds = spec.get("eje_dataset") or {}
+        valor_del_dataset = None
+        if eje is None and eje_ds.get("campo"):
+            eje, valor_del_dataset = eje_ds["campo"], eje_ds.get("valor")
+        eje = eje or "?"
         tope = int((spec.get("budget") or {}).get("epochs", 0) or 0)
 
         filas = []
@@ -130,7 +141,7 @@ def main() -> int:
             for f in filas:
                 if f["valor"] is None:
                     continue
-                clave = json.dumps(f["punto"].get(eje))
+                clave = json.dumps(f["punto"].get(eje, valor_del_dataset))
                 porvalor.setdefault(clave, []).append(f)
             print(f"    --- media PARCIAL por {eje} (no decide nada) ---")
             for clave in sorted(porvalor, key=lambda c: json.loads(c)):
