@@ -53,6 +53,15 @@ BLOQUE_B = [("wd-t", "weight_decay", 0.0), ("opt-t", "optimizer", "adam"),
             ("ovb-t", "overlap_border_px", 0)]
 BLOQUE_C = [("bp-r26", "border_px", 4), ("pl-f2-bs", "batch_size", 85),
             ("pl-f2-nl", "n_layers", 4)]
+# (tanteo, verificacion, eje, vigente). El tanteo pone las semillas 1-2 y la
+# verificacion las 3-5, sobre el MISMO dataset: se suman hasta 5.
+BLOQUE_D = [("wd-t", "wd-v", "weight_decay", 0.0),
+            ("lp-t", "lp-v", "lambda_pos", 1.0),
+            ("sb-t", "sb-v", "smooth_l1_beta", 0.08),
+            ("pat-t", "pat-v", "patience", 10),
+            ("mrg-t", "mrg-v", "merge", "concat"),
+            ("pool-t", "pool-v", "pool_mode", "avg"),
+            ("ovb-t", "ovb-v", "overlap_border_px", 0)]
 
 UMBRAL_AMPLITUD = 0.010      # §2 criterio 1: el doble del ruido tipico entre semillas
 UMBRAL_MRG = 0.010           # §2 criterio 3: sum "no pierde mas de" esto
@@ -123,9 +132,9 @@ def pinta(titulo, filas, delta, fuente, nota=""):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--bloque", action="append", choices=["A", "B", "C"])
+    ap.add_argument("--bloque", action="append", choices=["A", "B", "C", "D"])
     args = ap.parse_args()
-    bloques = set(args.bloque or ["A", "B", "C"])
+    bloques = set(args.bloque or ["A", "B", "C", "D"])
     store, runs = SweepStore(), RunStore()
 
     # ------------------------------------------------------------------ bloque A
@@ -292,6 +301,42 @@ def main() -> int:
                       f"entrenamiento. La media de un punto con un cero es el "
                       f"promedio de una moneda y **no debe citarse**: "
                       f"{[x['run'] for x in ceros]}")
+    # ------------------------------------------------------------------ bloque D
+    if "D" in bloques:
+        print("\n\n## Bloque D — verificación de los tanteos que ascendieron (5 semillas)")
+        print("\nCada eje junta su tanteo (semillas 1–2) con su verificación (3–5). "
+              "Se comprueba antes que comparten dataset, red, receta y tope: si no, "
+              "**no se juntan y se dice**.")
+        for tan, ver, eje, vig in BLOQUE_D:
+            t, err_t = medidos(tan, store, runs)
+            v, err_v = medidos(ver, store, runs)
+            if err_t or not t["scored"]:
+                print(f"\n### `{eje}` — el tanteo `{tan}` no tiene medidas")
+                continue
+            junto, nota = list(t["scored"]), ""
+            if err_v or not v["scored"]:
+                nota = (f"⚠ `{ver}` aún sin medidas: esto es **todavía el tanteo**, "
+                        f"no declara.")
+            else:
+                malos = compatibles(store.spec(tan), store.spec(ver))
+                if malos:
+                    nota = f"⚠ `{ver}` NO se junta: difiere en {malos}."
+                else:
+                    junto += v["scored"]
+                    nota = (f"`{tan}` ({len(t['scored'])} runs) + `{ver}` "
+                            f"({len(v['scored'])} runs).")
+            filas, delta, fuente = tabla(junto, eje, t["direction"], vig)
+            pinta(f"`{eje}` — {len(junto)} runs", filas, delta, fuente, nota=nota)
+            mejor = filas[0]
+            if not mejor["es_vigente"] and mejor["p"] is not None:
+                mueve = mejor["p"] < 0.05 and (mejor["diff"] or 0) > (delta or 0)
+                print(f"\n**{eje}**: mejor = `{mejor['valor']}` con {mejor['n']} "
+                      f"semillas, `p` = {n(mejor['p'],3)}, Δ = {n(mejor['diff'])}, "
+                      f"δ = {n(delta)} → el vigente "
+                      f"**{'PASA A ' + str(mejor['valor']) if mueve else 'se queda'}**.")
+            elif mejor["es_vigente"]:
+                print(f"\n**{eje}**: **gana el vigente** `{vig}`. El eje pasa de "
+                      f"«sin medir» a **medido**, que era el encargo.")
     return 0
 
 

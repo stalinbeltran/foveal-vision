@@ -272,6 +272,42 @@ ESTUDIOS = [
         "hereda_de": "pl-t-nl",          # la RED de la fase 1; el DATO ya no
         "epochs": EPOCHS, "semillas": 5,
     },
+    # ================================================================ bloque D
+    # La VERIFICACION de los tanteos que ascendieron (§2 del plan). Semillas 3-5
+    # y no 1-5: las 1 y 2 ya estan en el tanteo, sobre ESTE MISMO dataset, misma
+    # red y misma receta, asi que SUMAN hasta 5 en vez de repetirse. Son 60 runs
+    # en vez de 100.
+    #
+    # ⚠ Esto es exactamente lo que NO se podia hacer con ov-sig/bp-sig/pl-f2 al
+    # principio, y ahora si: la diferencia es que el tanteo y su verificacion
+    # estan sobre el MISMO dato. Es el rendimiento de haber rehecho todo sobre
+    # r20260826 en vez de sumar a los runs viejos.
+    #
+    # No entran `opt-t` ni `pad-t`: su tanteo se cerro "sin senal" (amplitud
+    # 0,0092 y 0,0045, por debajo del umbral de 0,010 escrito en el plan) y
+    # gastar 5 semillas en un eje que no asoma nada es justo lo que el tanteo
+    # existe para evitar.
+    {"bloque": "D", "name": "wd-v", "que": "D1 - weight_decay a 5 semillas: el vigente 0,0 gana y subirlo HUNDE",
+     "axis": "weight_decay", "range": [0.0, 1e-5, 1e-4, 1e-3],
+     "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 3, "seed0": 3},
+    {"bloque": "D", "name": "lp-v", "que": "D2 - lambda_pos a 5 semillas: plano entre 0,5 y 2, el 4 hace dano",
+     "axis": "lambda_pos", "range": [0.5, 1.0, 2.0, 4.0],
+     "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 3, "seed0": 3},
+    {"bloque": "D", "name": "sb-v", "que": "D3 - smooth_l1_beta a 5 semillas: 0,32 supera al vigente en mas de 1 SE",
+     "axis": "smooth_l1_beta", "range": [0.02, 0.08, 0.32],
+     "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 3, "seed0": 3},
+    {"bloque": "D", "name": "pat-v", "que": "D4 - patience a 5 semillas: el 5 confirma el minimo medido de 8",
+     "axis": "patience", "range": [5, 10, 20],
+     "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 3, "seed0": 3},
+    {"bloque": "D", "name": "mrg-v", "que": "D5 - merge a 5 semillas: si `sum` empata, sobra la MITAD de la red",
+     "axis": "merge", "range": ["concat", "sum"],
+     "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 3, "seed0": 3},
+    {"bloque": "D", "name": "pool-v", "que": "D6 - pool_mode a 5 semillas: `max` pierde 0,023, y hay que confirmarlo",
+     "axis": "pool_mode", "range": ["avg", "max"],
+     "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 3, "seed0": 3},
+    {"bloque": "D", "name": "ovb-v", "que": "D7 - overlap_border_px a 5 semillas: +0,0158, el efecto MAS GRANDE del bloque B",
+     "axis": "overlap_border_px", "range": [0, 2],
+     "base": FOVEADA, "border_px": 4, "epochs": EPOCHS, "semillas": 3, "seed0": 3},
 ]
 
 
@@ -347,7 +383,7 @@ def _hereda(name: str, est: dict, dataset: str, receta: dict,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--dataset", required=True)
-    ap.add_argument("--bloque", action="append", choices=["0", "A", "B", "C"],
+    ap.add_argument("--bloque", action="append", choices=["0", "A", "B", "C", "D"],
                     help="crea solo estos bloques (repetible)")
     ap.add_argument("--solo", action="append",
                     help="crea solo estos recorridos (repetible)")
@@ -358,7 +394,7 @@ def main() -> int:
     store = SweepStore()
     existentes = {p.name for p in (ROOT / "sweeps").iterdir() if p.is_dir()}
     receta_base = RecipeStore().get(RECIPE).as_dict()
-    bloques = set(args.bloque or ["0", "A", "B", "C"])
+    bloques = set(args.bloque or ["0", "A", "B", "C", "D"])
     pedidos = set(args.solo or [])
     creados, saltados, fallidos = [], [], []
 
