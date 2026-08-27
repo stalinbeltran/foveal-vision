@@ -397,7 +397,7 @@ es un comentario.
 | `test_stride_informe_says_when_there_is_no_noise_band` | sin réplicas δ = 0 y **cualquier** diferencia «supera» δ: R1 corona ganador y R3 marca ruptura por construcción. Un «δ = 0,0000» parece precisión y es ausencia |
 | `test_estudio_stride_refuses_a_missing_source_with_the_fix` | la fuente está en `.gitignore`: se comprueba **antes de nada** y el error dice el comando que la reconstruye, no sólo que falta |
 
-**37 tests**, en `tests/test_stride.py`. La suite entera pasa de 192 a **229**.
+**39 tests**, en `tests/test_stride.py`. La suite entera pasa de 192 a **231**.
 
 ⚠ Este recuento se queda viejo solo. Si no cuadra con
 `pytest tests/test_stride.py --collect-only`, manda el segundo.

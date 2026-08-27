@@ -640,3 +640,34 @@ def test_stride_informe_never_contradicts_itself_with_one_arm():
     if salida.count("| stride |") and salida.count("`dirty1000") == 1:
         assert "R1 · Saturación.** ⚠ **No evaluable" in salida
         assert "R3 · Monotonía.** ⚠ **No evaluable" in salida
+
+
+def test_r4_counts_steps_not_seconds():
+    """R4 tiene que medir el PRESUPUESTO, no el reloj.
+
+    La primera version comparaba `s/epoca` entre brazos con un tope del 15 %, y
+    dio FALLO en el estudio completo por ruido de maquina: MEDIDO el 2026-08-27,
+    dentro de un mismo brazo -misma config, cinco maquinas alquiladas- el
+    cociente max/min de s/epoca llego a 2,50, mas que el 1,53 que separaba las
+    medias de los brazos. Un control que da falsa alarma se acaba ignorando, y
+    entonces no hay control. Ahora lee los pasos del `config.json` que devolvio
+    cada maquina, que es exacto y no tiene ruido.
+    """
+    fuente = (Path(__file__).resolve().parents[1] / "scripts" /
+              "estudio_stride_informe.py").read_text(encoding="utf-8")
+    assert "pasos_por_run" in fuente
+    assert 'w = int(cfg.get("windows_per_epoch", 0) or 0)' in fuente
+    assert "pasos de gradiente por época" in fuente
+    # y s/epoca sigue saliendo, pero declarado como lo que es
+    assert "*Información, no control*" in fuente
+    # el veredicto ya no puede depender de un umbral de segundos
+    assert "DESVIO_MAX_R4" not in fuente.split("def main")[1]
+
+
+def test_r2_reports_the_real_group_sizes():
+    """`permutation_test` devuelve `n`/`m`, no `n_a`/`n_b`: el informe imprimia
+    «(None vs None semillas)», que es un hueco con pinta de dato."""
+    fuente = (Path(__file__).resolve().parents[1] / "scripts" /
+              "estudio_stride_informe.py").read_text(encoding="utf-8")
+    assert "contraste.get('n_a')" not in fuente
+    assert "contraste.get('n')" in fuente and "contraste.get('m')" in fuente

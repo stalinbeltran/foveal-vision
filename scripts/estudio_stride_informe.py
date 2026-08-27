@@ -174,16 +174,46 @@ def main() -> int:
         if peor:
             rupturas.append({"de": x, "a": y, "valor_de": v0, "valor_a": v1})
 
-    # ---- R4: el CONTROL de coste
+    # ---- R4: el CONTROL de presupuesto
+    #
+    # MIDE LOS PASOS, NO LOS SEGUNDOS. La primera version comparaba `s/epoca`
+    # entre brazos con un tope del 15 %, y eso es el proxy equivocado: cada run
+    # corre en una maquina alquilada distinta, y la dispersion entre maquinas del
+    # catalogo es mayor que cualquier efecto del eje.
+    #
+    # MEDIDO el 2026-08-27 en el estudio completo (25 runs): DENTRO de un mismo
+    # brazo -- misma config, cinco maquinas -- el cociente max/min de s/epoca
+    # llego a **2,50**, mientras que ENTRE brazos las medias solo se separaban
+    # 1,53. O sea que el control marcaba FALLO por ruido de maquina, que es
+    # justo lo que no mide. Un control que da falsa alarma se acaba ignorando, y
+    # entonces no hay control.
+    #
+    # Lo que R4 quiere saber es si los brazos hicieron el MISMO trabajo por
+    # epoca, y eso se lee directo del `config.json` que cada maquina devolvio:
+    # pasos = ceil(windows_per_epoch / batch_size). Es exacto y no tiene ruido.
+    pasos_por_run, sin_config = {}, []
+    for t_ in scored:
+        try:
+            cfg = run_store.config(t_["run"]).get("recipe", {})
+            w = int(cfg.get("windows_per_epoch", 0) or 0)
+            b = int(cfg.get("batch_size", 0) or 0)
+            pasos_por_run[t_["run"]] = -(-w // b) if (w and b) else None
+        except Exception:                                      # noqa: BLE001
+            sin_config.append(t_["run"])
+    distintos = sorted({v for v in pasos_por_run.values() if v})
+    con_pool_entero = [r for r, v in pasos_por_run.items() if v is None]
+
     segundos = {s: por_stride[s].get("seconds_per_epoch") for s in strides}
     medidos = [v for v in segundos.values() if v]
     mediana = statistics.median(medidos) if medidos else None
+    # la dispersion DENTRO de un brazo es la vara de medir del ruido de maquina
+    dentro = {}
+    for s in strides:
+        v = [t_["seconds_per_epoch"] for t_ in scored
+             if t_["point"]["stride"] == s and t_.get("seconds_per_epoch")]
+        if len(v) > 1:
+            dentro[s] = max(v) / min(v)
     desviados = []
-    if mediana:
-        for s, v in segundos.items():
-            if v and abs(v - mediana) / mediana > DESVIO_MAX_R4:
-                desviados.append({"stride": s, "s_por_epoca": v,
-                                  "desvio": (v - mediana) / mediana})
 
     # ------------------------------------------------------------------ salida
     p = print
@@ -262,8 +292,10 @@ def main() -> int:
         dif = por_stride[mejor['point']['stride']]["value"] - por_stride[mas_disperso]["value"]
         p(f"**R2 · Significación.** stride {mejor['point']['stride']} contra "
           f"stride {mas_disperso}: diferencia **{num(abs(dif))}**, "
-          f"`p` = **{num(pv, 5)}** ({contraste.get('n_a')} vs "
-          f"{contraste.get('n_b')} semillas).")
+          f"`p` = **{num(pv, 5)}** ({contraste.get('n')} vs "
+          f"{contraste.get('m')} semillas, "
+          f"{'exacto' if contraste.get('exact') else 'aproximado'} sobre "
+          f"{contraste.get('arrangements')} reordenaciones).")
         if pv is not None and pv < 0.05 and abs(dif) > delta:
             p("")
             p("  → **la densidad de la rejilla mueve la calidad de predicción.**")
@@ -291,25 +323,36 @@ def main() -> int:
         p("**R3 · Monotonía.** Sin rupturas mayores que δ: el objetivo no empeora "
           "al hacer la rejilla más densa.")
     p("")
-    if mediana is None:
-        p("**R4 · Control de coste.** ⚠ Ningún brazo reportó `seconds_per_epoch`: "
-          "**el control no se pudo aplicar**, así que el igualado de presupuesto "
-          "está sin comprobar.")
-    elif desviados:
-        p(f"**R4 · Control de coste.** ❌ **FALLA.** Mediana "
-          f"{num(mediana, 1)} s/época; se desvían más del "
-          f"{DESVIO_MAX_R4:.0%}:")
-        for d in desviados:
-            p(f"  - stride {d['stride']}: {num(d['s_por_epoca'], 1)} s/época "
-              f"({d['desvio']:+.0%})")
+    if sin_config or not pasos_por_run:
+        p(f"**R4 · Control de presupuesto.** ⚠ **No se pudo aplicar**: falta el "
+          f"`config.json` de {len(sin_config)} run(s), así que no se puede leer "
+          f"qué trabajo hizo cada época.")
+    elif con_pool_entero:
+        p(f"**R4 · Control de presupuesto.** ❌ **FALLA.** {len(con_pool_entero)} "
+          f"run(s) entrenaron sobre el **pool entero** (`windows_per_epoch` = 0), "
+          f"así que su época no es la de los demás.")
         p("")
-        p("  **El estudio NO declara nada hasta explicarlo**: con el presupuesto "
-          "igualado los brazos hacen los mismos pasos por época, así que esta "
-          "tabla puede estar midiendo cómputo y no densidad.")
+        p("  **El estudio NO declara nada hasta explicarlo.**")
+    elif len(distintos) > 1:
+        p(f"**R4 · Control de presupuesto.** ❌ **FALLA.** Los runs no hicieron los "
+          f"mismos pasos por época: {distintos}.")
+        p("")
+        p("  **El estudio NO declara nada hasta explicarlo**: la tabla estaría "
+          "midiendo cuánto entrenó cada brazo, no la densidad de su rejilla.")
     else:
-        p(f"**R4 · Control de coste.** ✅ Pasa. Mediana {num(mediana, 1)} s/época y "
-          f"ningún brazo se desvía más del {DESVIO_MAX_R4:.0%}: el presupuesto "
-          f"estaba igualado de verdad.")
+        p(f"**R4 · Control de presupuesto.** ✅ **Pasa.** Los {len(pasos_por_run)} "
+          f"runs hicieron **{distintos[0]} pasos de gradiente por época**, el mismo "
+          f"número, leído del `config.json` que devolvió cada máquina.")
+        if mediana:
+            p("")
+            p(f"  *Información, no control*: la mediana fue {num(mediana, 1)} "
+              f"s/época. Ese número **no** sirve de control porque cada run corrió "
+              f"en una máquina alquilada distinta: la dispersión **dentro** de un "
+              f"mismo brazo llega a "
+              f"{num(max(dentro.values()), 2) if dentro else '-'}× "
+              f"(misma config, máquinas distintas), o sea del orden de la que hay "
+              f"entre brazos. Es ruido de catálogo, y es lo que la criba de "
+              f"velocidad existe para recortar.")
     if not un_solo_brazo:
         p("")
         p(f"*{tie_reason(frontera, delta)}*")
@@ -333,9 +376,13 @@ def main() -> int:
                            "cerrado_por_arriba": cerrado_por_arriba}),
         "R2_contraste": contraste,
         "R3_rupturas": rupturas, "sin_banda_de_ruido": sin_banda,
-        "R4_control": {"mediana_s_por_epoca": mediana, "desviados": desviados,
-                       "umbral": DESVIO_MAX_R4,
-                       "pasa": bool(mediana) and not desviados},
+        "R4_control": {"pasos_por_epoca": distintos,
+                       "runs_sin_config": sin_config,
+                       "runs_con_pool_entero": con_pool_entero,
+                       "mediana_s_por_epoca": mediana,
+                       "dispersion_dentro_de_brazo": dentro,
+                       "pasa": bool(pasos_por_run) and not sin_config
+                               and not con_pool_entero and len(distintos) == 1},
         "pendientes": [{"sweep": s, "run": r, "status": st}
                        for s, r, st in pendientes],
     }
