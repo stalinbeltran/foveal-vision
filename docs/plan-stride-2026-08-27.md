@@ -180,6 +180,23 @@ que puede fallar, y falla **en local**, que es donde no cuesta dinero.
 
 ## 5. Operación
 
+### 5.0 Lo que tiene que estar antes (y no está en git)
+
+**La fuente `local/dirty-1000-80px` vive en `data/sources/`, que está en `.gitignore`.** Un clon
+limpio **no la trae**, y sin ella no hay datasets que extraer. Se reconstruye —es reproducible,
+los specs del generador están congelados con semilla 1— o se copia de una máquina que ya la tenga:
+
+```bash
+.venv/bin/python scripts/bench_dataset.py build      # ~15-20 min de renders
+```
+
+`estudio_stride.py` lo comprueba **antes de nada** y falla con ese comando al lado. Es la regla de
+preflight de este proyecto: lo que se descubre a mitad se resuelve improvisando, y así es como se
+da por imposible algo que sí se puede hacer.
+
+Los cinco `windows.npz` tampoco están en git (`/data/window-datasets/*/windows.npz`); sí lo están
+sus `manifest.json` y `split.json`, así que se puede comprobar que lo reconstruido es lo mismo.
+
 ### 5.1 Orden de los pasos
 
 ```bash

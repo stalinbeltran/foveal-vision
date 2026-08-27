@@ -548,3 +548,19 @@ def test_stride_informe_never_contradicts_itself_with_one_arm():
     if salida.count("| stride |") and salida.count("`dirty1000") == 1:
         assert "R1 · Saturación.** ⚠ **No evaluable" in salida
         assert "R3 · Monotonía.** ⚠ **No evaluable" in salida
+
+
+def test_estudio_stride_refuses_a_missing_source_with_the_fix():
+    """La fuente esta en .gitignore: un clon limpio no la trae. Se comprueba
+    ANTES de nada y con el comando que la reconstruye al lado -- lo que se
+    descubre a mitad se resuelve improvisando."""
+    import subprocess
+    r = subprocess.run(
+        [sys.executable, "scripts/estudio_stride.py",
+         "--fuente", "local/no-existe-seguro", "--strides", "16", "--solo-datasets"],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        capture_output=True, text=True, timeout=180)
+    assert r.returncode != 0
+    salida = r.stderr + r.stdout
+    assert "no encuentro la fuente" in salida
+    assert "bench_dataset.py build" in salida          # el arreglo, no solo el fallo

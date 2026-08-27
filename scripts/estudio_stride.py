@@ -48,6 +48,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from fv.datasets.loader import SourceDataset       # noqa: E402
 from fv.sweeps.runner import prepare_sweep          # noqa: E402
 from fv.sweeps.spec import SweepError               # noqa: E402
 from fv.sweeps.store import SweepStore              # noqa: E402
@@ -228,6 +229,23 @@ def main() -> int:
 
     store = SweepStore()
     wstore = WindowDatasetStore()
+
+    # La fuente esta en .gitignore (/data/sources/), asi que en una maquina recien
+    # hecha NO esta, y sin ella no hay datasets que extraer. Se comprueba ANTES de
+    # nada y con el comando que la reconstruye al lado: descubrirlo a mitad es
+    # como se dan por imposibles cosas que si se pueden hacer (CLAUDE.md del
+    # coordinador, "el dataset se genera, y esta comprobado que se puede").
+    if not args.solo_recorridos:
+        try:
+            ds = SourceDataset(args.fuente)
+            if not ds.labels_path.exists():
+                raise FileNotFoundError(ds.labels_path)
+        except Exception as exc:                              # noqa: BLE001
+            die(f"no encuentro la fuente '{args.fuente}' ({type(exc).__name__}).\n"
+                f"  Vive en data/sources/, que esta en .gitignore: un clon limpio no\n"
+                f"  la trae. Se RECONSTRUYE (~15-20 min de renders, reproducible):\n"
+                f"      .venv/bin/python scripts/bench_dataset.py build\n"
+                f"  o se copia de otra maquina que ya la tenga.")
 
     if not store.exists(args.hereda_de):
         die(f"no existe el recorrido '{args.hereda_de}', del que se hereda la red "
