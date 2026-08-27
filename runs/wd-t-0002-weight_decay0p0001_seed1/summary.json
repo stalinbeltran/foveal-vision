@@ -1,0 +1,17 @@
+{
+  "run": "wd-t-0002-weight_decay0p0001_seed1",
+  "epochs_run": 81,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.1089726467362859,
+  "best_epoch": 71,
+  "seconds_per_epoch": 123.53,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
