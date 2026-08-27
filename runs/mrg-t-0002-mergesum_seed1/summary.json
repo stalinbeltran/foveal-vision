@@ -1,0 +1,17 @@
+{
+  "run": "mrg-t-0002-mergesum_seed1",
+  "epochs_run": 52,
+  "epochs_requested": 150,
+  "stopped_early": true,
+  "cancelled": false,
+  "monitor": "val_loss",
+  "best": 0.09338543518361721,
+  "best_epoch": 42,
+  "seconds_per_epoch": 51.702,
+  "corner_order": [
+    "TL",
+    "TR",
+    "BR",
+    "BL"
+  ]
+}
