@@ -301,7 +301,8 @@ El pico del tanteo es **`0,0`**, y la tabla de §5 (escrita antes de mirar, y qu
 > **`dropout` ∈ {0,0 · 0,05 · 0,1 · 0,2}** — *«el paso más pequeño del tanteo era 0,1; que 0,1 ya
 > duela NO descarta una ganancia en 0,05: cerrar "no ayuda" exige haber mirado ahí»*.
 
-El recorrido **está creado y commiteado** (`sweeps/do-v/spec.json`, 4 valores × 5 semillas =
+El recorrido **está creado y commiteado** (`2026/08-agosto/sweeps/do-v/spec.json` del repo de
+datos, 4 valores × 5 semillas =
 **20 runs**). **No se ha lanzado**: el server se destruye. Estimado **≈1,1 $** y ~3,5 h de reloj
 al ritmo real medido en el tanteo (53 s/época, no los 40 estimados).
 
