@@ -1,0 +1,13 @@
+{
+  "name": "recoger-planos",
+  "descripcion": "Mueve al <anio>/<mes>/ que le toca lo que quedo escrito en la raiz plana del repo de datos (runs/, sweeps/). SIMULA por defecto: sin --aplicar no mueve nada. Se NIEGA si hay una flota viva o algun run sin cerrar.",
+  "ejemplos": [
+    "",
+    "--aplicar",
+    "--aplicar --aunque-corra"
+  ],
+  "command": ".venv/bin/python scripts/recoger_planos.py {{input}} 2>&1 | tail -c 3500",
+  "encargados": ["echo"],
+  "timeoutMs": 120000,
+  "requiere": ["python3"]
+}

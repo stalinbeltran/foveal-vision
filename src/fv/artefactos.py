@@ -5,17 +5,20 @@ Por que hacen falta TRES sitios y no uno
 Los artefactos de estudio se escriben ahora en `foveal-vision-data` (settings.
 `data_root`), pero lo que ya existe esta repartido en dos formas distintas:
 
-  1. **plano**, `<data>/runs/<run>/` -- lo que se escribe DE AHORA EN ADELANTE.
-     Es la forma que `RunStore.path()` ha usado siempre.
-  2. **archivo fechado**, `<data>/<anio>/<mes>/sweeps/<recorrido>/runs/<run>/` --
-     lo que dejo la migracion. Un run vive dentro de su recorrido y de su mes, y
-     esa relacion es estructura de directorios a proposito. `index.json` es el
-     mapa: sin el no se puede encontrar un run sin saber su mes.
+  1. **fechado**, `<data>/<anio>/<mes>/sweeps/<recorrido>/runs/<run>/` -- lo que
+     dejo la migracion Y lo que se escribe DE AHORA EN ADELANTE. Un run vive
+     dentro de su recorrido y de su mes, y esa relacion es estructura de
+     directorios a proposito. `index.json` es el mapa de lo migrado: sin el no se
+     puede encontrar un run viejo sin saber su mes.
+  2. **plano**, `<data>/runs/<run>/` -- la forma que `RunStore.path()` uso
+     siempre, y en la que todavia hay cosas escritas. Ya NO se escribe aqui: ver
+     `destino_agrupado`.
   3. **legado**, `<foveal-vision>/runs/<run>/` -- lo que este repo todavia tiene
      y la migracion copio, mas lo que se escribio DESPUES de aquella copia.
 
-Se busca en ese orden y se ESCRIBE siempre en (1). El orden importa: si (3) se
-mirara antes, un run migrado se leeria de la copia vieja y no de la buena.
+Se busca **plano -> fechado -> legado** y se ESCRIBE siempre en (1). Que se lea
+lo plano primero es lo que hace que lo ya escrito ahi siga apareciendo mientras
+no se migre; que se escriba fechado es lo que hace que no crezca.
 
 ⚠ Esto es una escalera para poder migrar sin parar el mundo, no un diseño
 permanente. Cuando (3) se vacie, `legado()` se borra y queda una escalera de dos.
@@ -182,37 +185,88 @@ def _dir_por_mes(clase: str, nombre: str) -> Path | None:
     return None
 
 
+def _mes_por_sus_recorridos(estudio: str) -> str | None:
+    """El mes donde ya vive algun recorrido de `estudio`, o None.
+
+    Un estudio de aqui no siempre es un directorio `studies/<nombre>/`: solo el
+    motor OAT del API lo crea. Los `scripts/estudio_*.py` -- que es como se ha
+    lanzado TODO lo que se ha medido en este proyecto -- nombran su estudio en el
+    `spec.json` de cada recorrido y no crean el artefacto nunca.
+
+    Buscar el mes SOLO por el directorio del estudio dejaba entonces sin mes a
+    todo lo lanzado por script. Medido el 2026-08-28: el tanteo `do-t` de
+    `dropout-2026-08-28` se escribio en `<data>/sweeps/do-t/` y sus runs en
+    `<data>/runs/`, o sea en la raiz plana y sin un solo aviso.
+
+    Se recorren en orden de mes (`_dirs_por_mes` va ordenado), asi que gana el
+    mas antiguo: es el criterio 3 del README del repo de datos -- un estudio se
+    fecha por su recorrido mas viejo, no por el ultimo que se lanzo.
+    """
+    for d in _dirs_por_mes("sweeps"):
+        try:
+            spec = json.loads((d / "spec.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if spec.get("study") == estudio:
+            mes = _mes_de(d)
+            if mes:
+                return mes
+    return None
+
+
 def mes_del_estudio(estudio: str) -> str | None:
-    """El mes bajo el que vive un estudio, o None si no esta agrupado."""
+    """El mes bajo el que vive un estudio, o None si no hay ni rastro de el.
+
+    Por su directorio si lo tiene; si no, por el de sus recorridos, que es la
+    unica huella que deja un estudio lanzado por script.
+    """
     d = _archivado("studies", estudio) or _dir_por_mes("studies", estudio)
-    return _mes_de(d) if d is not None else None
+    if d is not None:
+        return _mes_de(d)
+    return _mes_por_sus_recorridos(estudio)
 
 
 def destino_agrupado(clase: str, nombre: str, *, estudio: str | None = None,
                      recorrido: str | None = None) -> Path | None:
-    """Donde CREAR `nombre` agrupado, o None si no hay con que agruparlo.
+    """Donde CREAR `nombre`, bajo su carpeta de mes.
 
-    Devolver None es la respuesta honesta cuando no se sabe a que estudio
-    pertenece: quien llama cae entonces a la forma plana, en vez de inventarse
-    una carpeta de mes que separaria lo que deberia ir junto.
+    ⚠ Antes esto devolvia None en cuanto no sabia a que estudio pertenecia algo,
+    con este motivo: "es la respuesta honesta, en vez de inventarse una carpeta
+    de mes que separaria lo que deberia ir junto". El razonamiento tenia un
+    agujero, y costo un estudio entero escrito donde no debia (§
+    `_mes_por_sus_recorridos`): **la alternativa a la carpeta de mes no era "no
+    separar", era la RAIZ PLANA** -- un tercer sitio, sin fecha, en el que el
+    estudio queda igual de separado de los demas y ademas sin decirlo.
+
+    Lo que hay que conservar es *un estudio en UN mes*, y eso se conserva
+    **heredando** el mes (`mes_del_estudio`), no renunciando a tener uno. Asi que
+    ahora solo se devuelve None en el unico caso en que el mes de verdad
+    separaria: un run cuyo recorrido esta plano. Ese run se queda con su
+    recorrido -- peor sitio, pero no OTRO sitio.
     """
     raiz = settings.data_archive_root() or settings.data_root()
 
-    if clase == "runs" and recorrido:
-        # un run vive DENTRO de su recorrido: hereda su mes sin calcular nada
-        d = _archivado("sweeps", recorrido) or _dir_por_mes("sweeps", recorrido)
-        if d is not None:
-            return d / "runs" / nombre
-        return None
+    if clase == "runs":
+        if recorrido:
+            # un run vive DENTRO de su recorrido: hereda su mes sin calcular nada
+            d = _archivado("sweeps", recorrido) or _dir_por_mes("sweeps", recorrido)
+            return (d / "runs" / nombre) if d is not None else None
+        # un run suelto (un benchmark) no se inventa un recorrido, pero si tiene
+        # mes: sin recorrido ni estudio con los que agruparse, el suyo es el de
+        # hoy. Es lo que el README del repo de datos ya dice de los sueltos.
+        return raiz / mes_actual() / "runs" / nombre
 
     if clase == "sweeps":
-        mes = mes_del_estudio(estudio) if estudio else None
-        if mes:
-            return raiz / mes / "sweeps" / nombre
-        return None
+        # el mes de su estudio si ese estudio ya tiene uno; si no, este recorrido
+        # lo ESTRENA -- y los siguientes del mismo estudio lo heredaran de el,
+        # aunque se lancen el mes que viene
+        mes = (mes_del_estudio(estudio) if estudio else None) or mes_actual()
+        return raiz / mes / "sweeps" / nombre
 
     if clase == "studies":
-        # un estudio nuevo ESTRENA mes: es quien lo elige para todo lo suyo
-        return raiz / mes_actual() / "studies" / nombre
+        # un estudio ESTRENA mes... salvo que sus propios recorridos ya hayan
+        # elegido uno: por script el recorrido se crea ANTES que el estudio (o el
+        # estudio no se crea nunca), y el orden no puede partir en dos lo mismo
+        return raiz / (mes_del_estudio(nombre) or mes_actual()) / "studies" / nombre
 
     return None

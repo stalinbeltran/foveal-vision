@@ -1112,32 +1112,88 @@ Lo ya medido está repartido en **tres formas** que no coinciden, así que
 
 | # | forma | qué es |
 |---|---|---|
-| 1 | `<data>/runs/<run>/` | **lo que se escribe de ahora en adelante** |
-| 2 | `<data>/<año>/<mes>/sweeps/<recorrido>/runs/<run>/` | el **archivo fechado** de la migración; `index.json` es el mapa |
+| 1 | `<data>/runs/<run>/` | la forma **plana**. ⚠ Ya **no** se escribe aquí (desde 2026-08-28); se sigue **leyendo** mientras quede algo sin recoger |
+| 2 | `<data>/<año>/<mes>/sweeps/<recorrido>/runs/<run>/` | el **archivo fechado**: lo que dejó la migración **y lo que se escribe de ahora en adelante**. `index.json` es el mapa de lo migrado |
 | 3 | `<foveal-vision>/runs/<run>/` | el **legado** — ⚠ **ya vaciado** (2026-08-27), pero la cascada lo sigue mirando por si un proceso lo recrea |
 
 - **`path(nombre)`** busca en ese orden — 1 → 2 → **lo agrupado hoy** → 3. Si (3) se mirara antes,
   un run migrado se leería de la copia vieja y no de la buena.
-- **`destino(...)`** devuelve dónde se CREA, y **agrupa por estudio** (ver abajo). `create()` usa
+- **`destino(...)`** devuelve dónde se CREA, y **siempre fecha** (ver abajo). `create()` usa
   `destino()`, **nunca `path()`**: si un run ya estuviera archivado, `path()` devolvería el archivo
   y se escribiría dentro de él.
+- ⚠ **Y `path()` parte de la forma PLANA, no de `destino()`.** Desde que `destino()` siempre fecha,
+  pasárselo a `path()` haría invisible de golpe todo lo que ya está escrito en la raíz plana. Fijado
+  por `test_what_is_already_flat_stays_visible`, **probado rompiéndolo**.
 
 ### El mes lo elige EL ESTUDIO, y lo hereda todo lo suyo
 
 Decisión del usuario, y es el motivo de que exista el agrupamiento: **no ver un mismo estudio
 disperso en varias carpetas de mes** sólo porque unos recorridos corrieron al día siguiente.
 
-- Un **estudio** estrena su carpeta de mes al crearse: es quien la elige.
+- Un **estudio** estrena su carpeta de mes: es quien la elige.
 - Un **recorrido** hereda el mes de **su estudio** (`spec.study`), no el de hoy. Uno lanzado el día
-  1 del mes siguiente **se queda con su estudio**.
+  1 del mes siguiente **se queda con su estudio**. Si su estudio no tiene mes todavía, este
+  recorrido lo **estrena**, y los siguientes del mismo estudio lo heredarán de él.
 - Un **run** vive **dentro** de su recorrido (`<mes>/sweeps/<rec>/runs/<run>`), vía
   `provenance.sweep` — así la relación es estructura de directorios y no un prefijo en el nombre.
-- Sin estudio (un benchmark suelto), la forma plana. `destino_agrupado()` devuelve `None` cuando no
-  sabe a qué estudio pertenece: es la respuesta honesta, en vez de inventar una carpeta que
-  separaría lo que debería ir junto.
+- Un **run suelto** (un benchmark, sin recorrido) no se inventa un padre, pero sí va a
+  `<mes>/runs/`: *«un huérfano no se inventa un padre»* es sobre el **recorrido**, no sobre la fecha.
 
 ⚠ **El mes AGRUPA para poder leer el directorio; no fecha cada run.** Fijado por
 `test_a_study_keeps_its_sweeps_and_runs_in_one_month`, **probado rompiéndolo**.
+
+#### ⚠ El agujero que dejó todo un estudio en la raíz plana (medido 2026-08-28)
+
+**Un estudio de este proyecto casi nunca es un directorio `studies/<nombre>/`.** Sólo el motor OAT
+del API lo crea; los `scripts/estudio_*.py` —que es cómo se ha lanzado **todo** lo que se ha medido
+aquí— nombran su estudio en el `spec.json` de cada recorrido y **no crean el artefacto nunca**.
+
+Como el mes se buscaba **únicamente** por ese directorio, `mes_del_estudio()` devolvía `None` para
+todos ellos, `destino_agrupado()` devolvía `None` detrás, y el recorrido y sus runs caían en
+`<data>/sweeps/` y `<data>/runs/`. **Sin fecha y sin un solo aviso.** Le pasó al tanteo `do-t` de
+`dropout-2026-08-28` mientras corría.
+
+El razonamiento que lo permitía estaba escrito y era *«devolver `None` es la respuesta honesta, en
+vez de inventar una carpeta de mes que separaría lo que debería ir junto»*. **Tenía un agujero: la
+alternativa a la carpeta de mes no era «no separar», era la RAÍZ PLANA** — un tercer sitio, sin
+fecha, donde el estudio queda igual de separado de los demás y además sin decirlo. Lo que hay que
+conservar es *un estudio en UN mes*, y eso se conserva **heredando** el mes, no renunciando a tenerlo.
+
+Así que ahora:
+
+- **`mes_del_estudio()` también mira los recorridos**: si algún `spec.json` ya archivado nombra ese
+  estudio, su mes es el del más antiguo (criterio 3 del README del repo de datos).
+- **`destino_agrupado()` sólo devuelve `None` en el único caso en que el mes de verdad separaría**:
+  un run cuyo recorrido está plano. Ese run se queda con su recorrido — peor sitio, pero no *otro*.
+
+Fijado por `test_nothing_new_is_ever_written_to_the_flat_root`,
+`test_a_study_without_an_artifact_still_keeps_one_month` y
+`test_a_loose_run_gets_a_month_but_never_an_invented_sweep`, **los tres probados rompiéndolos**.
+
+#### Y lo que ya quedó plano: `scripts/recoger_planos.py`
+
+Dejar de escribir mal no mueve lo ya escrito. Eso lo hace `recoger_planos.py`, que **simula por
+defecto** y sólo mueve con `--aplicar` (`/use recoger-planos` desde Telegram):
+
+```bash
+.venv/bin/python scripts/recoger_planos.py             # dice qué haría
+.venv/bin/python scripts/recoger_planos.py --aplicar   # lo hace
+```
+
+- **Fecha por el JSON del propio artefacto**, nunca por el mtime — en un clon limpio el mtime es la
+  fecha del checkout y movería el archivo entero al mes en que alguien clonó.
+- **No toca `index.json`**: es el mapa de la migración de agosto, y lo movido se encuentra
+  recorriendo las carpetas de mes. (`migrar_data.py` del repo de datos **no sirve** para esto: aquel
+  *copia* —lo plano seguiría estando— y reescribe `index.json` entero, cargándose el mapa de los 851
+  artefactos ya migrados.)
+- ⚠ **Se niega si hay algo vivo**, por dos vías porque ninguna ve lo de la otra: un `estudio_flota.py`
+  cuyo `/proc/<pid>/cwd` esté en este workspace, y cualquier run plano en estado no terminal (que es
+  lo que se ve cuando quien entrena es una máquina alquilada). Mover un directorio bajo los pies de
+  quien escribe deja los runs a medias en el sitio viejo y al escritor apuntando adonde ya no lee
+  nadie: datos ya pagados, perdidos sin un solo error.
+- ⚠ Y **excluye su propio pid y los de sus padres** del `pgrep`: `pgrep -f` casa con la línea de
+  comando entera, así que un shell que mencione `estudio_flota.py` se contaba como flota viva y
+  bloqueaba la recogida para siempre. Es la otra cara de la trampa del `pkill -f` del coordinador.
 
 ⚠ La cascada es **una escalera para migrar sin parar el mundo, no un diseño permanente**. El legado
 ya está vacío; cuando se confirme que nada lo recrea, `legado()` se borra y quedan dos escalones.
