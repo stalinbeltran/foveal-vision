@@ -179,17 +179,31 @@ cd ~/src/foveal-vision
 .venv/bin/python scripts/estudio_estimar.py --sweep do-t
 
 # 3. La flota (ESTO ES LO QUE FACTURA)
-scripts/desacoplar.sh .venv/bin/python scripts/estudio_flota.py \
-    --sweep do-t --cpu E5-26 --criba 2 --git --horas-max 6 --yes
+#    ⚠ `desacoplar.sh` vive en el COORDINADOR, no en este repo. Con la ruta
+#    relativa que usan otros planes de aquí el comando no corre. Y los secretos
+#    NO viajan por `desacoplar.sh` (a propósito: `sudo` los escribiría en claro
+#    en el journal), así que los carga el propio comando desde disco — son DOS
+#    ficheros, `.env` y `~/.config/dev-secrets.env`, y el token de Vast está en
+#    el segundo.
+"$COORD_HOME/scripts/desacoplar.sh" sh -c '
+set -a
+[ -f "$COORD_HOME/.env" ] && . "$COORD_HOME/.env"
+[ -f "$HOME/.config/dev-secrets.env" ] && . "$HOME/.config/dev-secrets.env"
+set +a
+.venv/bin/python scripts/estudio_flota.py --sweep do-t --cpu E5-26 --criba 2 \
+    --git --horas-max 6 --prefijo dr- --yes > /tmp/estudio-dropout-tanteo.log 2>&1
+node "$COORD_HOME/scripts/notify.mjs" "tanteo de dropout terminado"
+' &
 
 # 4. Leerlo
 .venv/bin/python scripts/estudio_informe.py --sweep do-t --vigente 0.0
 
-# 5. Fase 2, con el rango que manda la tabla de §5
+# 5. Fase 2. El rango NO se teclea: el script deriva el pico de los runs de
+#    `do-t` con las mismas funciones que el informe, y la tabla de §5 (que vive
+#    en TABLA_PICO) dice qué rango le toca. Se niega si el tanteo está a medias.
 .venv/bin/python scripts/estudio_dropout.py --dataset dirty1000-80px-16px-r20260827 \
-    --fase completo --pico <p*>
-scripts/desacoplar.sh .venv/bin/python scripts/estudio_flota.py \
-    --sweep do-v --cpu E5-26 --criba 2 --git --horas-max 8 --yes
+    --fase completo
+# (misma envoltura que el paso 3, cambiando do-t por do-v y horas-max a 8)
 .venv/bin/python scripts/estudio_informe.py --sweep do-v --vigente 0.0
 ```
 
@@ -198,6 +212,11 @@ scripts/desacoplar.sh .venv/bin/python scripts/estudio_flota.py \
 | Cómo va | `/use estudio-progreso` → `--sweep do-t --tabla` | nada |
 | Vigilancia máquina a máquina | `/use vigilante-avance` → `--sweep do-t --cada 600` | nada |
 | **Freno de emergencia** | `/use apagar-vast` | — |
+
+⚠ **`--prefijo dr-` no es opcional.** Es el espacio de nombres de las instancias en la cuenta, y
+es por lo que `vigilante_avance.py` distingue *sus* máquinas de las de otra sesión. Sale del
+`WORKSPACE.json` del workspace (creado hoy en `~/src`: `nombre` "src", `prefijo` `dr-`). Sin él,
+dos estudios a la vez se creen dueños de las máquinas del otro.
 
 ---
 
