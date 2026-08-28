@@ -25,22 +25,26 @@ class SweepStore:
         self.root = Path(root) if root else settings.sweeps_root()
 
     def path(self, name: str) -> Path:
-        """Donde ESTA el recorrido: plano -> archivo fechado -> legado."""
-        return artefactos.resolver("sweeps", name, self.destino(name))
+        """Donde ESTA el recorrido: plano -> archivo fechado -> legado.
+
+        La forma PLANA (`self.root`), no `destino()`: desde que `destino()`
+        siempre fecha, pasarselo aqui haria invisible todo lo que ya esta escrito
+        en la raiz plana -- que es justo lo que hay que seguir encontrando
+        mientras no se migre.
+        """
+        return artefactos.resolver("sweeps", name, self.root / name)
 
     def destino(self, name: str, spec: dict | None = None) -> Path:
-        """Donde se ESCRIBE.
+        """Donde se ESCRIBE: bajo la carpeta de mes, siempre.
 
-        Si el recorrido pertenece a un estudio YA archivado, se crea bajo el mes
-        de ese estudio: un estudio no se reparte entre carpetas porque sus pasos
-        corran en meses distintos. Sin estudio (o sin archivar), la forma plana.
+        Si el recorrido pertenece a un estudio que ya tiene mes, hereda el suyo:
+        un estudio no se reparte entre carpetas porque sus pasos corran en meses
+        distintos. Si no lo tiene -- porque este es su primer recorrido, o porque
+        el estudio no existe como artefacto (lo normal por script) -- lo estrena.
         """
-        estudio = (spec or {}).get("study")
-        if estudio:
-            d = artefactos.destino_agrupado("sweeps", name, estudio=estudio)
-            if d is not None:
-                return d
-        return self.root / name
+        d = artefactos.destino_agrupado("sweeps", name,
+                                        estudio=(spec or {}).get("study"))
+        return d if d is not None else self.root / name
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "spec.json").exists()

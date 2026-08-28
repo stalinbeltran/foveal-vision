@@ -752,6 +752,108 @@ def test_deleting_a_study_still_finds_its_grouped_sweeps(monkeypatch, tmp_path):
     assert SweepStore().used_by_study("est") == ["est-s0-lr"]
 
 
+def test_nothing_new_is_ever_written_to_the_flat_root(monkeypatch, tmp_path):
+    """El agujero que dejo `do-t` en la raiz plana el 2026-08-28.
+
+    Los `scripts/estudio_*.py` nombran su estudio en el `spec.json` y NO crean
+    el `studies/<nombre>/` -- solo el motor OAT del API lo crea. Como el mes se
+    buscaba unicamente por ese directorio, un estudio lanzado por script (o sea,
+    todos los que se han medido aqui) no tenia mes, y el recorrido y sus runs
+    caian en `<data>/sweeps/` y `<data>/runs/`, sin fecha y sin un solo aviso.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+
+    # exactamente lo que hace estudio_dropout.py: un estudio que nadie ha creado
+    sw = SweepStore().create("do-t", {"study": "dropout-2026-08-28",
+                                      "window_dataset": "x"})
+    run = RunStore().create("do-t-0000-a", {"provenance": {"sweep": "do-t"}})
+
+    datos = tmp_path / "datos"
+    assert not (datos / "sweeps").exists(), "el recorrido cayo en la raiz plana"
+    assert not (datos / "runs").exists(), "el run cayo en la raiz plana"
+    assert sw.parent.parent.name.endswith("agosto") or sw.parent.parent.parent.name
+    assert sw.relative_to(datos).parts[0].isdigit(), sw   # <anio>/<mes>/sweeps/...
+    assert run.parent.parent == sw, run                   # y dentro de SU recorrido
+    # y se sigue encontrando por su nombre, que es para lo que sirve la cascada
+    assert SweepStore().path("do-t") == sw
+    assert RunStore().path("do-t-0000-a") == run
+
+
+def test_a_study_without_an_artifact_still_keeps_one_month(monkeypatch, tmp_path):
+    """El segundo recorrido de un estudio hereda el mes del primero.
+
+    Es el invariante que el agrupamiento existe para dar ("un estudio no se
+    reparte entre carpetas de mes"), y hay que conservarlo tambien cuando el
+    estudio no es un directorio: la fase 2 de un estudio se lanza dias despues
+    de la fase 1 y puede caer al otro lado de la medianoche del dia 1.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv import artefactos
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+
+    monkeypatch.setattr(artefactos, "mes_actual", lambda: "2026/08-agosto")
+    tanteo = SweepStore().create("do-t", {"study": "do-2026", "window_dataset": "x"})
+    assert "2026/08-agosto" in str(tanteo)
+
+    # ...y la fase 2 se lanza en SEPTIEMBRE: se queda con su estudio
+    monkeypatch.setattr(artefactos, "mes_actual", lambda: "2026/09-septiembre")
+    completo = SweepStore().create("do-v", {"study": "do-2026", "window_dataset": "x"})
+    assert "2026/08-agosto" in str(completo), completo
+    run = RunStore().create("do-v-0000-a", {"provenance": {"sweep": "do-v"}})
+    assert "2026/08-agosto" in str(run), run
+    assert not (tmp_path / "datos" / "2026" / "09-septiembre").exists()
+
+    # y el artefacto del estudio, si alguien lo crea DESPUES, va con los suyos
+    from fv.studies.store import StudyStore
+    assert "2026/08-agosto" in str(StudyStore().create("do-2026", {"axes": []}, {}))
+
+
+def test_a_loose_run_gets_a_month_but_never_an_invented_sweep(monkeypatch, tmp_path):
+    """Un benchmark no pertenece a ningun recorrido, pero si a un mes.
+
+    "Un huerfano no se inventa un padre" es sobre el RECORRIDO, no sobre la
+    fecha: el README del repo de datos ya coloca los sueltos en `<mes>/runs/`.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv.training.registry import RunStore
+    d = RunStore().create("bench-foveal-1", {"provenance": {}})
+    assert d.parent.name == "runs"
+    assert d.parent.parent.parent.name.isdigit(), d      # <anio>/<mes>/runs/<run>
+    assert not (tmp_path / "datos" / "runs").exists()
+
+
+def test_what_is_already_flat_stays_visible(monkeypatch, tmp_path):
+    """Lo escrito en la raiz plana se sigue leyendo mientras no se migre.
+
+    `path()` resuelve desde la forma PLANA, no desde `destino()`. Pasarle el
+    destino -- que desde el arreglo siempre esta fechado -- haria invisible de
+    golpe todo lo que ya hay escrito ahi: el tanteo `do-t` que estaba corriendo
+    el 2026-08-28 mientras se escribia esto, entre otras cosas.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv.ioutils import write_json_atomic
+    from fv.sweeps.store import SweepStore
+    from fv.training.registry import RunStore
+
+    plano_sw = tmp_path / "datos" / "sweeps" / "viejo"
+    plano_sw.mkdir(parents=True)
+    write_json_atomic(plano_sw / "spec.json", {"study": "x", "window_dataset": "y"})
+    plano_run = tmp_path / "datos" / "runs" / "viejo-0000-a"
+    plano_run.mkdir(parents=True)
+    write_json_atomic(plano_run / "config.json", {"provenance": {"sweep": "viejo"}})
+
+    assert SweepStore().path("viejo") == plano_sw
+    assert SweepStore().exists("viejo")
+    assert "viejo" in [s["name"] for s in SweepStore().list()]
+    assert RunStore().path("viejo-0000-a") == plano_run
+    # y un run nuevo de ESE recorrido se queda con el: el mes lo separaria
+    assert RunStore().destino("viejo-0001-b",
+                              {"provenance": {"sweep": "viejo"}}).parent == plano_run.parent
+
+
 def test_the_archive_index_is_cached_per_root(monkeypatch, tmp_path):
     """La cache del indice va por RAIZ, no global.
 
@@ -771,3 +873,106 @@ def test_the_archive_index_is_cached_per_root(monkeypatch, tmp_path):
     monkeypatch.setenv("FV_DATA_ROOT", str(b))
     nombres_b = artefactos.nombres("runs", b / "runs")
     assert "run-de-b" in nombres_b and "run-de-a" not in nombres_b
+
+
+# ------------------------------- recoger lo que quedo plano (recoger_planos.py)
+#
+# El arreglo de arriba deja de ESCRIBIR plano; no mueve lo ya escrito. Eso lo
+# hace `scripts/recoger_planos.py`, y estas son las dos cosas que si se rompen
+# cuestan datos ya pagados: mover bajo los pies de una flota viva, y fechar por
+# el mtime en vez de por el JSON del propio artefacto.
+
+from pathlib import Path  # noqa: E402  (para los helpers de abajo)
+
+
+def _recoger():
+    import importlib.util
+    ruta = Path(__file__).resolve().parents[1] / "scripts" / "recoger_planos.py"
+    spec = importlib.util.spec_from_file_location("_recoger_test", ruta)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _datos_planos(raiz: Path, estado_ultimo: str = "done") -> Path:
+    """Una replica de lo que `do-t` dejo plano el 2026-08-28, con sus fechas."""
+    import json
+    raiz.mkdir(parents=True, exist_ok=True)
+    (raiz / "index.json").write_text(
+        json.dumps({"sweeps": {}, "runs": {}, "studies": {}}), encoding="utf-8")
+    sw = raiz / "sweeps" / "do-t"
+    sw.mkdir(parents=True)
+    (sw / "spec.json").write_text(
+        json.dumps({"study": "dropout-2026-08-28"}), encoding="utf-8")
+    (sw / "state.json").write_text(
+        json.dumps({"status": "queued", "updated_at": 1787880431.2}), encoding="utf-8")
+    for i, (ts, estado) in enumerate([(1787882986.2, "done"),
+                                      (1787882671.4, estado_ultimo)]):
+        r = raiz / "runs" / f"do-t-000{i}-a"
+        r.mkdir(parents=True)
+        (r / "config.json").write_text(
+            json.dumps({"provenance": {"sweep": "do-t"}}), encoding="utf-8")
+        (r / "status.json").write_text(
+            json.dumps({"status": estado, "updated_at": ts}), encoding="utf-8")
+    # un benchmark suelto de JULIO: su mes es el suyo, no el de hoy
+    b = raiz / "runs" / "bench-foveal-9"
+    b.mkdir(parents=True)
+    (b / "config.json").write_text(json.dumps({"provenance": {}}), encoding="utf-8")
+    (b / "status.json").write_text(
+        json.dumps({"status": "done", "updated_at": 1783000000.0}), encoding="utf-8")
+    return raiz
+
+
+def test_recoger_dates_by_the_json_not_by_today(monkeypatch, tmp_path):
+    """Lo recogido va al mes en que se GENERO, leido de su propio JSON.
+
+    Es la regla del README del repo de datos, y la razon es que el mtime en un
+    clon limpio es la fecha del checkout: fechar por ahi movería en bloque todo
+    el archivo al mes en que alguien clonó.
+    """
+    datos = _datos_planos(tmp_path / "datos")
+    monkeypatch.setenv("FV_DATA_ROOT", str(datos))
+    mod = _recoger()
+    monkeypatch.setattr(mod.artefactos, "mes_actual", lambda: "2031/01-enero")
+
+    movimientos, _ = mod.planear(datos)
+    destinos = {o.name: d.relative_to(datos).as_posix() for o, d in movimientos}
+    assert destinos["do-t"] == "2026/08-agosto/sweeps/do-t"
+    # el run vive DENTRO de su recorrido, y hereda su mes
+    assert destinos["do-t-0000-a"] == "2026/08-agosto/sweeps/do-t/runs/do-t-0000-a"
+    # y el suelto se queda en SU julio, no en el mes de hoy ni en el del sweep
+    assert destinos["bench-foveal-9"] == "2026/07-julio/runs/bench-foveal-9"
+    assert not any("2031" in v for v in destinos.values())
+
+
+def test_recoger_refuses_while_something_is_still_alive(monkeypatch, tmp_path):
+    """No se mueve un recorrido vivo.
+
+    Mover el directorio bajo los pies de quien escribe deja los runs a medias en
+    el sitio viejo y al escritor apuntando a un sitio que ya no lee nadie: datos
+    ya pagados, perdidos sin un solo error.
+    """
+    datos = _datos_planos(tmp_path / "datos", estado_ultimo="running")
+    monkeypatch.setenv("FV_DATA_ROOT", str(datos))
+    motivos = _recoger().motivos_para_no_tocar(datos)
+    assert any("running" in m for m in motivos), motivos
+    # ...y con todo terminado, adelante
+    limpio = _datos_planos(tmp_path / "limpio")
+    assert _recoger().motivos_para_no_tocar(limpio) == []
+
+
+def test_recoger_does_not_mistake_its_own_shell_for_a_fleet(monkeypatch, tmp_path):
+    """`pgrep -f` casa con la linea de comando entera, incluida la del shell que
+    lanzo esto. Un falso "hay una flota viva" bloquea la recogida para siempre,
+    que es peor que no comprobar: yo no soy una flota, y mi padre tampoco."""
+    import os
+    datos = _datos_planos(tmp_path / "datos")
+    monkeypatch.setenv("FV_DATA_ROOT", str(datos))
+    mod = _recoger()
+    mios = mod._yo_y_mis_padres()
+    assert str(os.getpid()) in mios
+    assert str(os.getppid()) in mios
+    # el pgrep se lo cree todo: lo que filtra es la exclusion de arriba
+    monkeypatch.setattr(mod.subprocess, "run",
+                        lambda *a, **k: type("R", (), {"stdout": str(os.getpid())})())
+    assert mod.motivos_para_no_tocar(datos) == []

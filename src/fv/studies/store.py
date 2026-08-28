@@ -22,13 +22,19 @@ class StudyStore:
         self.root = Path(root) if root else settings.studies_root()
 
     def path(self, name: str) -> Path:
-        """Donde ESTA el estudio: plano -> archivo fechado -> legado."""
-        return artefactos.resolver("studies", name, self.destino(name))
+        """Donde ESTA el estudio: plano -> archivo fechado -> legado.
+
+        La forma PLANA, no `destino()`: ver `SweepStore.path`.
+        """
+        return artefactos.resolver("studies", name, self.root / name)
 
     def destino(self, name: str) -> Path:
-        """Donde se ESCRIBE. Un estudio ESTRENA su carpeta de mes: es el que la
-        elige, y todo lo suyo -- sus recorridos y los runs de estos -- la
-        hereda. Por eso el mes se decide aqui y en ningun otro sitio."""
+        """Donde se ESCRIBE. Un estudio ESTRENA su carpeta de mes, y todo lo
+        suyo -- sus recorridos y los runs de estos -- la hereda.
+
+        Salvo que sus recorridos ya hayan estrenado una: por script el recorrido
+        se crea antes que el estudio, asi que quien llegue segundo hereda del
+        primero en vez de abrir un mes nuevo."""
         d = artefactos.destino_agrupado("studies", name)
         return d if d is not None else self.root / name
 

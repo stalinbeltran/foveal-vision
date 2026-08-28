@@ -52,8 +52,12 @@ class RunStore:
 
     def path(self, name: str) -> Path:
         """Donde ESTA el run: plano -> archivo fechado -> legado (fv.artefactos).
-        Si no esta en ningun sitio devuelve el destino de escritura."""
-        return artefactos.resolver("runs", name, self.destino(name))
+        Si no esta en ningun sitio devuelve la forma plana.
+
+        La forma PLANA, no `destino()`: ver `SweepStore.path`. Y `destino()`
+        tampoco serviria aqui, porque sin el `config` no sabe de que recorrido
+        es el run."""
+        return artefactos.resolver("runs", name, self.root / name)
 
     def destino(self, name: str, config: dict | None = None) -> Path:
         """Donde se ESCRIBE.
@@ -64,15 +68,16 @@ class RunStore:
         el mes de su recorrido -- y con el, el de su estudio.
 
         `path()` solo recibe el nombre y por eso no puede decidir esto; `create`
-        si, porque el config trae `provenance.sweep`. Sin recorrido (un
-        benchmark) o sin archivar, la forma plana.
+        si, porque el config trae `provenance.sweep`.
+
+        Un run SUELTO (un benchmark, sin `provenance.sweep`) no se inventa un
+        recorrido, pero si va bajo el mes de hoy. La forma plana queda solo para
+        el run cuyo recorrido esta plano: ahi el mes lo separaria de su
+        recorrido, y eso pesa mas que la fecha.
         """
         sweep = ((config or {}).get("provenance") or {}).get("sweep")
-        if sweep:
-            d = artefactos.destino_agrupado("runs", name, recorrido=sweep)
-            if d is not None:
-                return d
-        return self.root / name
+        d = artefactos.destino_agrupado("runs", name, recorrido=sweep)
+        return d if d is not None else self.root / name
 
     def exists(self, name: str) -> bool:
         return (self.path(name) / "config.json").exists()
