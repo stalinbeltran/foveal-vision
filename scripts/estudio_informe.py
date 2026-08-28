@@ -211,7 +211,16 @@ def main() -> int:
          "contrastes": contrastes, "pendientes": [t["run"] for t in pendientes],
          "sugerido": ganador["suggested"]["point"]},
         indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"\n<!-- tambien en {destino.relative_to(ROOT)} -->")
+    # `relative_to(ROOT)` daba ValueError desde que los artefactos viven en
+    # `foveal-vision-data`: el informe ya estaba ESCRITO y el comando salia con
+    # codigo != 0 por una linea decorativa. Desde Telegram eso no es cosmetico --
+    # el coordinador lee cualquier codigo != 0 como "el ejecutor fallo" y no
+    # corre los encargados, asi que la tabla no llega al chat. Medido 2026-08-28.
+    try:
+        mostrado = destino.relative_to(ROOT)
+    except ValueError:
+        mostrado = destino                      # otro repo: la ruta entera
+    print(f"\n<!-- tambien en {mostrado} -->")
     return 0
 
 

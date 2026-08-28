@@ -224,14 +224,124 @@ dos estudios a la vez se creen dueños de las máquinas del otro.
 
 *(Se pegan aquí cuando lleguen. El criterio de arriba no se toca.)*
 
-### 8.1 Tanteo `do-t`
+### 8.1 Tanteo `do-t` — TERMINADO
 
-*pendiente*
+**8/8 runs**, dataset `dirty1000-80px-16px-r20260827`, base `ws16-p2-d2-L4`, receta `plan40`.
+Corrido el **2026-08-28 de 01:30:11 a 04:51:22 UTC** (201,2 min de reloj), **5 máquinas
+alquiladas** (2 entrenaron; 3 se fueron en fallos de alquiler y criba), **0,3626 $**.
 
-### 8.2 Estudio completo `do-v`
+| `dropout` | f1 (media) | sem | min | max | épocas | s/época |
+|---:|---:|---:|---:|---:|---:|---:|
+| **0,0** | **0,9315** | 0,0010 | 0,9305 | 0,9326 | 47 · 54 | 35,7 |
+| 0,25 | 0,9282 | 0,0022 | 0,9260 | 0,9304 | 46 · 59 | 56,9 |
+| 0,5 | 0,9274 | 0,0025 | 0,9250 | 0,9299 | 73 · 82 | 63,2 |
+| **0,1** | **0,9129** | 0,0020 | 0,9108 | 0,9149 | 34 · 35 | 53,3 |
 
-*pendiente*
+- **R1 ✅** — recorrido válido: los 8 runs pararon por `patience`, entre 34 y 82 épocas, ninguno
+  cerca del tope de 150.
+- **R2** — gana **`dropout` = 0,0**, el vigente. δ = 0,0010 (1-SE del mejor punto), así que
+  **ningún otro valor entra en la banda**.
+- **R4** — los tres contrastes dan `p` = 0,333, que es **el suelo alcanzable con 2 contra 2**
+  (6 arreglos). Como estaba escrito: **un tanteo no declara**. Lo que sí hace es acotar, y
+  la amplitud es **0,0186**, casi el doble del umbral de 0,010 — o sea que el eje **sí mueve
+  la aguja**, sólo que hacia abajo.
 
-### 8.3 Veredicto
+⚠ **El 0,1 es el PEOR, por debajo de 0,25 y de 0,5: el eje no es monótono.** Y no parece ruido:
+sus dos semillas caen juntas (0,9108 · 0,9149) y son las que **antes paran** (34 y 35 épocas,
+contra 73-82 de `0,5`). Ver la nota de §8.4.
 
-*pendiente*
+### 8.1 bis — R5-bis: el mecanismo. **Esto es lo que este estudio ha medido de verdad**
+
+La brecha `val_loss` contra `train_loss` en la época del checkpoint, run a run:
+
+| `dropout` | seed | épocas | mejor | train_loss | val_loss | **brecha** | val_f1 |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0,0 | 1 | 54 | 44 | 0,07930 | 0,10611 | **+33,8 %** | 0,9305 |
+| 0,0 | 2 | 47 | 37 | 0,08035 | 0,10052 | **+25,1 %** | 0,9326 |
+| 0,1 | 1 | 34 | 24 | 0,14799 | 0,14336 | −3,1 % | 0,9108 |
+| 0,1 | 2 | 35 | 25 | 0,14123 | 0,13839 | −2,0 % | 0,9149 |
+| 0,25 | 1 | 46 | 36 | 0,10762 | 0,10446 | −2,9 % | 0,9260 |
+| 0,25 | 2 | 59 | 49 | 0,10521 | 0,09904 | −5,9 % | 0,9304 |
+| 0,5 | 1 | 82 | 72 | 0,11534 | 0,09809 | −15,0 % | 0,9299 |
+| 0,5 | 2 | 73 | 63 | 0,15090 | 0,12619 | −16,4 % | 0,9250 |
+
+| `dropout` | brecha media | f1 medio |
+|---:|---:|---:|
+| **0,0** | **+29,5 %** | 0,9315 |
+| 0,1 | −2,6 % | 0,9129 |
+| 0,25 | −4,4 % | 0,9282 |
+| 0,5 | −15,7 % | 0,9274 |
+
+**Dos cosas, y las dos importan:**
+
+1. **La brecha de +28 % que motivó todo esto queda CONFIRMADA de forma independiente.** Aquel
+   número salió de 612 runs viejos sobre datasets que ya no existen; aquí, sobre `r20260827` y
+   con dos semillas limpias, el `dropout` = 0,0 da **+29,5 %**. La premisa del estudio era buena.
+
+2. **`dropout` cierra esa brecha ENTERA, y ya con 0,1** (+29,5 % → −2,6 %), y con 0,5 la invierte
+   (−15,7 %: val mejor que train, que es lo que se espera cuando el ruido sólo actúa en train).
+   **O sea que regulariza exactamente como se diseñó.** Y aun así **el f1 no sube: baja en los
+   tres valores.**
+
+Ése es el segundo renglón de la tabla que este plan escribió en §5 **antes de mirar**:
+
+> *la brecha baja y el f1 no sube → el sobreajuste **no era el cuello de botella**: `patience`
+> ya lo estaba recogiendo. Cierra la hipótesis de regularización entera, y con una razón, no con
+> un encogimiento de hombros.*
+
+**Y hay un tercer dato que lo refuerza y que no estaba previsto: el `train_loss` casi se dobla**
+(0,0793 → 0,1480 con `dropout` = 0,1). El modelo no está redistribuyendo capacidad: está
+**perdiéndola**. Con 167.852 parámetros sobre este dato, la red no sobra — le falta.
+
+### 8.2 Estudio completo `do-v` — CREADO, **SIN LANZAR**
+
+El pico del tanteo es **`0,0`**, y la tabla de §5 (escrita antes de mirar, y que vive en
+`TABLA_PICO` dentro de `estudio_dropout.py`) le asigna el rango:
+
+> **`dropout` ∈ {0,0 · 0,05 · 0,1 · 0,2}** — *«el paso más pequeño del tanteo era 0,1; que 0,1 ya
+> duela NO descarta una ganancia en 0,05: cerrar "no ayuda" exige haber mirado ahí»*.
+
+El recorrido **está creado y commiteado** (`sweeps/do-v/spec.json`, 4 valores × 5 semillas =
+**20 runs**). **No se ha lanzado**: el server se destruye. Estimado **≈1,1 $** y ~3,5 h de reloj
+al ritmo real medido en el tanteo (53 s/época, no los 40 estimados).
+
+Qué añade sobre lo que ya se sabe, que no es poco:
+
+- **`0,05`, que nadie ha mirado.** Es el único punto donde podría quedar una ganancia.
+- **5 semillas**, que bajan el `p` mínimo alcanzable de 0,333 a **0,0079**: es lo que convierte
+  «el vigente gana» en **una declaración al 5 %** en vez de en una impresión.
+
+### 8.3 Veredicto — **PROVISIONAL** (falta `do-v`)
+
+**Con lo medido hasta ahora, `dropout` no mejora la capacidad predictiva de esta red, y el
+vigente `0,0` se queda.** Los tres valores probados pierden, y el mejor de ellos (0,25) pierde
+0,0033 — dentro de lo que un tanteo no puede declarar, pero sin ningún indicio en la otra
+dirección.
+
+Lo importante no es el «no», es **por qué**: el sobreajuste existía y estaba bien medido, y
+`dropout` lo elimina por completo — **y el f1 no mejora**. Junto con el resultado de
+`weight_decay` en el #14, eso cierra **los dos** mandos de regularización del inventario con la
+misma conclusión, y ahora con un mecanismo medido detrás en vez de una conjetura:
+**la brecha val/train de esta red no es el cuello de botella; `patience` ya la estaba
+recogiendo.**
+
+⚠ **No está cerrado del todo hasta que corra `do-v`**, por el punto `0,05` y por las 5 semillas.
+
+### 8.4 Lo que quedó pendiente, y una pista que vale más que el veredicto
+
+1. **Lanzar `do-v`.** Está creado y commiteado. Un comando.
+2. ⚠ **`patience` = 10 NO es neutral a lo largo de este eje, y eso confunde parte de lo medido.**
+   Las épocas van de **34-35** (`dropout` 0,1) a **73-82** (`dropout` 0,5): un factor **2,4**.
+   `dropout` mete ruido en el entrenamiento, la `val_loss` mejora a tirones, y una `patience` fija
+   corta antes. Así que parte de lo que mide este eje es *«cómo le sienta a `patience` = 10 este
+   nivel de ruido»*, no sólo *«cuánto regulariza»*. **Es la explicación más plausible de la
+   no-monotonía** (0,1 el peor y el que antes para; 0,5 el que más entrena y casi alcanza al
+   vigente). Comprobarlo es un estudio propio: `dropout` × `patience`, o `dropout` con `patience`
+   escalada. **No se ha hecho, y sin él el «no» de arriba tiene esa reserva.**
+3. **Sigue sin pasar por la métrica de tarea (R5)**, como todos los ejes del proyecto.
+4. **El s/época NO es comparable entre valores de este recorrido.** Va de 35,7 a 63,2, pero los
+   cuatro valores se corrieron **en orden en la misma máquina**, así que está confundido con el
+   momento del alquiler (las máquinas de Vast se frenan cuando entra otro inquilino: el log
+   registra la de `s1` pasando de ~36 a 53,9 s/época). **`dropout` es cost-neutral en parámetros
+   —167.852 en todo el rango, medido— y no hay razón para que cueste más.** Si el coste importa,
+   se mide aparte.
