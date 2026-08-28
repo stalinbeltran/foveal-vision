@@ -56,7 +56,7 @@ from fv.windows.extract import ExtractConfig, extract_windows
 
 BENCH_SOURCE_NAME = "dirty-1000-80px"
 BENCH_SOURCE_ID = "local/dirty-1000-80px"
-BENCH_DATASET = "bench-dirty1000-16"
+BENCH_DATASET = "bench-dirty1000-16-r20260827"
 BENCH_NETWORK = "bench-16"
 BENCH_RECIPE = "bench"
 

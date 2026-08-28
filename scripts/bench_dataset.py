@@ -59,7 +59,14 @@ from fv import settings  # noqa: E402
 DATASET_GENERADOR = "dirty-1000-699b2e01"
 FUENTE_GRANDE = "dirty-1000"
 FUENTE = "dirty-1000-80px"
-VENTANAS = "bench-dirty1000-16"
+# ⚠ Lleva la EPOCA DE RENDER en el nombre (`-r<fecha>`), y no es cosmetico.
+# Comprobado el 2026-08-27 en esta cadena: renderizar de nuevo NO da el mismo
+# `windows.npz` --la comprobacion de huella de mas abajo aborto sola-- porque el
+# motor de render no es el mismo (`cdn.playwright.dev` da 403 desde nyc1, asi
+# que se rinde con Google Chrome). Reutilizar el nombre habria dejado las dos
+# mediciones de vCPU del 2026-08-20 comparandose contra otro dato, en silencio.
+# Dato nuevo, nombre nuevo.
+VENTANAS = "bench-dirty1000-16-r20260827"
 EXTRACCION = {"window_size": 16, "stride": 8, "seed": 1}
 
 # Lo que se publica y se copia. La fuente reducida va porque permite volver a

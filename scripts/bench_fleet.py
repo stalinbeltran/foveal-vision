@@ -50,7 +50,7 @@ from fv import settings  # noqa: E402
 # El dataset del benchmark de vCPU. Tiene que coincidir con `bench_dataset.py`
 # (VENTANAS) y con `bench_speed.py`: si dejan de coincidir se mide sobre un dato
 # que no es el suyo y no se nota.
-VENTANAS = "bench-dirty1000-16"
+VENTANAS = "bench-dirty1000-16-r20260827"
 
 # Lo rellena `preparar_dataset()` antes de tocar ningun droplet: el directorio
 # del que se copia (una etapa temporal publicada desde git, o el volumen).
