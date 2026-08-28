@@ -1945,7 +1945,11 @@ def main() -> int:
         "lotes": resultados,
     }
     for s in sweeps:
-        destino = SWEEPS.destino(s["nombre"]) / "flota.json"
+        # `path()` y no `destino()`: el recorrido ya existe. Y aqui importa
+        # mas que en ningun sitio -- esto se escribe DESPUES de haber
+        # alquilado, medido y recogido la flota, asi que un directorio
+        # inexistente se lleva por delante el reporte de algo ya pagado.
+        destino = SWEEPS.path(s["nombre"]) / "flota.json"
         destino.write_text(json.dumps(reporte, indent=2, ensure_ascii=False) + "\n",
                            encoding="utf-8")
 

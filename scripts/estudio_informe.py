@@ -203,7 +203,12 @@ def main() -> int:
 
     texto = "\n".join(out)
     print(texto)
-    destino = SweepStore().destino(args.sweep) / "informe.json"
+    # `path()`, NO `destino()`: el recorrido YA existe y el informe va DENTRO
+    # de el. `destino()` dice donde se crearia uno NUEVO, que desde el
+    # agrupamiento esta siempre fechado -- con un recorrido todavia plano eso
+    # es un directorio que no existe, y el informe reventaba DESPUES de
+    # haberlo impreso entero (medido el 2026-08-28 sobre `do-t`).
+    destino = SweepStore().path(args.sweep) / "informe.json"
     destino.write_text(json.dumps(
         {"recorrido": args.sweep, "eje": args.eje, "objetivo": tabla["objective"],
          "dataset": spec["window_dataset"], "delta": delta, "delta_fuente": fuente_delta,

@@ -165,7 +165,8 @@ def main() -> int:
 
     texto = "\n".join(out)
     print(texto)
-    destino = SweepStore().destino(args.b) / "comparacion.json"
+    # `path()` y no `destino()`: ver la nota de `estudio_informe.py`
+    destino = SweepStore().path(args.b) / "comparacion.json"
     destino.write_text(json.dumps(
         {"a": {k: v for k, v in A.items() if k != "detalle"},
          "b": {k: v for k, v in B.items() if k != "detalle"},

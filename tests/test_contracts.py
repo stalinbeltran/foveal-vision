@@ -976,3 +976,38 @@ def test_recoger_does_not_mistake_its_own_shell_for_a_fleet(monkeypatch, tmp_pat
     monkeypatch.setattr(mod.subprocess, "run",
                         lambda *a, **k: type("R", (), {"stdout": str(os.getpid())})())
     assert mod.motivos_para_no_tocar(datos) == []
+
+
+def test_writing_inside_an_existing_sweep_uses_path_not_destino(monkeypatch, tmp_path):
+    """Un artefacto que va DENTRO de un recorrido que ya existe se escribe en
+    `path()`, nunca en `destino()`.
+
+    `destino()` dice donde se crearia uno NUEVO, y desde el agrupamiento eso
+    esta SIEMPRE fechado; `path()` dice donde esta el que hay. Con un recorrido
+    todavia plano las dos no coinciden, y escribir en `destino()` revienta con
+    FileNotFoundError -- pero tarde: `estudio_informe.py` ya ha impreso el
+    informe entero, y `estudio_flota.py` ya ha alquilado, medido y recogido la
+    flota. Medido el 2026-08-28 sobre `do-t`, que estaba plano.
+    """
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    from fv.ioutils import write_json_atomic
+    from fv.sweeps.store import SweepStore
+
+    plano = tmp_path / "datos" / "sweeps" / "do-t"
+    plano.mkdir(parents=True)
+    write_json_atomic(plano / "spec.json", {"study": "x", "window_dataset": "y"})
+
+    # las dos NO coinciden, que es justo lo que hace posible el fallo
+    assert SweepStore().path("do-t") == plano
+    assert SweepStore().destino("do-t") != plano
+    # ...y solo la primera es un directorio en el que se puede escribir
+    (SweepStore().path("do-t") / "informe.json").write_text("{}", encoding="utf-8")
+
+    # y ningun script escribe un artefacto suyo en `destino()`
+    for nombre, fichero in (("estudio_informe", "informe.json"),
+                            ("estudio_comparar", "comparacion.json"),
+                            ("estudio_flota", "flota.json")):
+        fuente = (Path(__file__).resolve().parents[1] / "scripts"
+                  / f"{nombre}.py").read_text(encoding="utf-8")
+        assert f'.destino(' not in fuente.split(f'/ "{fichero}"')[0].rsplit("\n", 3)[-1], \
+            f"{nombre}.py escribe {fichero} en destino() en vez de en path()"
