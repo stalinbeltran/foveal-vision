@@ -500,6 +500,166 @@ def create_app() -> FastAPI:
         result["truth"] = [{"quad": b.quad.tolist()} for b in s.blocks]
         return result
 
+    # ------------------------------------------------- revision a ojo (F x B)
+    #
+    # Mirar N imagenes de un split con las cajas encima. Es la pregunta que la
+    # metrica de tarea NO contesta: `task_score` dice cuanto acierta, esto dice
+    # QUE esta fallando. Reusa exactamente la misma puerta que aquella --
+    # provenance -> dataset -> split_map -> source -> predict_image-- para que
+    # las cajas que se miran sean las mismas que se puntuan.
+    from fv import review as review_mod
+    from fv.metrics import paragraph_f1
+
+    REVIEW_MAX = 60   # acotado por la RUTA, no por convencion: son ~30 ms de
+                      # inferencia por imagen y esto va sincrono como
+                      # /task-score. Sin tope, un N=200 desde el movil cuelga la
+                      # peticion y parece que la pagina esta rota.
+
+    def _review_target(run_name: str, window_dataset: str | None):
+        """(dataset, manifest, source_id) para un run. Misma resolucion que
+        `task_score`: la procedencia manda, y sin ella no hay contra que mirar."""
+        cfg = runs.config(run_name)
+        prov = (cfg.get("provenance") or {}).get("window_dataset") or {}
+        ds_name = window_dataset or prov.get("name")
+        if not ds_name:
+            raise _http_error(RunError(
+                "run_without_provenance",
+                f"'{run_name}' no dice de que dataset salio: no hay split que revisar",
+                "elige el dataset a mano, o reentrena el run con procedencia"))
+        manifest = wstore.manifest(ds_name)
+        return ds_name, manifest, manifest["source_id"]
+
+    @app.get("/review/context")
+    def review_context(run: str, window_dataset: str | None = None,
+                       split: str = "val", count: int = 10):
+        """Que hay que revisar de este split, SIN inferir nada.
+
+        Existe separado del lote porque contesta la pregunta barata ("cuantas
+        quedan, por donde iba") y la cara (inferir) no debe hacer falta para
+        pintar la pantalla."""
+        ds_name, manifest, source_id = _review_target(run, window_dataset)
+        indices = wstore.split_map(ds_name).get(split) or []
+        vistos = review_mod.reviewed_indices(ds_name, split)
+        n = max(1, min(int(count), REVIEW_MAX))
+        pend = [i for i in indices if i not in set(vistos)]
+        return {
+            "run": run, "window_dataset": ds_name, "split": split,
+            "source": source_id, "total": len(indices),
+            "splits": sorted(wstore.split_map(ds_name).keys()),
+            "reviewed": len(vistos), "pending": len(pend),
+            "next_offset": review_mod.next_unreviewed_offset(indices, vistos, n),
+            "marked": review_mod.marked_in(ds_name, split),
+            "storage": review_mod.donde_se_guarda(),
+        }
+
+    @app.post("/review/batch")
+    def review_batch(body: dict):
+        """Infiere un RANGO del split y deja constancia de que se miro.
+
+        El registro lo escribe ESTE endpoint, no un boton de guardar: lo que se
+        anota es que alguien miro, y una anotacion que depende de que el usuario
+        pulse algo despues es justo la que no se escribe (misma decision que
+        `record_holdout_touch`)."""
+        run_name = body["run"]
+        split = body.get("split", "val")
+        ds_name, manifest, source_id = _review_target(
+            run_name, body.get("window_dataset"))
+        indices = wstore.split_map(ds_name).get(split) or []
+        if not indices:
+            raise _http_error(RunError(
+                "split_empty", f"el split '{split}' de '{ds_name}' no tiene imagenes",
+                "elige otro split o reconstruye el dataset"))
+        count = max(1, min(int(body.get("count", 10)), REVIEW_MAX))
+        # `indices` explicitos: es como la pagina de detalle pide UNA imagen. Se
+        # admite aqui en vez de darle un endpoint propio para que haya UN solo
+        # camino de inferencia -- si el detalle tuviera el suyo, las cajas de la
+        # miniatura y las del detalle podrian dejar de ser las mismas y nadie
+        # sabria cual de las dos mirar.
+        if body.get("indices"):
+            pedidos = [int(i) for i in body["indices"]][:REVIEW_MAX]
+            fuera = [i for i in pedidos if i not in set(indices)]
+            if fuera:
+                raise _http_error(RunError(
+                    "index_not_in_split",
+                    f"{fuera} no esta(n) en el split '{split}' de '{ds_name}'",
+                    "abre la imagen desde su split, o cambia de split"))
+            trozo = pedidos
+            offset = indices.index(pedidos[0]) if pedidos else 0
+        else:
+            offset = max(0, min(int(body.get("offset", 0)),
+                                max(0, len(indices) - 1)))
+            trozo = indices[offset:offset + count]
+
+        model = _model_for(run_name)
+        try:
+            source = SourceDataset(source_id)
+        except SourceError as e:
+            raise _http_error(RunError(
+                "review_needs_source",
+                f"las imagenes salen de la fuente '{source_id}', y no esta "
+                f"({e.message})",
+                "recupera la fuente: sin ella no hay nada que mirar")) from e
+
+        kinds = set(manifest["config"]["target_kinds"])
+        marcadas = set(review_mod.marked_in(ds_name, split))
+        knobs, imgs = None, []
+        for idx in trozo:
+            s = source.sample_at(int(idx))
+            out = predict_image(
+                model, s.load_image(),
+                threshold=float(body.get("threshold", 0.5)),
+                stride=body.get("stride"), nms_radius=body.get("nms_radius"),
+                min_size=body.get("min_size"))
+            knobs = out["knobs"]
+            pred = [(p["x0"], p["y0"], p["x1"], p["y1"]) for p in out["paragraphs"]]
+            # el filtro por kind NO es opcional: es el mismo que usa task_score,
+            # y sin el la "verdad" dibujada no seria la que se puntua
+            true = [b.bbox for b in s.blocks if b.kind in kinds]
+            r = paragraph_f1(pred, true, float(body.get("iou_threshold", 0.5)))
+            imgs.append({
+                "index": int(idx), "width": s.width, "height": s.height,
+                "paragraphs": out["paragraphs"],
+                "truth": [b.quad.tolist() for b in s.blocks if b.kind in kinds],
+                "f1": r["f1"], "tp": r["tp"], "fp": r["fp"], "fn": r["fn"],
+                "marked": int(idx) in marcadas,
+            })
+
+        review_mod.record_review(
+            window_dataset=ds_name, split=split, source=source_id, run=run_name,
+            indices=[int(i) for i in trozo], offset=offset,
+            knobs={**(knobs or {})})
+        vistos = review_mod.reviewed_indices(ds_name, split)
+        return {
+            "run": run_name, "window_dataset": ds_name, "split": split,
+            "source": source_id, "offset": offset, "count": len(imgs),
+            "total": len(indices), "images": imgs, "knobs": knobs,
+            "reviewed": len(vistos),
+            "pending": len([i for i in indices if i not in set(vistos)]),
+            "next_offset": review_mod.next_unreviewed_offset(
+                indices, vistos, count),
+            "storage": review_mod.donde_se_guarda(),
+        }
+
+    @app.get("/review/sessions")
+    def review_sessions(days: int | None = None, window_dataset: str | None = None,
+                        split: str | None = None):
+        """El historial de rangos mirados, lo mas reciente primero."""
+        return {"sessions": review_mod.reviews(
+            window_dataset=window_dataset, split=split, since_days=days)}
+
+    @app.get("/review/marks")
+    def review_marks():
+        return {"marks": review_mod.mark_list(),
+                "storage": review_mod.donde_se_guarda()}
+
+    @app.post("/review/marks")
+    def review_set_mark(body: dict):
+        return review_mod.set_mark(
+            window_dataset=body["window_dataset"], split=body["split"],
+            index=int(body["index"]), marked=bool(body.get("marked", True)),
+            note=str(body.get("note", "")), source=str(body.get("source", "")),
+            run=str(body.get("run", "")))
+
     # ---------------------------------------------------------------- sweeps (H)
     @app.get("/sweeps")
     def list_sweeps():

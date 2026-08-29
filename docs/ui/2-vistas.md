@@ -91,6 +91,17 @@ Numeración del hermano donde la vista se hereda; se marca lo que cambia.
 | V16 | Deconvolución | E, ventana | el filtro | qué píxeles lo activaron | Gradiente puro, siempre divergente ±0; gana valor de la capa 2 en adelante; `silent` con palabras cuando un filtro no dispara |
 | V18 | Evidencia disponible | E, split, umbral | cuánto del párrafo cabe en la ventana | detección y posición **por separado**, por banda de evidencia | Vuelve con las cabezas de esquina (C9). `corner_evidence` congelada contra la ventana etiquetada (F1b). **Es el criterio de éxito del primer experimento**: ¿la periferia baja el `err_px` de la banda ciega sin dañar la visible? |
 
+- **FR1 — Revisión a ojo de un split** (pantalla Revisar) · *fija: E (run) y el split · varía:
+  la imagen · mide: qué detecta y qué se le escapa*: las cajas de párrafo sobre las imágenes
+  enteras del split, en miniaturas, con la verdad superpuesta. Es la pregunta que la **métrica de
+  tarea no contesta**: aquélla dice *cuánto* acierta, ésta dice *qué* falla. Se distingue de **V6**
+  (galería peor-primero) en que la unidad es la **imagen**, no la ventana, y de **V11** en que fija
+  un split entero en vez de una imagen.
+  ⚠ **Lo que la hace distinta de un panel de caché**: deja **estado propio y commiteado** — qué
+  rangos se miraron ya y qué imágenes quedaron marcadas—, así que es una entidad con su artefacto,
+  no un cruce recalculable (por eso tiene pantalla, como `Diagnóstico`). El registro lo escribe el
+  servidor **al inferir**, no un botón de guardar.
+
 **Nuevas, propias de la geometría foveada:**
 
 - **FG1 — El diagrama de zonas de una red** (en Redes, sin pesos) · *fija: C · varía: —  · mide: la

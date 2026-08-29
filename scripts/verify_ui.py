@@ -197,6 +197,26 @@ def main() -> int:
             page.wait_for_timeout(1500)
         check(page, "/predict", "text=Predecir", "11-predecir", predict_extra)
 
+        # Revisar: la rejilla infiere SOLA al entrar (no hay boton), y marcar
+        # tiene que sobrevivir al lote siguiente -- que es lo unico de esta
+        # pantalla que escribe en el repo de datos.
+        def review_extra(page):
+            page.wait_for_selector("[data-testid=review-grid] .revthumb", timeout=60000)
+            page.locator(".markbtn").first.click()
+            page.wait_for_timeout(800)
+            # y el detalle se alcanza PINCHANDO una miniatura: asi la URL sale de
+            # lo que hay en la maquina en vez de un literal inventado, que seria
+            # un 404 disfrazado de verificacion
+            page.locator("[data-testid=review-grid] a").first.click()
+            page.wait_for_selector("[data-testid=review-detail]", timeout=60000)
+        check(page, "/review", "text=Revisar detecciones", "12-revisar", review_extra)
+
+        # ⚠ Este literal existe para el catalogo de rutas (U7.9) y depende de los
+        # MISMOS fixtures que el resto del fichero (`synth-b16`, `fov-16-param`):
+        # si esa maquina no los tiene, falla en voz alta, como los demas.
+        check(page, "/review/synth-b16/val/0", "[data-testid=review-detail]",
+              "12b-revisar-detalle")
+
         browser.close()
 
     real = [e for e in errors if "favicon" not in e]
@@ -205,7 +225,7 @@ def main() -> int:
         for e in real:
             print(" ", e)
         return 1
-    print(f"\nTODO OK: 12 pantallas/interacciones sin errores. Capturas en {SHOTS}")
+    print(f"\nTODO OK: 14 pantallas/interacciones sin errores. Capturas en {SHOTS}")
     return 0
 
 

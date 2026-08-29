@@ -13,6 +13,8 @@ import Runs from "./screens/Runs";
 import RunDetail from "./screens/RunDetail";
 import Diagnostics from "./screens/Diagnostics";
 import Predict from "./screens/Predict";
+import Review from "./screens/Review";
+import ReviewDetail from "./screens/ReviewDetail";
 
 // The app-wide session control: filters/forms live in localStorage per browser;
 // "Guardar" snapshots them to a committable JSON, "Cargar" pulls it back (and
@@ -107,6 +109,7 @@ export default function App() {
         <div className="group">Analizar</div>
         <NavLink to="/diagnostics">Diagnóstico</NavLink>
         <NavLink to="/predict">Predecir</NavLink>
+        <NavLink to="/review">Revisar</NavLink>
         <SessionBar />
       </nav>
       <main className="main">
@@ -125,6 +128,8 @@ export default function App() {
           <Route path="/runs/:name" element={<RunDetail />} />
           <Route path="/diagnostics" element={<Diagnostics />} />
           <Route path="/predict" element={<Predict />} />
+          <Route path="/review" element={<Review />} />
+          <Route path="/review/:dataset/:split/:index" element={<ReviewDetail />} />
         </Routes>
         </Boundary>
       </main>

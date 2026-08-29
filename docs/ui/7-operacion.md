@@ -124,7 +124,7 @@ reason: "no se provoca una hibernacion en una corrida; la mitad del servidor (re
 
 ## Verificación y cierre
 
-**U7.9 — La UI se verifica mirándola, no razonándola.** `scripts\verify_ui.py` recorre las **12
+**U7.9 — La UI se verifica mirándola, no razonándola.** `scripts\verify_ui.py` recorre las **14
 pantallas/interacciones** con Playwright/Chromium, **falla ante cualquier error de consola o de
 página**, hace clicks reales (no solo `goto`) y deja capturas en `data/ui-shots/`. Hay Chromium en
 esta máquina: **no se entrega UI diciendo «no puedo verlo»**.
@@ -158,7 +158,7 @@ verificación en silencio (el selector expira por timeout y parece lentitud). Lo
 `task-score`, `task-row`,
 `task-split`, `task-dataset`, `task-small-sample`, `task-holdout-warn`, `task-holdout-touches`,
 `diag-summary`, `gallery`, `nine-block`, `probes`, `predict-stage`, `predict-numbers`,
-`runs-table`, `session-bar`, `screen-error`.
+`runs-table`, `session-bar`, `screen-error`, `review-grid`, `review-detail`.
 
 ```check U7.11
 substrate: fs

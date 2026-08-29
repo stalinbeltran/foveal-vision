@@ -196,3 +196,94 @@ button:disabled { opacity: 0.5; cursor: default; }
 .legenditem.off { opacity: 0.5; }
 .legenditem .swatch { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
 .legenditem input[type="checkbox"] { margin: 0; }
+
+/* ---------------------------------------------------------------- Revisar */
+/* Imagen + cajas: el <svg> va en coordenadas de la IMAGEN (viewBox), asi que
+   las cajas escalan con el contenedor y no hay que convertir a px de pantalla. */
+.boxed { position: relative; display: block; line-height: 0; }
+.boxed img { display: block; width: 100%; height: auto;
+  image-rendering: pixelated; background: var(--surface-2); }
+.boxed svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.review .revbar { position: sticky; top: 0; z-index: 4; margin-bottom: 10px; }
+.review .revbar-line { display: flex; gap: 10px; align-items: flex-end; }
+.review .revbar-line label.field { flex: 1; margin-bottom: 6px; }
+.review .revbar-nav { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.review .revbar-nav button { min-width: 44px; }
+.review .rangelabel { flex: 1; text-align: center; font-variant-numeric: tabular-nums; }
+.review .sub2 { color: var(--text-dim); font-size: 12px; }
+.review .warnline { color: var(--warn); }
+.review .revstate { margin: 0 0 12px; }
+.review .backlink { margin: 0 0 6px; }
+.review label.inline { display: inline-flex; align-items: center; gap: 6px;
+  margin-right: 14px; }
+.review .toggles { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-bottom: 10px; }
+.review .detailwrap { padding: 8px; }
+
+/* la rejilla de miniaturas de revision: mas grandes que .thumbgrid, porque aqui
+   hay que VER si la caja encaja, no contar cuantas hay */
+.thumbgrid.rev { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px; }
+.revthumb { border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  background: var(--surface); }
+.revthumb.marked { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn); }
+.revcap { display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+  font-size: 12px; }
+.revcap .ok { color: var(--ok); }
+.revcap .bad { color: var(--error); }
+.revcap .mono { flex: 0 0 auto; }
+.markbtn { margin-left: auto; background: none; border: 0; color: var(--text-dim);
+  font-size: 20px; line-height: 1; padding: 2px 6px; cursor: pointer; }
+.markbtn.on { color: var(--warn); }
+.markbtn.big { font-size: 14px; border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 12px; margin-left: 0; color: var(--text); }
+.markbtn.big.on { color: var(--warn); border-color: var(--warn); }
+
+.marklist { display: flex; flex-wrap: wrap; gap: 8px; }
+.markchip { border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 12px; background: var(--surface-2); color: var(--text); }
+.review details { margin-bottom: 8px; }
+.review summary { cursor: pointer; padding: 4px 0; }
+
+/* --------------------------------------------------------------- movil ---
+   La app nacio con un sidebar fijo de 190 px y CERO breakpoints: en un telefono
+   el caparazon aplastaba cualquier pantalla, asi que "una pagina mobile
+   friendly" no se podia conseguir sin tocar esto. Es aditivo a proposito: por
+   encima de 720 px no cambia ni un pixel de lo que ya habia. */
+@media (max-width: 720px) {
+  .app { flex-direction: column; }
+  .nav {
+    /* `display:flex` NO es opcional aqui: `.nav` es un bloque y `.nav a` es
+       `display:block`, asi que con solo `flex-direction:row` los 11 enlaces
+       seguian apilandose en vertical y empujaban la pagina 460 px hacia abajo
+       -- justo el caparazon aplastando el contenido que este bloque existe para
+       arreglar. Visto en la captura a 390 px, no leyendo el CSS. */
+    display: flex;
+    width: auto; flex-direction: row; align-items: center; gap: 4px;
+    overflow-x: auto; white-space: nowrap; padding: 6px 8px;
+    border-right: 0; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 6;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav h1, .nav .group { display: none; }
+  .nav a { flex: 0 0 auto; padding: 8px 12px; }
+  .session { display: flex; gap: 4px; margin: 0 0 0 8px; padding: 0 0 0 8px;
+    border-top: 0; border-left: 1px solid var(--border); flex: 0 0 auto; }
+  .session .linkbtn { display: inline; padding: 8px 6px; }
+  .sessionmsg { display: none; }
+  .main { padding: 12px; max-width: 100%; }
+  .card { padding: 12px; }
+  /* 16px es el minimo que NO dispara el zoom automatico de iOS al enfocar un
+     input -- con 14px el telefono hace zoom y deja la pagina descuadrada */
+  input, select, button { font-size: 16px; }
+  button { padding: 10px 16px; }
+  .thumbgrid.rev { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  /* un valor largo (los knobs son un JSON de una linea) se salia de la pantalla
+     y dejaba la pagina con scroll horizontal, que en un movil es lo que hace que
+     una pagina se sienta rota. Parte por donde sea antes que desbordar. */
+  .kv { grid-template-columns: minmax(6.5em, auto) 1fr; }
+  .kv dd { overflow-wrap: anywhere; }
+  .review .revbar { padding: 8px 10px; }
+  table.data th, table.data td { padding: 6px 6px; }
+}

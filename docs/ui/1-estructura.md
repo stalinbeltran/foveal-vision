@@ -137,8 +137,9 @@ strength: strong
 | | Runs | `/runs` · `/runs/:name` | E (lista + detalle) |
 | **Analizar** | Diagnóstico | `/diagnostics` | E×B |
 | | Predecir | `/predict` | F |
+| | Revisar | `/review` · `/review/:dataset/:split/:index` | F×B (mirar a ojo un split; deja registro de lo revisado en el repo de datos) |
 
-**Cumplimiento (verificado 2026-07-27)**: las 12 rutas existen en
+**Cumplimiento (verificado 2026-07-27; 14 rutas desde 2026-08-29)**: existen en
 [web/src/App.tsx](../../web/src/App.tsx#L114-L128) con esas etiquetas de nav.
 **U1.6 (2026-07-28)**: se escribió `violada` a propósito y se implementó el mismo día en
 [web/src/screens/Studies.tsx](../../web/src/screens/Studies.tsx) — bloque `study-plan` con los

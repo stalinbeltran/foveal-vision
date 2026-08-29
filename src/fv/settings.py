@@ -96,6 +96,21 @@ def studies_root() -> Path:
     return data_root() / "studies"
 
 
+def reviews_root() -> Path:
+    """Donde vive la REVISION A OJO: que rangos ya se miraron y que imagenes
+    quedaron marcadas para volver.
+
+    En el repo de DATOS, como runs/sweeps/studies, y por el mismo motivo (R7): lo
+    produce quien mira, no quien transporta, y el juicio de "esta salio mal" no
+    se puede re-derivar de nada -- si se pierde, se vuelve a mirar a mano.
+
+    Sin repo de datos clonado cae al repo de codigo, igual que `data_root()`:
+    degrada en vez de romper (R2), pero ahi NO se commitea nada. Quien lo lea
+    debe decirlo -- ver `review.donde_se_guarda`.
+    """
+    return data_root() / "reviews"
+
+
 def cache_root() -> Path:
     return project_root() / "data" / "cache"
 
