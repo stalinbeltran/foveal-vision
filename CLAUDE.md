@@ -900,6 +900,95 @@ dónde está.
 
 ---
 
+## La web app corre como SERVICIO, y el ajuste sobrevive a rehacer la máquina
+
+**Desde el 2026-08-29.** Antes la app eran dos terminales (`fv-api` + `npm run dev`)
+que alguien tenía que abrir a mano después de cada `lanzar launch dev`; en un server
+desechable eso significa que **no está** casi nunca. Ahora es una unidad de systemd,
+`foveal-vision-web`, y la app entera vive en **un** proceso.
+
+```bash
+python3 scripts/web_app.py preparar | estado | url | abrir | cerrar | parar | arrancar | log
+```
+
+Desde Telegram: `/use fvweb`. Sin argumentos da el estado.
+
+### Las cinco decisiones que hay que respetar si se toca
+
+1. **UN proceso, no dos, y la razón de peso es del lanzador**: `selected_services` en
+   `do_droplet.py` **rechaza** dos servicios del mismo repo, porque comparten directorio
+   y `.env`. Además el servidor de vite es una herramienta de desarrollo. Así que
+   `fv.api --web` sirve `web/dist` en `/` y monta el API en `/api`.
+
+2. ⚠ **El API va bajo `/api` y NO en la raíz** — y esto es lo que muerde: las rutas del
+   front y los recursos del API **colisionan** (`/runs`, `/sweeps`, `/studies`,
+   `/networks`, `/recipes` son cada uno una **pantalla** y un **recurso**). Servido en la
+   raíz, abrir «Runs» en el navegador devuelve el JSON del API. `/api` es además el
+   prefijo que `web/src/api.ts` ya manda y el que el proxy de vite quita en desarrollo:
+   **el front no cambia**. Tiene test.
+
+3. **Expuesta pide token, y se niega a arrancar sin él.** El API **borra** datasets,
+   runs, recorridos y estudios sin preguntar, así que `fv.api` con un `--host` que no sea
+   local y sin token **no arranca** (R2 b: o degrada con un defecto declarado, o falla
+   *antes de empezar*). Vale también para `--host 0.0.0.0` **sin** `--web`: ahí también
+   se le instala la puerta, porque sigue siendo el API entero publicado.
+
+4. ⚠ **Loopback entra SIN token, y eso sólo vale mientras nada haga de proxy delante.**
+   Sin proxy, `request.client.host` es el par real, así que `127.0.0.1` significa «ya está
+   dentro de la máquina» — y es como `cerrable.mjs` pregunta si hay un entrenamiento vivo,
+   y como no se rompe el flujo de desarrollo. **Si algún día se pone un reverse proxy, esta
+   regla se va con él**: detrás de un proxy todas las peticiones parecen locales y la
+   puerta quedaría abierta para todos. Escrito también en
+   [src/fv/api/web.py](src/fv/api/web.py).
+
+5. **`web/dist` no se commitea** (`dist/` está en `.gitignore`, y aquí se versiona la
+   descripción, no la carga). Lo construye `preparar` con `npm ci` —no `install`— para que
+   al server llegue exactamente el lockfile medido.
+
+### El token: de dónde sale, y por qué en ese orden
+
+1. `FV_WEB_TOKEN` del entorno. 2. `<repo>/.env`, que es lo que escribe el lanzador con
+`env_prefix: "FVW_"` — **el único camino por el que un token sobrevive a rehacer el dev**,
+así que con `FVW_WEB_TOKEN` en el `.env` del lanzador la URL se puede marcar en el móvil
+una vez y ya. 3. `~/.config/fv-web.env` (modo 600), generado en la máquina la primera vez:
+efímero como ella, y se pregunta con `/use fvweb` → `url`.
+
+⚠ **El token viaja en `?t=` la primera vez** porque es la única forma de dárselo a un
+navegador de móvil. Queda en el log de acceso de este proceso; en cuanto entra, se guarda
+en cookie y se **rebota a la misma ruta sin él**, para que deje de estar en marcadores,
+enlaces y `Referer`.
+
+### El freno va con el acelerador (R11), y aquí no era el obvio
+
+Esto **no** gasta dinero nuevo: el droplet factura por existir. Lo que introduce es una
+forma nueva de **perder trabajo**: un entrenamiento lanzado desde el navegador vive en un
+**hilo** de `fv.api` (`JobQueue`, `max_workers=1`), no en un proceso propio — así que
+`cerrable.mjs`, que casa **líneas de comando**, no podía verlo, y un barrido lanzado desde
+el móvil se habría perdido con el veredicto en 🟢. Ahora `cerrable.mjs` le pregunta a
+`/api/jobs` por loopback; seis tests en `telegram-coordinator/tests/cerrable-webapp.test.mjs`.
+
+El otro freno es la **exposición**: `web_app.py cerrar` cierra el puerto en `ufw` sin parar
+el proceso — lo que se quita es que se llegue desde fuera, no el trabajo que haya dentro.
+
+### Dónde vive cada pieza, y por qué ahí (R7)
+
+| Pieza | Dónde | Por qué |
+|---|---|---|
+| cómo se sirve, se prepara y se arranca | **aquí** (`src/fv/api/web.py`, `scripts/web_app.py`) | es de quien produce la app, no de quien la transporta |
+| que exista como unidad de systemd | lanzador (`services/foveal-vision-web.json`) | es el mecanismo declarado del lanzador para un proceso de larga vida, y da gratis `service logs`, `update` y el reinicio al hacer `git pull` |
+| que **toda** máquina `dev` la traiga | lanzador (`types/dev.json`) | si hay que acordarse de un `--service`, tarde o temprano no se pide |
+| instalarla en una máquina YA viva | lanzador (`do_droplet.py install-service`) | `update` traía código y reiniciaba lo instalado, pero una unidad **nueva** sólo la escribía `provision`: declararla llegaba a las máquinas futuras y no a ésta |
+
+⚠ **El puerto lo abre `preparar` en `ufw`, no `cloud-init`**: cloud-init vale para **todas**
+las máquinas y este puerto sólo tiene sentido donde corre este servicio.
+
+⚠ **Y el `:8010` puede estar ocupado por un `fv-api` lanzado a mano.** Pasó el 2026-08-29
+con uno de `~/ws/tema-2` puesto con `setsid nohup`, huérfano de la sesión que lo arrancó.
+Un servicio con `Restart=always` contra un puerto ocupado no falla de una vez: se reinicia
+en bucle con un «address already in use» que parece un fallo suyo. Por eso `estado` dice
+**de quién es** el puerto (pid y **cwd**, que es lo que identifica al dueño con varios
+workspaces, misma lección que `cerrable.mjs`).
+
 ## Los datos de los estudios van a `foveal-vision-data`, no aquí
 
 **Desde 2026-08-27, por decisión del usuario: todo dato generado por un estudio se guarda en el
@@ -1359,8 +1448,12 @@ Aquí queda sólo lo que se dispara **en este repo**, que es lo que cuesta diner
   llegan con `git pull` **a `main`** — que es donde se commitea todo (regla de rama). Se
   escriben como si estuvieras dentro de este repo (el cwd ya es su raíz: nada de
   `cd ~/src/foveal-vision &&`), con `descripcion` y `ejemplos` en el mismo fichero, y
-  `$COORD_HOME` para llamar a algo del coordinador (`notify.mjs`, `desacoplar.sh`). Hoy hay
-  uno: `bench`. El porqué está en
+  `$COORD_HOME` para llamar a algo del coordinador (`notify.mjs`, `desacoplar.sh`). Son
+  varios; `bench` y `fvweb` son los dos que hay que conocer.
+  ⚠ **Terminan en `; true`** (o no fallan nunca): el coordinador lee cualquier código ≠ 0
+  como «el ejecutor falló» y entonces **no corre los encargados**, o sea que la respuesta no
+  llega a Telegram. El veredicto va en el **texto**, que es donde se lee — la misma razón
+  por la que `cerrable.mjs` se invoca con `--exit0`. El porqué está en
   [`telegram-coordinator/docs/ejecutores-federados.md`](https://github.com/stalinbeltran/telegram-coordinator/blob/main/docs/ejecutores-federados.md).
 - **Stack**: Python 3.12 (PyTorch no tiene wheels para 3.14) + PyTorch + FastAPI + Vite/React.
   En Windows el intérprete será `.\.venv\Scripts\python.exe`. Paquete `fv`, layout `src/`.

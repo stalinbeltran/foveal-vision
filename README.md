@@ -136,6 +136,37 @@ valida en vivo: dimensiones derivadas, rangos calculados y el diagrama de zonas;
 edita por `n_layers` + `channels` por capa). **Estudios** encadena barridos por ejes (OAT):
 deriva la base del problema, arrastra el ganador y guía paso a paso.
 
+### En un server: **un** proceso, siempre disponible
+
+Lo de arriba son dos terminales en la máquina de desarrollo. En un droplet —que
+es desechable y se opera desde el móvil— la app corre como **servicio**, en un
+solo proceso: `fv.api --web` sirve el front construido (`web/dist`) en `/` y
+monta el API en `/api`, que es el prefijo que el front ya usa. Sin vite, sin
+CORS y sin dos terminales que abrir después de cada lanzamiento.
+
+```bash
+python3 scripts/web_app.py preparar   # venv + npm ci + build + token + abre el puerto
+python3 scripts/web_app.py estado     # ¿está viva? ¿se llega desde fuera? ¿dónde?
+python3 scripts/web_app.py url        # la URL con el token, para pegar en el móvil
+python3 scripts/web_app.py cerrar     # el freno: deja de estar disponible desde fuera
+```
+
+Desde Telegram, lo mismo con el ejecutor **`fvweb`** (`/use fvweb`, luego `url`).
+
+⚠ **Expuesta pide token, y no es opcional.** El API **borra** datasets, runs,
+recorridos y estudios sin preguntar, así que `fv.api` **se niega a arrancar** con
+un `--host` que no sea local si no hay token: un puerto abierto sin puerta es una
+capacidad destructiva publicada. Desde `127.0.0.1` no se pide (el flujo de
+desarrollo de arriba no cambia, y es como `cerrable.mjs` pregunta si hay un
+entrenamiento dentro). El detalle y sus dos advertencias, en
+[src/fv/api/web.py](src/fv/api/web.py).
+
+**Y persiste al rehacer la máquina**, que es el punto: el servicio está declarado
+en el lanzador (`services/foveal-vision-web.json`) y en `types/dev.json`, así que
+un `lanzar launch dev` nuevo trae la app puesta sin que nadie se acuerde de nada.
+En una máquina que ya está viva:
+`python3 scripts/do_droplet.py install-service --service foveal-vision-web`.
+
 Al seleccionar un **Recorrido** se superponen las curvas de val (loss / f1 / pos_err_px) de
 **todos sus runs** en tres small-multiples: una línea de color por run, con leyenda de casillas
 para ocultar/mostrar cada uno (o todos), y un conmutador **líneas por run ↔ media ± banda**

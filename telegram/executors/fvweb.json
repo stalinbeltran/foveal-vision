@@ -1,0 +1,21 @@
+{
+  "name": "fvweb",
+  "descripcion": "La web app de foveal-vision servida en este server: donde esta, si se llega desde fuera, y abrirla o cerrarla al mundo. Sin argumentos, el estado.",
+  "ejemplos": [
+    "url",
+    "estado",
+    "cerrar",
+    "abrir",
+    "log",
+    "parar",
+    "arrancar"
+  ],
+  "command": "A=\"{{input}}\"; python3 scripts/web_app.py ${A:-estado} 2>&1; true",
+  "encargados": [
+    "echo"
+  ],
+  "timeoutMs": 120000,
+  "requiere": [
+    "python3"
+  ]
+}

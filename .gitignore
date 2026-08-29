@@ -246,6 +246,11 @@ __marimo__/
 /studies/
 
 /web/node_modules/
+# Cache incremental de `tsc -b`. Estaba rastreado y cambiaba en CADA build; desde
+# que la app se construye sola al instalarse como servicio (2026-08-29), eso
+# dejaba el repo sucio despues de cada aprovisionamiento y `cerrable.mjs` en 🔴
+# permanente por un fichero que no es trabajo de nadie.
+/web/*.tsbuildinfo
 /web/.vite/
 
 # artefactos del plan de 40 h (logs y marcadores, no descripcion)
