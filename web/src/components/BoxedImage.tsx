@@ -6,7 +6,9 @@ import React from "react";
 // se ve distinta que el detalle" es un bug que nadie sabe donde mirar.
 //
 // La imagen la sirve y la REDIMENSIONA el backend (`?w=`), que en un movil es
-// la diferencia entre 240 px y la imagen entera por cada miniatura. El overlay
+// la diferencia entre 240 px y la imagen entera por cada miniatura. De DONDE la
+// sirve (la fuente A, o el `windows.npz` cuando la fuente no esta en esta
+// maquina) lo decide el servidor y llega en `base`: aqui no se elige. El overlay
 // va en un <svg> con viewBox en coordenadas de la IMAGEN, asi que las cajas
 // escalan solas con el contenedor y no hay que convertir nada a pixeles de
 // pantalla.
@@ -14,7 +16,9 @@ import React from "react";
 export type Box = { x0: number; y0: number; x1: number; y1: number };
 
 export function BoxedImage(props: {
-  source: string;
+  /** de donde sale el PNG, decidido por el SERVIDOR (`image_base`): puede ser la
+      fuente o el propio dataset de ventanas. El front no repite esa regla. */
+  base: string;
   index: number;
   width: number;
   height: number;
@@ -26,7 +30,7 @@ export function BoxedImage(props: {
   fetchWidth?: number;
   alt?: string;
 }) {
-  const { source, index, width: W, height: H } = props;
+  const { base, index, width: W, height: H } = props;
   const q = props.fetchWidth ? `?w=${props.fetchWidth}` : "";
   const showPred = props.showPred ?? true;
   const showTruth = props.showTruth ?? true;
@@ -36,7 +40,7 @@ export function BoxedImage(props: {
   return (
     <div className="boxed">
       <img
-        src={`/api/sources/${source}/samples/${index}/image${q}`}
+        src={`${base}/${index}/image${q}`}
         alt={props.alt ?? `imagen ${index}`}
         loading="lazy"
         width={W}

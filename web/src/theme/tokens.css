@@ -273,6 +273,13 @@ button:disabled { opacity: 0.5; cursor: default; }
   .session .linkbtn { display: inline; padding: 8px 6px; }
   .sessionmsg { display: none; }
   .main { padding: 12px; max-width: 100%; }
+  /* DOS barras pegajosas en top:0 se tapan: la nav gana por z-index y se comia
+     los 50 px de arriba de los controles (el select de dataset) en cuanto
+     scrollabas. Medido el 2026-08-29 con Chrome a 390x780 contra el server real:
+     nav 0..50, revbar 0..247. La barra de la pantalla se pega DEBAJO de la nav.
+     `--nav-h` es la altura medida de esa nav; si cambia, este numero con ella. */
+  :root { --nav-h: 50px; }
+  .review .revbar { top: var(--nav-h); }
   .card { padding: 12px; }
   /* 16px es el minimo que NO dispara el zoom automatico de iOS al enfocar un
      input -- con 14px el telefono hace zoom y deja la pagina descuadrada */
@@ -293,3 +300,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .inferbtn { width: 100%; margin-top: 6px; }
 .review .dirtyhint { color: var(--warn); }
 @media (min-width: 721px) { .inferbtn { width: auto; } }
+
+/* lo que FALTA se dice: sin modelo o sin la fuente, una rejilla sin cajas se
+   leeria como "la red no detecta nada", que es la conclusion equivocada */
+.review .avisobox { border-left: 3px solid var(--warn); }
+.review .avisobox code { font-family: ui-monospace, monospace; font-size: 12px; }

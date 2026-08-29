@@ -43,7 +43,7 @@ def test_mirar_deja_rastro_sin_pulsar_nada(client):
     from fv import review
 
     assert review.reviews() == []
-    r = c.post("/review/batch", json={"run": w["run"], "split": "val", "count": 2})
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val", "count": 2})
     assert r.status_code == 200, r.text
     hist = review.reviews()
     assert len(hist) == 1
@@ -61,8 +61,8 @@ def test_el_historial_solo_se_añade_y_las_marcas_se_reescriben(client):
     c, w = client
     from fv import review, settings
 
-    c.post("/review/batch", json={"run": w["run"], "split": "val", "count": 1})
-    c.post("/review/batch", json={"run": w["run"], "split": "val", "count": 1,
+    c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val", "count": 1})
+    c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val", "count": 1,
                                   "offset": 1})
     assert len(review.reviews()) == 2          # historial: solo crece
 
@@ -84,9 +84,9 @@ def test_lo_ya_revisado_se_acumula_entre_sesiones(client):
     c, w = client
     from fv import review
 
-    a = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    a = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                       "count": 1, "offset": 0}).json()
-    b = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    b = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                       "count": 1, "offset": 1}).json()
     vistos = review.reviewed_indices(a["window_dataset"], "val")
     assert vistos == sorted([a["images"][0]["index"], b["images"][0]["index"]])
@@ -99,13 +99,13 @@ def test_saltar_a_lo_no_revisado_avanza_y_no_da_vueltas(client):
     c, w = client
     from fv import review
 
-    ctx = c.get(f"/review/context?run={w['run']}&split=val&count=1").json()
+    ctx = c.get(f"/review/context?window_dataset={w['dataset']}&split=val&count=1").json()
     total = ctx["total"]
     assert total >= 2, "el mundo mini necesita al menos 2 imagenes en val"
 
     off = 0
     for _ in range(total):
-        r = c.post("/review/batch", json={"run": w["run"], "split": "val",
+        r = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                           "count": 1, "offset": off}).json()
         off = r["next_offset"]
     assert r["pending"] == 0
@@ -120,10 +120,10 @@ def test_los_splits_no_se_contaminan(client):
     c, w = client
     from fv import review
 
-    r = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                       "count": 2}).json()
     assert review.reviewed_indices(r["window_dataset"], "train") == []
-    t = c.get(f"/review/context?run={w['run']}&split=train&count=2").json()
+    t = c.get(f"/review/context?window_dataset={w['dataset']}&split=train&count=2").json()
     assert t["reviewed"] == 0
 
 
@@ -139,7 +139,7 @@ def test_las_cajas_son_las_MISMAS_que_puntua_la_metrica_de_tarea(client):
     # (1 epoca) no detecta NADA, y entonces esta prueba comparaba [] con [] y
     # habria pasado igual con el endpoint devolviendo cajas inventadas. Un test
     # que no puede fallar no es un test. La asercion de abajo lo fija.
-    r = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                       "count": 2, "threshold": 0.1}).json()
     assert sum(len(i["paragraphs"]) for i in r["images"]) > 0, \
         "sin ninguna caja esta comparacion no comprueba nada"
@@ -158,7 +158,7 @@ def test_la_verdad_se_filtra_por_kind_como_en_task_score(client):
     from fv.datasets.loader import SourceDataset
     from fv.windows.store import WindowDatasetStore
 
-    r = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                       "count": 2}).json()
     kinds = set(WindowDatasetStore().manifest(r["window_dataset"])["config"]["target_kinds"])
     source = SourceDataset(w["source"])
@@ -174,18 +174,18 @@ def test_indices_explicitos_dan_UNA_imagen_y_rechazan_lo_de_otro_split(client):
     """Es como pide la pagina de detalle. Un indice que no esta en el split es un
     400 con su motivo, no una imagen de otro sitio."""
     c, w = client
-    r0 = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    r0 = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                        "count": 1}).json()
     idx = r0["images"][0]["index"]
 
-    uno = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    uno = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                         "indices": [idx]})
     assert uno.status_code == 200
     assert [i["index"] for i in uno.json()["images"]] == [idx]
 
     from fv.windows.store import WindowDatasetStore
     train_idx = WindowDatasetStore().split_map(r0["window_dataset"])["train"][0]
-    malo = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    malo = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                          "indices": [int(train_idx)]})
     assert malo.status_code == 400
     assert malo.json()["detail"]["code"] == "index_not_in_split"
@@ -195,7 +195,7 @@ def test_el_lote_esta_acotado_por_la_ruta(client):
     """Sin tope, un N grande desde el movil cuelga la peticion y parece que la
     pagina esta rota. El tope es de la ruta, no una convencion del cliente."""
     c, w = client
-    r = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                       "count": 9999}).json()
     assert len(r["images"]) <= 60
     assert len(r["images"]) <= r["total"]
@@ -207,7 +207,7 @@ def test_dice_si_lo_que_guarda_acaba_en_el_repo_de_datos(client):
     perderlas sin un solo error es justo el fallo silencioso que este proyecto
     rechaza. Por eso viaja en el payload."""
     c, w = client
-    r = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                       "count": 1}).json()
     assert "storage" in r
     assert set(r["storage"]) == {"path", "in_data_repo"}
@@ -220,7 +220,7 @@ def test_una_linea_rota_no_tumba_el_historial(client):
     c, w = client
     from fv import review, settings
 
-    c.post("/review/batch", json={"run": w["run"], "split": "val", "count": 1})
+    c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val", "count": 1})
     f = sorted(settings.reviews_root().glob("*.jsonl"))[0]
     with f.open("a", encoding="utf-8") as fh:
         fh.write("{esto no es json\n")
@@ -231,14 +231,14 @@ def test_marcar_sobrevive_y_se_ve_en_el_lote_siguiente(client):
     """La marca es del par (dataset, split, indice), no de la sesion: por eso se
     vuelve a ver al pasar por ese rango otra vez."""
     c, w = client
-    r0 = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    r0 = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                        "count": 2}).json()
     idx = r0["images"][0]["index"]
     assert c.post("/review/marks", json={
         "window_dataset": r0["window_dataset"], "split": "val",
         "index": idx, "marked": True, "note": "caja partida"}).status_code == 200
 
-    r1 = c.post("/review/batch", json={"run": w["run"], "split": "val",
+    r1 = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val",
                                        "count": 2}).json()
     marcadas = {i["index"]: i["marked"] for i in r1["images"]}
     assert marcadas[idx] is True
@@ -254,7 +254,7 @@ def test_el_historial_se_filtra_por_dias(client):
     from datetime import datetime, timedelta, timezone
     from fv import review
 
-    c.post("/review/batch", json={"run": w["run"], "split": "val", "count": 1})
+    c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val", "count": 1})
     review.record_review(window_dataset="mini-b8", split="val", source="x",
                          run=w["run"], indices=[0], offset=0,
                          when=datetime.now(timezone.utc) - timedelta(days=30))
@@ -269,7 +269,7 @@ def test_un_split_vacio_se_niega_con_su_motivo(client):
     tanto el mismo 409 de `CONFLICT_CODES`: dos endpoints que contestan distinto
     a la misma causa son dos vocabularios que el cliente tiene que aprender."""
     c, w = client
-    r = c.post("/review/batch", json={"run": w["run"], "split": "noexiste",
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "noexiste",
                                       "count": 2})
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "split_empty"
@@ -297,7 +297,8 @@ def test_mirar_dos_veces_el_mismo_rango_no_duplica_la_linea(client):
     from datetime import datetime, timedelta, timezone
     from fv import review
 
-    peticion = {"run": w["run"], "split": "val", "count": 1, "offset": 0}
+    peticion = {"window_dataset": w["dataset"], "run": w["run"],
+                "split": "val", "count": 1, "offset": 0}
     for _ in range(4):
         c.post("/review/batch", json=peticion)
     assert len(review.reviews()) == 1
@@ -315,7 +316,146 @@ def test_cambiar_de_rango_siempre_deja_linea(client):
     otra mirada, y perderla seria perder justo lo que hace util el fichero."""
     c, w = client
     from fv import review
-    c.post("/review/batch", json={"run": w["run"], "split": "val", "count": 1, "offset": 0})
-    c.post("/review/batch", json={"run": w["run"], "split": "val", "count": 1, "offset": 1})
-    c.post("/review/batch", json={"run": w["run"], "split": "val", "count": 1, "offset": 0})
+    c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val", "count": 1, "offset": 0})
+    c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val", "count": 1, "offset": 1})
+    c.post("/review/batch", json={"window_dataset": w["dataset"], "run": w["run"], "split": "val", "count": 1, "offset": 0})
     assert len(review.reviews()) == 3
+
+
+# --- lo que manda es el DATASET, no el run ----------------------------------
+
+def test_el_contexto_NO_devuelve_los_runs_de_la_maquina_sino_los_del_dataset(client):
+    """El fallo que se vio en el server real: el select principal era el run y
+    ahi son 859, con lo que la pantalla quedaba inservible. Ahora el servidor los
+    filtra, y el front ni pide /runs."""
+    c, w = client
+    ctx = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    assert [r["name"] for r in ctx["runs"]] == [w["run"]]
+    assert ctx["runs"][0]["has_checkpoint"] is True
+
+    # un run de OTRO dataset no aparece aqui
+    from fv.training.loop import train
+    from fv.training.recipe import Recipe
+    from fv.windows.extract import ExtractConfig, extract_windows
+    from fv import settings
+    from tests.conftest import TINY_NET
+    extract_windows(ExtractConfig(source=w["source"], window_size=8, stride=7,
+                                  val_frac=0.2, test_frac=0.2, seed=2),
+                    settings.window_datasets_root() / "otro-b8")
+    train("otro-run", "otro-b8", "n", TINY_NET, "r",
+          Recipe(epochs=1, batch_size=32), store=w["store"])
+    ctx2 = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    assert "otro-run" not in [r["name"] for r in ctx2["runs"]]
+
+
+def test_solo_se_ofrecen_datasets_CON_npz(client):
+    """Un manifest sin `windows.npz` describe un dataset cuyo dato se perdio (16
+    de 18 en el server real). Ofrecerlo es prometer imagenes que no existen."""
+    c, w = client
+    from fv import settings
+    import json as _json
+    vacio = settings.window_datasets_root() / "sin-dato"
+    vacio.mkdir(parents=True)
+    (vacio / "manifest.json").write_text(
+        _json.dumps({"source_id": w["source"], "num_samples": 3,
+                     "config": {"target_kinds": ["paragraph"]},
+                     "windows_per_split": {"val": 1}}), encoding="utf-8")
+
+    nombres = [d["name"] for d in c.get("/review/datasets").json()["datasets"]]
+    assert w["dataset"] in nombres
+    assert "sin-dato" not in nombres
+
+
+def test_SIN_run_se_ven_las_imagenes_igual(client):
+    """Lo que hace utilizable la pantalla en una maquina que solo tiene el repo
+    de datos: los `*.pt` no viajan por git, asi que exigir un run seria no poder
+    mirar nunca el dataset que SI viajo."""
+    c, w = client
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"],
+                                      "split": "val", "count": 2})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["inferred"] is False
+    assert d["run"] is None
+    assert len(d["images"]) == 2
+    assert all(i["paragraphs"] == [] for i in d["images"])
+    # ...y mirar sin modelo SIGUE siendo mirar
+    from fv import review
+    assert len(review.reviews()) == 1
+
+
+def test_un_run_SIN_checkpoint_se_niega_diciendo_por_que(client):
+    """No basta con no ofrecerlo: si llega igual, el error tiene que explicar que
+    los pesos no viajan por git, no un 500 opaco."""
+    c, w = client
+    (w["store"].path(w["run"]) / "best.pt").unlink()
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"],
+                                      "split": "val", "count": 1,
+                                      "run": w["run"]})
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "run_has_no_checkpoint"
+    assert "gitignore" in r.json()["detail"]["hint"]
+    ctx = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    assert ctx["runs"][0]["has_checkpoint"] is False
+
+
+def test_sin_fuente_las_imagenes_salen_del_npz_y_se_DICE_que_no_hay_verdad(client):
+    """El caso del server real: 0 fuentes. Las imagenes estan en el npz (que si
+    esta commiteado) y la verdad no, porque vive en labels.jsonl de A. Dibujar un
+    overlay vacio se leeria como "la red no se dejo nada"."""
+    c, w = client
+    from fv import settings
+    import shutil
+    shutil.rmtree(settings.local_sources_root())
+
+    d = c.post("/review/batch", json={"window_dataset": w["dataset"],
+                                      "split": "val", "count": 2}).json()
+    assert d["truth_available"] is False
+    assert all(i["truth"] == [] for i in d["images"])
+    assert d["image_base"] == f"/api/window-datasets/{w['dataset']}/samples"
+    # y la imagen se sirve de verdad, no es una promesa del payload
+    img = c.get(f"{d['image_base'][4:]}/{d['images'][0]['index']}/image")
+    assert img.status_code == 200
+    assert img.headers["content-type"] == "image/png"
+
+
+def test_los_pixeles_del_npz_son_los_MISMOS_que_los_de_la_fuente(client):
+    """Si no lo fueran, mirar sin fuente ensenaria otra cosa que mirar con ella,
+    y nadie sabria cual de las dos es la buena."""
+    c, w = client
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    from fv.datasets.loader import SourceDataset
+    d = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    i = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    idx = 0
+    con_fuente = np.asarray(SourceDataset(w["source"]).sample_at(idx).load_image())
+    r = c.get(f"/window-datasets/{w['dataset']}/samples/{idx}/image")
+    del_npz = np.asarray(Image.open(io.BytesIO(r.content)).convert("L"))
+    assert np.array_equal(con_fuente, del_npz)
+    assert d["image_base"].endswith("/samples") and i["image_size"]
+
+
+def test_el_servidor_decide_de_donde_sale_el_PNG(client):
+    """`image_base` viaja en el payload para que el front no tenga su propia
+    copia de la regla "hay fuente o no": dos copias divergen."""
+    c, w = client
+    from fv import settings
+    import shutil
+    con = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    assert con["image_base"].startswith("/api/sources/")
+    shutil.rmtree(settings.local_sources_root())
+    sin = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    assert sin["image_base"].startswith("/api/window-datasets/")
+
+
+def test_un_dataset_que_no_existe_cae_al_primero_valido(client):
+    """El nombre recordado en el navegador puede haber desaparecido. Caer al
+    primero es mejor que un 404 sobre una pantalla que si tiene algo que ensenar
+    -- pero el que cae lo decide el SERVIDOR, y lo dice."""
+    c, w = client
+    ctx = c.get("/review/context?window_dataset=no-existe&split=val").json()
+    assert ctx["window_dataset"] == w["dataset"]

@@ -194,6 +194,34 @@ def create_app() -> FastAPI:
                 "pixels": crop.tolist(),
                 "split": int(arrays["split"][index])}
 
+    @app.get("/window-datasets/{name}/samples/{index}/image")
+    def window_dataset_image(name: str, index: int, w: int | None = None):
+        """La imagen ENTERA de una muestra, sacada del `windows.npz`.
+
+        Existe porque el npz es lo que de verdad viaja por git y las FUENTES no:
+        medido el 2026-08-29 en un dev recien hecho, `discover_sources()` devolvia
+        0 y con ello no habia una sola imagen que mirar. `extract.py` las guarda
+        verbatim (`images[si] = s.load_image()`), asi que estos pixeles son
+        exactamente los que el modelo miro -- no una reconstruccion.
+
+        Es el gemelo de `/sources/{id}/samples/{i}/image`, con la misma firma y
+        el mismo `?w=` para el movil: quien pinta no tiene que saber de cual de
+        los dos vino (`image_base` en la respuesta de revision lo decide una vez).
+        """
+        arrays = wstore.arrays(name)
+        lookup = {int(a): i for i, a in enumerate(arrays["images_sample_idx"])}
+        if int(index) not in lookup:
+            raise _http_error(WindowStoreError(
+                "sample_not_found", f"'{name}' no guarda la muestra {index}",
+                "usa un indice de los que trae el split"))
+        from PIL import Image
+        img = Image.fromarray(arrays["images"][lookup[int(index)]], mode="L")
+        if w and w < img.width:
+            img = img.resize((w, int(img.height * w / img.width)))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return Response(content=buf.getvalue(), media_type="image/png")
+
     @app.get("/window-datasets/{name}/windows")
     def window_list(name: str, split: str | None = None, offset: int = 0,
                     limit: int = 24, positives_only: bool = False):
@@ -515,36 +543,98 @@ def create_app() -> FastAPI:
                       # /task-score. Sin tope, un N=200 desde el movil cuelga la
                       # peticion y parece que la pagina esta rota.
 
-    def _review_target(run_name: str, window_dataset: str | None):
-        """(dataset, manifest, source_id) para un run. Misma resolucion que
-        `task_score`: la procedencia manda, y sin ella no hay contra que mirar."""
-        cfg = runs.config(run_name)
-        prov = (cfg.get("provenance") or {}).get("window_dataset") or {}
-        ds_name = window_dataset or prov.get("name")
-        if not ds_name:
-            raise _http_error(RunError(
-                "run_without_provenance",
-                f"'{run_name}' no dice de que dataset salio: no hay split que revisar",
-                "elige el dataset a mano, o reentrena el run con procedencia"))
+    def _reviewable() -> list[dict]:
+        """Los datasets que se PUEDEN revisar: los que traen `windows.npz`.
+
+        Es la lista corta a proposito. Un `manifest.json` sin npz describe un
+        dataset cuyo dato se perdio (hay 16 asi hoy), y ofrecerlo en un select es
+        prometer imagenes que no existen.
+        """
+        out = []
+        for m in wstore.list():
+            if not (wstore.path(m["name"]) / "windows.npz").exists():
+                continue
+            try:
+                fuente_ok = bool(SourceDataset(m["source_id"]))
+            except (SourceError, KeyError):
+                fuente_ok = False
+            out.append({
+                "name": m["name"], "source": m.get("source_id"),
+                "source_available": fuente_ok,
+                "images": m.get("num_samples"),
+                "splits": sorted((m.get("windows_per_split") or {}).keys()),
+            })
+        return out
+
+    def _review_ctx(ds_name: str):
+        """(manifest, source o None). Sin fuente NO se falla: las imagenes salen
+        del npz, que es justo lo que si viaja por git. Lo que se pierde es la
+        VERDAD (los parrafos reales viven en labels.jsonl de A), y eso se dice en
+        el payload en vez de dibujar un overlay vacio que se lea como "la red no
+        se dejo nada" (R2: degradar con un defecto declarado)."""
         manifest = wstore.manifest(ds_name)
-        return ds_name, manifest, manifest["source_id"]
+        try:
+            return manifest, SourceDataset(manifest["source_id"])
+        except (SourceError, KeyError):
+            return manifest, None
+
+    def _runs_de(ds_name: str) -> list[dict]:
+        """Los runs de ESTE dataset, con si tienen checkpoint.
+
+        Filtrar aqui y no en el front es lo que quita el select de 859 runs: la
+        lista ya trae `window_dataset`, asi que no cuesta una lectura de mas.
+        """
+        out = []
+        for r in runs.list():
+            if r.get("window_dataset") != ds_name:
+                continue
+            out.append({"name": r["name"], "status": r.get("status"),
+                        "best": r.get("best"),
+                        "has_checkpoint": (runs.path(r["name"]) / "best.pt").exists()})
+        # los que pueden inferir primero: un select cuyo primer elemento falla
+        # ensena un error antes que una imagen
+        out.sort(key=lambda r: (not r["has_checkpoint"], r["name"]))
+        return out
+
+    @app.get("/review/datasets")
+    def review_datasets():
+        return {"datasets": _reviewable()}
 
     @app.get("/review/context")
-    def review_context(run: str, window_dataset: str | None = None,
-                       split: str = "val", count: int = 10):
-        """Que hay que revisar de este split, SIN inferir nada.
+    def review_context(window_dataset: str | None = None, split: str = "val",
+                       count: int = 10, run: str | None = None):
+        """Que hay que revisar, SIN inferir nada.
 
-        Existe separado del lote porque contesta la pregunta barata ("cuantas
-        quedan, por donde iba") y la cara (inferir) no debe hacer falta para
-        pintar la pantalla."""
-        ds_name, manifest, source_id = _review_target(run, window_dataset)
+        `window_dataset` manda; `run` es opcional. Antes mandaba el run (el
+        dataset salia de su procedencia) y eso obligaba al front a traerse los
+        859 runs para poder elegir -- que es exactamente lo que no se queria ver.
+        """
+        datasets = _reviewable()
+        if not datasets:
+            raise _http_error(WindowStoreError(
+                "no_reviewable_datasets",
+                "ningun dataset de ventanas tiene windows.npz: no hay imagenes que mirar",
+                "commitea el dataset en el repo de datos, o extrae uno nuevo"))
+        nombres = [d["name"] for d in datasets]
+        ds_name = window_dataset if window_dataset in nombres else nombres[0]
+        manifest, source = _review_ctx(ds_name)
         indices = wstore.split_map(ds_name).get(split) or []
         vistos = review_mod.reviewed_indices(ds_name, split)
         n = max(1, min(int(count), REVIEW_MAX))
         pend = [i for i in indices if i not in set(vistos)]
         return {
-            "run": run, "window_dataset": ds_name, "split": split,
-            "source": source_id, "total": len(indices),
+            "datasets": datasets, "window_dataset": ds_name, "split": split,
+            "source": manifest.get("source_id"),
+            "truth_available": source is not None,
+            "image_base": _image_base(ds_name, manifest, source),
+            # [W, H] de la imagen entera, del propio manifest: permite pintar el
+            # hueco con SU proporcion antes de inferir, en vez de con un defecto
+            # que luego salta
+            "image_size": [manifest["images"]["shape"][2],
+                           manifest["images"]["shape"][1]]
+                          if manifest.get("images", {}).get("shape") else None,
+            "runs": _runs_de(ds_name), "run": run,
+            "total": len(indices),
             "splits": sorted(wstore.split_map(ds_name).keys()),
             "reviewed": len(vistos), "pending": len(pend),
             "next_offset": review_mod.next_unreviewed_offset(indices, vistos, n),
@@ -552,18 +642,30 @@ def create_app() -> FastAPI:
             "storage": review_mod.donde_se_guarda(),
         }
 
+    def _image_base(ds_name: str, manifest: dict, source) -> str:
+        """De donde saca el navegador el PNG. Se decide UNA vez, aqui: si lo
+        decidiera el front, tendria una segunda copia de la regla "hay fuente o
+        no" y las dos podrian dejar de coincidir."""
+        if source is not None:
+            return f"/api/sources/{manifest['source_id']}/samples"
+        return f"/api/window-datasets/{ds_name}/samples"
+
     @app.post("/review/batch")
     def review_batch(body: dict):
         """Infiere un RANGO del split y deja constancia de que se miro.
 
-        El registro lo escribe ESTE endpoint, no un boton de guardar: lo que se
-        anota es que alguien miro, y una anotacion que depende de que el usuario
-        pulse algo despues es justo la que no se escribe (misma decision que
-        `record_holdout_touch`)."""
-        run_name = body["run"]
+        `run` es OPCIONAL: sin el (o sin checkpoint) se devuelven las imagenes sin
+        cajas, que es lo que permite mirar el dataset en una maquina que solo
+        tiene el repo de datos. Mirar sigue quedando registrado -- mirar sin
+        modelo es mirar.
+        """
+        ds_name = body.get("window_dataset")
+        if not ds_name:
+            raise _http_error(WindowStoreError(
+                "window_dataset_required", "hay que decir que dataset se revisa",
+                "eligelo en la lista de /review/datasets"))
         split = body.get("split", "val")
-        ds_name, manifest, source_id = _review_target(
-            run_name, body.get("window_dataset"))
+        manifest, source = _review_ctx(ds_name)
         indices = wstore.split_map(ds_name).get(split) or []
         if not indices:
             raise _http_error(RunError(
@@ -590,48 +692,71 @@ def create_app() -> FastAPI:
                                 max(0, len(indices) - 1)))
             trozo = indices[offset:offset + count]
 
-        model = _model_for(run_name)
-        try:
-            source = SourceDataset(source_id)
-        except SourceError as e:
-            raise _http_error(RunError(
-                "review_needs_source",
-                f"las imagenes salen de la fuente '{source_id}', y no esta "
-                f"({e.message})",
-                "recupera la fuente: sin ella no hay nada que mirar")) from e
+        run_name = body.get("run") or None
+        model = None
+        if run_name:
+            if not (runs.path(run_name) / "best.pt").exists():
+                raise _http_error(RunError(
+                    "run_has_no_checkpoint",
+                    f"'{run_name}' no tiene best.pt en esta maquina: no puede inferir",
+                    "los pesos no viajan por git (*.pt esta en el .gitignore del "
+                    "repo de datos); entrena aqui, o mira las imagenes sin run"))
+            model = _model_for(run_name)
 
+        arrays = None if source is not None else wstore.arrays(ds_name)
+        fila = ({} if arrays is None
+                else {int(a): i for i, a in enumerate(arrays["images_sample_idx"])})
         kinds = set(manifest["config"]["target_kinds"])
         marcadas = set(review_mod.marked_in(ds_name, split))
         knobs, imgs = None, []
         for idx in trozo:
-            s = source.sample_at(int(idx))
-            out = predict_image(
-                model, s.load_image(),
-                threshold=float(body.get("threshold", 0.5)),
-                stride=body.get("stride"), nms_radius=body.get("nms_radius"),
-                min_size=body.get("min_size"))
-            knobs = out["knobs"]
-            pred = [(p["x0"], p["y0"], p["x1"], p["y1"]) for p in out["paragraphs"]]
-            # el filtro por kind NO es opcional: es el mismo que usa task_score,
-            # y sin el la "verdad" dibujada no seria la que se puntua
-            true = [b.bbox for b in s.blocks if b.kind in kinds]
-            r = paragraph_f1(pred, true, float(body.get("iou_threshold", 0.5)))
-            imgs.append({
-                "index": int(idx), "width": s.width, "height": s.height,
-                "paragraphs": out["paragraphs"],
-                "truth": [b.quad.tolist() for b in s.blocks if b.kind in kinds],
-                "f1": r["f1"], "tp": r["tp"], "fp": r["fp"], "fn": r["fn"],
-                "marked": int(idx) in marcadas,
-            })
+            if source is not None:
+                s = source.sample_at(int(idx))
+                pix = s.load_image()
+                W, H = s.width, s.height
+                # el filtro por kind NO es opcional: es el mismo que usa
+                # task_score, y sin el la "verdad" dibujada no seria la que se
+                # puntua
+                truth = [b.quad.tolist() for b in s.blocks if b.kind in kinds]
+                true_bbox = [b.bbox for b in s.blocks if b.kind in kinds]
+            else:
+                pix = arrays["images"][fila[int(idx)]]
+                H, W = pix.shape
+                truth, true_bbox = [], []
+            fila_img = {"index": int(idx), "width": int(W), "height": int(H),
+                        "truth": truth, "marked": int(idx) in marcadas}
+            if model is not None:
+                out = predict_image(
+                    model, pix,
+                    threshold=float(body.get("threshold", 0.5)),
+                    stride=body.get("stride"), nms_radius=body.get("nms_radius"),
+                    min_size=body.get("min_size"))
+                knobs = out["knobs"]
+                fila_img["paragraphs"] = out["paragraphs"]
+                if source is not None:
+                    pred = [(p["x0"], p["y0"], p["x1"], p["y1"])
+                            for p in out["paragraphs"]]
+                    r = paragraph_f1(pred, true_bbox,
+                                     float(body.get("iou_threshold", 0.5)))
+                    fila_img.update({"f1": r["f1"], "tp": r["tp"],
+                                     "fp": r["fp"], "fn": r["fn"]})
+            else:
+                fila_img["paragraphs"] = []
+            imgs.append(fila_img)
 
         review_mod.record_review(
-            window_dataset=ds_name, split=split, source=source_id, run=run_name,
+            window_dataset=ds_name, split=split,
+            source=manifest.get("source_id", ""), run=run_name or "",
             indices=[int(i) for i in trozo], offset=offset,
             knobs={**(knobs or {})})
         vistos = review_mod.reviewed_indices(ds_name, split)
         return {
             "run": run_name, "window_dataset": ds_name, "split": split,
-            "source": source_id, "offset": offset, "count": len(imgs),
+            "source": manifest.get("source_id"),
+            "truth_available": source is not None,
+            "inferred": model is not None,
+            "image_base": _image_base(ds_name, manifest, source),
+            "offset": offset, "count": len(imgs),
             "total": len(indices), "images": imgs, "knobs": knobs,
             "reviewed": len(vistos),
             "pending": len([i for i in indices if i not in set(vistos)]),

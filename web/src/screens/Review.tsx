@@ -1,20 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, isTerminal } from "../api";
+import { api } from "../api";
 import { usePersistedState } from "../uiState";
 import { BoxedImage } from "../components/BoxedImage";
 import { ErrorBox, Field, Working } from "../components/ui";
 
-// F x B -- mirar a ojo lo que la red detecta sobre un SPLIT, con las cajas
-// encima. La metrica de tarea dice CUANTO acierta; esto dice QUE falla.
+// F x B -- mirar a ojo un SPLIT del dataset, con las cajas encima si hay modelo.
 //
-// Pensada para el movil, que es donde se revisa: la barra de control es
-// pegajosa, la rejilla baja a 2 columnas, y la miniatura la redimensiona el
-// backend. Ver el bloque `@media` de tokens.css.
+// ⚠ La pregunta de esta pantalla es "QUE DATASET del repo de datos quiero
+// mirar", no "que run". Empezo al reves --el select principal era el run-- y en
+// el server real eso son 859 opciones, con lo que la pantalla quedaba
+// inservible. Ahora el dataset manda, la lista sale ya filtrada a los que
+// TIENEN `windows.npz` (2 de 18 hoy) y los runs los devuelve el servidor ya
+// reducidos a los de ese dataset.
 //
-// El rango mirado se registra SOLO en el servidor, al inferir. Aqui no hay
-// boton de "guardar": una anotacion que depende de que el usuario pulse algo
-// despues es justo la que no se escribe.
+// Y el run es OPCIONAL: sin modelo se ven las imagenes sin cajas, que es lo unico
+// que se puede hacer en una maquina que solo tiene el repo de datos (los `*.pt`
+// no viajan por git). Mirar sin modelo sigue siendo mirar, y queda registrado.
 
 const DIA = 86400000;
 
@@ -36,8 +38,8 @@ const ORDEN = ["hoy", "ayer", "esta semana", "la semana pasada", "este mes",
   "hace más de un mes", "sin fecha"];
 
 export default function Review() {
-  const [runs, setRuns] = useState<any[]>([]);
   const [run, setRun] = usePersistedState("review.run", "");
+  const [ds, setDs] = usePersistedState("review.dataset", "");
   const [split, setSplit] = usePersistedState("review.split", "val");
   const [n, setN] = usePersistedState("review.n", 10);
   const [offset, setOffset] = usePersistedState("review.offset", 0);
@@ -50,18 +52,8 @@ export default function Review() {
   const [error, setError] = useState<unknown>(null);
   const seq = useRef(0);
 
-  // Solo runs terminados y CON checkpoint: sin best.pt no hay nada que inferir,
-  // y ofrecerlo en el select es prometer una pantalla que va a fallar.
-  useEffect(() => {
-    api.get("/runs").then((d) => {
-      const ok = d.runs.filter((r: any) => isTerminal(r.status));
-      setRuns(ok);
-      setRun((cur) => (cur && ok.some((r: any) => r.name === cur))
-        ? cur : (ok[0]?.name ?? ""));
-    }).catch(setError);
-  }, []);
-
-  const runReady = !!run && runs.some((r) => r.name === run);
+  const runs: any[] = ctx?.runs ?? [];
+  const datasets: any[] = ctx?.datasets ?? [];
 
   const recargarHistorial = () => {
     api.get("/review/sessions?days=45").then((d) => setSessions(d.sessions))
@@ -70,31 +62,37 @@ export default function Review() {
   };
 
   useEffect(() => {
-    if (!runReady) return;
-    api.get(`/review/context?run=${encodeURIComponent(run)}&split=${split}&count=${n}`)
-      .then(setCtx).catch(setError);
+    const q = new URLSearchParams({ split, count: String(n) });
+    if (ds) q.set("window_dataset", ds);
+    api.get(`/review/context?${q}`).then((c) => {
+      setCtx(c); setError(null);
+      // el servidor decide cual es el dataset valido (y cae al primero si el
+      // recordado ya no existe): el front no puede tener su propia regla
+      if (c.window_dataset !== ds) setDs(c.window_dataset);
+      // un run recordado que no es de este dataset no sirve aqui
+      if (run && !c.runs.some((r: any) => r.name === run)) setRun("");
+    }).catch(setError);
     recargarHistorial();
-  }, [run, split, n, runReady]);
+  }, [ds, split, n]);
 
-  // La inferencia sale SOLA al cambiar de split (o de run, o de N): eso es lo
-  // que se pidio. El debounce es por el input de N, que dispara por tecla.
   useEffect(() => {
-    if (!runReady) return;
+    if (!ctx?.window_dataset) return;
     const mio = ++seq.current;
     setBusy(true);
     const t = setTimeout(() => {
-      api.post("/review/batch", { run, split, offset, count: n })
+      api.post("/review/batch", {
+        window_dataset: ctx.window_dataset, split, offset, count: n,
+        run: run || undefined,
+      })
         .then((r) => { if (seq.current === mio) { setBatch(r); setError(null); } })
         .catch((e) => { if (seq.current === mio) { setError(e); setBatch(null); } })
         .finally(() => { if (seq.current === mio) { setBusy(false); recargarHistorial(); } });
     }, 250);
     return () => clearTimeout(t);
-  }, [run, split, offset, n, runReady]);
+  }, [ctx?.window_dataset, run, split, offset, n]);
 
   const marcar = async (img: any, marked: boolean) => {
     if (!batch) return;
-    // pintado optimista: en el movil esperar al servidor para que se rellene
-    // una estrella se lee como que el toque no entro
     setBatch({
       ...batch,
       images: batch.images.map((x: any) =>
@@ -103,7 +101,7 @@ export default function Review() {
     try {
       await api.post("/review/marks", {
         window_dataset: batch.window_dataset, split: batch.split,
-        index: img.index, marked, source: batch.source, run: batch.run,
+        index: img.index, marked, source: batch.source, run: batch.run ?? "",
       });
       recargarHistorial();
     } catch (e) { setError(e); }
@@ -115,26 +113,46 @@ export default function Review() {
     return ORDEN.filter((k) => g[k]?.length).map((k) => [k, g[k]] as const);
   }, [sessions]);
 
-  // Los contadores salen del LOTE cuando lo hay, y solo si no, del contexto.
-  // Mezclarlos daba una linea que se contradecia sola ("0 de 10 ya revisadas ·
-  // 0 pendientes"): `ctx` se pide antes de inferir, asi que su `reviewed` es de
-  // antes de que esta misma tanda quedara registrada. Un numero de dos fuentes
-  // con dos edades es peor que un numero viejo.
-  const vista = batch ?? ctx;
+  // ⚠ Nada se pinta si no habla del dataset que ESTA ELEGIDO. Medido el
+  // 2026-08-29 contra el server real: al cambiar de dataset la pagina paso ~3 s
+  // diciendo "de 150" con el de 200 seleccionado, y ensenando sus miniaturas.
+  //
+  // Comparar el lote contra el CONTEXTO no arreglaba nada, y el intento quedo
+  // escrito porque es la trampa: al cambiar el select, ctx y batch estan los DOS
+  // atrasados, coinciden entre si, y el par obsoleto se valida solo. La
+  // referencia tiene que ser `ds`, que es lo que el usuario acaba de elegir.
+  const alDia = (x: any) => x && x.window_dataset === ds && x.split === split;
+  const loteVigente = alDia(batch) ? batch : null;
+  const vista = loteVigente ?? (alDia(ctx) ? ctx : null);
   const total = vista?.total ?? 0;
   const hasta = Math.min(offset + n, total);
   const pendientes = vista?.pending ?? 0;
   const revisadas = vista?.reviewed ?? 0;
+  const conModelo = loteVigente?.inferred ?? false;
+  const hayVerdad = vista?.truth_available ?? false;
+  const base = vista?.image_base ?? "";
 
   return (
     <div className="review">
-      <h2 data-domain="F×B" data-view="FR1" data-fixes="run + split"
+      <h2 data-domain="F×B" data-view="FR1" data-fixes="dataset + split"
         data-varies="el rango" data-measures="que detecta y que se le escapa">
         Revisar detecciones</h2>
-      <p className="sub">Las cajas de la red sobre las imágenes del split. Lo que se
-        mire queda registrado, para poder elegir otras la próxima vez.</p>
+      <p className="sub">Las imágenes del split, con las cajas de la red encima si
+        eliges un run. Lo que se mire queda registrado, para poder elegir otras la
+        próxima vez.</p>
 
       <div className="card revbar">
+        <div className="revbar-line">
+          <Field label="dataset">
+            <select value={ds} onChange={(e) => { setDs(e.target.value); setOffset(0); }}>
+              {datasets.map((d) => (
+                <option key={d.name} value={d.name}>
+                  {d.name} ({d.images})
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
         <div className="revbar-line">
           <Field label="split">
             <select value={split} onChange={(e) => { setSplit(e.target.value); setOffset(0); }}>
@@ -148,9 +166,17 @@ export default function Review() {
           </Field>
         </div>
         <div className="revbar-line">
-          <Field label="run">
+          <Field label={`run (${runs.length})`}>
+            {/* ⛔ se MARCA, no se esconde: un run sin best.pt escondido no se
+                distingue de un run que no existe, y entonces no sabes si
+                entrenar aqui o buscar en otro sitio */}
             <select value={run} onChange={(e) => setRun(e.target.value)}>
-              {runs.map((r) => <option key={r.name}>{r.name}</option>)}
+              <option value="">— sin modelo (sólo imágenes) —</option>
+              {runs.map((r) => (
+                <option key={r.name} value={r.name} disabled={!r.has_checkpoint}>
+                  {r.has_checkpoint ? "" : "⛔ "}{r.name}
+                </option>
+              ))}
             </select>
           </Field>
         </div>
@@ -158,23 +184,25 @@ export default function Review() {
           <button className="secondary" disabled={offset <= 0 || busy}
             onClick={() => setOffset(Math.max(0, offset - n))}>◀</button>
           <span className="rangelabel">
-            {total ? `${offset + 1}–${hasta}` : "—"} <span className="sub2">de {total}</span>
+            {vista
+              ? <>{total ? `${offset + 1}–${hasta}` : "—"} <span className="sub2">de {total}</span></>
+              : <span className="sub2">cargando…</span>}
           </span>
           <button className="secondary" disabled={hasta >= total || busy}
             onClick={() => setOffset(offset + n)}>▶</button>
           <button className="secondary" disabled={busy || !pendientes}
-            onClick={() => setOffset(batch?.next_offset ?? ctx?.next_offset ?? 0)}>
-            sin revisar
-          </button>
+            onClick={() => setOffset(vista?.next_offset ?? 0)}>sin revisar</button>
         </div>
-        <label className="inline">
-          <input type="checkbox" checked={showTruth}
-            onChange={(e) => setShowTruth(e.target.checked)} /> ver la verdad
-        </label>
+        {hayVerdad ? (
+          <label className="inline">
+            <input type="checkbox" checked={showTruth}
+              onChange={(e) => setShowTruth(e.target.checked)} /> ver la verdad
+          </label>
+        ) : null}
       </div>
 
       <ErrorBox error={error} />
-      <Working on={busy} label="infiriendo…" />
+      <Working on={busy || !vista} label="cargando…" />
 
       {vista ? (
         <p className="sub revstate">
@@ -186,21 +214,49 @@ export default function Review() {
         </p>
       ) : null}
 
-      {batch ? (
+      {/* Lo que FALTA se dice, en vez de dibujar una rejilla sin cajas que se lea
+          como "la red no detecta nada". Son dos ausencias distintas y se separan:
+          el modelo (pesos) y la verdad (la fuente). */}
+      {ctx && !conModelo ? (
+        <div className="card avisobox" data-testid="review-missing">
+          <b>Sin modelo:</b> se ven las imágenes del dataset, sin cajas.{" "}
+          {runs.length === 0
+            ? <>Este dataset no tiene ningún run en esta máquina.</>
+            : runs.some((r) => r.has_checkpoint)
+              ? <>Elige un run arriba.</>
+              : <>Ninguno de sus {runs.length} runs tiene <code>best.pt</code> aquí:
+                 los pesos no viajan por git (<code>*.pt</code> está en el
+                 <code>.gitignore</code> del repo de datos).</>}
+        </div>
+      ) : null}
+      {ctx && !hayVerdad ? (
+        <div className="card avisobox">
+          <b>Sin la verdad:</b> las imágenes salen del <code>windows.npz</code>, que
+          sí viaja por git; los párrafos reales viven en la fuente
+          (<code>{ctx.source}</code>), que no está en esta máquina.{" "}
+          <span className="sub2">Publícala con <code>fv-publish-source</code>.</span>
+        </div>
+      ) : null}
+
+      {loteVigente ? (
         <div className="thumbgrid rev" data-testid="review-grid">
-          {batch.images.map((img: any) => (
+          {loteVigente.images.map((img: any) => (
             <div className={`revthumb${img.marked ? " marked" : ""}`} key={img.index}>
-              <Link to={`/review/${encodeURIComponent(batch.window_dataset)}/${batch.split}/${img.index}?run=${encodeURIComponent(batch.run)}`}>
-                <BoxedImage source={batch.source} index={img.index}
+              <Link to={`/review/${encodeURIComponent(loteVigente.window_dataset)}/${loteVigente.split}/${img.index}${run ? `?run=${encodeURIComponent(run)}` : ""}`}>
+                <BoxedImage base={base} index={img.index}
                   width={img.width} height={img.height}
                   paragraphs={img.paragraphs} truth={img.truth}
                   showTruth={showTruth} fetchWidth={320} />
               </Link>
               <div className="revcap">
                 <span className="mono">#{img.index}</span>
-                <span className={img.f1 >= 0.99 ? "ok" : img.f1 >= 0.5 ? "" : "bad"}>
-                  f1 {img.f1.toFixed(2)}
-                </span>
+                {typeof img.f1 === "number" ? (
+                  <span className={img.f1 >= 0.99 ? "ok" : img.f1 >= 0.5 ? "" : "bad"}>
+                    f1 {img.f1.toFixed(2)}
+                  </span>
+                ) : conModelo ? (
+                  <span className="sub2">{img.paragraphs.length} cajas</span>
+                ) : null}
                 <button className={`markbtn${img.marked ? " on" : ""}`}
                   aria-pressed={img.marked}
                   title={img.marked ? "quitar la marca" : "marcar para volver"}
