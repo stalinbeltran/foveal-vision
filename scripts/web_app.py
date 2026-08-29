@@ -214,6 +214,17 @@ def unidad_estado() -> str:
     return "activo" if activo == 0 else "instalado, parado"
 
 
+def ayuda_instalar() -> str:
+    """El remedio de "no instalado", escrito UNA vez.
+
+    Lo imprimen `estado` y `arrancar`. Copiado serian dos textos que divergen, y
+    el que se depura luego es siempre el que no escribiste tu.
+    """
+    return ("\n  Instalarlo:  python3 scripts/do_droplet.py install-service "
+            f"--service {UNIT}\n  (desde ~/src/digital-ocean-dropplet-auto-launching; "
+            "desde Telegram, el ejecutor `instalar-servicio`)")
+
+
 # ------------------------------------------------------------------ preparar
 
 
@@ -358,9 +369,7 @@ def cmd_estado(args: argparse.Namespace) -> int:
     if activa and viva and token():
         print(f"\n  {url(args)}")
     elif estado_unidad == "no instalado":
-        print("\n  Instalarlo:  python3 scripts/do_droplet.py install-service "
-              f"--service {UNIT}\n  (desde ~/src/digital-ocean-dropplet-auto-launching; "
-              "desde Telegram, el ejecutor `instalar-servicio`)")
+        print(ayuda_instalar())
     elif viva:
         print(f"\n  Libera el puerto {args.port} y luego:  sudo systemctl start {UNIT}")
     else:
@@ -393,12 +402,34 @@ def cmd_abrir(args: argparse.Namespace) -> int:
 
 
 def cmd_parar(args: argparse.Namespace) -> int:
+    # Sin unidad no hay nada que parar, o sea que el estado que pediste ya se
+    # cumple: se sale con 0 y NO se imprime el remedio de instalar. Pediste
+    # apagar; ofrecerte encender seria contestar a otra pregunta.
+    if unidad_estado() == "no instalado":
+        print(f"{UNIT}: no instalado (nada que parar)")
+        return 0
     code, salida = corre(["sudo", "-n", "systemctl", "stop", UNIT], timeout=60)
     print(f"{UNIT}: {'parado' if code == 0 else 'no pude pararlo: ' + salida[:200]}")
     return 0 if code == 0 else 1
 
 
 def cmd_arrancar(args: argparse.Namespace) -> int:
+    # Preguntar ANTES de llamar a systemctl. "no instalado" y "instalado y
+    # parado" piden cosas distintas -- que es exactamente para lo que existe
+    # `unidad_estado()`-- y este era el unico subcomando que no la miraba: en una
+    # maquina sin la unidad devolvia el error crudo de systemd ("Unit ... not
+    # found") y ningun remedio, mientras `estado` -- a un mensaje de distancia --
+    # si lo daba. Medido el 2026-08-29 en un dev que nacio sin el servicio porque
+    # la lanzadora leyo un types/dev.json viejo.
+    #
+    # ⚠ Corta SOLO con "no instalado", nunca con "no se": si systemctl no
+    # contesta no sabemos nada, y un falso negativo que impida arrancar algo que
+    # si funciona es peor que el error crudo. Ahi se intenta y habla el error de
+    # verdad. Mismo criterio que el `requiere` de los ejecutores, que avisa pero
+    # no bloquea.
+    if unidad_estado() == "no instalado":
+        print(f"{UNIT}: no instalado{ayuda_instalar()}")
+        return 1
     code, salida = corre(["sudo", "-n", "systemctl", "start", UNIT], timeout=60)
     if code != 0:
         print(f"{UNIT}: no pude arrancarlo: {salida[:200]}")
@@ -408,8 +439,15 @@ def cmd_arrancar(args: argparse.Namespace) -> int:
 
 
 def cmd_log(args: argparse.Namespace) -> int:
+    # `-q` calla el aviso de tres lineas que journalctl imprime cuando quien
+    # pregunta no esta en `adm`/`systemd-journal` -- y `deploy` no lo esta, asi
+    # que salia SIEMPRE. Desde Telegram eso son tres de las cinco lineas de la
+    # respuesta, en la pantalla mas pequena que tenemos.
+    # Y arregla de paso el fallback de abajo: sin `-q`, journalctl escribe
+    # "-- No entries --", que NO es vacio, asi que `sin log para ...` no se
+    # imprimia nunca. Comprobado el 2026-08-29 con la unidad sin instalar.
     code, salida = corre(["journalctl", "-u", UNIT, "-n", str(args.lineas),
-                          "--no-pager"], timeout=60)
+                          "--no-pager", "-q"], timeout=60)
     print(salida or f"sin log para {UNIT}")
     return 0 if code == 0 else 1
 
