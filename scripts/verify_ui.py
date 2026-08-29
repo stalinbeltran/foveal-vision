@@ -209,6 +209,10 @@ def main() -> int:
             # un 404 disfrazado de verificacion
             page.locator("[data-testid=review-grid] a").first.click()
             page.wait_for_selector("[data-testid=review-detail]", timeout=60000)
+            # ...y en el detalle la inferencia va A BOTON: pulsarlo es lo unico
+            # que comprueba que el boton hace algo, y no solo que esta pintado
+            page.locator("[data-testid=infer-now]").click()
+            page.wait_for_timeout(2000)
         check(page, "/review", "text=Revisar detecciones", "12-revisar", review_extra)
 
         # ⚠ Este literal existe para el catalogo de rutas (U7.9) y depende de los

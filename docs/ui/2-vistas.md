@@ -101,6 +101,10 @@ Numeración del hermano donde la vista se hereda; se marca lo que cambia.
   rangos se miraron ya y qué imágenes quedaron marcadas—, así que es una entidad con su artefacto,
   no un cruce recalculable (por eso tiene pantalla, como `Diagnóstico`). El registro lo escribe el
   servidor **al inferir**, no un botón de guardar.
+  ⚠ En la rejilla la inferencia sale **sola** al elegir el split; en el detalle va **a botón**, y
+  la asimetría es deliberada: allí se pueden cambiar el run y el umbral, así que repetir significa
+  algo. La imagen se pinta antes y aparte, de modo que un fallo del modelo (sin `best.pt`, por
+  ejemplo) deja la página **con la imagen**, no en blanco.
 
 **Nuevas, propias de la geometría foveada:**
 

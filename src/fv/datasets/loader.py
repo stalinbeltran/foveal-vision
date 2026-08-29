@@ -52,13 +52,29 @@ class SourceError(ValueError):
 
 
 def _roots() -> list[tuple[str, Path]]:
+    """Donde se buscan las fuentes, EN ORDEN: primero la de esta maquina, luego
+    la publicada en el repo de datos.
+
+    Las dos llevan el prefijo `local/` porque son el mismo espacio de nombres: el
+    `source_id` de un manifest de ventanas dice `local/dirty-1000-80px` y tiene
+    que resolver contra cualquiera de las dos. Que gane la de la maquina es
+    deliberado -- quien tiene la fuente de verdad (con su copia grande al lado)
+    trabaja sobre ella; el repo de datos es lo que hace que una maquina RECIEN
+    HECHA tenga alguna. Es la misma escalera que `artefactos.resolver`.
+
+    Sin repo de datos clonado las dos rutas coinciden, y entonces es una sola:
+    duplicarla haria que `discover_sources` listase cada fuente dos veces.
+    """
     roots: list[tuple[str, Path]] = []
     # ext = settings.external_datasets_root()
     # if ext and ext.exists():
     #     roots.append(("", ext))
-    local = settings.local_sources_root()
-    if local.exists():
-        roots.append(("local/", local))
+    vistas: set[Path] = set()
+    for d in (settings.local_sources_root(), settings.published_sources_root()):
+        r = Path(d).resolve()
+        if d.exists() and r not in vistas:
+            vistas.add(r)
+            roots.append(("local/", d))
     return roots
 
 
@@ -81,20 +97,43 @@ def source_meta(root: Path) -> dict:
 
 
 def discover_sources() -> list[dict]:
+    """Las fuentes visibles, sin repetir.
+
+    Una misma fuente puede estar EN LAS DOS raices (la maquina la tiene y ademas
+    esta publicada en el repo de datos): es un id, no dos. Gana la primera, que
+    es el mismo orden que `resolve_source` -- si listase dos y resolviese una,
+    el selector de la UI ofreceria una fila que abre la otra.
+    """
     out = []
+    vistos: set[str] = set()
     for prefix, root in _roots():
         for d in sorted(root.iterdir()):
             if not d.is_dir() or not (d / "labels.jsonl").exists():
                 continue
+            sid = prefix + d.name
+            if sid in vistos:
+                continue
+            vistos.add(sid)
             meta = source_meta(d)
             out.append({
-                "id": prefix + d.name,
+                "id": sid,
                 "path": str(d),
                 "declared_id": meta.get("id"),
                 "count": meta.get("count"),
                 "derived": meta.get("derived"),
+                # de cual de las dos raices salio: sin esto, "esta publicada?"
+                # no se puede contestar desde la UI ni desde un preflight
+                "published": _es_publicada(d),
             })
     return out
+
+
+def _es_publicada(d: Path) -> bool:
+    try:
+        return Path(d).resolve().is_relative_to(
+            settings.published_sources_root().resolve())
+    except (OSError, ValueError):
+        return False
 
 
 def resolve_source(source_id: str) -> Path:

@@ -76,6 +76,29 @@ def window_datasets_root() -> Path:
         else project_root() / "data" / "window-datasets"
 
 
+def published_sources_root() -> Path:
+    """Fuentes PUBLICADAS: las que viajan por git en el repo de datos.
+
+    Existe porque `/data/sources/` esta en el `.gitignore` de este repo (son
+    renders regenerables, 234 MB la grande), asi que una maquina recien hecha se
+    queda SIN una sola fuente -- y sin fuente no se puede mirar una imagen ni
+    medir la metrica de tarea, que se puntua contra los parrafos de A.
+
+    Lo que se publica es la fuente REDUCIDA (80x60): medido el 2026-08-29, sus
+    1000 PNG ocupan 2,01 MB (2,0 KB de media). La grande NO se publica, que sigue
+    siendo cache regenerable.
+
+    ⚠ Mismo prefijo `local/` que `local_sources_root()`, a proposito: el id de
+    una fuente esta escrito en el `source_id` de cada manifest de ventanas (18
+    hoy). Publicarla bajo otro prefijo la haria invisible para todos ellos.
+
+    Sin repo de datos clonado cae a `local_sources_root()`, y entonces las dos
+    raices son la misma y `_roots()` la cuenta una sola vez.
+    """
+    d = data_root()
+    return (d / "sources") if d != project_root() else local_sources_root()
+
+
 def networks_root() -> Path:
     return project_root() / "configs" / "networks"
 

@@ -70,6 +70,43 @@ procedencia: `declared_id` apunta al dataset original aunque el directorio se ll
 copiar → reducir → borrar la copia de 640×480 (se regenera desde el generador, cuyos specs sí
 están en git). Reducida a 80 px, `dirty-1000` pasa de 234 MB a 27 MB.
 
+## Publicar una fuente para que SOBREVIVA a rehacer la máquina
+
+`/data/sources/` está en el `.gitignore` de este repo, así que **una máquina recién hecha se
+queda con cero fuentes** — medido el 2026-08-29 en el dev: `discover_sources()` devolvía `0`, y
+sin fuente no se puede mirar una imagen, ni puntuar la métrica de tarea (que se mide contra los
+párrafos de A), ni revisar a ojo lo que detecta la red.
+
+La fuente **reducida** cabe de sobra en git: los 1000 PNG de `dirty-1000-80px` son **2,01 MB**
+(medido el 2026-08-29, 2,0 KB de media). Así que se publica en el repo de datos, junto a
+`window-datasets/`:
+
+```bash
+.venv/bin/fv-publish-source --source local/dirty-1000-80px
+cd ../foveal-vision-data && git add sources && git commit -m 'data: fuente' && git push
+```
+
+Desde entonces cualquier máquina que clone `foveal-vision-data` la ve, con el **mismo id**
+(`local/…`): el prefijo se conserva a propósito, porque ese id está escrito en el `source_id` de
+cada manifest de ventanas (12 apuntan hoy a `local/dirty-1000-80px`).
+
+⚠ **Y comprueba, antes de copiar, que la fuente es la que el `windows.npz` guarda.** Está medido
+(2026-08-27) que **renderizar de nuevo no da el mismo dato** — cambió el motor de render, y la
+comprobación de huella de `bench_dataset.py` abortó sola. Publicar un re-render dejaría la
+revisión mirando **imágenes que el modelo nunca vio**, y sin un solo error por el camino. Se puede
+comprobar exacto porque `extract.py` guarda las imágenes verbatim en el npz, y ese npz sí está
+commiteado:
+
+```bash
+.venv/bin/fv-publish-source --source local/dirty-1000-80px --solo-comprobar
+```
+
+Sale con 0 si cuadra, **2 si no se pudo comprobar** (ningún dataset con `windows.npz`) y 1 si
+discrepa. «No pude mirar» y «miré y cuadra» no se leen igual.
+
+⚠ **La grande de 640×480 NO se publica**: son 234 MB de caché regenerable y a git lo que entra no
+se quita. `fv-publish-source` se niega por encima de 50 MB.
+
 ## Reducir una fuente (A′)
 
 El dato real se genera grande en el proyecto hermano (640×480) y se **reduce** aquí: las

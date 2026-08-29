@@ -26,6 +26,7 @@ dev = [
 [project.scripts]
 fv-extract = "fv.windows.cli:main"
 fv-resize = "fv.datasets.cli:main"
+fv-publish-source = "fv.datasets.cli:main_publish"
 fv-train = "fv.training.cli:main"
 fv-sweep = "fv.sweeps.cli:main"
 fv-oat = "fv.sweeps.oat_cli:main"
