@@ -3,11 +3,11 @@
 **Qué es esto.** El criterio de lectura de tres bloques de estudios, escrito **antes de mirar
 ningún resultado**. Es la regla de siempre del proyecto: el veredicto vive aquí, en el documento
 que fijó el criterio, y los reportes de
-[`telegram-coordinator/reportes/`](https://github.com/stalinbeltran/telegram-coordinator/tree/main/reportes)
+[`estudios-redes-neuronales/reportes/`](https://github.com/stalinbeltran/estudios-redes-neuronales/tree/main/reportes)
 resumen *qué se corrió, cuándo, con cuántas máquinas y qué costó* y enlazan aquí.
 
 Lo dispara la tabla resumen de
-[`reportes/README.md`](https://github.com/stalinbeltran/telegram-coordinator/blob/main/reportes/README.md)
+[`reportes/README.md`](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/README.md)
 del coordinador, que a 2026-08-26 deja tres huecos:
 
 1. **`overlap_fovea_px` no está acotado por arriba** y su ganador nominal (4) no llega a

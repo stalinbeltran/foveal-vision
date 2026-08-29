@@ -28,7 +28,7 @@ el bueno), asi que los knobs buenos **comprimen** la separacion entre modelos
 mientras el ruido se queda igual. Mejoran el numero absoluto y empeoran su poder
 de distinguir, que es justo para lo que se usa la metrica.
 
-    .venv/bin/python scripts/knobs_f.py --json reportes/knobs-f-20260825.json
+    .venv/bin/python scripts/knobs_f.py --json reportes/2026/08-agosto/datos/knobs-f-20260825.json
 """
 
 from __future__ import annotations

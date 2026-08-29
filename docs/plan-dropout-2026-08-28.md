@@ -25,7 +25,7 @@ parámetros**. No está entre capas conv a propósito: allí hay ~3 % de los par
 activaciones enteras de un mapa espacial pequeño sobre todo añadiría ruido a una cabeza que
 tiene que decir **dónde** está una esquina.
 
-**El motivo medido**, del [inventario de parámetros](../reportes/2026/08-agosto/parametros-y-prioridad-de-estudios.md) §1:
+**El motivo medido**, del [inventario de parámetros](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/sintesis/2026/08-agosto/2026-08-25-parametros-y-prioridad-de-estudios.md) §1:
 sobre los **612 runs con curvas en disco**, la brecha `val_loss` contra `train_loss` en la época
 del checkpoint es de **+28 % mediana**, y **390 de los 612** pasan del 20 %. Además, entre el
 mejor punto y la parada por `patience`, la `val_loss` **vuelve a subir** (mediana +0,0026)
@@ -37,7 +37,7 @@ es exactamente lo que ataca la regularización.
 El plan de prioridades puso `weight_decay` (**10 ter**) **antes** que `dropout` (**10 quater**)
 con esta frase: *«si `weight_decay` no mueve nada, implementar `dropout` es mucho menos
 prometedor»*. **`weight_decay` ya se midió** (barrido
-[#14](https://github.com/stalinbeltran/telegram-coordinator/blob/main/reportes/README.md),
+[#14](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/README.md),
 recorridos `wd-t` + `wd-v`, 5 semillas) y el resultado fue el peor posible para esta hipótesis:
 
 > **`weight_decay` = 0 GANA y subirlo HUNDE** (0,001 → 0,8731 contra ~0,93 del vigente).

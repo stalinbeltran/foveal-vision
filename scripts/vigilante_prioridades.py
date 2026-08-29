@@ -7,7 +7,8 @@ Una flota de 44 maquinas alquiladas a desconocidos pierde maquinas: sshd que no
 contesta, hosts que se caen, inquilinos que se comen los nucleos, plazos que se
 agotan. Cada una de esas se lleva los puntos que le quedaban. El resultado es un
 estudio **incompleto**, y un barrido incompleto que no dice que le falta es
-indistinguible de uno terminado (CLAUDE.md, `reportes/`).
+indistinguible de uno terminado (CLAUDE.md; el indice esta en el repo
+central `estudios-redes-neuronales`).
 
 Relanzar es barato y seguro: `estudio_flota.py` lee `runs/` al arrancar y **salta
 todo punto cuyo `status.json` diga `done`**, asi que solo alquila para lo que

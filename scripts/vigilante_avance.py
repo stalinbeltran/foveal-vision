@@ -556,7 +556,7 @@ def una_vuelta(args, V, estado: dict) -> str:
                     log(f"    AVISO: no pude destruir {i['id']}: {e}")
         avisar(f"vigilante: los {len(args.sweep)} recorridos están completos "
                f"({total} runs) y no queda nada facturando. Toca escribir el "
-               f"reporte en reportes/. Log: {args.log}")
+               f"reporte en estudios-redes-neuronales/reportes/. Log: {args.log}")
         return "fin"
 
     pid = flota_viva(args.sweep)

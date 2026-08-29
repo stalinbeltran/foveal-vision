@@ -67,7 +67,7 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 > Los ocho recorridos de prioridad que corrió la flota, **leídos** en esta sesión desde los
 > artefactos del repo con `scripts/estudio_informe.py` (aplica R1–R6, escritas antes). Detalle
 > completo en
-> [reportes/2026/08-agosto/2026-08-26-geometria-nueva-primeros-resultados.md](reportes/2026/08-agosto/2026-08-26-geometria-nueva-primeros-resultados.md).
+> [el reporte de la geometría nueva, en el repo central](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/sintesis/2026/08-agosto/2026-08-26-geometria-nueva-primeros-resultados.md).
 > ⚠ **Nada de esto lo midió esta sesión**: los runs los produjo la flota.
 > 1. ⚠⚠ **`red-fov` es el resultado grande: a igual área, ver el borde SIN COMPRIMIR gana.** Con
 >    `border_px` fijo en 8, `border_reduce` 1 → **0,9574** contra 0,9472 (reduce 2) y 0,9408
@@ -124,7 +124,7 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 >   corrida son irrecuperables** desde el repo; los `flota.json` que hay en esos cuatro directorios
 >   son de la corrida **anterior** (06:53 UTC) y atribuírselos sería contar dos veces 101 instancias
 >   y 3,2996 $. Reporte con el detalle:
->   [telegram-coordinator/reportes/2026/08-agosto/2026-08-26-prioridad2-relanzamiento.md](https://github.com/stalinbeltran/telegram-coordinator/blob/main/reportes/2026/08-agosto/2026-08-26-prioridad2-relanzamiento.md).
+>   [el reporte #13, en el repo central](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/estudios/2026/08-agosto/2026-08-26-prioridad2-relanzamiento.md).
 > - ⚠ **El vigilante horario sigue existiendo y PUEDE VOLVER A ALQUILAR MÁQUINAS** si está armado:
 >   mira si a un estudio le faltan puntos y relanza la flota sólo para lo que falte — y a `ov-fov` y
 >   `ch-fov` **les faltan**. Se para con `/use vigilante` → `parar`. Comprueba en qué estado está
@@ -915,7 +915,9 @@ limpios: 3.256 ficheros JSON de resultados ahogaban el diff de cualquier cambio 
 - `configs/networks/` y `configs/recipes/` (**C** y **D**): son **fuente**, se editan a mano y
   definen el experimento; no los genera un estudio.
 - `docs/plan-*.md`: se escriben **antes** de medir. Son criterio, no resultado (protocolo.md §1).
-- `reportes/<año>/<mes>-<nombre>/`: texto interpretativo, se lee junto al código que lo produjo.
+- `reportes/`: **ya no vive aquí.** Desde el 2026-08-29 los reportes van al repo central
+  [`estudios-redes-neuronales`](https://github.com/stalinbeltran/estudios-redes-neuronales); aquí sólo se queda el **dato crudo** que producen
+  (`reportes/2026/08-agosto/datos/*.json`).
 - `benchmarks/`: caracterizan **la máquina**, no un estudio.
 
 **La estructura de allá es `<año>/<NN>-<mes>/`** (`2026/08-agosto/`), fechada por la **fecha de
@@ -1291,8 +1293,8 @@ Aquí queda sólo lo que se dispara **en este repo**, que es lo que cuesta diner
    `vigilante_avance.py:362` usa `pgrep -f "estudio_flota.py"` sin filtrar por ruta, así que
    el vigilante de un workspace ve la flota de otro y aplica su regla 4 («hay una flota viva:
    no se relanza»). Consecuencia: **los puntos que le faltan no se relanzan nunca y nadie
-   avisa** — un barrido incompleto que parece terminado, que es justo lo que `reportes/`
-   existe para evitar. Arreglo: mirar `/proc/<pid>/cwd` de cada PID y quedarse con los que
+   avisa** — un barrido incompleto que parece terminado, que es justo lo que el índice de
+   reportes existe para evitar. Arreglo: mirar `/proc/<pid>/cwd` de cada PID y quedarse con los que
    cuelguen de `ROOT`. ⚠ **No** filtrar por la línea de `ps`: la flota se lanza con ruta
    relativa (`.venv/bin/python scripts/estudio_flota.py`), así que el workspace no aparece
    en ella y el filtro daría por ajenos **tus propios procesos**.
@@ -1373,11 +1375,16 @@ Aquí queda sólo lo que se dispara **en este repo**, que es lo que cuesta diner
   vivo le ocupa el puerto o le contesta con rutas obsoletas. Matar hijos antes que padres (vite
   antes de `npm run dev`; el `fv-api` que escucha antes de su lanzador) y filtrar por ruta —
   en esta máquina hay pythons ajenos al proyecto.
-- **Los reportes van a `reportes/<año>/<mes>-<nombre-del-mes>/`** — p. ej.
-  `reportes/2026/08-agosto/`. Un *reporte* es todo informe dirigido al usuario que resume, compara
+- **Los reportes van al repo central [`estudios-redes-neuronales`](https://github.com/stalinbeltran/estudios-redes-neuronales)**, no aquí — desde el
+  2026-08-29, y sea cual sea el repo que lanzó el trabajo o produjo el dato. Van a
+  `reportes/<tipo>/<año>/<mes>/`, p. ej. `reportes/estudios/2026/08-agosto/`; el **tipo** sale de
+  dos preguntas mecánicas (*¿se corrió algo?* y *¿el sujeto medido es la red, la máquina, o el
+  sistema?*) y está escrito en [su `reportes/README.md`](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/README.md).
+  Un *reporte* es todo informe dirigido al usuario que resume, compara
   o prioriza (inventarios de parámetros, análisis de resultados, comparativas, informes de
-  estado); **no** lo son los planes de estudio, que siguen en `docs/plan-*.md` porque se escriben
-  **antes** de medir y son criterio, no informe. El mes va **con su número delante** para que
+  estado); **no** lo son los planes de estudio, que **siguen aquí**, en `docs/plan-*.md`, porque se
+  escriben **antes** de medir y son criterio, no informe — esa parte no se movió y no debe moverse.
+  El mes va **con su número delante** para que
   ordenen solos, y el nombre en español y en minúscula (`01-enero` … `12-diciembre`). Fichero por
   reporte, nombre en kebab-case que diga de qué va, y **se commitean y se empujan**: un reporte
   que sólo existe en esta máquina desaparece con ella.

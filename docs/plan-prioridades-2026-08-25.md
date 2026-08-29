@@ -4,7 +4,7 @@ Fecha de redacción: **2026-08-25**, y la fecha importa: esto se escribe **antes
 ningún resultado**, que es la única forma de que las reglas de abajo decidan algo. Un
 criterio escrito después de ver la tabla no es un criterio, es una justificación.
 
-Origen: [`reportes/2026/08-agosto/parametros-y-prioridad-de-estudios.md`](../reportes/2026/08-agosto/parametros-y-prioridad-de-estudios.md)
+Origen: [`estudios-redes-neuronales/reportes/sintesis/2026/08-agosto/2026-08-25-parametros-y-prioridad-de-estudios.md`](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/sintesis/2026/08-agosto/2026-08-25-parametros-y-prioridad-de-estudios.md)
 §6, que ordenó el inventario entero por *(evidencia de que hay algo que ganar) × (lo que
 cuesta) × (si desbloquea otra pregunta)*. Este documento no reordena nada: coge esa lista y
 le pone el **cómo se lee** a cada entrada.
