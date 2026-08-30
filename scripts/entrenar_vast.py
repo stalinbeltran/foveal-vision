@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import statistics
 import subprocess
 import sys
 import tarfile
@@ -299,61 +300,97 @@ def traer(host: str, port: int, name: str, destino: Path, remoto_dir: str) -> li
     return traidos
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Entrena UN run en una maquina de Vast y baja los pesos segun se escriben")
-    ap.add_argument("--name", required=True)
-    ap.add_argument("--dataset", default="dirty1000-80px-16px-r20260827")
-    ap.add_argument("--network", default="fov16-optimo")
-    ap.add_argument("--recipe", default="plan40")
-    ap.add_argument("--epochs", type=int, default=2)
-    ap.add_argument("--continuar", action="store_true",
-                    help="sigue un run que ya existe aqui (sube su last.pt)")
-    ap.add_argument("--cpus", type=int, default=8, help="vCPU minimos")
-    ap.add_argument("--max-cpus", type=int, default=32)
-    ap.add_argument("--ram-gb", type=float, default=8.0)
-    ap.add_argument("--max-precio", type=float, default=0.15, help="$/h")
-    ap.add_argument("--disco-gb", type=float, default=12.0)
-    ap.add_argument("--cada", type=int, default=60, help="segundos entre sondas")
-    ap.add_argument("--horas-max", type=float, default=2.0)
-    ap.add_argument("--prefijo", default="tv-")
-    ap.add_argument("--yes", action="store_true", help="no preguntar")
-    args = ap.parse_args()
+# --------------------------------------------------- cuando cambiar de maquina
+#
+# Los DOS casos que se dan, y son distintos (R13: escritos antes de mirar):
+#
+#   se DEGRADO  la maquina iba bien y se puso lenta -- otro inquilino le comio
+#               los nucleos. Se mide contra SI MISMA: mediana de las 3 ultimas
+#               epocas contra la de las 3 primeras. El umbral 1.35 no es
+#               inventado: es el que ya usa `estudio_flota --umbral-degradacion`.
+#   nacio LENTA  el marketplace da maquinas muy distintas por el mismo precio.
+#               Eso no se ve contra si misma --es lenta desde la primera epoca--
+#               sino contra la MEJOR que hemos visto en esta corrida.
+#
+# Los dos piden un minimo de epocas antes de juzgar: una epoca suelta mide el
+# arranque (cache fria, primer batch), no la maquina.
+UMBRAL_DEGRADACION = 1.35
+UMBRAL_LENTA = 1.6
+MIN_EPOCAS_DEGRADACION = 6
+MIN_EPOCAS_LENTA = 3
 
-    ctx = preflight(args)
+
+def _medianas(segs: list) -> "tuple[float, float] | None":
+    if len(segs) < MIN_EPOCAS_DEGRADACION:
+        return None
+    return statistics.median(segs[:3]), statistics.median(segs[-3:])
+
+
+def veredicto_maquina(segs: list, mejor: "float | None") -> "dict | None":
+    """¿Hay que cambiar de maquina? Devuelve el motivo, o None para seguir."""
+    par = _medianas(segs)
+    if par:
+        base, reciente = par
+        if base and reciente / base > UMBRAL_DEGRADACION:
+            return {"motivo": "degradada",
+                    "detalle": f"se puso lenta: {reciente:.0f} s/epoca contra "
+                               f"{base:.0f} al empezar ({reciente / base:.2f}x)"}
+    if len(segs) >= MIN_EPOCAS_LENTA and mejor:
+        mia = statistics.median(segs)
+        if mia / mejor > UMBRAL_LENTA:
+            return {"motivo": "lenta",
+                    "detalle": f"nacio lenta: {mia:.0f} s/epoca contra {mejor:.0f} "
+                               f"de la mejor de esta corrida ({mia / mejor:.2f}x)"}
+    return None
+
+
+def avisar(texto: str) -> None:
+    """Un aviso a Telegram, si se puede. NUNCA rompe el entrenamiento: es una
+    comodidad, y la fuente de verdad es el log y el run en disco (CLAUDE.md)."""
+    coord = Path(os.environ.get("COORD_HOME") or (Path.home() / "src/telegram-coordinator"))
+    notify = coord / "scripts" / "notify.mjs"
+    if not notify.exists():
+        return
+    try:
+        subprocess.run(["node", str(notify), texto], timeout=60,
+                       capture_output=True)
+    except Exception:                                   # noqa: BLE001
+        pass
+
+
+def una_maquina(args, ctx, destino, estado) -> dict:
+    """Alquila UNA maquina, entrena en ella, y la destruye pase lo que pase.
+
+    Devuelve por que se salio: `done` (termino el entrenamiento), `degradada`,
+    `lenta`, `presupuesto`, `plazo`, o `fallo`. Quien llama decide si alquila
+    otra -- aqui no, para que el camino de destruccion sea SIEMPRE el mismo y no
+    dependa de la decision de seguir.
+    """
     payload = construir_payload(args, ctx)
-    mb = payload.stat().st_size / 1e6
-
     oferta = V.elegir_oferta(args.cpus, args.max_cpus, args.ram_gb, args.max_precio)
     precio = float(oferta.get("dph_total", 0.0))
-    resumen = V.resumen_maquina(oferta)
-    log(f"\nMaquina elegida: {resumen.get('cpu_name', '?')} · "
-        f"{oferta.get('cpu_cores_effective', '?')} vCPU · "
-        f"{oferta.get('cpu_ram', 0) / 1024:.0f} GB · {precio:.4f} $/h")
-    log(f"Payload: {mb:.1f} MB · plazo maximo {args.horas_max:g} h "
-        f"(techo de gasto {precio * args.horas_max:.3f} $)")
-    if not args.yes and not V.confirmar("Alquilar?"):
-        return 1
+    vcpu = oferta.get("cpu_cores_effective", "?")
+    log(f"\nMaquina: {vcpu} vCPU · {oferta.get('cpu_ram', 0) / 1024:.0f} GB · "
+        f"{precio:.4f} $/h · payload {payload.stat().st_size / 1e6:.1f} MB")
 
     etiqueta = f"{args.prefijo}{args.name}"[:60]
     iid = V.alquilar(oferta, etiqueta, V.cfg("VAST_IMAGE"), args.disco_gb)
     t0 = time.time()
-    # Lo PRIMERO que se imprime, antes de nada que pueda fallar: si este proceso
-    # muere aqui, esto es lo unico que queda para poder apagarla.
-    log(f"\n  ALQUILADA: instancia {iid} ({etiqueta}) a {precio:.4f} $/h")
-    log(f"  Si algo va mal, esto la apaga:")
-    log(f"    python3 {LANZADOR}/scripts/vast_instance.py destroy {iid} --yes\n")
+    # Lo PRIMERO, antes de nada que pueda fallar: si este proceso muere aqui,
+    # esto es lo unico que queda para poder apagarla.
+    log(f"  ALQUILADA: instancia {iid} ({etiqueta}) a {precio:.4f} $/h")
+    log(f"    python3 {LANZADOR}/scripts/vast_instance.py destroy {iid} --yes")
+    estado["instancias"].append(iid)
 
-    destino = ctx["store"].destino(args.name) if not ctx["continuar"] \
-        else ctx["store"].path(args.name)
-    codigo = 1
+    salida = {"motivo": "fallo", "detalle": "", "iid": iid, "precio": precio,
+              "vcpu": vcpu, "gasto": 0.0, "mediana": None, "epocas": 0}
+    host = port = None
+    epocas_aqui: list = []          # s/epoca MEDIDAS EN ESTA MAQUINA
     try:
         info = V.esperar_estado(iid, int(V.cfg("VAST_BOOT_TIMEOUT")))
-        estado = (info.get("actual_status") or info.get("cur_state") or "?").lower()
-        if estado != "running":
-            # como la flota: una instancia que no arranca factura igual que una
-            # buena, asi que se dice y se destruye, no se espera por si acaso
-            raise RuntimeError(f"la instancia acabo en '{estado}', no arranco")
+        st = (info.get("actual_status") or info.get("cur_state") or "?").lower()
+        if st != "running":
+            raise RuntimeError(f"la instancia acabo en '{st}', no arranco")
         host, port = conectar(iid)
 
         with payload.open("rb") as fh:
@@ -366,87 +403,206 @@ def main() -> int:
                         "set -eu\ncd /root/bench\ntar -xzf /root/payload.tar.gz\n",
                         600) != 0:
             raise RuntimeError("no pude desempaquetar el payload")
-        log("  payload subido y desempaquetado; instalando (tarda unos minutos)...")
+        log("  payload subido; instalando (unos minutos)...")
         if V.ssh_script(host, port, INSTALL, 2400) != 0:
             raise RuntimeError("fallo la instalacion en la maquina")
 
-        # FV_DATA_ROOT apunta dentro de /root/bench: sin el, `data_root()` cae al
-        # repo de codigo y los runs se escribirian en otro sitio del que se leen.
         if ctx["continuar"]:
-            cmd = (f".venv/bin/fv-continue --name {args.name} --more {args.epochs}")
+            cmd = (f".venv/bin/fv-continue --name {args.name} --more {args.epochs}"
+                   f" --patience {args.patience}")
         else:
             cmd = (f".venv/bin/fv-train --name {args.name} "
                    f"--window-dataset {args.dataset} --network {args.network} "
-                   f"--recipe {args.recipe} --epochs {args.epochs}")
+                   f"--recipe {args.recipe} --epochs {args.epochs} "
+                   f"--patience {args.patience}")
         lanzar = (f"set -eu\ncd /root/bench\nexport FV_DATA_ROOT=/root/bench/data\n"
-                  f"nohup {cmd} > /root/train.log 2>&1 &\n"
-                  f"echo lanzado\n")
+                  f"nohup {cmd} > /root/train.log 2>&1 &\necho lanzado\n")
         if V.ssh_script(host, port, lanzar, 120) != 0:
             raise RuntimeError("no pude lanzar el entrenamiento")
-        log(f"  entrenando: {cmd}\n")
+        log(f"  entrenando: {cmd}")
 
-        plazo = t0 + args.horas_max * 3600
-        ultimo = -1
+        vistas = len(_epocas(destino))  # las que ya venian de antes
         while True:
             time.sleep(args.cada)
             rdir = dir_remoto(host, port, args.name)
-            traidos = traer(host, port, args.name, destino, rdir)
-            n = 0
-            met = destino / "metrics.jsonl"
-            if met.exists():
-                lineas = [l for l in met.read_text(encoding="utf-8").splitlines() if l.strip()]
-                n = len(lineas)
-                if n > ultimo and lineas:
-                    m = json.loads(lineas[-1])
-                    log(f"  epoca {m['epoch']}  train_loss={m['train_loss']:.4f}  "
-                        f"val_loss={m['val']['loss']:.4f}  f1={m['val']['f1']:.3f}  "
-                        f"({m['seconds']:.0f}s)  [bajados: {', '.join(traidos)}]")
-                    ultimo = n
-            code, estado = V.ssh_capture(
-                host, port,
-                f"cat {rdir}/status.json 2>/dev/null || true\n", 120)
-            st = ""
+            traer(host, port, args.name, destino, rdir)
+            filas = _epocas(destino)
+            for m in filas[vistas:]:
+                epocas_aqui.append(m["seconds"])
+                log(f"  epoca {m['epoch']}  train={m['train_loss']:.4f} "
+                    f"val={m['val']['loss']:.4f} f1={m['val']['f1']:.3f} "
+                    f"({m['seconds']:.0f}s)")
+            vistas = len(filas)
+            estado["gasto_vivo"] = estado["gasto"] + precio * (time.time() - t0) / 3600
+
+            code, txt = V.ssh_capture(
+                host, port, f"cat {rdir}/status.json 2>/dev/null || true\n", 120)
             try:
-                st = json.loads(estado).get("status", "")
+                sit = json.loads(txt).get("status", "")
             except (json.JSONDecodeError, AttributeError):
-                pass
-            if st in ("done", "error", "cancelled"):
-                log(f"\n  el entrenamiento termino: {st}")
+                sit = ""
+            if sit in ("done", "error", "cancelled"):
+                salida["motivo"] = "done" if sit == "done" else "fallo"
+                salida["detalle"] = f"el entrenamiento termino: {sit}"
                 break
-            if time.time() > plazo:
-                log("\n  AVISO: se agoto --horas-max; me traigo lo que haya")
+            if estado["gasto_vivo"] >= args.presupuesto:
+                salida["motivo"] = "presupuesto"
+                salida["detalle"] = (f"techo de {args.presupuesto:.2f} $ alcanzado "
+                                     f"({estado['gasto_vivo']:.3f} $)")
+                break
+            if time.time() > estado["t_fin"]:
+                salida["motivo"] = "plazo"
+                salida["detalle"] = "se agoto --horas-max"
+                break
+            if time.time() - estado["ultimo_aviso"] > args.aviso_cada * 3600:
+                estado["ultimo_aviso"] = time.time()
+                ult = filas[-1] if filas else None
+                avisar(
+                    f"'{args.name}' sigue: {len(filas)} epocas"
+                    + (f", f1={ult['val']['f1']:.3f}" if ult else "")
+                    + (f", {statistics.median(epocas_aqui):.0f} s/epoca"
+                       if epocas_aqui else "")
+                    + f", {estado['gasto_vivo']:.3f} $ de {args.presupuesto:.2f}")
+            v = veredicto_maquina(epocas_aqui, estado["mejor"])
+            if v and estado["cambios"] < args.max_cambios:
+                salida.update(v)
                 break
         traer(host, port, args.name, destino, dir_remoto(host, port, args.name))
-        codigo = 0
     except Exception as exc:                            # noqa: BLE001
-        log(f"\n  FALLO: {exc}")
-        try:
-            traer(host, port, args.name, destino,       # lo que haya, igualmente
-                  dir_remoto(host, port, args.name))
-            log("  (me traje lo que hubiera del run antes de destruir)")
-        except Exception:                               # noqa: BLE001
-            pass
+        salida["detalle"] = str(exc)
+        log(f"  FALLO: {exc}")
+        if host:
+            try:
+                traer(host, port, args.name, destino,
+                      dir_remoto(host, port, args.name))
+            except Exception:                           # noqa: BLE001
+                pass
     finally:
         vivida = time.time() - t0
+        salida["gasto"] = precio * vivida / 3600
+        salida["epocas"] = len(epocas_aqui)
         try:
             V.destruir(iid)
-            log(f"\n  instancia {iid} DESTRUIDA. Vivio {vivida / 60:.1f} min, "
-                f"{precio * vivida / 3600:.4f} $")
+            log(f"  instancia {iid} destruida ({salida['motivo']}). "
+                f"{vivida / 60:.1f} min, {salida['gasto']:.4f} $")
         except Exception as exc:                        # noqa: BLE001
-            log(f"\n  AVISO GRAVE: no pude destruir {iid}: {exc}\n"
-                f"  SIGUE FACTURANDO. Destruyela ya:\n"
+            log(f"  AVISO GRAVE: no pude destruir {iid}: {exc}\n"
+                f"  SIGUE FACTURANDO:\n"
                 f"    python3 {LANZADOR}/scripts/vast_instance.py destroy {iid} --yes")
-            return 3
+            avisar(f"GRAVE: no pude destruir la instancia {iid} de Vast. SIGUE "
+                   f"FACTURANDO. Destruyela: vast_instance.py destroy {iid} --yes")
+    if epocas_aqui:
+        salida["mediana"] = statistics.median(epocas_aqui)
+        salida["epocas"] = len(epocas_aqui)
+    return salida
 
+
+def _epocas(destino: Path) -> list:
+    f = destino / "metrics.jsonl"
+    if not f.exists():
+        return []
+    out = []
+    for l in f.read_text(encoding="utf-8").splitlines():
+        if l.strip():
+            try:
+                out.append(json.loads(l))
+            except json.JSONDecodeError:
+                pass
+    return out
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        description="Entrena un run en Vast, cambiando de maquina si se vuelve lenta")
+    ap.add_argument("--name", required=True)
+    ap.add_argument("--dataset", default="dirty1000-80px-16px-r20260827")
+    ap.add_argument("--network", default="fov16-optimo")
+    ap.add_argument("--recipe", default="plan40")
+    ap.add_argument("--epochs", type=int, default=300,
+                    help="tope de epocas (guarda). Quien para de verdad es --patience")
+    ap.add_argument("--patience", type=int, default=20,
+                    help="epocas sin mejorar antes de parar")
+    ap.add_argument("--continuar", action="store_true")
+    ap.add_argument("--cpus", type=int, default=8)
+    ap.add_argument("--max-cpus", type=int, default=32)
+    ap.add_argument("--ram-gb", type=float, default=8.0)
+    ap.add_argument("--max-precio", type=float, default=0.15, help="$/h")
+    ap.add_argument("--disco-gb", type=float, default=12.0)
+    ap.add_argument("--cada", type=int, default=60)
+    ap.add_argument("--horas-max", type=float, default=8.0)
+    ap.add_argument("--presupuesto", type=float, default=5.0,
+                    help="techo DURO de gasto en $; por encima no se alquila mas")
+    ap.add_argument("--max-cambios", type=int, default=6)
+    ap.add_argument("--aviso-cada", type=float, default=1.0, help="horas entre avisos")
+    ap.add_argument("--prefijo", default="tv-")
+    ap.add_argument("--yes", action="store_true")
+    args = ap.parse_args()
+
+    ctx = preflight(args)
+    destino = (ctx["store"].path(args.name) if ctx["continuar"]
+               else ctx["store"].destino(args.name))
+    if not args.yes and not V.confirmar(
+            f"Entrenar '{args.name}' en Vast con techo de {args.presupuesto:.2f} $?"):
+        return 1
+
+    estado = {"gasto": 0.0, "gasto_vivo": 0.0, "mejor": None, "cambios": 0,
+              "instancias": [], "t_fin": time.time() + args.horas_max * 3600,
+              "ultimo_aviso": time.time()}
+    historia: list = []
+
+    while True:
+        # ⚠ Se decide ANTES de alquilar, no despues: descubrir que no cabe con la
+        # maquina ya encendida es justo el gasto que el techo existe para evitar.
+        if estado["gasto"] >= args.presupuesto * 0.9:
+            log(f"\nNo alquilo otra: llevo {estado['gasto']:.3f} $ y el techo es "
+                f"{args.presupuesto:.2f} $ (margen del 10 % para no pasarme).")
+            break
+        r = una_maquina(args, ctx, destino, estado)
+        estado["gasto"] += r["gasto"]
+        historia.append(r)
+        if r["mediana"]:
+            estado["mejor"] = min(estado["mejor"] or r["mediana"], r["mediana"])
+        # a partir de aqui SIEMPRE se continua: ya hay pesos que subir
+        ctx["continuar"] = (destino / "last.pt").exists()
+
+        if r["motivo"] in ("done", "presupuesto", "plazo"):
+            log(f"\n{r['detalle']}")
+            break
+        if r["motivo"] == "fallo":
+            estado["cambios"] += 1
+            if estado["cambios"] > args.max_cambios:
+                log(f"\n{estado['cambios']} maquinas seguidas con problemas; paro.")
+                break
+            log(f"  -> pruebo con otra maquina ({estado['cambios']}/{args.max_cambios})")
+            continue
+        estado["cambios"] += 1
+        log(f"  -> cambio de maquina: {r['detalle']} "
+            f"({estado['cambios']}/{args.max_cambios})")
+        avisar(f"cambio de maquina en '{args.name}': {r['detalle']}. "
+               f"Llevo {len(_epocas(destino))} epocas y {estado['gasto']:.3f} $")
+        if estado["cambios"] > args.max_cambios:
+            log("\nDemasiados cambios de maquina; paro.")
+            break
+
+    filas = _epocas(destino)
+    ultima = filas[-1] if filas else None
+    resumen = (f"'{args.name}': {len(filas)} epocas, "
+               f"{len(historia)} maquina(s), {estado['gasto']:.3f} $")
+    if ultima:
+        resumen += (f", f1={ultima['val']['f1']:.3f} "
+                    f"val_loss={ultima['val']['loss']:.4f}")
+    log(f"\n{resumen}")
+    for i, h in enumerate(historia, 1):
+        log(f"  {i}. {h['vcpu']} vCPU · {h['epocas']} epocas · "
+            f"mediana {h['mediana'] and round(h['mediana'])} s · "
+            f"{h['gasto']:.4f} $ · salio por {h['motivo']}")
     log(f"\n  el run esta en: {destino}")
     for f in TRAER:
-        p = destino / f
-        log(f"    {'ok ' if p.exists() else '-- '} {f}"
-            + (f"  ({p.stat().st_size} B)" if p.exists() else ""))
-    log(f"\n  para seguir entrenandolo:\n"
-        f"    .venv/bin/fv-continue --name {args.name} --more N        (aqui)\n"
-        f"    python3 scripts/entrenar_vast.py --name {args.name} --continuar --epochs N")
-    return codigo
+        pth = destino / f
+        log(f"    {'ok ' if pth.exists() else '-- '} {f}"
+            + (f"  ({pth.stat().st_size} B)" if pth.exists() else ""))
+    avisar(f"entrenamiento terminado. {resumen}")
+    return 0
 
 
 if __name__ == "__main__":

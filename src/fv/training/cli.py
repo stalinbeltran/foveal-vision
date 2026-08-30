@@ -24,6 +24,11 @@ def main() -> int:
     ap.add_argument("--epochs", type=int, default=None,
                     help="cuantas epocas (pisa la de la receta). `epochs` es "
                          "guarda, no ajuste: no cambia el resultado, lo acota")
+    ap.add_argument("--patience", type=int, default=None,
+                    help="epocas sin mejorar antes de parar (pisa la de la "
+                         "receta). OJO: a diferencia de --epochs, esto SI cambia el "
+                         "resultado: un run con otra paciencia no es comparable "
+                         "con las tablas. Queda en el config.json del run")
     args = ap.parse_args()
 
     try:
@@ -39,6 +44,12 @@ def main() -> int:
             # verdad: la procedencia sigue diciendo lo que paso, no lo que decia
             # el fichero de la receta
             recipe = replace(recipe, epochs=args.epochs)
+        if args.patience is not None:
+            if args.patience < 0:
+                print("  [bad_patience] --patience tiene que ser >= 0 (0 = sin "
+                      "early-stop)", file=sys.stderr)
+                return 2
+            recipe = replace(recipe, patience=args.patience)
     except (NetworkStoreError, RecipeStoreError) as e:
         print(f"\n  [{e.code}] {e.message}\n    -> {e.hint}", file=sys.stderr)
         return 2
@@ -66,7 +77,7 @@ def _resumen(summary: dict) -> None:
     if summary.get("stopped_early"):
         print("  paro por patience (dejo de mejorar). Para seguir igualmente:")
         print(f"    fv-continue --name {summary['run']} --more N --patience 0")
-    print("  pesos:  best.pt -> evaluar   ·   last.pt -> continuar")
+    print("  pesos:  best.pt -> evaluar   |   last.pt -> continuar")
     print(f"    fv-continue --name {summary['run']} --more N")
 
 

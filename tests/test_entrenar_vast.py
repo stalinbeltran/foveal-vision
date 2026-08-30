@@ -169,3 +169,68 @@ def test_el_stderr_de_ssh_NO_se_tira(mod):
 def _cuerpo(mod, desde: str, hasta: str) -> str:
     f = (ROOT / "scripts" / "entrenar_vast.py").read_text(encoding="utf-8")
     return f[f.index(desde):f.index(hasta)]
+
+
+# --- cuando cambiar de maquina (R13: el criterio, escrito antes de mirar) ----
+
+def test_una_maquina_que_se_DEGRADA_se_cambia(mod):
+    """El caso "iba bien y se puso lenta": se mide contra SI MISMA. El umbral
+    1.35 no es inventado, es el que ya usa `estudio_flota --umbral-degradacion`."""
+    assert mod.UMBRAL_DEGRADACION == 1.35
+    v = mod.veredicto_maquina([80, 82, 81, 130, 135, 132], mejor=80)
+    assert v and v["motivo"] == "degradada"
+    assert "se puso lenta" in v["detalle"]
+
+
+def test_una_maquina_ESTABLE_no_se_toca(mod):
+    v = mod.veredicto_maquina([80, 82, 81, 83, 79, 84], mejor=80)
+    assert v is None
+
+
+def test_una_maquina_que_NACE_lenta_tambien_se_cambia(mod):
+    """El otro caso, y es distinto: el marketplace da maquinas muy distintas por
+    el mismo precio. Eso no se ve contra si misma --es lenta desde la primera
+    epoca-- sino contra la MEJOR de esta corrida."""
+    v = mod.veredicto_maquina([200, 205, 198], mejor=80)
+    assert v and v["motivo"] == "lenta"
+    assert "nacio lenta" in v["detalle"]
+
+
+def test_sin_una_MEJOR_con_la_que_comparar_no_se_juzga_lenta(mod):
+    """La primera maquina de una corrida no puede ser 'lenta': no hay contra que.
+    Cambiarla seria tirar la unica referencia que tenemos."""
+    assert mod.veredicto_maquina([200, 205, 198], mejor=None) is None
+
+
+def test_una_epoca_suelta_NO_decide(mod):
+    """Una epoca mide el arranque (cache fria, primer batch), no la maquina."""
+    assert mod.veredicto_maquina([500], mejor=80) is None
+    assert mod.veredicto_maquina([500, 90], mejor=80) is None
+    # con 3 ya se puede juzgar 'lenta', pero no 'degradada' (necesita 6)
+    assert mod.veredicto_maquina([90, 91, 92], mejor=88) is None
+
+
+def test_el_aviso_NUNCA_rompe_el_entrenamiento(mod, monkeypatch):
+    """Es una comodidad; la fuente de verdad es el log y el run en disco. Un
+    fallo del avisador no puede tumbar horas de entrenamiento."""
+    def explota(*a, **k):
+        raise OSError("no hay node")
+    monkeypatch.setattr(mod.subprocess, "run", explota)
+    mod.avisar("lo que sea")          # no lanza
+
+
+def test_el_techo_de_gasto_se_mira_ANTES_de_alquilar(mod):
+    """Descubrir que no cabe con la maquina ya encendida es justo el gasto que el
+    techo existe para evitar."""
+    fuente = (ROOT / "scripts" / "entrenar_vast.py").read_text(encoding="utf-8")
+    bucle = fuente[fuente.index("    while True:\n        # "):fuente.index("        r = una_maquina(")]
+    assert "presupuesto" in bucle and "break" in bucle
+
+
+def test_la_destruccion_no_depende_de_la_decision_de_seguir(mod):
+    """`una_maquina` destruye SIEMPRE en su `finally`; quien decide si alquila
+    otra es el bucle de fuera. Si la destruccion viviera en el bucle, cada camino
+    de salida nuevo seria una fuga posible."""
+    fuente = (ROOT / "scripts" / "entrenar_vast.py").read_text(encoding="utf-8")
+    cuerpo = fuente[fuente.index("def una_maquina("):fuente.index("def _epocas(")]
+    assert "finally:" in cuerpo and "V.destruir(iid)" in cuerpo
