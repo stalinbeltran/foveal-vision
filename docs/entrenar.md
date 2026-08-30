@@ -358,9 +358,22 @@ Cada run deja los dos en su directorio (`fv.settings.runs_root()`):
 No llevan lo mismo a propósito: meterle el optimizador a `best.pt` lo engordaría ~3× para nadie,
 y quitárselo a `last.pt` haría que continuar no fuese continuar.
 
-⚠ **Los `.pt` NO viajan por git** (`*.pt` está en el `.gitignore` del repo de datos). Un modelo
-entrenado vive **sólo en la máquina donde se entrenó**: si la rehaces, se pierde. Lo que sí viaja
-es el dataset y la configuración, o sea la receta para volver a obtenerlo.
+⚠ **Los `.pt` de un run NO viajan por git** (`*.pt` está en el `.gitignore` del repo de datos). Un
+modelo entrenado vive **sólo en la máquina donde se entrenó**: si la rehaces, se pierde. Lo que sí
+viaja es el dataset y la configuración, o sea la receta para volver a obtenerlo.
+
+**Y esa receta tarda horas, que es lo que se descubre tarde.** Medido el 2026-08-30 en un dev
+recién nacido: los 10 runs de `dirty1000-80px-16px-r20260827` estaban ahí con sus métricas —el
+mejor, `fov-optimo-p20`, con f1 **0,9430**— y ninguno con pesos, así que la pantalla **Revisar**
+sólo podía enseñar las imágenes sin cajas. Volver a entrenarlo costó **~100 s/época** en las 2
+vCPU del dev, o sea ~1 h 20 min hasta la época del mejor checkpoint. Es re-derivable, pero **no en
+el momento en que hace falta**, que es al abrir la app.
+
+**Por eso hay una excepción, y es una sola:** un run llamado **`demo-*`** commitea su `best.pt` en
+el repo de datos (665 KB medidos). Con eso, un dev recién lanzado —que ya clona `foveal-vision-data`
+y arranca `foveal-vision-web`— puede **inferir** sin entrenar nada. No es para comparar estudios:
+es para que la app funcione en una máquina nueva. El motivo entero está junto a la línea que lo
+permite, en el `.gitignore` del repo de datos.
 
 ## 6. Evaluar con imágenes
 

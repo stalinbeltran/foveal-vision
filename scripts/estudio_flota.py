@@ -94,9 +94,11 @@ ficheros pequenos del run -- `metrics.jsonl`, `status.json`, `config.json`,
 `summary.json` -- y que un hilo aparte los commitee y los empuje. Con `--cada 60`
 y epocas de 40-60 s eso es, en la practica, **una entrada por epoca**.
 
-Los pesos (`*.pt`) NO van a git, y no es un olvido: `.gitignore` lo dice desde
-siempre (`/runs/*/*.pt`) porque son ~700 KB por run y por epoca, y el repo se
-comeria gigabytes por estudio. Lo que va es el resultado, que es lo que se lee.
+Los pesos (`*.pt`) de un run de estudio NO van a git, y no es un olvido:
+`.gitignore` lo dice desde siempre (`/runs/*/*.pt`) porque son ~700 KB por run y
+por epoca, y el repo se comeria gigabytes por estudio. Lo que va es el resultado,
+que es lo que se lee. (La excepcion `demo-*` del 2026-08-30 no toca esto: es UN
+modelo para que la app infiera en una maquina nueva, no un run de barrido.)
 
 Que compra eso, exactamente:
 

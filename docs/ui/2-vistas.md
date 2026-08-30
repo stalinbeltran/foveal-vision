@@ -105,9 +105,10 @@ Numeración del hermano donde la vista se hereda; se marca lo que cambia.
   filtra el servidor a los de ese dataset (8), y se **marcan** los que no tienen `best.pt` en vez
   de esconderlos.
 
-  ⚠ **El run es OPCIONAL, y sin él se ven las imágenes igual.** Los pesos no viajan por git
-  (`*.pt` está en el `.gitignore` del repo de datos), así que exigir un modelo sería no poder mirar
-  nunca el dataset que sí viajó. Las imágenes salen entonces del propio `windows.npz`
+  ⚠ **El run es OPCIONAL, y sin él se ven las imágenes igual.** Los pesos de un run no viajan por
+  git (`*.pt` está en el `.gitignore` del repo de datos), así que exigir un modelo sería no poder
+  mirar nunca el dataset que sí viajó. La única excepción son los runs **`demo-*`**, que sí
+  commitean su `best.pt` para que una máquina nueva pueda inferir (desde el 2026-08-30). Las imágenes salen entonces del propio `windows.npz`
   (`/window-datasets/<b>/samples/<i>/image`), que guarda los píxeles **verbatim**. Lo que falta
   —el modelo, la verdad— se **dice en la pantalla**: una rejilla sin cajas y sin aviso se lee como
   «la red no detecta nada», que es la conclusión equivocada.

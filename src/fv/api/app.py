@@ -610,14 +610,17 @@ def create_app() -> FastAPI:
         except (SourceError, KeyError):
             return manifest, None
 
-    def _runs_de(ds_name: str) -> list[dict]:
+    def _runs_de(ds_name: str, todos: list | None = None) -> list[dict]:
         """Los runs de ESTE dataset, con si tienen checkpoint.
 
         Filtrar aqui y no en el front es lo que quita el select de 859 runs: la
         lista ya trae `window_dataset`, asi que no cuesta una lectura de mas.
+
+        `todos` existe para no releer los 859 runs una vez por dataset al elegir
+        cual se abre por defecto: quien llame en bucle pasa la lista una vez.
         """
         out = []
-        for r in runs.list():
+        for r in (runs.list() if todos is None else todos):
             if r.get("window_dataset") != ds_name:
                 continue
             out.append({"name": r["name"], "status": r.get("status"),
@@ -648,7 +651,21 @@ def create_app() -> FastAPI:
                 "ningun dataset de ventanas tiene windows.npz: no hay imagenes que mirar",
                 "commitea el dataset en el repo de datos, o extrae uno nuevo"))
         nombres = [d["name"] for d in datasets]
-        ds_name = window_dataset if window_dataset in nombres else nombres[0]
+        todos = runs.list()
+        if window_dataset in nombres:
+            ds_name = window_dataset
+        else:
+            # Sin peticion explicita manda el dataset que SE PUEDE mirar con
+            # modelo, no el primero de la lista. Medido el 2026-08-30 en un dev
+            # recien hecho: el primero era `bench-dirty1000-16-r20260827`, que
+            # tiene CERO runs, asi que la pantalla abria diciendo "este dataset
+            # no tiene ningun run en esta maquina" mientras el de al lado tenia
+            # un `demo-*` con pesos. Si ninguno tiene checkpoint se cae al
+            # primero, que es el comportamiento de siempre.
+            ds_name = next(
+                (n for n in nombres
+                 if any(r["has_checkpoint"] for r in _runs_de(n, todos))),
+                nombres[0])
         manifest, source = _review_ctx(ds_name)
         indices = wstore.split_map(ds_name).get(split) or []
         vistos = review_mod.reviewed_indices(ds_name, split)
@@ -665,7 +682,15 @@ def create_app() -> FastAPI:
             "image_size": [manifest["images"]["shape"][2],
                            manifest["images"]["shape"][1]]
                           if manifest.get("images", {}).get("shape") else None,
-            "runs": _runs_de(ds_name), "run": run,
+            "runs": _runs_de(ds_name, todos), "run": run,
+            # Cual abrir si el usuario no ha elegido nunca. Lo decide el servidor
+            # -- que ya ordena los runs poniendo delante los que pueden inferir--
+            # y no el front, para que no haya dos copias de la regla. Es lo que
+            # hace que una maquina recien lanzada ensene CAJAS al abrir en vez de
+            # pedir que adivines cual de sus 10 runs trajo pesos.
+            "run_sugerido": next(
+                (r["name"] for r in _runs_de(ds_name, todos)
+                 if r["has_checkpoint"]), None),
             "total": len(indices),
             "splits": sorted(wstore.split_map(ds_name).keys()),
             "reviewed": len(vistos), "pending": len(pend),
@@ -731,8 +756,9 @@ def create_app() -> FastAPI:
                 raise _http_error(RunError(
                     "run_has_no_checkpoint",
                     f"'{run_name}' no tiene best.pt en esta maquina: no puede inferir",
-                    "los pesos no viajan por git (*.pt esta en el .gitignore del "
-                    "repo de datos); entrena aqui, o mira las imagenes sin run"))
+                    "los pesos de un run no viajan por git (*.pt esta en el "
+                    ".gitignore del repo de datos); elige un run `demo-*`, que es "
+                    "la excepcion y SI viaja, o entrena aqui, o mira sin run"))
             model = _model_for(run_name)
 
         arrays = None if source is not None else wstore.arrays(ds_name)

@@ -459,3 +459,61 @@ def test_un_dataset_que_no_existe_cae_al_primero_valido(client):
     c, w = client
     ctx = c.get("/review/context?window_dataset=no-existe&split=val").json()
     assert ctx["window_dataset"] == w["dataset"]
+
+
+def test_el_dataset_por_defecto_es_uno_QUE_PUEDA_inferir(client):
+    """Sin `window_dataset` mandaba el primero de la lista, y eso abria la
+    pantalla en el que no tiene con que inferir.
+
+    Medido el 2026-08-30 en un dev recien hecho: el primero era
+    `bench-dirty1000-16-r20260827`, con CERO runs, mientras el de al lado tenia
+    un modelo con pesos. La pantalla abria diciendo "este dataset no tiene ningun
+    run en esta maquina" -- que se lee como "aqui no hay nada que hacer".
+    """
+    c, w = client
+    from fv.windows.extract import ExtractConfig, extract_windows
+    from fv import settings
+    # ordena ANTES que `mini-b8`, y no tiene ni un run
+    extract_windows(ExtractConfig(source=w["source"], window_size=8, stride=7,
+                                  val_frac=0.2, test_frac=0.2, seed=3),
+                    settings.window_datasets_root() / "aaa-b8")
+
+    ctx = c.get("/review/context?split=val").json()
+    assert ctx["window_dataset"] == w["dataset"]
+    # ...y pedirlo explicitamente sigue mandando: esto elige un DEFECTO, no impone
+    ctx2 = c.get("/review/context?window_dataset=aaa-b8&split=val").json()
+    assert ctx2["window_dataset"] == "aaa-b8"
+
+
+def test_sin_ningun_checkpoint_el_defecto_es_el_de_siempre(client):
+    """El otro lado de la regla: si NINGUNO puede inferir, no hay nada que
+    preferir y se cae al primero. Una pantalla que se quedara en blanco por no
+    encontrar su favorito seria peor que la de antes."""
+    c, w = client
+    from fv.windows.extract import ExtractConfig, extract_windows
+    from fv import settings
+    extract_windows(ExtractConfig(source=w["source"], window_size=8, stride=7,
+                                  val_frac=0.2, test_frac=0.2, seed=3),
+                    settings.window_datasets_root() / "aaa-b8")
+    (w["store"].path(w["run"]) / "best.pt").unlink()
+
+    ctx = c.get("/review/context?split=val").json()
+    assert ctx["window_dataset"] == "aaa-b8"
+    assert ctx["run_sugerido"] is None
+
+
+def test_el_servidor_sugiere_QUE_run_abrir(client):
+    """Cual abrir lo decide el servidor, que es quien ya sabe cual tiene pesos.
+
+    Si lo decidiera el front habria dos copias de la regla; y sin sugerencia, una
+    maquina recien lanzada abre pidiendo que adivines cual de sus 10 runs trajo
+    checkpoint -- que es justo lo que no se puede saber mirando la lista."""
+    c, w = client
+    ctx = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    assert ctx["run_sugerido"] == w["run"]
+
+    # y desaparece cuando el run deja de poder inferir: sugerir uno que da 409
+    # seria peor que no sugerir ninguno
+    (w["store"].path(w["run"]) / "best.pt").unlink()
+    ctx2 = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
+    assert ctx2["run_sugerido"] is None

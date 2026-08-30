@@ -15,8 +15,18 @@ import { ErrorBox, Field, Working } from "../components/ui";
 // reducidos a los de ese dataset.
 //
 // Y el run es OPCIONAL: sin modelo se ven las imagenes sin cajas, que es lo unico
-// que se puede hacer en una maquina que solo tiene el repo de datos (los `*.pt`
-// no viajan por git). Mirar sin modelo sigue siendo mirar, y queda registrado.
+// que se puede hacer en una maquina que solo tiene el repo de datos y ningun
+// modelo (los `*.pt` de un run no viajan por git; desde el 2026-08-30 SI viaja
+// uno de demostracion, `demo-*`). Mirar sin modelo sigue siendo mirar, y queda
+// registrado.
+
+// "todavia no he elegido run" tiene que poder distinguirse de "he elegido MIRAR
+// SIN MODELO", que es un modo legitimo de esta pantalla (revisar a ojo sin que
+// las cajas te condicionen). Por eso el valor recordado arranca en un centinela
+// y no en "": con "" no habria forma de saber si el usuario lo eligio o si
+// nunca abrio el select, y auto-elegir un run le pisaria la decision cada vez
+// que cambiase de split. `\u0000` no puede ser el nombre de un run.
+const SIN_ELEGIR = "\u0000";
 
 const DIA = 86400000;
 
@@ -38,7 +48,12 @@ const ORDEN = ["hoy", "ayer", "esta semana", "la semana pasada", "este mes",
   "hace más de un mes", "sin fecha"];
 
 export default function Review() {
-  const [run, setRun] = usePersistedState("review.run", "");
+  // ⚠ La clave cambio de `review.run` a `review.run2` a proposito: el defecto
+  // anterior era "" y se escribia en localStorage con solo abrir la pantalla, o
+  // sea que TODO navegador que ya la hubiera visto quedaria marcado como "elegi
+  // mirar sin modelo" y no adoptaria nunca la sugerencia. Con una clave nueva la
+  // distincion empieza limpia; la vieja queda de basura inofensiva.
+  const [run, setRun] = usePersistedState("review.run2", SIN_ELEGIR);
   const [ds, setDs] = usePersistedState("review.dataset", "");
   const [split, setSplit] = usePersistedState("review.split", "val");
   const [n, setN] = usePersistedState("review.n", 10);
@@ -69,8 +84,13 @@ export default function Review() {
       // el servidor decide cual es el dataset valido (y cae al primero si el
       // recordado ya no existe): el front no puede tener su propia regla
       if (c.window_dataset !== ds) setDs(c.window_dataset);
-      // un run recordado que no es de este dataset no sirve aqui
-      if (run && !c.runs.some((r: any) => r.name === run)) setRun("");
+      // Un run recordado que no es de este dataset no sirve aqui; y si no se ha
+      // elegido nunca, se adopta el que sugiere el servidor. Los dos casos se
+      // resuelven juntos a proposito: si se limpiara a "" por separado, quedaria
+      // indistinguible de "el usuario quiere mirar sin modelo".
+      const valido = run !== SIN_ELEGIR && run !== ""
+        && c.runs.some((r: any) => r.name === run);
+      if (!valido && run !== "") setRun(c.run_sugerido ?? "");
     }).catch(setError);
     recargarHistorial();
   }, [ds, split, n]);
@@ -82,7 +102,7 @@ export default function Review() {
     const t = setTimeout(() => {
       api.post("/review/batch", {
         window_dataset: ctx.window_dataset, split, offset, count: n,
-        run: run || undefined,
+        run: run && run !== SIN_ELEGIR ? run : undefined,
       })
         .then((r) => { if (seq.current === mio) { setBatch(r); setError(null); } })
         .catch((e) => { if (seq.current === mio) { setError(e); setBatch(null); } })
@@ -170,7 +190,8 @@ export default function Review() {
             {/* ⛔ se MARCA, no se esconde: un run sin best.pt escondido no se
                 distingue de un run que no existe, y entonces no sabes si
                 entrenar aqui o buscar en otro sitio */}
-            <select value={run} onChange={(e) => setRun(e.target.value)}>
+            <select value={run === SIN_ELEGIR ? "" : run}
+              onChange={(e) => setRun(e.target.value)}>
               <option value="">— sin modelo (sólo imágenes) —</option>
               {runs.map((r) => (
                 <option key={r.name} value={r.name} disabled={!r.has_checkpoint}>
@@ -225,8 +246,10 @@ export default function Review() {
             : runs.some((r) => r.has_checkpoint)
               ? <>Elige un run arriba.</>
               : <>Ninguno de sus {runs.length} runs tiene <code>best.pt</code> aquí:
-                 los pesos no viajan por git (<code>*.pt</code> está en el
-                 <code>.gitignore</code> del repo de datos).</>}
+                 los pesos de un run no viajan por git (<code>*.pt</code> está en el
+                 <code>.gitignore</code> del repo de datos). Los <code>demo-*</code> sí
+                 viajan: si tampoco hay ninguno, este dataset no tiene modelo de
+                 demostración publicado.</>}
         </div>
       ) : null}
       {ctx && !hayVerdad ? (
