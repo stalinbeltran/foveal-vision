@@ -37,7 +37,7 @@ from fv.studies.driver import (StudyError, advance, confirm, create_study,
                                delete_study)
 from fv.studies.driver import status as study_status_fn
 from fv.studies.store import StudyStore, StudyStoreError
-from fv.training.loop import train
+from fv.training.loop import reanudar, train
 from fv.training.recipe import Recipe, RecipeStore, RecipeStoreError
 from fv.training.registry import RunError, RunStore
 from fv.validation import check_network, check_run
@@ -366,6 +366,38 @@ def create_app() -> FastAPI:
             return train(name, body["window_dataset"], body["network"], net,
                          body["recipe"], recipe, device=device, store=runs)
         return {"job": jobs.submit("train", work, {"run": name},
+                                   on_cancel=lambda: runs.request_stop(name))}
+
+    @app.post("/runs/{name}/continue", status_code=202)
+    def continue_run(name: str, body: dict):
+        """Sigue un run que ya existe, `more` epocas mas.
+
+        Endpoint propio y no una bandera de `POST /runs`: aquel CREA (y se niega
+        si el nombre existe, a proposito). Aqui no se eligen red, dataset ni
+        receta -- salen del run --, asi que aceptarlas seria admitir campos que
+        se ignoran en silencio.
+        """
+        if not runs.exists(name):
+            raise _http_error(RunError("run_not_found", f"no existe '{name}'",
+                                       "mira la lista en /runs"))
+        mas = int(body.get("more", 0))
+        if mas < 1:
+            raise HTTPException(400, {
+                "code": "bad_more", "message": "`more` son epocas ADICIONALES y >= 1",
+                "hint": "para empezar uno nuevo: POST /runs"})
+        st = runs.reconcile(name).get("status")
+        if st in ("running", "queued"):
+            raise _http_error(RunError(
+                "run_is_running", f"'{name}' ya esta entrenando",
+                "espera a que acabe, o paralo con POST /runs/{name}/stop"))
+        patience = body.get("patience")
+
+        def work(is_cancelled):
+            return reanudar(name, mas=mas,
+                            patience=None if patience is None else int(patience),
+                            device=body.get("device", "cpu"), store=runs,
+                            optimizador_limpio=bool(body.get("optimizador_limpio")))
+        return {"job": jobs.submit("continue", work, {"run": name, "more": mas},
                                    on_cancel=lambda: runs.request_stop(name))}
 
     @app.get("/runs/{name}/metrics")

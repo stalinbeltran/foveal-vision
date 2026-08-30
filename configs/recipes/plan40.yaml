@@ -1,3 +1,20 @@
+# LA RECETA VIGENTE: los valores sobre los que estan medidas las tablas.
+#
+# Es copia del `base_recipe_value` de los recorridos, que es donde vive el
+# vigente de verdad (ESTADO.md: "si una casilla y su fuente discrepan, manda la
+# fuente"). Leido de `sweeps/do-v/spec.json` el 2026-08-29 y comprobado campo a
+# campo. NO se duplica en otra receta "de estudios": dos ficheros con los mismos
+# valores son dos que pueden divergir.
+#
+# El detalle de que se cerro cada eje, con que evidencia y que sigue abierto:
+#   https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/ESTADO.md
+#
+# ⚠ `epochs` es GUARDA, no ajuste: acota el gasto, no cambia el resultado. Sobre
+# los 630 runs con curvas la epoca mas alta fue 130 y ninguno llego a 150. Se
+# pisa desde la linea de comandos (`fv-train --epochs N`) sin tocar esto.
+# ⚠ `patience` = 10 es lo unico de aqui que sigue ABIERTO POR ARRIBA: 20 gana las
+# dos veces que se midio (+0,0028 y +0,0027) pero ninguna declara, y 20 es el
+# techo del rango. Ver ESTADO.md.
 format_version: 1
 lr: 0.0014
 optimizer: adam

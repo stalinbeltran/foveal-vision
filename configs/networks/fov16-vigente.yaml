@@ -1,0 +1,25 @@
+format_version: 2
+# EL VIGENTE: la red sobre la que estan medidas TODAS las tablas publicadas
+# (`ws16-p2-d2-L4`, 167.852 parametros, recorte real 24x24, N = 20).
+#
+# Es copia exacta del `base_network_value` de los recorridos --que es donde vive
+# el vigente de verdad (ESTADO.md: "si una casilla y su fuente discrepan, manda
+# la fuente")--, leido de `sweeps/do-v/spec.json` el 2026-08-29.
+#
+# ⚠ Usa esta para COMPARAR con lo publicado. Para entrenar el mejor modelo
+# medido, usa `fov16-optimo`, que NO es comparable con esas tablas.
+fovea_px: 16
+border_px: 4
+border_reduce: 2
+overlap_fovea_px: 2
+overlap_border_px: 0
+n_layers: 4
+k_center: 3
+k_periph: 3
+s_center: 1
+s_periph: 1
+channels: [16, 16, 16, 16]
+merge: concat
+pool_mode: avg
+pad_mode: edge
+regions: split

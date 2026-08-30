@@ -212,6 +212,20 @@ degenerada, a propósito). Útil para ver el espacio entrenar y cazar el punto q
 
 ## Entrenar sin la UI
 
+> **Para entrenar la red foveada de verdad —con los parámetros que dejaron los estudios, con las
+> épocas que quieras y pudiendo continuar— el documento es
+> [`docs/entrenar.md`](docs/entrenar.md).** Trae las dos configuraciones (`fov16-vigente` para
+> comparar con lo publicado, `fov16-optimo` para el mejor modelo medido), cuánto tarda cada época
+> aquí, cómo continuar un entrenamiento parado y qué fichero de pesos sirve para qué.
+>
+> ```bash
+> .venv/bin/fv-train --name mi-run --window-dataset dirty1000-80px-16px-r20260827 \
+>     --network fov16-optimo --recipe plan40 --epochs 40
+> .venv/bin/fv-continue --name mi-run --more 20      # sigue donde lo dejó
+> ```
+
+Lo de abajo es el mecanismo genérico, con el mundo pequeño de pruebas.
+
 Hacen falta tres cosas **con nombre**: un dataset (B), una red (C) y una receta (D). Se crean
 desde la UI o dejando YAMLs en `configs\networks\` y `configs\recipes\`.
 

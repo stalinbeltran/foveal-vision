@@ -1,0 +1,13 @@
+{
+  "name": "entrenar",
+  "descripcion": "Entrena la red foveada con los parametros de los estudios. Horas: va desacoplado y avisa al terminar. Sin argumentos usa fov16-optimo + plan40 sobre el dataset del estudio.",
+  "ejemplos": [
+    "--name mi-run --epochs 40",
+    "--name mi-run --epochs 40 --network fov16-vigente",
+    "--name mi-run --window-dataset dirty1000-80px-16px-r20260827 --epochs 100"
+  ],
+  "requiere": ["python3"],
+  "command": "\"$COORD_HOME/scripts/desacoplar.sh\" sh -c 'cd \"$PWD\"; .venv/bin/fv-train --window-dataset dirty1000-80px-16px-r20260827 --network fov16-optimo --recipe plan40 {{input}} > \"/tmp/entrenar-$COORD_SESSION.log\" 2>&1; node \"$COORD_HOME/scripts/notify.mjs\" \"entrenamiento terminado. Mira /use revisar o el log /tmp/entrenar-$COORD_SESSION.log\"' >/dev/null 2>&1 & echo \"Entrenamiento lanzado en su propio cgroup (sobrevive a este turno Y a un reinicio del bot). 142-176 s/epoca en esta maquina (medido 2026-08-29; el rango es la maquina compartida): 40 epocas son 1h35-2h. Log: /tmp/entrenar-$COORD_SESSION.log -- avisara al terminar, pero el log es la fuente de verdad. Los pesos quedan en el directorio del run: best.pt para evaluar, last.pt para continuar.\"",
+  "encargados": ["echo"],
+  "timeoutMs": 60000
+}

@@ -1,0 +1,32 @@
+format_version: 2
+# EL OPTIMO MEDIDO: el vigente con los DOS ejes que los estudios cerraron al 5 %
+# y que nunca se aplicaron (ESTADO.md los marca "4 -> 8" y "2 -> 7", *no
+# aplicado*). Mismos 167.852 parametros; el recorte real pasa de 24x24 a 32x32.
+#
+#   border_px 4 -> 8   con border_reduce 2 -> 4   [#14] p = 0,006 · +0,0096
+#   overlap_fovea_px 2 -> 7                       [#14] p < 0,001 · +0,0124
+#
+# ⚠ `border_px` VA ATADO a `border_reduce`, y esto es lo que se pierde al leer
+# solo el resumen: el estudio (#9) barrio los dos a la vez para dejar el anillo
+# en 2 celdas y N en 20. Subir `border_px` a 8 SOLO (con reduce 2) da N = 24 y
+# 235.436 parametros -- +40 %, otra red, y ya no es "a coste constante".
+# Comprobado el 2026-08-29 con `derive_dims` + `build_model`.
+#
+# ⚠ Y los dos ejes se midieron POR SEPARADO, cada uno contra el vigente. Juntos
+# NO se han medido: es la mejor apuesta que da la evidencia, no un resultado.
+# Lo medido en cada uno es f1 de VENTANA, un proxy que exagera (ESTADO.md R5).
+fovea_px: 16
+border_px: 8
+border_reduce: 4
+overlap_fovea_px: 7
+overlap_border_px: 0
+n_layers: 4
+k_center: 3
+k_periph: 3
+s_center: 1
+s_periph: 1
+channels: [16, 16, 16, 16]
+merge: concat
+pool_mode: avg
+pad_mode: edge
+regions: split

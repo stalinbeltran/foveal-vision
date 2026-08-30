@@ -1,0 +1,12 @@
+{
+  "name": "continuar",
+  "descripcion": "Sigue entrenando un run que ya existe, N epocas MAS, desde su last.pt. No se puede cambiar la red ni la receta: salen del run.",
+  "ejemplos": [
+    "--name mi-run --more 20",
+    "--name mi-run --more 20 --patience 0"
+  ],
+  "requiere": ["python3"],
+  "command": "\"$COORD_HOME/scripts/desacoplar.sh\" sh -c 'cd \"$PWD\"; .venv/bin/fv-continue {{input}} > \"/tmp/continuar-$COORD_SESSION.log\" 2>&1; node \"$COORD_HOME/scripts/notify.mjs\" \"continuacion terminada. Log: /tmp/continuar-$COORD_SESSION.log\"' >/dev/null 2>&1 & echo \"Continuacion lanzada en su propio cgroup. Retoma el MISMO run: misma red, mismo dataset, mismo metrics.jsonl. Log: /tmp/continuar-$COORD_SESSION.log\"",
+  "encargados": ["echo"],
+  "timeoutMs": 60000
+}
