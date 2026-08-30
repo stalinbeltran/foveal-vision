@@ -185,6 +185,51 @@ Alquila **una** máquina, sube el código y el dataset, entrena, **se trae los p
 sonda** y la destruye. Sin argumentos usa `fov16-optimo` + `plan40` sobre
 `dirty1000-80px-16px-r20260827`.
 
+### Cambia de máquina si se vuelve lenta, y no pasa del presupuesto
+
+El marketplace da máquinas **muy distintas por el mismo precio**, y una buena se puede volver
+lenta a mitad (otro inquilino le come los núcleos). Son **dos casos distintos y se miden
+distinto** — el criterio, escrito antes de mirar:
+
+| Caso | Cómo se ve | Umbral | Mínimo de épocas |
+|---|---|---|---|
+| **se degradó** | contra **sí misma**: mediana de las 3 últimas épocas contra la de las 3 primeras *en esa máquina* | **1,35** | 6 |
+| **nació lenta** | contra la **mejor** mediana de esta corrida (contra sí misma no se ve: es lenta desde la época 1) | **1,6** | 3 |
+
+El 1,35 no es inventado: es el que ya usa `estudio_flota --umbral-degradacion`. Y **sin una mejor
+con la que comparar, la primera máquina nunca es «lenta»** — cambiarla sería tirar la única
+referencia que hay.
+
+Cambiar de máquina es posible **porque `last.pt` viaja**: se destruye la lenta, se alquila otra y
+se **continúa**. Es el pago directo de que continuar sea fiel.
+
+```bash
+.venv/bin/python scripts/entrenar_vast.py --name mi-run \
+    --epochs 300 --patience 20 --presupuesto 5 --max-cambios 6 --aviso-cada 1
+```
+
+- `--presupuesto` es un techo **duro** en dólares, y **se mira antes de alquilar la siguiente**
+  (con un margen del 10 %): descubrir que no cabe con la máquina ya encendida es justo el gasto
+  que el techo existe para evitar.
+- `--max-cambios` evita que una racha de máquinas malas queme el presupuesto a base de arranques.
+- `--aviso-cada` manda un aviso a Telegram con épocas, f1, s/época y gasto. **El aviso nunca
+  rompe el entrenamiento**: la fuente de verdad es el log y el run en disco.
+
+⚠ **La destrucción vive en el `finally` de `una_maquina`, no en el bucle**, y eso es deliberado:
+si viviera fuera, cada camino de salida nuevo sería una fuga posible. Tiene test.
+
+### El criterio de parada: `patience`
+
+`--patience 20` (con `--epochs 300` de guarda). Es **más alta que el vigente**, y a propósito:
+`ESTADO.md` mide que 20 ganó a 10 **las dos veces** (+0,0028 y +0,0027) y que el eje está
+**abierto por arriba**; 10 sigue siendo el vigente sólo porque esa diferencia no llega a δ.
+
+Aquí el objetivo es **un modelo**, no una fila de tabla, y una época cuesta ~0,0012 $ — así que
+esperar más es prácticamente gratis.
+
+⚠ **Y por eso un run entrenado así NO es comparable con las tablas publicadas.** La paciencia
+usada queda en el `config.json` del run, que es donde hay que mirarla.
+
 ### ✅ Verificado el 2026-08-30: entrenado en Vast, continuando lo de aquí
 
 No es una prueba con datos de juguete: se **continuó** el run `fov-optimo-3ep` (que llevaba 3
