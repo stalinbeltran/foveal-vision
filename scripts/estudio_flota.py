@@ -94,11 +94,24 @@ ficheros pequenos del run -- `metrics.jsonl`, `status.json`, `config.json`,
 `summary.json` -- y que un hilo aparte los commitee y los empuje. Con `--cada 60`
 y epocas de 40-60 s eso es, en la practica, **una entrada por epoca**.
 
-Los pesos (`*.pt`) de un run de estudio NO van a git, y no es un olvido:
-`.gitignore` lo dice desde siempre (`/runs/*/*.pt`) porque son ~700 KB por run y
-por epoca, y el repo se comeria gigabytes por estudio. Lo que va es el resultado,
-que es lo que se lee. (La excepcion `demo-*` del 2026-08-30 no toca esto: es UN
-modelo para que la app infiera en una maquina nueva, no un run de barrido.)
+LOS PESOS SI VAN A GIT desde el 2026-08-30, y solo dos por run: `best.pt` (la
+mejor epoca, 665 KB, la que se prueba a mano) y `last.pt` (la mas actualizada,
+2,0 MB, la que permite continuar). La razon la puso el dueno: **hay que poder
+probar a mano un entrenamiento**, y sin pesos no se puede -- la web app ensena
+las imagenes sin cajas y "la red detecta mal" no se distingue de "no hay red".
+
+Lo que costo no tenerlo: `fov-optimo-p20` se entreno la noche del 29 al 30 de
+agosto (69 epocas en Vast, f1 0,9430), se commitearon sus cuatro ficheros de
+descripcion y ningun peso, y al rehacer la maquina la red dejo de existir. Hubo
+que reentrenarla entera.
+
+⚠ LA CADENCIA es lo que evita el problema que la exclusion evitaba. git guarda
+todas las versiones que se commitean, asi que subir `last.pt` en cada sonda son
+2 MB por epoca y por run -- 140 MB en un run de 70 epocas y gigabytes en un
+barrido, que es exactamente por lo que estaba excluido. Por eso los pesos se
+traen cada `FV_EPOCAS_POR_PESOS` epocas (25 por defecto) y SIEMPRE en el ultimo
+tiron, antes de destruir la maquina. Dos o tres versiones por run, no setenta.
+Las sondas intermedias siguen trayendo solo los cuatro ficheros pequenos.
 
 Que compra eso, exactamente:
 
@@ -234,7 +247,16 @@ EXCLUYE = {"__pycache__", ".pytest_cache", ".venv", ".git", "node_modules"}
 
 # Los ficheros del libro de a bordo: pequenos, textuales y los unicos que git
 # quiere. Los pesos se quedan en la maquina (ver el docstring).
-LIBRO = ("metrics.jsonl", "status.json", "config.json", "summary.json")
+# Lo que se extrae de un tar traido de una maquina. Los dos `.pt` entraron el
+# 2026-08-30: sin ellos, la maquina se destruia con la red entrenada dentro.
+LIBRO = ("metrics.jsonl", "status.json", "config.json", "summary.json",
+         "best.pt", "last.pt")
+
+# Cada cuantas epocas se traen los pesos ademas de los ficheros pequenos. No es
+# un ajuste fino: separa "una version por epoca" (gigabytes) de "dos o tres por
+# run" (megabytes). Se puede subir en un barrido largo y bajar si se quiere
+# probar a mano un run mientras corre.
+EPOCAS_POR_PESOS = int(os.environ.get("FV_EPOCAS_POR_PESOS", "25"))
 
 INSTALL = """set -eu
 cd /root/bench
@@ -1365,19 +1387,34 @@ def cribar(maquinas: list, cuantas: int, umbral: float) -> tuple:
 # ------------------------------------------ fase C: entrenar en una maquina ya lista
 
 
-PULL = ("cd /root/bench 2>/dev/null && find runs -type f "
-        r"\( -name metrics.jsonl -o -name status.json -o -name config.json "
-        r"-o -name summary.json \) -print0 2>/dev/null "
-        "| tar --null -czf - -T - 2>/dev/null || true")
+def _pull(con_pesos: bool) -> str:
+    """El comando que se corre EN la maquina para empaquetar lo que se trae.
+
+    Dos versiones y no una: la sonda normal trae kilobytes y corre cada `--cada`
+    segundos; la que trae pesos son ~2,7 MB por run y solo tiene sentido de
+    tarde en tarde (`EPOCAS_POR_PESOS`) y en el ultimo tiron.
+    """
+    nombres = ["metrics.jsonl", "status.json", "config.json", "summary.json"]
+    if con_pesos:
+        nombres += ["best.pt", "last.pt"]
+    cond = " -o ".join(f"-name {n}" for n in nombres)
+    return ("cd /root/bench 2>/dev/null && find runs -type f "
+            rf"\( {cond} \) -print0 2>/dev/null "
+            "| tar --null -czf - -T - 2>/dev/null || true")
 
 
-def traer_libro(m: "Maquina", libro: Libro) -> list:
-    """Se trae los ficheros pequenos de los runs de esta maquina. Nunca lanza:
-    una sonda perdida no puede tumbar un entrenamiento que va bien."""
+def traer_libro(m: "Maquina", libro: Libro, con_pesos: bool = False) -> list:
+    """Se trae lo que ha escrito esta maquina. Nunca lanza: una sonda perdida no
+    puede tumbar un entrenamiento que va bien.
+
+    `con_pesos` anade `best.pt` y `last.pt`. Va apagado por defecto a proposito:
+    lo caro no es traerlos, es que cada uno que llega es una version mas que git
+    guarda para siempre.
+    """
     try:
         destino = Path(tempfile.mkdtemp(prefix=f"libro-{m.etiqueta}-")) / "libro.tar.gz"
         with destino.open("wb") as fh:
-            p = subprocess.run(V.ssh_command(m.host, m.port) + [PULL],
+            p = subprocess.run(V.ssh_command(m.host, m.port) + [_pull(con_pesos)],
                                stdout=fh, stderr=subprocess.DEVNULL, timeout=240)
         if p.returncode != 0 or destino.stat().st_size < 30:
             return []
@@ -1477,6 +1514,10 @@ def entrenar_lote(m: "Maquina", lote: dict, hilos: int, plazo_s: int, cada_s: in
 
         t_ent = time.time()
         rc, ultima, sospechas = None, "", 0
+        # en que epoca se trajeron los pesos por ultima vez. -1 y no 0 para que
+        # la primera vez que haya epocas ya se traigan: un run que se muere a la
+        # tercera epoca deja algo con lo que mirar que paso, en vez de nada.
+        epoca_pesos = -1
         while True:
             time.sleep(cada_s)
             code, salida = V.ssh_capture(
@@ -1505,8 +1546,16 @@ def entrenar_lote(m: "Maquina", lote: dict, hilos: int, plazo_s: int, cada_s: in
             resultado["s_por_epoca"] = round(spe, 1) if spe else None
 
             # el libro de a bordo: en cada vuelta, y por eso `--cada` marca la
-            # granularidad con la que se puede reanudar
-            traidos = traer_libro(m, libro)
+            # granularidad con la que se puede reanudar.
+            #
+            # Los PESOS no en cada vuelta: cada version que llega es una version
+            # que git guarda para siempre, y en cada epoca serian 2 MB por run.
+            # Cada `EPOCAS_POR_PESOS` epocas basta para poder probar a mano un
+            # run mientras corre, que es para lo que estan.
+            pesos_toca = epocas - epoca_pesos >= EPOCAS_POR_PESOS
+            traidos = traer_libro(m, libro, con_pesos=pesos_toca)
+            if pesos_toca:
+                epoca_pesos = epocas
 
             # La ultima linea del log REMOTO viaja hasta aqui a proposito: es
             # donde `estudio_lote.py` dice "punto 2/3 terminado: <run>", y sin
@@ -1569,9 +1618,14 @@ def entrenar_lote(m: "Maquina", lote: dict, hilos: int, plazo_s: int, cada_s: in
                                   f"fallo. Ultima linea: {ultima}")
         return resultado
     finally:
-        # antes de soltarla, un ultimo tiron del libro: lo que haya escrito en la
-        # ultima vuelta no puede quedarse en una maquina que va a desaparecer
-        traer_libro(m, libro)
+        # Antes de soltarla, un ultimo tiron del libro: lo que haya escrito en la
+        # ultima vuelta no puede quedarse en una maquina que va a desaparecer.
+        #
+        # ⚠ Y este SIEMPRE trae los pesos, pase lo que pase con la cadencia: es
+        # la ultima vez que la red entrenada existe. Aqui se perdio
+        # `fov-optimo-p20` la noche del 29 al 30 de agosto -- la maquina se
+        # destruyo con los pesos dentro y solo sobrevivieron sus metricas.
+        traer_libro(m, libro, con_pesos=True)
         resultado["segundos_vivida"] = round(time.time() - m.t0, 1)
         resultado["usd"] = m.usd()
         m.destruir("lote terminado")

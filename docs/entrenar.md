@@ -369,11 +369,34 @@ sólo podía enseñar las imágenes sin cajas. Volver a entrenarlo costó **~100
 vCPU del dev, o sea ~1 h 20 min hasta la época del mejor checkpoint. Es re-derivable, pero **no en
 el momento en que hace falta**, que es al abrir la app.
 
-**Por eso hay una excepción, y es una sola:** un run llamado **`demo-*`** commitea su `best.pt` en
-el repo de datos (665 KB medidos). Con eso, un dev recién lanzado —que ya clona `foveal-vision-data`
-y arranca `foveal-vision-web`— puede **inferir** sin entrenar nada. No es para comparar estudios:
-es para que la app funcione en una máquina nueva. El motivo entero está junto a la línea que lo
-permite, en el `.gitignore` del repo de datos.
+## Los pesos SÍ se guardan — dos por run, y sólo dos
+
+**Desde el 2026-08-30, y la razón la puso el dueño: hay que poder probar a mano un entrenamiento.**
+Sin pesos, la web app enseña las imágenes sin cajas, la métrica de tarea no se puede puntuar, y
+«la red detecta mal» no se distingue de «no hay red». Un run que sólo deja métricas es un número
+que hay que creerse.
+
+| | qué es | tamaño | para qué |
+|---|---|---:|---|
+| `best.pt` | la **mejor** época según el monitor | 665 KB | **probarlo a mano** |
+| `last.pt` | la **más actualizada**, con el estado entero | 2,0 MB | continuar el run |
+
+*(medidos el 2026-08-30 sobre `fov16-optimo`, 168.652 parámetros)*
+
+**Sólo en el repo de datos.** En el repo de código `/runs/`, `/sweeps/` y `/studies/` están
+ignorados enteros: un peso nunca entra ahí.
+
+⚠ **Y sólo esos dos.** Cualquier otro `.pt` sigue fuera del git.
+
+⚠ **La cadencia es parte de la regla.** git guarda **todas** las versiones que se commitean, así
+que subir `last.pt` en cada época son 2 MB por época y por run — 140 MB en un run de 70 épocas, y
+gigabytes en un barrido. Por eso la flota los trae cada `FV_EPOCAS_POR_PESOS` épocas (**25** por
+defecto) y **siempre en el último tirón**, antes de destruir la máquina. Dos o tres versiones por
+run, no setenta.
+
+⚠ **Un run lanzado a mano no lo commitea nadie.** La flota tiene su libro de a bordo
+(`estudio_flota.py --git`); `fv-train` sólo te imprime el comando al terminar. Si no lo corres, los
+pesos mueren con la máquina.
 
 ## 6. Evaluar con imágenes
 

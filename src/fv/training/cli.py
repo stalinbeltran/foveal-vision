@@ -79,6 +79,18 @@ def _resumen(summary: dict) -> None:
         print(f"    fv-continue --name {summary['run']} --more N --patience 0")
     print("  pesos:  best.pt -> evaluar   |   last.pt -> continuar")
     print(f"    fv-continue --name {summary['run']} --more N")
+    # ⚠ Un run lanzado a mano NO lo commitea nadie. La flota tiene su libro de a
+    # bordo (`estudio_flota.py --git`); `fv-train` no tiene nada equivalente, y un
+    # peso sin commitear muere con la maquina. Paso con `fov-optimo-p20` el
+    # 2026-08-30: 69 epocas entrenadas, y de la red no quedo nada.
+    #
+    # Se imprime el comando en vez de commitear solo: entrenar no deberia
+    # escribir en el historial de nadie sin que se lo pidan, y `git commit` desde
+    # aqui se comeria tambien lo que el usuario tuviera a medias.
+    from fv import settings
+    print("\n  GUARDALO o se pierde con la maquina (los .pt no se re-derivan):")
+    print(f"    cd {settings.data_root()} && git add -A && "
+          f"git commit -m 'run {summary['run']}' && git push")
 
 
 def main_continue() -> int:
