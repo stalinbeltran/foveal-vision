@@ -1,0 +1,13 @@
+{
+  "name": "entrenar-vast",
+  "descripcion": "Entrena la red foveada en UNA maquina de Vast con varias CPU y se trae los pesos en cada sonda. ⚠ CUESTA DINERO (~0,05 $/h). Desacoplado; avisa al terminar.",
+  "ejemplos": [
+    "--name mi-run --epochs 40",
+    "--name mi-run --continuar --epochs 40",
+    "--name mi-run --epochs 40 --cpus 16 --max-precio 0.10"
+  ],
+  "requiere": ["python3"],
+  "command": "\"$COORD_HOME/scripts/desacoplar.sh\" sh -c 'cd \"$PWD\"; set -a; [ -f \"$HOME/.config/dev-secrets.env\" ] && . \"$HOME/.config/dev-secrets.env\"; set +a; .venv/bin/python scripts/entrenar_vast.py --yes {{input}} > \"/tmp/vast-$COORD_SESSION.log\" 2>&1; node \"$COORD_HOME/scripts/notify.mjs\" \"entrenamiento en Vast terminado. Log: /tmp/vast-$COORD_SESSION.log -- comprueba que la instancia se destruyo\"' >/dev/null 2>&1 & echo \"Lanzado en su propio cgroup. ⚠ ALQUILA UNA MAQUINA: mira el log en cuanto puedas, que ahi sale el id y el comando para destruirla a mano. La destruye un finally, pero si ESTE server muere el finally no corre y la instancia sigue facturando. Comprueba con /use cerrable. Log: /tmp/vast-$COORD_SESSION.log\"",
+  "encargados": ["echo"],
+  "timeoutMs": 60000
+}

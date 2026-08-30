@@ -168,6 +168,139 @@ consola).
 ⚠ **3 épocas no es un modelo entrenado**, es la prueba de que la máquina funciona. Para uno de
 verdad, 40–100 épocas con la receta entera.
 
+## 4 bis. Entrenar en una máquina de Vast (varias CPU)
+
+Este droplet tiene **2 vCPU** y una época cuesta 142–176 s. Una máquina de Vast con 12 vCPU sale
+por **~0,05 $/h**, así que entrenar allí es más rápido y más barato que ocupar el servidor de
+control durante horas.
+
+```bash
+cd ~/src/foveal-vision
+set -a; . ~/.config/dev-secrets.env; set +a          # el token de Vast
+.venv/bin/python scripts/entrenar_vast.py --name mi-run --epochs 40
+.venv/bin/python scripts/entrenar_vast.py --name mi-run --continuar --epochs 40
+```
+
+Alquila **una** máquina, sube el código y el dataset, entrena, **se trae los pesos en cada
+sonda** y la destruye. Sin argumentos usa `fov16-optimo` + `plan40` sobre
+`dirty1000-80px-16px-r20260827`.
+
+### ✅ Verificado el 2026-08-30: entrenado en Vast, continuando lo de aquí
+
+No es una prueba con datos de juguete: se **continuó** el run `fov-optimo-3ep` (que llevaba 3
+épocas entrenadas en este droplet) **2 épocas más en una máquina de Vast de 9,3 vCPU**, y el
+resultado volvió aquí.
+
+| época | dónde | `train_loss` | `val_loss` | f1 | s/época |
+|---:|---|---:|---:|---:|---:|
+| 1–3 | este droplet (2 vCPU) | 0,4574 → 0,1600 | 0,2726 → 0,1460 | 0,739 → 0,892 | 142–202 |
+| **4** | **Vast (9,3 vCPU)** | 0,1397 | 0,1429 | **0,902** | **83** |
+| **5** | **Vast** | **0,1295** | **0,1268** | **0,912** | **84** |
+
+- **La curva siguió bajando al cruzar de máquina**: la continuación es real, no un reinicio.
+  `summary.json` quedó con `epochs_run: 5` y `continued_from: 3`.
+- **Los pesos bajaron en CADA sonda**, que es lo que se quería comprobar. El log lo dice literal:
+  `[bajados: metrics.jsonl, status.json, config.json, summary.json, best.pt, last.pt]` — las tres
+  veces.
+- **2,4× más rápido** que aquí (83 s contra 202 s), a 0,0516 $/h.
+- **La instancia se destruyó sola**: 5,5 min, **0,0048 $**.
+- Y lo que quedó sirve para las dos cosas: `best.pt` carga con `load_model` y la pantalla
+  `/review` dibuja sus cajas; `last.pt` trae `format_version: 2`, optimizador y los generadores,
+  o sea que se puede seguir entrenando.
+
+**Coste de toda la prueba, los cuatro intentos incluidos: ~0,025 $.**
+
+### La diferencia con `estudio_flota.py`, que es la razón de que exista
+
+La flota corre **barridos**: muchos puntos cortos, y su producto es la tabla. Por eso su libro de
+a bordo se trae sólo texto y **los pesos se quedan en la máquina** hasta el tar final — está
+escrito en su propio docstring, y para un barrido es correcto.
+
+Aquí el producto es **el modelo**. Un `best.pt` que sólo baja al final es un modelo que se pierde
+entero si la máquina se cae en la última época. Así que `TRAER` incluye `best.pt` y `last.pt`, y
+bajan **en cada sonda** (~2,7 MB). Consecuencia directa: un run entrenado en Vast **se puede
+continuar**, porque `last.pt` trae el estado del optimizador.
+
+### Lo que NO garantiza, y hay que decirlo
+
+**La destrucción va en un `finally` de este proceso.** Si el droplet de control muere de golpe, el
+`finally` no corre y **la instancia sigue facturando**. No hay interruptor dentro de la máquina
+alquilada porque destruirse a sí misma pediría el token de Vast, y ahí **no viaja ningún secreto**
+a propósito (`ENVIA` son cuatro rutas y hay test).
+
+Lo que sí hay:
+
+- el `iid` y el comando exacto de destrucción se imprimen **antes que nada más**;
+- `node scripts/cerrable.mjs` (en el coordinador) cuenta las instancias vivas y pone el server en
+  🔴 mientras alguna respire;
+- `--horas-max` corta el entrenamiento —no la factura— si algo se cuelga.
+
+⚠ **Y un run continuado en OTRA máquina no es bit a bit el mismo** que si no se hubiera parado.
+`reanudar` restaura los tres generadores, y el payload lleva las **mismas versiones** a los dos
+lados (medido el 2026-08-30: `torch 2.13.0+cpu` y `numpy 2.5.2` aquí y allí), así que la
+diferencia que queda es **la CPU**: otro juego de instrucciones da otro redondeo. Para entrenar un
+modelo da igual; para publicar una tabla comparable, no — es la misma razón por la que la flota
+prefiere repetir un punto a reanudarlo.
+
+### ⚠ Antes de nada: una clave de Vast PROPIA, y comprobada
+
+`VAST_SSH_KEY_FILE` apuntaba por defecto a `~/.ssh/do_droplet` —la clave de DigitalOcean—, esa
+clave **estaba en la cuenta de Vast** (comprobado por huella, y la API respondía
+`SSH key already associated with instance`) **y las instancias la rechazaban igual**:
+`Permission denied (publickey)`, tres máquinas seguidas.
+
+Generar una clave dedicada y registrarla lo arregló a la primera:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/vast_ed25519 -N "" -C "vast-$(hostname)"
+cd ~/src/digital-ocean-dropplet-auto-launching
+VAST_SSH_KEY_FILE=~/.ssh/vast_ed25519 python3 scripts/vast_instance.py register-key
+```
+
+...y luego se entrena con `VAST_SSH_KEY_FILE=~/.ssh/vast_ed25519`.
+
+⚠ **La causa de que la primera no valiera NO está establecida** — sólo que estaba en la cuenta y
+aun así no entraba. Lo que sí está medido es que la dedicada funcionó en la máquina siguiente.
+⚠ Y **la lista de claves de una instancia se fija al crearla**: registrar una clave después no
+sirve para las que ya están alquiladas.
+
+### Las DOS trampas de conectarse, que costaron los dos primeros intentos
+
+Las dos estaban **ya medidas en este repo**, dentro de `estudio_flota.py`, y no reutilizarlas es
+lo que las hizo volver a morder (2026-08-30):
+
+1. **El banner de sshd no es el login.** `V.esperar_ssh` comprueba que sshd contesta, y eso llega
+   **antes** de que la clave esté en `authorized_keys`. El primer intento murió con
+   `Permission denied (publickey)` **con la clave correctamente registrada** en la cuenta — media
+   hora buscando un problema de claves que no existía. `estudio_flota.sellar` reintenta 12 veces
+   justo por esto, con la medida al lado: *2026-08-24, sin reintentos, 3 de 5 máquinas fallaban en
+   el primer comando autenticado*.
+2. **El `host:puerto` que da la API al arrancar puede no ser el definitivo.** Por eso la flota no
+   usa `ssh_destino` a secas sino `resolver_destino`, con reintentos: *medido el 2026-08-24, la API
+   devolvió el mismo destino para dos instancias distintas mientras arrancaban*. El segundo intento
+   se quedó 5 minutos llamando a un destino leído **una sola vez**, al principio, y se rindió.
+
+`entrenar_vast.conectar()` cubre las dos de una vez: **re-pregunta el destino en cada vuelta** y lo
+comprueba con un comando **autenticado**, no con el banner. Tiene test (que además comprueba que no
+se llama a `esperar_ssh`).
+
+3. **Y lo que escondía las dos: `V.ssh_capture` se come `stderr`.** Devuelve sólo `stdout`, y el
+   motivo por el que SSH falla —`Permission denied (publickey)`, `Connection refused`— viaja por
+   `stderr`. Sin él, un **rechazo de clave** y una **máquina que aún no levanta sshd** se ven
+   exactamente igual: `rc=255` y nada más. Doce minutos de reintentos ciegos y un diagnóstico
+   apuntando al sitio equivocado. `entrenar_vast._ssh` envuelve la llamada para conservar `stderr`
+   (no se toca la de `vast_instance`, que la comparten otros), y ahora un rechazo de clave **falla
+   rápido y dice qué hacer** en vez de esperar — la misma asimetría que `sellar` ya aplicaba:
+   *el transporte mejora esperando, la autenticación no*.
+
+**Y el arreglo se pagó solo en el intento siguiente**: con `stderr` conservado, el log dijo
+`Connection refused` — o sea **transporte**, sshd todavía no escuchaba— en vez del `rc=255` mudo
+de antes. Es exactamente la distinción que costó los doce minutos, y ahora se lee de un vistazo.
+
+⚠ **Y las dos veces la instancia se destruyó sola** — el `finally` hizo su trabajo: 0,1 min
+(0,0001 $) y 5,0 min (0,0035 $). El coste de los dos fallos junto fue **menos de medio céntimo**,
+que es exactamente lo que se compra teniendo el camino de destrucción escrito antes de alquilar.
+
 ## 5. Los pesos: DOS ficheros, dos propósitos
 
 Cada run deja los dos en su directorio (`fv.settings.runs_root()`):
