@@ -208,6 +208,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 .review .revbar { position: sticky; top: 0; z-index: 4; margin-bottom: 10px; }
 .review .revbar-line { display: flex; gap: 10px; align-items: flex-end; }
 .review .revbar-line label.field { flex: 1; margin-bottom: 6px; }
+/* El pliegue de los ajustes: una tira, no un boton de accion. Se ve como texto
+   porque no HACE nada -- solo ensena lo que ya hay. */
+.review .revbar-toggle {
+  width: 100%; text-align: left; background: none; border: 0; padding: 8px 0;
+  color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.review .revbar-toggle .sub2 { margin-left: 6px; }
+
 .review .revbar-nav { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
 .review .revbar-nav button { min-width: 44px; }
 .review .rangelabel { flex: 1; text-align: center; font-variant-numeric: tabular-nums; }

@@ -55,6 +55,7 @@ export default function Review() {
   const [n, setN] = usePersistedState("review.n", 10);
   const [offset, setOffset] = usePersistedState("review.offset", 0);
   const [showTruth, setShowTruth] = usePersistedState("review.truth", true);
+  const [abierto, setAbierto] = usePersistedState("review.form", false);
   const [ctx, setCtx] = useState<any>(null);
   const [batch, setBatch] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -160,6 +161,14 @@ export default function Review() {
   // el tope de los deslizadores sale de la ventana de la RED, no de un 16 fijo:
   // una red con otra fovea necesita otro rango
   const ventana = efectivos?.window_size ?? 16;
+  // Lo que se ve con el panel cerrado. Sale del CONTEXTO y de los knobs pedidos,
+  // no del último lote: tiene que decir lo que está seleccionado AHORA, también
+  // mientras se vuelve a inferir.
+  const elegido = run === SIN_ELEGIR ? "" : run;
+  const resumen = [
+    ds || "—", split, elegido || "sin modelo",
+    `umbral ${knobs.threshold.toFixed(2)}`,
+  ].join(" · ");
 
   return (
     <div className="review">
@@ -171,6 +180,24 @@ export default function Review() {
         próxima vez.</p>
 
       <div className="card revbar">
+        {/* El formulario va PLEGADO por defecto y la navegación no.
+
+            En un móvil los selectores ocupaban la pantalla entera y las
+            miniaturas --que son lo que se viene a mirar-- quedaban debajo del
+            pliegue. Pero lo que se pliega es sólo la ELECCIÓN, que se toca una
+            vez por sesión; ◀ ▶ y "sin revisar" se usan en cada imagen y se
+            quedan fuera. Plegar algo que se usa a cada paso sería cambiar un
+            estorbo por dos toques.
+
+            Y plegado NO puede ser mudo: el resumen dice qué hay elegido, porque
+            un panel cerrado que esconde el run y el umbral hace que una rejilla
+            rara sea indistinguible de un ajuste olvidado. */}
+        <button className="revbar-toggle" aria-expanded={abierto}
+          data-testid="review-form-toggle" onClick={() => setAbierto(!abierto)}>
+          {abierto ? "▾ ajustes" : <>▸ ajustes <span className="sub2">{resumen}</span></>}
+        </button>
+        {abierto ? (
+          <>
         <div className="revbar-line">
           <Field label="dataset">
             <select value={ds} onChange={(e) => { setDs(e.target.value); setOffset(0); }}>
@@ -252,6 +279,8 @@ export default function Review() {
               onClick={() => setKnobs(KNOBS_DEFECTO)}>volver a auto</button>
           </div>
         ) : null}
+          </>
+        ) : null}
         <div className="revbar-nav">
           <button className="secondary" disabled={offset <= 0 || busy}
             onClick={() => setOffset(Math.max(0, offset - n))}>◀</button>
@@ -287,8 +316,18 @@ export default function Review() {
       ) : null}
 
       {/* Lo que FALTA se dice, en vez de dibujar una rejilla sin cajas que se lea
-          como "la red no detecta nada". Son dos ausencias distintas y se separan:
-          el modelo (pesos) y la verdad (la fuente). */}
+          como "la red no detecta nada".
+
+          ⚠ Eran DOS avisos, uno por ausencia --el modelo (pesos) y la verdad (la
+          fuente)--, y el de la verdad se quito el 2026-08-30 a peticion del
+          usuario. El motivo es el patron B del proyecto: en esta maquina no hay
+          NINGUNA fuente publicada, asi que ese aviso salia en todas las pantallas
+          y en todos los datasets, siempre igual, y un aviso que sale siempre se
+          deja de leer -- y de paso tapaba al de "sin modelo", que si cambia.
+          La ausencia NO queda muda: cuando no hay verdad no aparece la casilla
+          "ver la verdad" ni los numeros de f1/tp/fp por imagen, que es la senal
+          en el sitio donde se echa de menos. La explicacion larga vive donde se
+          arregla (`fv-publish-source`), no en una tira permanente. */}
       {ctx && !conModelo ? (
         <div className="card avisobox" data-testid="review-missing">
           <b>Sin modelo:</b> se ven las imágenes del dataset, sin cajas.{" "}
@@ -301,14 +340,6 @@ export default function Review() {
                  <code>.gitignore</code> del repo de datos). Los <code>demo-*</code> sí
                  viajan: si tampoco hay ninguno, este dataset no tiene modelo de
                  demostración publicado.</>}
-        </div>
-      ) : null}
-      {ctx && !hayVerdad ? (
-        <div className="card avisobox">
-          <b>Sin la verdad:</b> las imágenes salen del <code>windows.npz</code>, que
-          sí viaja por git; los párrafos reales viven en la fuente
-          (<code>{ctx.source}</code>), que no está en esta máquina.{" "}
-          <span className="sub2">Publícala con <code>fv-publish-source</code>.</span>
         </div>
       ) : null}
 
