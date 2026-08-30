@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { usePersistedState } from "../uiState";
+import {
+  CLAVE_KNOBS, CLAVE_RUN, KNOBS_DEFECTO, SIN_ELEGIR, cuerpoKnobs,
+} from "../reviewPrefs";
 import { BoxedImage } from "../components/BoxedImage";
 import { ErrorBox, Field, Working } from "../components/ui";
 
@@ -24,8 +27,11 @@ export default function ReviewDetail() {
   const { dataset = "", split = "val", index = "0" } = useParams();
   const [qs] = useSearchParams();
   const idx = parseInt(index, 10);
-  const [run, setRun] = usePersistedState("review.run", "");
-  const [threshold, setThreshold] = usePersistedState("review.threshold", 0.5);
+  // ⚠ La MISMA clave que la rejilla (`reviewPrefs`), no una propia: cuando eran
+  // dos, elegir el run en la rejilla y abrir una imagen te devolvia al recordado
+  // de esta pantalla -- que podia ser otro, o ninguno.
+  const [run, setRun] = usePersistedState(CLAVE_RUN, SIN_ELEGIR);
+  const [knobs, setKnobs] = usePersistedState(CLAVE_KNOBS, KNOBS_DEFECTO);
   const [showTruth, setShowTruth] = usePersistedState("review.truth", true);
   const [showPred, setShowPred] = useState(true);
   const [ctx, setCtx] = useState<any>(null);
@@ -35,7 +41,9 @@ export default function ReviewDetail() {
   const [sucia, setSucia] = useState(false);   // ¿cambiaste algo desde la ultima?
 
   const runUrl = qs.get("run") || "";
-  const elRun = runUrl || run;
+  // el orden manda: lo que dice la URL (se llego pinchando una miniatura), luego
+  // lo elegido, y si no se ha elegido nunca, lo que sugiere el servidor
+  const elRun = runUrl || (run === SIN_ELEGIR ? (ctx?.run_sugerido ?? "") : run);
 
   // UNA consulta barata: de donde sale el PNG, si hay verdad, y que runs tiene
   // este dataset (ya filtrados por el servidor). Sin esto la imagen tendria que
@@ -52,7 +60,7 @@ export default function ReviewDetail() {
     setBusy(true);
     api.post("/review/batch", {
       run: elRun || undefined, window_dataset: dataset, split,
-      indices: [idx], threshold,
+      indices: [idx], ...cuerpoKnobs(knobs),
     }).then((r) => { setData(r); setError(null); setSucia(false); })
       .catch((e) => { setError(e); })
       .finally(() => setBusy(false));
@@ -67,6 +75,9 @@ export default function ReviewDetail() {
   }, [ctx, idx, arrancado]);
 
   const img = data?.images?.[0];
+  // el tope de los deslizadores sale de la ventana de la RED (la fovea con la
+  // que se entreno), no de un 16 cableado
+  const ventana = data?.knobs?.window_size ?? 16;
   const base = data?.image_base ?? ctx?.image_base ?? "";
   const hayVerdad = data?.truth_available ?? ctx?.truth_available ?? false;
   const runs: any[] = ctx?.runs ?? [];
@@ -113,10 +124,41 @@ export default function ReviewDetail() {
             </select>
           </Field>
         </div>
-        <Field label={`umbral ${threshold.toFixed(2)}`}>
-          <input type="range" min={0.05} max={0.95} step={0.05} value={threshold}
-            onChange={(e) => { setThreshold(+e.target.value); setSucia(true); }} />
-        </Field>
+        <div className="revbar-line">
+          <Field label={`umbral ${knobs.threshold.toFixed(2)}`}
+            help="score minimo de una esquina">
+            <input type="range" min={0.05} max={0.95} step={0.05}
+              value={knobs.threshold}
+              onChange={(e) => { setKnobs({ ...knobs, threshold: +e.target.value }); setSucia(true); }} />
+          </Field>
+          <Field label={`nms ${knobs.nms_radius || "auto"}`}
+            help="px entre dos esquinas iguales">
+            <input type="range" min={0} max={2 * ventana} step={1}
+              value={knobs.nms_radius}
+              onChange={(e) => { setKnobs({ ...knobs, nms_radius: +e.target.value }); setSucia(true); }} />
+          </Field>
+        </div>
+        <div className="revbar-line">
+          <Field label={`paso ${knobs.stride || "auto"}`} help="px entre ventanas">
+            <input type="range" min={0} max={ventana} step={1} value={knobs.stride}
+              onChange={(e) => { setKnobs({ ...knobs, stride: +e.target.value }); setSucia(true); }} />
+          </Field>
+          <Field label={`caja min ${knobs.min_size || "auto"}`} help="px de lado">
+            <input type="range" min={0} max={2 * ventana} step={1}
+              value={knobs.min_size}
+              onChange={(e) => { setKnobs({ ...knobs, min_size: +e.target.value }); setSucia(true); }} />
+          </Field>
+        </div>
+        {data?.knobs ? (
+          <div className="sub2 mono" data-testid="review-knobs">
+            en uso: umbral {data.knobs.threshold} · paso {data.knobs.stride} · nms{" "}
+            {data.knobs.nms_radius} · caja min {data.knobs.min_size} · ventana{" "}
+            {data.knobs.window_size} (de la red, fija){" "}
+            <button className="secondary" style={{ padding: "2px 8px" }}
+              onClick={() => { setKnobs(KNOBS_DEFECTO); setSucia(true); }}>
+              volver a auto</button>
+          </div>
+        ) : null}
         <button className="inferbtn" onClick={inferir} disabled={busy}
           data-testid="infer-now">
           {busy ? "infiriendo…" : data ? "Inferir de nuevo" : "Inferir ahora"}

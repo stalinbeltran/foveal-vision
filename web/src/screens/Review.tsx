@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { usePersistedState } from "../uiState";
+import {
+  CLAVE_KNOBS, CLAVE_RUN, KNOBS_DEFECTO, SIN_ELEGIR, cuerpoKnobs,
+} from "../reviewPrefs";
 import { BoxedImage } from "../components/BoxedImage";
 import { ErrorBox, Field, Working } from "../components/ui";
 
@@ -19,14 +22,6 @@ import { ErrorBox, Field, Working } from "../components/ui";
 // modelo (los `*.pt` de un run no viajan por git; desde el 2026-08-30 SI viaja
 // uno de demostracion, `demo-*`). Mirar sin modelo sigue siendo mirar, y queda
 // registrado.
-
-// "todavia no he elegido run" tiene que poder distinguirse de "he elegido MIRAR
-// SIN MODELO", que es un modo legitimo de esta pantalla (revisar a ojo sin que
-// las cajas te condicionen). Por eso el valor recordado arranca en un centinela
-// y no en "": con "" no habria forma de saber si el usuario lo eligio o si
-// nunca abrio el select, y auto-elegir un run le pisaria la decision cada vez
-// que cambiase de split. `\u0000` no puede ser el nombre de un run.
-const SIN_ELEGIR = "\u0000";
 
 const DIA = 86400000;
 
@@ -53,7 +48,8 @@ export default function Review() {
   // sea que TODO navegador que ya la hubiera visto quedaria marcado como "elegi
   // mirar sin modelo" y no adoptaria nunca la sugerencia. Con una clave nueva la
   // distincion empieza limpia; la vieja queda de basura inofensiva.
-  const [run, setRun] = usePersistedState("review.run2", SIN_ELEGIR);
+  const [run, setRun] = usePersistedState(CLAVE_RUN, SIN_ELEGIR);
+  const [knobs, setKnobs] = usePersistedState(CLAVE_KNOBS, KNOBS_DEFECTO);
   const [ds, setDs] = usePersistedState("review.dataset", "");
   const [split, setSplit] = usePersistedState("review.split", "val");
   const [n, setN] = usePersistedState("review.n", 10);
@@ -103,13 +99,19 @@ export default function Review() {
       api.post("/review/batch", {
         window_dataset: ctx.window_dataset, split, offset, count: n,
         run: run && run !== SIN_ELEGIR ? run : undefined,
+        ...cuerpoKnobs(knobs),
       })
         .then((r) => { if (seq.current === mio) { setBatch(r); setError(null); } })
         .catch((e) => { if (seq.current === mio) { setError(e); setBatch(null); } })
         .finally(() => { if (seq.current === mio) { setBusy(false); recargarHistorial(); } });
     }, 250);
     return () => clearTimeout(t);
-  }, [ctx?.window_dataset, run, split, offset, n]);
+    // los knobs entran en las dependencias enteros: mover cualquiera vuelve a
+    // inferir el mismo rango, que es la unica forma de VER lo que hace. El
+    // debounce de 250 ms de arriba es lo que evita una peticion por paso del
+    // deslizador.
+  }, [ctx?.window_dataset, run, split, offset, n, knobs.threshold, knobs.stride,
+      knobs.nms_radius, knobs.min_size]);
 
   const marcar = async (img: any, marked: boolean) => {
     if (!batch) return;
@@ -151,6 +153,13 @@ export default function Review() {
   const conModelo = loteVigente?.inferred ?? false;
   const hayVerdad = vista?.truth_available ?? false;
   const base = vista?.image_base ?? "";
+  // Los knobs que el servidor devolvio del ultimo lote: con ellos se ve en que
+  // se convirtio cada "auto". Sin lote todavia no hay nada que ensenar --
+  // inventarse los numeros aqui seria la segunda copia de la regla.
+  const efectivos = loteVigente?.knobs ?? null;
+  // el tope de los deslizadores sale de la ventana de la RED, no de un 16 fijo:
+  // una red con otra fovea necesita otro rango
+  const ventana = efectivos?.window_size ?? 16;
 
   return (
     <div className="review">
@@ -201,6 +210,48 @@ export default function Review() {
             </select>
           </Field>
         </div>
+        {/* Los mandos de INFERENCIA. Van aqui, en la rejilla, y no solo en el
+            detalle: el efecto de un umbral se juzga sobre VARIAS imagenes a la
+            vez -- en una sola no se distingue "el umbral esta alto" de "esta
+            imagen es dificil". */}
+        <div className="revbar-line">
+          <Field label={`umbral ${knobs.threshold.toFixed(2)}`}
+            help="score minimo de una esquina">
+            <input type="range" min={0.05} max={0.95} step={0.05}
+              value={knobs.threshold}
+              onChange={(e) => setKnobs({ ...knobs, threshold: +e.target.value })} />
+          </Field>
+          <Field label={`nms ${knobs.nms_radius || "auto"}`}
+            help="px entre dos esquinas iguales">
+            <input type="range" min={0} max={2 * ventana} step={1}
+              value={knobs.nms_radius}
+              onChange={(e) => setKnobs({ ...knobs, nms_radius: +e.target.value })} />
+          </Field>
+        </div>
+        <div className="revbar-line">
+          <Field label={`paso ${knobs.stride || "auto"}`} help="px entre ventanas">
+            <input type="range" min={0} max={ventana} step={1} value={knobs.stride}
+              onChange={(e) => setKnobs({ ...knobs, stride: +e.target.value })} />
+          </Field>
+          <Field label={`caja min ${knobs.min_size || "auto"}`} help="px de lado">
+            <input type="range" min={0} max={2 * ventana} step={1}
+              value={knobs.min_size}
+              onChange={(e) => setKnobs({ ...knobs, min_size: +e.target.value })} />
+          </Field>
+        </div>
+        {/* Lo que se ensena es lo que el servidor USO, no lo que se pidio: es la
+            unica forma de saber en que numero se convirtio cada "auto", y
+            `window_size` sale de la RED (la fovea con la que se entreno), asi
+            que no es ajustable por mucho que aparezca en la misma linea. */}
+        {efectivos ? (
+          <div className="sub2 mono" data-testid="review-knobs">
+            en uso: umbral {efectivos.threshold} · paso {efectivos.stride} · nms{" "}
+            {efectivos.nms_radius} · caja min {efectivos.min_size} · ventana{" "}
+            {efectivos.window_size} (de la red, fija){" "}
+            <button className="secondary" style={{ padding: "2px 8px" }}
+              onClick={() => setKnobs(KNOBS_DEFECTO)}>volver a auto</button>
+          </div>
+        ) : null}
         <div className="revbar-nav">
           <button className="secondary" disabled={offset <= 0 || busy}
             onClick={() => setOffset(Math.max(0, offset - n))}>◀</button>

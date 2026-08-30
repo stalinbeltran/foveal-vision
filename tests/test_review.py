@@ -517,3 +517,50 @@ def test_el_servidor_sugiere_QUE_run_abrir(client):
     (w["store"].path(w["run"]) / "best.pt").unlink()
     ctx2 = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
     assert ctx2["run_sugerido"] is None
+
+
+def test_los_mandos_de_inferencia_LLEGAN_y_vuelven_dichos(client):
+    """Los knobs (F) son lo unico ajustable sin reentrenar, y la pantalla los
+    ofrece: si no llegasen, mover el deslizador no haria nada y las cajas
+    seguirian siendo las mismas -- que se lee como "el modelo no reacciona".
+
+    Y vuelven ECHADOS en la respuesta porque tres de los cuatro tienen un `auto`
+    derivado del tamano de ventana de la red (`predict.py`): sin verlos, no hay
+    forma de saber en que numero se convirtio cada uno, y la UI tendria que
+    guardar su propia copia de esa regla.
+    """
+    c, w = client
+    pedido = {"window_dataset": w["dataset"], "run": w["run"], "split": "val",
+              "count": 1, "threshold": 0.42, "stride": 3,
+              "nms_radius": 2.5, "min_size": 7.0}
+    k = c.post("/review/batch", json=pedido).json()["knobs"]
+    assert k["threshold"] == 0.42
+    assert k["stride"] == 3
+    assert k["nms_radius"] == 2.5
+    assert k["min_size"] == 7.0
+
+    # ...y lo que NO se manda lo deriva el servidor de la ventana de la RED, que
+    # es justo por lo que la UI manda "auto" callando en vez de mandar un 0
+    solo = c.post("/review/batch", json={"window_dataset": w["dataset"],
+                                         "run": w["run"], "split": "val",
+                                         "count": 1}).json()["knobs"]
+    n = solo["window_size"]
+    assert solo["stride"] == max(1, n // 2)
+    assert solo["nms_radius"] == n / 2
+    assert solo["min_size"] == 4.0
+    assert solo["threshold"] == 0.5
+
+
+def test_subir_el_umbral_no_puede_anadir_cajas(client):
+    """La direccion del mando, que es lo que un cableado al reves invierte sin
+    fallar: mas exigente nunca detecta MAS. Se fija como desigualdad y no como
+    numero porque el modelo del test entrena una epoca."""
+    c, w = client
+
+    def cajas(th):
+        r = c.post("/review/batch", json={"window_dataset": w["dataset"],
+                                          "run": w["run"], "split": "val",
+                                          "count": 1, "threshold": th})
+        return len(r.json()["images"][0]["paragraphs"])
+
+    assert cajas(0.99) <= cajas(0.05)
