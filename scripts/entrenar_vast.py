@@ -284,7 +284,19 @@ def traer(host: str, port: int, name: str, destino: Path, remoto_dir: str) -> li
     for f in TRAER:
         remoto = f"{remoto_dir}/{f}"
         local = destino / f
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        # ⚠ El temporal va AL LADO del destino, no en /tmp, y no es un detalle:
+        # `Path.replace` es `os.replace`, que solo es atomico DENTRO del mismo
+        # sistema de ficheros. Con el temporal en /tmp --que en muchas maquinas es
+        # un tmpfs aparte-- daria EXDEV, el `except OSError` de abajo se lo
+        # tragaria y la descarga fallaria EN SILENCIO para siempre. Aqui salio
+        # bien por casualidad (mismo /dev/vda1, comprobado el 2026-08-30).
+        #
+        # Y la atomicidad importa de verdad: `best.pt` se lee MIENTRAS se
+        # reemplaza -- la pantalla de revision usa el modelo con el
+        # entrenamiento en marcha. Con un rename atomico, quien lee obtiene la
+        # version vieja o la nueva, nunca media.
+        with tempfile.NamedTemporaryFile(delete=False, dir=str(destino),
+                                         prefix=f".{f}.") as tmp:
             p = subprocess.run(
                 V.ssh_command(host, port) + [f"cat {remoto} 2>/dev/null || true"],
                 stdout=tmp, timeout=300)
@@ -295,8 +307,10 @@ def traer(host: str, port: int, name: str, destino: Path, remoto_dir: str) -> li
                 traidos.append(f)
             else:
                 tmp_path.unlink(missing_ok=True)
-        except OSError:
+        except OSError as exc:
+            # que no se pueda colocar un fichero NO es "todavia no esta": se dice
             tmp_path.unlink(missing_ok=True)
+            log(f"  AVISO: no pude colocar {f}: {exc}")
     return traidos
 
 

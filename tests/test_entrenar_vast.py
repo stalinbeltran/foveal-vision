@@ -234,3 +234,18 @@ def test_la_destruccion_no_depende_de_la_decision_de_seguir(mod):
     fuente = (ROOT / "scripts" / "entrenar_vast.py").read_text(encoding="utf-8")
     cuerpo = fuente[fuente.index("def una_maquina("):fuente.index("def _epocas(")]
     assert "finally:" in cuerpo and "V.destruir(iid)" in cuerpo
+
+
+def test_los_ficheros_se_colocan_de_forma_ATOMICA(mod):
+    """`best.pt` se lee MIENTRAS se reemplaza: la pantalla de revision usa el
+    modelo con el entrenamiento en marcha. Con un rename atomico, quien lee
+    obtiene la version vieja o la nueva, nunca media.
+
+    Y el temporal tiene que ir AL LADO del destino: `os.replace` solo es atomico
+    dentro del mismo sistema de ficheros. En /tmp --que en muchas maquinas es un
+    tmpfs aparte-- daria EXDEV y la descarga fallaria en silencio."""
+    cuerpo = _cuerpo(mod, "def traer(", "def main(")
+    assert "dir=str(destino)" in cuerpo, "el temporal va junto al destino"
+    assert ".replace(local)" in cuerpo
+    # y un fallo al colocar se DICE, no se traga
+    assert "AVISO: no pude colocar" in cuerpo

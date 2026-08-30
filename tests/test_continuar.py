@@ -263,3 +263,51 @@ def test_pero_un_running_HUERFANO_no_bloquea(entrenado):
     st.set_status(entrenado["run"], "running", pid=999999)        # pid MUERTO
     r = reanudar(entrenado["run"], mas=1, store=st)
     assert r["epochs_run"] == 4
+
+
+def test_un_pid_de_OTRA_maquina_no_se_lee_como_muerto(entrenado):
+    """Desde que un run se entrena en Vast y su `status.json` viaja hasta aqui, el
+    `pid` que llega es el de la maquina alquilada. Aqui casi nunca existe, y sin
+    mirar el `host` `reconcile` declaraba "interrupted" un run que estaba
+    entrenando AHORA MISMO en otro sitio -- con lo que el guard de `reanudar`
+    dejaba pasar un SEGUNDO entrenamiento sobre el mismo run.
+
+    Medido el 2026-08-30 con `fov-optimo-p20`: pid 822, inexistente aqui, run
+    vivo en Vast."""
+    from fv.training.loop import RunError, reanudar
+    st = entrenado["store"]
+    st.set_status(entrenado["run"], "running", epoch=3, pid=999999)
+    # ...y se le pone a mano un host ajeno, como el que baja de la maquina
+    d = st.path(entrenado["run"])
+    payload = json.loads((d / "status.json").read_text(encoding="utf-8"))
+    payload["host"] = "una-maquina-de-vast"
+    (d / "status.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    assert st.reconcile(entrenado["run"])["status"] == "running", \
+        "un dueño en otra maquina no se juzga: pid muerto AQUI no es pid muerto"
+    with pytest.raises(RunError) as e:
+        reanudar(entrenado["run"], mas=1, store=st)
+    assert e.value.code == "run_is_running"
+
+
+def test_el_host_se_apunta_solo_al_poner_un_pid(entrenado):
+    """Para que la comprobacion de arriba pueda existir, el dato tiene que estar:
+    se apunta donde se escribe, no donde se lee."""
+    import socket
+    st = entrenado["store"]
+    st.set_status(entrenado["run"], "running", pid=os.getpid())
+    assert st.status(entrenado["run"])["host"] == socket.gethostname()
+    # sin pid no hace falta: no hay nada que juzgar
+    st.set_status(entrenado["run"], "done", epoch=3)
+    assert "host" not in st.status(entrenado["run"])
+
+
+def test_un_status_VIEJO_sin_host_se_sanea_como_siempre(entrenado):
+    """Romper el saneado de lo ya escrito seria peor que el caso raro que
+    arregla: 859 runs existentes no tienen `host`."""
+    st = entrenado["store"]
+    d = st.path(entrenado["run"])
+    (d / "status.json").write_text(
+        json.dumps({"status": "running", "epoch": 2, "pid": 999999}),
+        encoding="utf-8")
+    assert st.reconcile(entrenado["run"])["status"] == "interrupted"

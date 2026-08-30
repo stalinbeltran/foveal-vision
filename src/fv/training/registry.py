@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import socket
 import time
 from pathlib import Path
 
@@ -99,6 +100,11 @@ class RunStore:
     def set_status(self, name: str, status: str, **extra) -> None:
         payload = {"status": status, "updated_at": time.time()}
         payload.update(extra)
+        # Un `pid` solo significa algo EN SU MAQUINA. Desde que un run se entrena
+        # en otra y su `status.json` viaja hasta aqui (entrenar_vast.py), el
+        # numero se lee contra la tabla de procesos equivocada -- ver `reconcile`.
+        if payload.get("pid") is not None:
+            payload.setdefault("host", socket.gethostname())
         write_json_atomic(self.path(name) / "status.json", payload)
 
     def status(self, name: str) -> dict:
@@ -112,10 +118,26 @@ class RunStore:
         (crash / API restart / hibernation), the run would read 'running'
         forever (the inherited trap this store exists to kill). Mark it
         'interrupted' — the sweep runner redoes any non-(done|cancelled) point
-        on resume. Errs safe: a live or unknown owner is left be."""
+        on resume. Errs safe: a live or unknown owner is left be.
+
+        ⚠ Y un pid de OTRA maquina es un dueño desconocido, no uno muerto. Desde
+        que `entrenar_vast.py` entrena en Vast y se trae el `status.json`, el
+        `pid` que llega es el de la maquina alquilada: aqui casi nunca existe, y
+        sin esta comprobacion `reconcile` declaraba "interrupted" un run que
+        estaba entrenando AHORA MISMO en otro sitio -- con lo que el guard de
+        `reanudar` dejaba pasar un SEGUNDO entrenamiento sobre el mismo run.
+        Comprobado el 2026-08-30 con `fov-optimo-p20`: `pid 822`, inexistente
+        aqui, run vivo alli.
+
+        Un `status.json` sin `host` es de antes de esto y se trata como siempre:
+        no se puede saber de quien era, y romper el saneado de lo ya escrito
+        seria peor que el caso raro que arregla."""
         st = self.status(name)
         if st.get("status") != "running":
             return st
+        host = st.get("host")
+        if host and host != socket.gethostname():
+            return st                      # dueño en otra maquina: no se juzga
         pid = st.get("pid")
         if pid is None or pid_alive(pid):
             return st
