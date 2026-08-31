@@ -53,6 +53,7 @@ los CLI (`fv-extract`, `fv-train`, `fv-sweep`) lo prueban. Regla mecánica: **si
 | **H** Recorrido | `/sweeps` |
 | **I** Estudio (schedule OAT) | `/studies` (plan comiteable; genera recorridos, no ejecuta) |
 | **F** Inferencia | `/runs/{name}/predict` |
+| **F** Pesos para inferir | `/inference` (+ `/inference/staging/*`, `/inference/approved/*`) |
 | **X** Jobs | `/jobs` (+ `POST /jobs/{id}/cancel`, cooperativo) |
 | **UI** Estado recordado | `/ui-state` (`GET`/`PUT`) — blob opaco de filtros/formularios, NO dominio |
 
@@ -228,6 +229,36 @@ Devuelve **todas las etapas** (por-ventana crudo → fusión → resultado por i
 última — sin la cruda, «salió mal» no es diagnosticable. Los knobs van en **unidades de la
 ventana**, el payload los devuelve (las respuestas llegan desordenadas con sliders en vivo), y
 el cliente que no sabe qué mandar manda `null` y adopta el default de F.
+
+### `/inference` — qué redes pueden inferir, y por dónde llegan sus pesos
+
+Los pesos de un run **no se guardan por defecto**: sólo los de las redes que el dueño aprueba una
+a una, y **sólo ésas** usa la app para inferir. La regla, sus números y el porqué están en
+[inferencia.md](inferencia.md); aquí, lo que es decisión de API:
+
+| ruta | qué hace |
+|---|---|
+| `GET /inference` | el catálogo (aprobadas) + qué hay en la antesala |
+| `PUT /inference/staging/{run}/{best.pt\|last.pt}` | recibe **un** fichero de pesos mientras se entrena |
+| `POST /inference/staging/{run}/promote` | antesala → repo de datos **y** aprueba. Es **una** decisión |
+| `DELETE /inference/staging/{run}` | limpia la antesala |
+| `DELETE /inference/approved/{run}` | retira del catálogo. **No borra los ficheros** |
+
+- **El cuerpo del `PUT` son bytes en crudo**, no multipart: quien sube esto es un script
+  (`curl --data-binary @best.pt`). Es la única ruta del API que recibe un binario y por eso la
+  única que no toma un `dict`.
+- **Sin puerta propia**: hereda la de `fv.api.web` (token salvo loopback). Dos puertas divergen, y
+  la que se olvida es la que se deja abierta. ⚠ Lo que sí cambia es la consecuencia de que se
+  cuele alguien: un `.pt` es un pickle, o sea código. Por eso el nombre del fichero se comprueba
+  contra una lista de **dos** por igualdad, el del run tiene que ser un nombre de directorio, hay
+  techo de tamaño (`FV_MAX_CHECKPOINT_MB`) y **no se hace `torch.load` en la subida**.
+- **`GET /runs` trae dos campos distintos y la distinción es el punto**: `has_checkpoint` (hay un
+  `best.pt` en su directorio, lo pone E) e `inference` (`"antesala"`/`"catalogo"`/`null`, lo pone
+  el catálogo). Un run puede tener el fichero y **no** poder inferir.
+- ⚠ **Introspeccionar no es inferir.** `/kernels`, `/feature-maps` e `/input-view` **no** piden
+  aprobación: mirar una red que has pedido por su nombre no tiene el riesgo que la lista evita, y
+  exigirlo rompería el flujo local (`fv-train` deja `best.pt` en el directorio del run, no en la
+  antesala). `predict`, `review/batch` y `task-score` **sí** la piden.
 
 ### `/ui-state` (conveniencia, no dominio)
 

@@ -8,11 +8,12 @@ the domain, never by client path.
 from __future__ import annotations
 
 import dataclasses
+import os
 import io
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from fv import settings
@@ -21,6 +22,8 @@ from fv.ioutils import read_json_retrying, write_json_atomic
 from fv.datasets.loader import SourceDataset, SourceError, discover_sources
 from fv.fovea import (FoveaError, build_search_space, check_dims, derive_dims,
                       normalize_geometry)
+from fv.inference import catalogo
+from fv.inference.catalogo import CatalogoError
 from fv.inference.checkpoint import MODEL_CACHE, CheckpointError
 from fv.inference.introspect import (feature_maps_payload, input_view_payload,
                                      kernels_payload)
@@ -46,16 +49,26 @@ from fv.windows.store import WindowDatasetStore, WindowStoreError
 
 DOMAIN_ERRORS = (SourceError, ExtractError, WindowStoreError, NetworkStoreError,
                  RecipeStoreError, RunError, SweepError, SweepStoreError,
-                 StudyError, StudyStoreError, CheckpointError, FoveaError)
+                 StudyError, StudyStoreError, CheckpointError, FoveaError,
+                 CatalogoError)
 
 NOT_FOUND_CODES = {"source_not_found", "sample_not_found", "window_dataset_missing",
                    "network_not_found", "recipe_not_found", "run_not_found",
                    "sweep_not_found", "study_not_found"}
+# Techo del cuerpo de una subida de pesos. El `last.pt` de la red vigente son
+# 2,0 MB (medido 2026-08-30) y `best.pt` 680 KB, asi que 64 MB deja sitio de
+# sobra para una red bastante mayor y sigue siendo un techo: sin limite, una
+# subida es un disco lleno, y un disco lleno tumba el entrenamiento que estaba
+# corriendo. Se puede subir con FV_MAX_CHECKPOINT_MB para una red grande de
+# verdad -- que es declararlo, no descubrirlo a mitad.
+MAX_CHECKPOINT_BYTES = int(os.environ.get("FV_MAX_CHECKPOINT_MB", "64")) * 1024 * 1024
+
 CONFLICT_CODES = {"window_dataset_exists", "window_dataset_in_use", "network_exists",
                   "recipe_exists", "recipe_in_use", "run_exists", "run_is_running", "sweep_exists",
                   "run_without_provenance", "run_has_no_checkpoint", "run_belongs_to_sweep",
                   "window_dataset_changed", "split_empty", "sweep_is_running",
-                  "study_exists", "step_awaiting_confirmation", "study_has_live_sweeps"}
+                  "study_exists", "step_awaiting_confirmation", "study_has_live_sweeps",
+                  "run_not_approved_for_inference", "antesala_vacia", "no_aprobada"}
 
 
 def _http_error(e) -> HTTPException:
@@ -341,7 +354,29 @@ def create_app() -> FastAPI:
     # ------------------------------------------------------------------ runs (E)
     @app.get("/runs")
     def list_runs():
-        return {"runs": runs.list()}
+        """Los runs, y con cada uno si la app puede INFERIR con el.
+
+        `has_checkpoint` lo pone E (hay un best.pt en su directorio) y
+        `inference` lo pone F (de donde saldria el modelo: 'antesala' mientras
+        entrena, 'catalogo' si esta aprobada, null si no hay). Son dos hechos
+        distintos y por eso son dos campos: un run puede tener el fichero en
+        disco y NO estar aprobado, y entonces la app no lo usa.
+
+        El catalogo y la antesala se leen UNA vez para los 862 runs, no una por
+        run: son dos lecturas de disco contra 1.724."""
+        try:
+            aprobadas = set(catalogo.leer()["runs"])
+        except CatalogoError:
+            aprobadas = set()          # el detalle se ve en GET /inference
+        antesala = catalogo.antesala_completa()
+        out = runs.list()
+        for r in out:
+            en_antesala = catalogo.CHECKPOINT_INFERENCIA in antesala.get(r["name"], [])
+            r["approved"] = r["name"] in aprobadas
+            r["inference"] = ("antesala" if en_antesala
+                              else "catalogo" if (r["approved"] and r["has_checkpoint"])
+                              else None)
+        return {"runs": out}
 
     @app.post("/runs", status_code=202)
     def create_run(body: dict):
@@ -497,17 +532,164 @@ def create_app() -> FastAPI:
                           window_dataset=window_dataset, store=runs)
 
     # ------------------------------------------------------- introspection (V1/V2/F0)
-    def _model_for(name: str):
-        ckpt = runs.path(name) / "best.pt"
-        if not ckpt.exists():
-            raise _http_error(RunError("run_has_no_checkpoint",
-                                       f"'{name}' no tiene best.pt",
-                                       "espera a que termine una epoca"))
+    def _model_para_mirar(name: str):
+        """Los pesos de ESTE run, para INTROSPECCION (V1/V2/F0: kernels, mapas,
+        vista de entrada). No exige aprobacion, y esa es una decision:
+
+        introspeccionar no es inferir. La regla del dueno ("solo las redes
+        aprobadas se usan en la app para inferir") existe para que la app no
+        ensene cajas de una red que nadie eligio; mirar los kernels de un run
+        que has pedido por su nombre no tiene ese riesgo -- estas mirando esa
+        red a proposito, y el resultado no se parece a una prediccion.
+
+        Y si lo exigiera romperia el flujo local: `fv-train` deja `best.pt` en el
+        directorio del run, no en la antesala, asi que un run recien entrenado
+        aqui no se podria ni mirar sin aprobarlo antes -- o sea sin commitear
+        2,7 MB solo para ver que salio."""
+        p = staging_o_disco(name)
+        if p is None:
+            raise _http_error(RunError(*_por_que_no_infiere(name)))
+        return MODEL_CACHE.get(p)
+
+    def staging_o_disco(name: str):
+        p = catalogo.staging_dir(name) / catalogo.CHECKPOINT_INFERENCIA
+        if p.exists():
+            return p
+        p = runs.path(name) / catalogo.CHECKPOINT_INFERENCIA
+        return p if p.exists() else None
+
+    def _model_para_inferir(name: str):
+        """El modelo con el que INFERIR (predecir, revisar, puntuar la tarea), o
+        el motivo exacto de que no lo haya. Aqui SI manda el catalogo.
+
+        Tres negativas distintas, y distinguirlas es el punto: el mensaje viejo
+        decia siempre "espera a que termine una epoca", que sobre un run
+        terminado hace dias con 107 epocas es simplemente falso -- y manda a
+        esperar algo que no va a pasar."""
+        ckpt, _origen = catalogo.checkpoint_de(name, runs)
+        if ckpt is None:
+            raise _http_error(RunError(*_por_que_no_infiere(name)))
         return MODEL_CACHE.get(ckpt)
+
+    def _por_que_no_infiere(name: str) -> tuple:
+        """(code, message, hint) para un run sin pesos utilizables."""
+        st = (runs.status(name) or {}).get("status")
+        if st == "running":
+            return ("run_has_no_checkpoint",
+                    f"'{name}' esta entrenando y aun no ha dejado un best.pt",
+                    "espera a que termine una epoca")
+        if (runs.path(name) / catalogo.CHECKPOINT_INFERENCIA).exists():
+            # el fichero esta, pero nadie aprobo esta red: servirlo seria inferir
+            # con una que no se eligio
+            return ("run_not_approved_for_inference",
+                    f"'{name}' tiene pesos en disco pero NO esta aprobada para "
+                    f"inferir",
+                    f"apruebala con POST /inference/staging/{name}/promote, o "
+                    f"elige una de {catalogo.aprobadas() or '(ninguna)'}")
+        return ("run_has_no_checkpoint",
+                f"'{name}' no tiene pesos en esta maquina",
+                "los pesos de un run solo se guardan si se APRUEBA para "
+                "inferencia (fv.inference.catalogo); las aprobadas hoy son "
+                f"{catalogo.aprobadas() or '(ninguna)'}. Para tener los de este "
+                "run hay que reentrenarlo: los de un run que no se aprobo nunca "
+                "existieron")
+
+    # -------------------------------------------- pesos para inferencia (antesala)
+    #
+    # La antesala recibe los pesos MIENTRAS se entrena y no toca el repo de
+    # datos; la promocion los pasa a lo definitivo Y aprueba la red. Por que las
+    # dos cosas, y por que en este orden, en `fv.inference.catalogo`.
+    #
+    # ⚠ QUIEN PUEDE LLAMAR A ESTO. Estas rutas van dentro del mismo `app` que
+    # monta `fv.api.web`, asi que heredan su puerta: token (cabecera `x-fv-token`,
+    # cookie o `?t=`) salvo desde loopback. No hay una segunda puerta y no debe
+    # haberla -- dos puertas divergen y la que se olvida es la que se deja
+    # abierta. Lo que SI cambia respecto al resto del API es la consecuencia de
+    # que se cuele alguien: esto escribe FICHEROS DE PESOS, y un `.pt` es un
+    # pickle, o sea codigo. Por eso:
+    #   - el nombre del fichero se comprueba contra una lista de DOS (`PESOS`),
+    #     nunca se compone una ruta con lo que llega;
+    #   - el nombre del run tiene que ser un nombre de directorio;
+    #   - se guardan BYTES y no se hace `torch.load` en la subida: cargar es lo
+    #     que ejecuta el pickle, y aqui no hay ninguna razon para hacerlo.
+    # Con la puerta cerrada esto es "quien tiene el token puede escribir en la
+    # antesala", que es menos de lo que ya puede hacer (el API borra runs y
+    # datasets sin preguntar).
+
+    @app.get("/inference")
+    def inference_state():
+        """Que redes puede usar la app para inferir, y de donde salen."""
+        try:
+            cat = catalogo.leer()
+        except CatalogoError as e:
+            raise _http_error(e)
+        return {
+            "aprobadas": cat["runs"],
+            "antesala": catalogo.antesala_completa(),
+            "antesala_root": str(settings.inference_staging_root()),
+            "catalogo": str(catalogo.catalogo_path()),
+            "pesos": list(catalogo.PESOS),
+            "checkpoint_inferencia": catalogo.CHECKPOINT_INFERENCIA,
+        }
+
+    @app.put("/inference/staging/{name}/{fichero}", status_code=201)
+    async def upload_checkpoint(name: str, fichero: str, request: Request):
+        """Recibe UN fichero de pesos y lo deja en la antesala de `name`.
+
+        Cuerpo = los bytes del `.pt`, en crudo (`application/octet-stream`), no
+        multipart: quien sube esto es un script, y `curl --data-binary @best.pt`
+        no necesita una biblioteca de formularios. Se escribe atomico, porque el
+        fichero se lee mientras se reemplaza (la revision usa el modelo con el
+        entrenamiento en marcha)."""
+        datos = await request.body()
+        if not datos:
+            raise _http_error(RunError(
+                "checkpoint_vacio", f"el cuerpo de '{fichero}' llego vacio",
+                "manda los bytes del .pt en el cuerpo "
+                "(curl --data-binary @best.pt)"))
+        if len(datos) > MAX_CHECKPOINT_BYTES:
+            raise _http_error(RunError(
+                "checkpoint_demasiado_grande",
+                f"{len(datos)} bytes supera el limite de {MAX_CHECKPOINT_BYTES}",
+                "el last.pt de la red vigente son 2,0 MB; si el tuyo es "
+                "legitimamente mayor, sube FV_MAX_CHECKPOINT_MB"))
+        try:
+            destino = catalogo.guardar_en_antesala(name, fichero, datos)
+        except CatalogoError as e:
+            raise _http_error(e)
+        return {"run": name, "fichero": fichero, "bytes": len(datos),
+                "destino": str(destino), "antesala": catalogo.en_antesala(name)}
+
+    @app.post("/inference/staging/{name}/promote")
+    def promote_checkpoint(name: str, body: dict | None = None):
+        """Antesala -> repo de datos, y aprueba la red. Es UNA decision."""
+        body = body or {}
+        try:
+            return catalogo.promover(name, runs, motivo=body.get("motivo", ""),
+                                     origen=body.get("origen", ""))
+        except CatalogoError as e:
+            raise _http_error(e)
+
+    @app.delete("/inference/staging/{name}", status_code=200)
+    def clear_staging(name: str):
+        try:
+            return {"run": name, "borrados": catalogo.limpiar_antesala(name)}
+        except CatalogoError as e:
+            raise _http_error(e)
+
+    @app.delete("/inference/approved/{name}", status_code=200)
+    def retire_from_catalog(name: str):
+        """Saca la red del catalogo. NO borra sus pesos: retirar es reversible
+        y borrar no, y ademas un peso ya commiteado no se va del historial de
+        git por borrarlo del arbol."""
+        try:
+            return catalogo.retirar(name)
+        except CatalogoError as e:
+            raise _http_error(e)
 
     @app.get("/runs/{name}/kernels")
     def run_kernels(name: str):
-        return kernels_payload(_model_for(name))
+        return kernels_payload(_model_para_mirar(name))
 
     def _probe_window(body: dict):
         """Resolve (image, window x0, y0) for a probe, validating the index
@@ -530,7 +712,7 @@ def create_app() -> FastAPI:
 
     @app.post("/runs/{name}/feature-maps")
     def run_feature_maps(name: str, body: dict):
-        model = _model_for(name)
+        model = _model_para_mirar(name)
         img, wx0, wy0 = _probe_window(body)
         from fv.fovea import build_view
         view, _cov = build_view(img, wx0, wy0, model.dims,
@@ -540,14 +722,14 @@ def create_app() -> FastAPI:
 
     @app.post("/runs/{name}/input-view")
     def run_input_view(name: str, body: dict):
-        model = _model_for(name)
+        model = _model_para_mirar(name)
         img, wx0, wy0 = _probe_window(body)
         return input_view_payload(model, img, wx0, wy0)
 
     # --------------------------------------------------------------- predict (F)
     @app.post("/runs/{name}/predict")
     def run_predict(name: str, body: dict):
-        model = _model_for(name)
+        model = _model_para_inferir(name)
         ds = SourceDataset(body["source"])
         s = ds.sample_at(int(body.get("index", 0)))
         image = s.load_image()
@@ -619,13 +801,33 @@ def create_app() -> FastAPI:
         `todos` existe para no releer los 859 runs una vez por dataset al elegir
         cual se abre por defecto: quien llame en bucle pasa la lista una vez.
         """
+        try:
+            aprobadas = set(catalogo.leer()["runs"])
+        except CatalogoError:
+            aprobadas = set()
+        antesala = catalogo.antesala_completa()
         out = []
         for r in (runs.list() if todos is None else todos):
             if r.get("window_dataset") != ds_name:
                 continue
+            # `has_checkpoint` aqui significa "la app PUEDE inferir con el", que
+            # desde el 2026-08-31 no es lo mismo que "el fichero esta en disco":
+            # una red sin aprobar no se usa aunque tenga pesos. Ese es el filtro
+            # que el dueno pidio, y el sitio donde ponerlo es este -- si se
+            # dejara al front, cada pantalla tendria su propia idea de cual vale.
+            origen = ("antesala" if catalogo.CHECKPOINT_INFERENCIA
+                      in antesala.get(r["name"], [])
+                      else "catalogo" if (r["name"] in aprobadas
+                                          and r.get("has_checkpoint"))
+                      else None)
             out.append({"name": r["name"], "status": r.get("status"),
                         "best": r.get("best"),
-                        "has_checkpoint": (runs.path(r["name"]) / "best.pt").exists()})
+                        "has_checkpoint": origen is not None,
+                        "inference": origen,
+                        # se MARCA, no se esconde: distinguir "no esta aprobada"
+                        # de "no tiene pesos" es lo que dice si hay que aprobar
+                        # algo o reentrenar algo
+                        "on_disk": bool(r.get("has_checkpoint"))})
         # los que pueden inferir primero: un select cuyo primer elemento falla
         # ensena un error antes que una imagen
         out.sort(key=lambda r: (not r["has_checkpoint"], r["name"]))
@@ -752,14 +954,13 @@ def create_app() -> FastAPI:
         run_name = body.get("run") or None
         model = None
         if run_name:
-            if not (runs.path(run_name) / "best.pt").exists():
-                raise _http_error(RunError(
-                    "run_has_no_checkpoint",
-                    f"'{run_name}' no tiene best.pt en esta maquina: no puede inferir",
-                    "los pesos de un run no viajan por git (*.pt esta en el "
-                    ".gitignore del repo de datos); elige un run `demo-*`, que es "
-                    "la excepcion y SI viaja, o entrena aqui, o mira sin run"))
-            model = _model_for(run_name)
+            # `_model_for` ya distingue los tres casos (entrenando / con pesos sin
+            # aprobar / sin pesos) y lo dice. Antes habia aqui un mensaje propio
+            # que decia que los pesos NO viajan por git y que eligieras un run
+            # `demo-*`: cierto hasta el 2026-08-30, falso desde el commit que
+            # abrio la tercera excepcion del .gitignore. Dos sitios que explican
+            # lo mismo divergen, y el que se olvida es el que miente.
+            model = _model_para_inferir(run_name)
 
         arrays = None if source is not None else wstore.arrays(ds_name)
         fila = ({} if arrays is None

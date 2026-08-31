@@ -24,6 +24,14 @@ def trained(world):
     store = RunStore()
     train("rev-run", world["dataset"], "n", TINY_NET, "r",
           Recipe(epochs=1, batch_size=32), store=store)
+    # Desde el 2026-08-31 tener `best.pt` en disco NO basta para inferir: la red
+    # tiene que estar APROBADA (fv.inference.catalogo). Aqui se aprueba a mano y
+    # no por la antesala porque lo que este fichero prueba es la REVISION; la
+    # politica de aprobacion tiene sus propios tests en test_inferencia.py.
+    from fv.inference import catalogo
+    from fv.ioutils import write_json_atomic
+    write_json_atomic(catalogo.catalogo_path(),
+                      {"version": 1, "runs": {"rev-run": {"motivo": "fixture"}}})
     return {"run": "rev-run", "store": store, **world}
 
 
@@ -385,8 +393,14 @@ def test_SIN_run_se_ven_las_imagenes_igual(client):
 
 
 def test_un_run_SIN_checkpoint_se_niega_diciendo_por_que(client):
-    """No basta con no ofrecerlo: si llega igual, el error tiene que explicar que
-    los pesos no viajan por git, no un 500 opaco."""
+    """No basta con no ofrecerlo: si llega igual, el error tiene que explicar POR
+    QUE no hay pesos y que hacer, no un 500 opaco.
+
+    ⚠ El mensaje cambio el 2026-08-31 y el motivo importa: antes decia que los
+    pesos "no viajan por git", que era cierto hasta que se abrio la tercera
+    excepcion del .gitignore. Ahora la razon verdadera es otra -- los pesos solo
+    se guardan si la red se APRUEBA para inferencia-- y el hint dice que hay que
+    reentrenar, que es lo unico que se puede hacer con un run que no se aprobo."""
     c, w = client
     (w["store"].path(w["run"]) / "best.pt").unlink()
     r = c.post("/review/batch", json={"window_dataset": w["dataset"],
@@ -394,7 +408,7 @@ def test_un_run_SIN_checkpoint_se_niega_diciendo_por_que(client):
                                       "run": w["run"]})
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "run_has_no_checkpoint"
-    assert "gitignore" in r.json()["detail"]["hint"]
+    assert "reentrenarlo" in r.json()["detail"]["hint"]
     ctx = c.get(f"/review/context?window_dataset={w['dataset']}&split=val").json()
     assert ctx["runs"][0]["has_checkpoint"] is False
 

@@ -161,6 +161,18 @@ def test_full_flow_train_diagnose_predict(world, client):
                        json={"window_dataset": world["dataset"], "index": 10_000_000}
                        ).status_code == 400
 
+    # ...y para PREDECIR hace falta un paso mas desde el 2026-08-31: la red tiene
+    # que estar APROBADA para inferencia. Introspeccionar (kernels/mapas/vista,
+    # arriba) no lo pide -- mirar una red que has pedido por su nombre no es
+    # inferir con una que nadie eligio. Este es el flujo completo de verdad.
+    assert client.post("/runs/api-run/predict",
+                       json={"source": world["source"], "index": 0}
+                       ).status_code == 409
+    from fv.inference import catalogo
+    from fv.ioutils import write_json_atomic
+    write_json_atomic(catalogo.catalogo_path(),
+                      {"version": 1, "runs": {"api-run": {"motivo": "flujo completo"}}})
+
     # predict: the three stages + knobs echoed in window units
     p = client.post("/runs/api-run/predict",
                     json={"source": world["source"], "index": 0}).json()

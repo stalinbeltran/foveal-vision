@@ -23,6 +23,36 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **🔒 2026-08-31 — REGLA DEL DUEÑO: los pesos de un run NO se guardan por defecto.**
+> Sólo se conservan —y **sólo ésas puede usar la web app para inferir**— las redes que
+> **el dueño aprueba una a una**. **Hoy la lista es exactamente una: `demo-fov16-optimo`**
+> (`best.pt` + `last.pt`). Las demás se añaden **cuando él lo ordene** («guarda esta nn para
+> inferencia», «guarda sus pesos») — **no** porque hayan salido bien, **no** por iniciativa
+> propia.
+> 1. **La lista es un DATO**, no código: `inferencia.json` en la raíz del repo de datos. Ahí y
+>    no en el repo de código porque gobierna unos ficheros que viven ahí: la lista y los pesos
+>    que nombra tienen que viajar y revertirse juntos.
+> 2. ⚠ **Un `.pt` que esté en disco pero no en la lista NO se usa.** Es algo que se coló, y
+>    servirlo haría inferir con una red que nadie eligió. Tiene test.
+> 3. **Por qué la regla:** 862 runs × 2,7 MB de pesos = ~2,3 GB en un repo de 49 MB *(medido
+>    2026-08-31)*, y git guarda **todas** las versiones que se commitean. La mayoría de esos
+>    runs son puntos de un barrido: lo que se lee de ellos es su número, no el modelo.
+>    ⚠ Y la otra cara también está medida: hasta el 2026-08-30 no se guardaba **ninguno**, y eso
+>    costó `fov-optimo-p20` entero (~1 h 40 min de reentrenamiento). La regla no es «no
+>    guardes»: es **«guarda lo que se va a usar, y dilo»**.
+> 4. **La ANTESALA** (`data/inferencia/<run>/`, **fuera de git**) recibe los pesos **mientras se
+>    entrena**, por `PUT /api/inference/staging/<run>/<best|last>.pt`. **Gana al definitivo** al
+>    inferir: durante un entrenamiento la buena es la que acaba de bajar. ⚠ Estar en la antesala
+>    **no es** estar aprobada.
+> 5. **Al terminar, `POST /api/inference/staging/<run>/promote`** copia los dos al repo de datos
+>    **y aprueba**: copiar y aprobar son **una** decisión. No commitea — devuelve el comando,
+>    como `fv-train`.
+> ⚠ **La antesala NO es `data/cache/`**: la caché se borra sin perder nada, esto guarda los
+> únicos pesos de un entrenamiento en curso.
+> **El detalle entero, la puerta del endpoint y por qué el PULL de `entrenar_vast.py` sigue
+> siendo el camino recomendado: [docs/inferencia.md](docs/inferencia.md).** 24 tests en
+> `tests/test_inferencia.py`.
+
 > **🔧 2026-08-31 — `edge_inputs`: la red ya puede saber DÓNDE SE ACABA LA IMAGEN.
 > Implementado y probado; NO medido.**
 > Pedido por el usuario, y con el sitio elegido por él: **las entradas nuevas van directas a la

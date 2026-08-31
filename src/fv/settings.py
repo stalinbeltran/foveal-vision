@@ -138,6 +138,31 @@ def cache_root() -> Path:
     return project_root() / "data" / "cache"
 
 
+def inference_staging_root() -> Path:
+    """El ANTESALA de los pesos: donde aterrizan mientras se entrena.
+
+    Va en el repo de CODIGO y fuera de git (`/data/inferencia/` en el
+    .gitignore), no en el repo de datos, y esa es toda la decision:
+
+      - git guarda TODAS las versiones que se commitean. Un `last.pt` son 2,0 MB
+        y una sonda cada pocas epocas serian decenas de versiones por run: el
+        `.gitignore` del repo de datos ya avisa de que eso son gigabytes por
+        barrido. Lo de en medio no puede tocar el repo de datos.
+      - y aun asi hay que poder MIRAR el modelo con el entrenamiento en marcha,
+        que es justo para lo que `entrenar_vast.py` se trae los pesos en cada
+        sonda. La antesala existe para eso.
+
+    ⚠ NO es `cache_root()`, aunque se le parezca. La cache se puede borrar sin
+    perder nada; esto guarda los unicos pesos de un entrenamiento en curso, y
+    borrarlo a mitad pierde horas de maquina. Un directorio con otra regla de
+    borrado es otro directorio.
+
+    Lo definitivo vive en el repo de DATOS y solo llega ahi por una promocion
+    explicita (`fv.inference.catalogo`).
+    """
+    return project_root() / "data" / "inferencia"
+
+
 def ui_state_path() -> Path:
     # Remembered UI defaults (filters + form values). Committable so it travels
     # with the repo to the GPU server. NOT a domain artifact: an opaque blob of

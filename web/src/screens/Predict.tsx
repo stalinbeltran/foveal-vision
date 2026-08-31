@@ -27,9 +27,23 @@ export default function Predict() {
   // the picker instead of 404-ing on the next predict.
   const refreshLists = () => {
     api.get("/runs").then((d) => {
+      // Sólo los que la app PUEDE usar para inferir: `inference` los ordena
+      // primero y dice de dónde saldrían los pesos («antesala» = entrenando
+      // ahora, «catalogo» = aprobada y guardada).
+      //
+      // ⚠ Antes esto ofrecía TODOS los terminales — 861 el 2026-08-31, de los
+      // que 860 fallaban al pulsar, y el preseleccionado era uno de ésos. Un
+      // selector cuyo primer elemento da error enseña un fallo antes que una
+      // imagen. Se marcan y se desactivan, no se esconden: un run escondido no
+      // se distingue de uno que no existe, y entonces no sabes si aprobarlo o
+      // reentrenarlo (es lo que /review ya hacía).
       const done = d.runs.filter((r: any) => isTerminal(r.status));
+      done.sort((a: any, b: any) => Number(!a.inference) - Number(!b.inference));
       setRuns(done);
-      setRun((cur) => (cur && done.some((r: any) => r.name === cur)) ? cur : (done[0]?.name ?? ""));
+      const usable = (n: string) => done.some((r: any) => r.name === n && r.inference);
+      setRun((cur) => (cur && usable(cur))
+        ? cur
+        : (done.find((r: any) => r.inference)?.name ?? ""));
     }).catch(setError);
     api.get("/sources").then((d) => {
       setSources(d.sources);
@@ -83,11 +97,34 @@ export default function Predict() {
       <p className="sub">Las tres etapas — sin la cruda, «el párrafo salió mal» no es diagnosticable.
         Los knobs van en unidades de la ventana y no reentrenan nada.</p>
       <ErrorBox error={error} />
+      {runs.length > 0 && !runs.some((r) => r.inference) ? (
+        // El aviso que separa las dos causas: no es que falle la predicción, es
+        // que ninguna red está aprobada aquí. Decirlo evita el diagnóstico que
+        // ya costó una vez — «la red detecta mal» cuando lo que pasa es que no
+        // hay red.
+        <div className="card" style={{ borderColor: "var(--warn, #b7791f)" }}>
+          <strong>Ninguno de los {runs.length} runs puede inferir aquí.</strong>
+          <p className="sub" style={{ marginTop: 4 }}>
+            Los pesos de un run <b>no se guardan por defecto</b>: sólo los de las
+            redes aprobadas para inferencia (<code>inferencia.json</code> del repo
+            de datos). Un run que nunca se aprobó no tiene pesos en ninguna parte
+            y hay que <b>reentrenarlo</b>; uno que sí los tiene se aprueba con{" "}
+            <code>POST /api/inference/staging/&lt;run&gt;/promote</code>.
+          </p>
+        </div>
+      ) : null}
       <div className="card row" style={{ alignItems: "flex-end" }}>
         <div style={{ width: 200 }}><Field label="run">
           <select value={run} onChange={(e) => setRun(e.target.value)}>
-            {runs.map((r) => <option key={r.name}>{r.name}</option>)}
-          </select></Field></div>
+            {runs.map((r) => (
+              <option key={r.name} value={r.name} disabled={!r.inference}>
+                {r.inference ? (r.inference === "antesala" ? "🟡 " : "") : "⛔ "}{r.name}
+              </option>
+            ))}
+          </select></Field>
+          <p className="sub" style={{ marginTop: 2 }}>
+            ⛔ sin pesos aprobados · 🟡 entrenando (antesala)
+          </p></div>
         <div style={{ width: 220 }}><Field label="fuente">
           <select value={source} onChange={(e) => setSource(e.target.value)}>
             {sources.map((s) => <option key={s.id} value={s.id}>{s.id}</option>)}

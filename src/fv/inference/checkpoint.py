@@ -18,8 +18,22 @@ class CheckpointError(ValueError):
 
 
 def load_model(ckpt_path: Path, device: str = "cpu") -> FoveatedRegionalNN:
-    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
-    model = build_model(ckpt["config"]["model"])
+    try:
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+        cfg = ckpt["config"]["model"]
+    except Exception as e:
+        # Un fichero que NO es un checkpoint. Antes esto no podia pasar --los
+        # `.pt` los escribia el propio bucle de entrenamiento-- y desde que hay
+        # un endpoint que recibe bytes (`PUT /inference/staging/...`) si puede:
+        # una subida cortada, un fichero equivocado, cualquier cosa. Sin esto es
+        # un 500 opaco en la pantalla, que es el peor sitio para enterarse.
+        raise CheckpointError(
+            "checkpoint_ilegible",
+            f"{ckpt_path.name} no es un checkpoint de este proyecto: {e}",
+            "vuelve a subirlo (una subida cortada deja bytes validos pero "
+            "incompletos), o borra la antesala con DELETE "
+            "/inference/staging/<run>") from e
+    model = build_model(cfg)
     try:
         model.load_state_dict(ckpt["model"])
     except RuntimeError as e:

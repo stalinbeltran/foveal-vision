@@ -185,6 +185,15 @@ class RunStore:
                 "monitor": summary.get("monitor"),
                 "epochs_run": summary.get("epochs_run"),
                 "seconds_per_epoch": summary.get("seconds_per_epoch"),
+                # ¿hay un best.pt AQUI? Es un hecho del disco, no una decision
+                # de inferencia: si esta red esta aprobada lo dice `fv.inference`,
+                # que este dominio no puede importar (contrato ⑦) y no debe.
+                #
+                # Se calcula sobre `d`, que ya esta resuelto, y por eso cuesta
+                # 23 ms sobre los 862 runs de hoy; volviendo a resolver la ruta
+                # (`self.path(name)`) costaria 799 ms -- 35x -- sobre una ruta
+                # que la pantalla de Predecir sondea cada 3 s. Medido 2026-08-31.
+                "has_checkpoint": (d / "best.pt").exists(),
             })
         return out
 

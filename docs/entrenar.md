@@ -84,6 +84,13 @@ cd ~/src/foveal-vision
 `--name` tiene que ser **nuevo**: un run no se sobrescribe nunca. Para seguir uno que ya existe,
 `fv-continue` (abajo).
 
+🔒 **Y entrenar NO guarda la red para inferencia.** Desde el 2026-08-31 los pesos de un run
+**no se conservan por defecto**: sólo los de las redes que el dueño aprueba una a una, y sólo
+ésas puede usar la web app. Al terminar, la red se aprueba con **una** orden —
+`POST /api/inference/staging/<run>/promote`, que copia los pesos al repo de datos y anota la
+entrada en `inferencia.json`. Qué se guarda, por qué, y cómo llegan los pesos mientras se
+entrena: **[docs/inferencia.md](inferencia.md)**.
+
 ### Cuánto tarda
 
 | Máquina | s/época | 40 épocas | 100 épocas |

@@ -220,6 +220,9 @@ __marimo__/
 # --- foveal-vision: se versiona la descripcion, se ignora la carga
 # (docs/formatos.md §5).
 /data/cache/
+# la ANTESALA de los pesos (fv.settings.inference_staging_root): lo que llega
+# mientras se entrena. Lo definitivo va al repo de DATOS por promocion explicita.
+/data/inferencia/
 /data/sources/
 /data/ui-shots/
 
