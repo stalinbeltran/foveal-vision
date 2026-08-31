@@ -28,8 +28,28 @@ no viaja ningun secreto a proposito.
 
 Lo que si hay:
   - el `iid` y el comando exacto de destruccion se imprimen ANTES de nada mas;
-  - `cerrable.mjs` cuenta las instancias vivas y pone el server en rojo;
-  - `--horas-max` corta el entrenamiento (no la factura) por si algo se cuelga.
+  - `cerrable.mjs` cuenta las instancias vivas y pone el server en rojo, y desde
+    el 2026-08-31 avisa APARTE de una maquina viva SIN vigilante, que es otro
+    estado y peor: esa no se destruye ni aunque el server siga encendido;
+  - `--horas-max` corta el entrenamiento (no la factura) por si algo se cuelga;
+  - `scripts/adoptar_vast.py` vuelve a engancharse a una instancia huerfana, que
+    antes no se podia (`--continuar` alquila OTRA maquina).
+
+⚠⚠ COMO SE LANZA ESTO, y no es un detalle
+------------------------------------------
+Con `telegram-coordinator/scripts/desacoplar-persistente.sh`, que registra una
+UNIDAD de systemd (padre PID 1, `Restart=on-failure`). NO con `desacoplar.sh`:
+aquel usa `systemd-run --scope`, que da cgroup propio --sobrevive al restart del
+coordinador-- pero sigue siendo HIJO de quien lo lanza, y un tree-kill al padre
+se lo lleva.
+
+Paso el 2026-08-31: se lanzo asi desde una sesion de Claude Code, la sesion
+termino, y el vigilante murio con ella. El entrenamiento siguio vivo en la
+maquina (1 h 38 min) y la factura corriendo sin nadie que la cortara.
+
+    "$COORD_HOME/scripts/desacoplar-persistente.sh" entrenar-<run> \
+      /bin/bash -lc 'set -a; . "$HOME/.config/dev-secrets.env"; set +a
+                     .venv/bin/python scripts/entrenar_vast.py --name <run> ...' 
 
 ⚠ Y una diferencia con la flota que importa para comparar: un run continuado en
 OTRA maquina no es bit a bit el mismo que si no se hubiera parado. `reanudar`

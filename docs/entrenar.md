@@ -106,12 +106,30 @@ alarga el entrenamiento. Cuenta con el número alto.
 ⚠ **Más de unos minutos no cabe en un turno**: lánzalo desacoplado y avísate al terminar, o se
 muere con el proceso que lo lanzó.
 
+⚠⚠ **Y usa `desacoplar-persistente.sh`, NO `desacoplar.sh`.** Los dos «desacoplan», pero a cosas
+distintas y la diferencia costó una máquina facturando sola:
+
+| | sobrevive a `systemctl restart` del coordinador | sobrevive a que muera **quien lo lanzó** |
+|---|---|---|
+| `desacoplar.sh` (`systemd-run --scope`) | ✅ | ❌ **sigue siendo su hijo** |
+| `desacoplar-persistente.sh` (unidad) | ✅ | ✅ su padre es **PID 1** |
+
+Medido el 2026-08-31: `entrenar_vast.py` se lanzó con el primero desde una sesión de Claude Code,
+la sesión terminó, el harness mató el árbol de su comando y el scope se fue con él. El
+entrenamiento en Vast siguió vivo (1 h 38 min) y el proceso que baja los pesos **y destruye la
+instancia** desapareció.
+
 ```bash
-"$COORD_HOME/scripts/desacoplar.sh" sh -c '
-  cd ~/src/foveal-vision
-  .venv/bin/fv-train --name mi-run --window-dataset dirty1000-80px-16px-r20260827 \
-      --network fov16-optimo --recipe plan40 --epochs 40 > /tmp/mi-run.log 2>&1
-  node "$COORD_HOME/scripts/notify.mjs" "entrenamiento mi-run terminado"' &
+cd ~/src/foveal-vision
+"$COORD_HOME/scripts/desacoplar-persistente.sh" entrenar-mi-run \
+  /bin/bash -lc '
+    set -a; . "$HOME/.config/dev-secrets.env"; set +a
+    .venv/bin/fv-train --name mi-run --window-dataset dirty1000-80px-16px-r20260827 \
+        --network fov16-optimo --recipe plan40 --epochs 40
+    node "$COORD_HOME/scripts/notify.mjs" "entrenamiento mi-run terminado"'
+
+systemctl status entrenar-mi-run     # cómo va
+tail -f /tmp/entrenar-mi-run.log     # el log
 ```
 
 ## 4. Continuar un entrenamiento
