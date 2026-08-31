@@ -22,7 +22,12 @@ con su estado (optimizador, contadores, generadores) baja lo que
 -----------------------------------------
 La destruccion de la instancia va en un `finally` de ESTE proceso. Si el droplet
 de control muere de golpe (SIGKILL, se destruye la maquina), el `finally` no
-corre y **la instancia sigue facturando**. No hay interruptor dentro de la
+corre y **la instancia sigue facturando**.
+
+⚠ SIGTERM SI esta cubierto desde el 2026-08-31 (`fv.proc.morir_por_el_finally`),
+y no lo estaba: el `finally` de Python cubre excepciones y no senales, asi que
+un `systemctl stop` mataba el proceso sin destruir. Contra SIGKILL no hay nada
+que hacer y por eso siguen las otras redes. No hay interruptor dentro de la
 maquina alquilada porque destruirse a si misma pediria el token de Vast, y ahi
 no viaja ningun secreto a proposito.
 
@@ -84,6 +89,7 @@ import vast_instance as V                              # noqa: E402
 
 from fv import settings                                # noqa: E402
 from fv.inference import catalogo                      # noqa: E402
+from fv.proc import morir_por_el_finally               # noqa: E402
 from fv.training.registry import RunStore              # noqa: E402
 from fv.windows.store import WindowDatasetStore        # noqa: E402
 
@@ -583,6 +589,13 @@ def main() -> int:
                          "repo de datos y aprobar la red para inferencia")
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
+
+    # Lo PRIMERO, antes del preflight y por tanto antes de alquilar nada: que
+    # SIGTERM/SIGINT pasen por el `finally` que destruye la instancia. Sin esto,
+    # un `systemctl stop` de este proceso --que es justo lo que uno hace para
+    # terminar-- lo mataba dejando la maquina facturando (medido 2026-08-31 con
+    # el vigilante hermano).
+    morir_por_el_finally(log)
 
     ctx = preflight(args)
     destino = (ctx["store"].path(args.name) if ctx["continuar"]

@@ -213,6 +213,7 @@ sys.path.insert(0, str(LANZADOR / "scripts"))
 import estudio_estimar as EST                       # noqa: E402
 import vast_instance as V                           # noqa: E402
 from fv import settings                             # noqa: E402
+from fv.proc import morir_por_el_finally            # noqa: E402
 from fv.sweeps.runner import point_run_name         # noqa: E402
 from fv.sweeps.spec import expand_points            # noqa: E402
 from fv.sweeps.store import SweepStore              # noqa: E402
@@ -1822,6 +1823,14 @@ def main() -> int:
                          "filtra por el y se creeria dueno de las maquinas del otro")
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
+
+    # Lo PRIMERO, antes de alquilar nada: que SIGTERM/SIGINT pasen por los
+    # `finally` que destruyen las maquinas. El `finally` de Python cubre
+    # excepciones y NO senales, asi que sin esto un `systemctl stop` --o un
+    # `kill` a mano, que es como se para una flota que se ha ido de las manos--
+    # mataba el proceso dejando la FLOTA ENTERA facturando. Medido el
+    # 2026-08-31 en el vigilante hermano, con una sola maquina; aqui son N.
+    morir_por_el_finally(log)
 
     # Antes de mirar nada mas: si se pidio libro y el libro no puede commitear,
     # se para aqui -- sin alquilar, sin gastar y diciendo como se arregla.

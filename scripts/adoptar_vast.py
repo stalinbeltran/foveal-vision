@@ -76,32 +76,12 @@ EV = _cargar("entrenar_vast", ROOT / "scripts" / "entrenar_vast.py")
 V = EV.V
 
 from fv.inference import catalogo          # noqa: E402
+from fv.proc import morir_por_el_finally    # noqa: E402
 from fv.training.registry import RunStore   # noqa: E402
 
 
 def log(msg: str = "") -> None:
     print(msg, flush=True)
-
-
-def _morir_con_finally(sig, _frame):
-    """SIGTERM/SIGINT -> excepcion, para que el `finally` LLEGUE A CORRER.
-
-    ⚠⚠ Sin esto, `systemctl stop` de este vigilante mataba el proceso sin
-    destruir la instancia -- y "paro el vigilante" es justo lo que uno hace
-    cuando quiere terminar. Medido el 2026-08-31: se paro la unidad y la maquina
-    siguio facturando; hubo que destruirla a mano.
-
-    El `finally` de Python cubre EXCEPCIONES, no senales: SIGTERM termina el
-    proceso sin desenrollar la pila. `SystemExit` si la desenrolla, asi que
-    convertir la senal en excepcion es lo que hace que el unico sitio donde se
-    destruye la instancia se ejecute SIEMPRE que este proceso acabe por su
-    cuenta.
-
-    (Contra SIGKILL no hay nada que hacer, y por eso ademas estan el comando
-    impreso al principio y el aviso de `cerrable.mjs`.)
-    """
-    log(f"\n  recibida senal {signal.Signals(sig).name}: recojo y destruyo antes de salir")
-    raise SystemExit(143 if sig == signal.SIGTERM else 130)
 
 
 def vive_el_entrenamiento(destino: Path) -> bool:
@@ -156,9 +136,10 @@ def main() -> int:
                     help="deja la instancia viva al terminar (para depurar)")
     args = ap.parse_args()
 
-    # antes de nada: que una senal pase por el `finally` que destruye
-    signal.signal(signal.SIGTERM, _morir_con_finally)
-    signal.signal(signal.SIGINT, _morir_con_finally)
+    # antes de nada: que una senal pase por el `finally` que destruye.
+    # La funcion vive en `fv.proc` y no aqui porque los TRES scripts que
+    # alquilan maquinas la necesitan igual; tres copias divergirian.
+    morir_por_el_finally(log)
 
     V.load_env()
     inst = V.buscar_instancia(str(args.iid))

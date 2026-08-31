@@ -139,14 +139,41 @@ def test_una_senal_pasa_por_el_finally_que_destruye(tmp_path):
         "el finally no corrió con SIGTERM: la instancia se habría quedado facturando"
 
 
-def test_el_handler_de_senal_esta_puesto_ANTES_de_alquilar_nada():
-    """Ponerlo tarde deja una ventana en la que una señal mata sin destruir. Se
-    registra lo primero de `main`, antes incluso de hablar con la API."""
-    fuente = (ROOT / "scripts" / "adoptar_vast.py").read_text(encoding="utf-8")
+# TODO script que alquile una máquina: el mismo agujero y la misma cura.
+# ⚠ `entrenar_vast` y `estudio_flota` LO TENÍAN cuando se arregló `adoptar_vast`
+# (2026-08-31) — el fallo se descubrió en uno y vivía en los tres. `estudio_flota`
+# es el peor de los tres: alquila una FLOTA, así que ahí la señal perdida deja N
+# máquinas facturando en vez de una.
+QUE_ALQUILAN = ["adoptar_vast.py", "entrenar_vast.py", "estudio_flota.py"]
+
+
+@pytest.mark.parametrize("script", QUE_ALQUILAN)
+def test_el_handler_de_senal_esta_puesto_ANTES_de_alquilar_nada(script):
+    """Ponerlo tarde deja una ventana en la que una señal mata sin destruir, y
+    esa ventana es justo el arranque: la máquina ya existe y el programa aún no
+    llegó a su bucle. Se registra lo primero de `main`."""
+    fuente = (ROOT / "scripts" / script).read_text(encoding="utf-8")
     cuerpo = fuente.split("def main(")[1]
-    i_sig = cuerpo.index("signal.signal(signal.SIGTERM")
-    i_api = cuerpo.index("V.buscar_instancia")
-    assert i_sig < i_api, "la señal se atrapa antes de tocar la instancia"
+    assert "morir_por_el_finally(" in cuerpo, \
+        f"{script} alquila máquinas y no atrapa SIGTERM: un `systemctl stop` " \
+        f"lo mataría dejándolas facturando"
+    i_sig = cuerpo.index("morir_por_el_finally(")
+    # lo que en cada uno significa "ya hay dinero corriendo"
+    marca = {"adoptar_vast.py": "V.buscar_instancia",
+             "entrenar_vast.py": "preflight(args)",
+             "estudio_flota.py": "motivo_sin_libro()"}[script]
+    assert i_sig < cuerpo.index(marca), \
+        f"{script}: la señal se atrapa DESPUÉS de {marca}"
+
+
+def test_el_handler_es_uno_solo_para_los_tres():
+    """Tres copias del mismo handler divergen, y la que se quede atrás es la que
+    deja una máquina encendida. Vive en `fv.proc`, que es dominio de procesos."""
+    from fv.proc import morir_por_el_finally      # existe y es importable
+    for script in QUE_ALQUILAN:
+        fuente = (ROOT / "scripts" / script).read_text(encoding="utf-8")
+        assert "from fv.proc import morir_por_el_finally" in fuente, script
+        assert "def _morir" not in fuente, f"{script} tiene una copia local"
 
 
 def test_destruir_es_lo_ultimo_y_va_en_finally():
