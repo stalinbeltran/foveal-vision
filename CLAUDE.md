@@ -21,6 +21,56 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ---
 
+## Resumen ejecutivo — qué se pidió el 2026-08-31, qué se puede y qué no
+
+**Léelo antes que nada.** Los bloques largos de abajo son el detalle; esto es el estado.
+
+| # | Lo pedido | Estado | Dónde |
+|---|---|---|---|
+| 1 | Entradas que digan a la red si hay **borde de imagen**, conectadas a la **cabeza**, no a las convs | ✅ hecho · ⚠ **NO medido** | [instructionsNewNN.md §6bis](instructionsNewNN.md) |
+| 2 | **Sólo las nn aprobadas** se guardan, y sólo ésas infieren en la app | ✅ hecho. Hoy la lista es **una**: `demo-fov16-optimo` | [inferencia.md](docs/inferencia.md) |
+| 3 | **Carpeta temporal** en dev para los pesos mientras entrena | ✅ `data/inferencia/<run>/`, fuera de git | ídem |
+| 4 | **Endpoint** que reciba esos pesos | ✅ `PUT /api/inference/staging/<run>/<best\|last>.pt` | [api.md](docs/api.md) |
+| 5 | Al terminar, **copiar temporal → repo de datos** | ✅ `POST …/promote` — copia **y aprueba**, es una decisión | ídem |
+| 6 | **Entrenar** una nn | ⏸ **no lanzado**: faltan 5 decisiones del dueño (§ abajo) | [entrenar.md](docs/entrenar.md) |
+
+### ❌ Lo que NO se puede (no es una limitación de esta implementación)
+
+- **Recuperar los pesos de los runs previos.** Hay **862 runs** y **1 con pesos**
+  *(medido 2026-08-31)*. Los otros 861 **no los tienen en ninguna parte** — no se guardaron
+  nunca. La única vía es **reentrenar** el que interese.
+- **Predecir sobre imágenes de una fuente**: hay **0 fuentes publicadas** (`GET /api/sources`
+  devuelve `[]`). **Revisar sí funciona**, porque lee las imágenes del `windows.npz`. Publicar
+  una fuente es trabajo aparte y **no trivial** (ver abajo).
+
+### ⚠ Lo que NO conviene, y por qué
+
+| Idea que parece obvia | Por qué no |
+|---|---|
+| Guardar los pesos de todos los runs | 862 × 2,7 MB = **~2,3 GB** en un repo de **49 MB**, y git guarda **todas** las versiones commiteadas |
+| Empujar (PUSH) los pesos al endpoint **desde una máquina de Vast** | obliga a mandarle el token del API y a exponer el puerto del dev. El **PULL por ssh** de `entrenar_vast.py` ya funciona y por diseño *«ahí no viaja ningún secreto»* |
+| Re-renderizar la fuente para publicarla | está **medido** que un re-render **no da el mismo dato**, y `fv.datasets.publish` **aborta** si no cuadra pixel a pixel contra el `windows.npz` |
+| Entrenar en este droplet si hay prisa | 2 vCPU → **142–176 s/época** *(medido)*. 40 épocas ≈ 1 h 35 – 2 h |
+| Exigir aprobación también para **introspeccionar** (`/kernels`, `/feature-maps`) | rompería el flujo local: `fv-train` deja `best.pt` en el directorio del run, así que habría que commitear 2,7 MB sólo para mirar qué salió |
+
+### 🔶 Riesgo abierto, si se entrena en Vast
+
+**`entrenar_vast.py` NO está en la lista `TRABAJOS` de `cerrable.mjs`** (`fv-train` y `fv-continue`
+sí). La máquina alquilada sí se vería —el freno consulta la API de Vast—, pero el proceso local que
+la vigila y la **destruye** no se contaría. Si se va por Vast, **esa línea va en el mismo commit**.
+
+### Las 5 decisiones que faltan para entrenar
+
+1. **Qué red**: `fov16-optimo` (la mejor que la evidencia respalda; sus dos ejes nunca se midieron
+   juntos) · `fov16-vigente` (comparable con las tablas publicadas) · una con `edge_inputs` (⚠
+   mezclaría un mecanismo sin medir con un modelo que se va a usar).
+2. **Dónde**: este droplet (gratis, lento) o Vast (~0,05 $/h, rápido → ver el riesgo de arriba).
+3. **Cuántas épocas** (`demo-fov16-optimo` hizo 74).
+4. **Qué se guarda**: ¿se aprueba para inferencia toda nn entrenada a mano, o sólo la que se ordene?
+5. **¿Hace falta que Predecir funcione**, o basta Revisar? Lo primero pide publicar una fuente.
+
+---
+
 ## Estado actual — léelo primero
 
 > **🔒 2026-08-31 — REGLA DEL DUEÑO: los pesos de un run NO se guardan por defecto.**
