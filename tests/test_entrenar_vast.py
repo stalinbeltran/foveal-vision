@@ -243,9 +243,16 @@ def test_los_ficheros_se_colocan_de_forma_ATOMICA(mod):
 
     Y el temporal tiene que ir AL LADO del destino: `os.replace` solo es atomico
     dentro del mismo sistema de ficheros. En /tmp --que en muchas maquinas es un
-    tmpfs aparte-- daria EXDEV y la descarga fallaria en silencio."""
+    tmpfs aparte-- daria EXDEV y la descarga fallaria en silencio.
+
+    ⚠ Desde el 2026-08-31 hay DOS destinos --la antesala para los `.pt` y el repo
+    de datos para la descripcion-- asi que "junto al destino" ya no es un
+    directorio fijo: es `local.parent`, el del fichero que se esta colocando.
+    Fijar la cadena `dir=str(destino)` habria hecho pasar el test justo cuando el
+    temporal se quedaba en el directorio EQUIVOCADO de los dos."""
     cuerpo = _cuerpo(mod, "def traer(", "def main(")
-    assert "dir=str(destino)" in cuerpo, "el temporal va junto al destino"
+    assert "dir=str(local.parent)" in cuerpo, \
+        "el temporal va junto al fichero que se coloca, sea cual sea de los dos"
     assert ".replace(local)" in cuerpo
     # y un fallo al colocar se DICE, no se traga
     assert "AVISO: no pude colocar" in cuerpo

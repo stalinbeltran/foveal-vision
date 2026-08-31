@@ -1,0 +1,46 @@
+format_version: 2
+# `fov16-optimo` MAS las entradas de borde a la cabeza (`edge_inputs: pad`).
+# Encargada por el dueno el 2026-08-31 para entrenarla y USARLA en inferencia.
+#
+# Es `fov16-optimo` sin tocar un solo campo de su geometria ni de sus ramas: lo
+# unico que cambia es que la cabeza recibe 4 escalares mas diciendo si la IMAGEN
+# se acaba por cada lado (instructionsNewNN.md §6bis). 168.652 -> 168.700
+# parametros: +48, +0,03 % (medido 2026-08-31 con `network_trace`).
+#
+# POR QUE `pad` Y NO `dist`, que es la decision de esta config:
+#   - `pad` mide que fraccion del margen de ESTA vista es relleno replicado en
+#     vez de imagen. Es exactamente lo que se pidio ("saber si la vista a la
+#     entrada tiene un borde de algun lado") y no dice nada mas.
+#   - `dist` mide la distancia al borde en foveas, llega mas lejos... y sobre
+#     imagenes de 80x60 (5x3,75 foveas) esta encendida en el 91,4 % de las
+#     ventanas: ahi "cerca del borde" y "en que parte de la pagina estoy" son
+#     casi la misma variable. Para un modelo que se va a USAR eso no es un
+#     defecto fatal, pero es una entrada que puede aprender posicion absoluta y
+#     no generalizar a otro tamano de imagen. `pad` no tiene esa ambiguedad.
+#
+# ⚠ Y `pad` NO se queda corto con esta geometria, que era la duda: con
+# `border_px` = 8 el recorte real es 32x32 y la senal se enciende en el 57,1 %
+# de las ventanas y el 52,9 % de las esquinas positivas del dataset vigente
+# (medido 2026-08-31 sobre dirty1000-80px-16px-r20260827, recorriendo el .npz).
+# Con `border_px` = 4 eran 31,4 % / 30,4 %.
+#
+# ⚠ NADA DE ESTO ESTA MEDIDO COMO MEJORA. Que la senal exista, entrene y alcance
+# a la mitad del dataset no es que suba el f1. El tanteo que lo mediria (`ei-t`,
+# 3 modos x 2 semillas) NO se ha corrido: esta red se entrena para USARLA, no
+# para declarar nada. Ver docs/plan-edge-inputs-2026-08-31.md.
+fovea_px: 16
+border_px: 8
+border_reduce: 4
+overlap_fovea_px: 7
+overlap_border_px: 0
+n_layers: 4
+k_center: 3
+k_periph: 3
+s_center: 1
+s_periph: 1
+channels: [16, 16, 16, 16]
+merge: concat
+pool_mode: avg
+pad_mode: edge
+regions: split
+edge_inputs: pad

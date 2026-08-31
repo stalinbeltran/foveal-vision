@@ -90,32 +90,55 @@ function Boundary({ children }: { children: React.ReactNode }) {
 
 // One screen, one domain. Groups follow domain dependency, not steps: in
 // research you iterate on a point and come back — no numbered pipeline.
+
+// QUÉ PANTALLAS SE OFRECEN. Es una lista DECLARADA y no un `if` repartido por el
+// nav, porque encenderlas y apagarlas tiene que ser una línea y verse de un
+// vistazo — el 2026-08-31 el dueño pidió dejar sólo Revisar («no se usarán por
+// el momento»), y «por el momento» quiere decir que esto se revierte.
+//
+// ⚠ Las RUTAS siguen montadas: lo que se quita es lo que se OFRECE, no lo que
+// existe. Un enlace guardado a /runs/<name> sigue funcionando, y las pantallas
+// ocultas no dejan de servir al que sepa su URL. Esto no es una puerta —la
+// puerta es el token de `fv.api.web`— es la lista de lo que se usa hoy.
+const NAV: { grupo: string; items: [string, string][] }[] = [
+  { grupo: "Datos", items: [["/sources", "Fuentes"], ["/window-datasets", "Ventanas"]] },
+  { grupo: "Modelo", items: [["/networks", "Redes"], ["/recipes", "Recetas"]] },
+  { grupo: "Entrenar", items: [["/train", "Entrenar"], ["/sweeps", "Recorridos"],
+                               ["/studies", "Estudios"], ["/runs", "Runs"]] },
+  { grupo: "Analizar", items: [["/diagnostics", "Diagnóstico"], ["/predict", "Predecir"],
+                               ["/review", "Revisar"]] },
+];
+
+// Lo único que se ofrece hoy. Para volver a enseñar una pantalla, añade su ruta
+// aquí; para enseñarlas todas, pon `null`.
+const VISIBLES: Set<string> | null = new Set(["/review"]);
+
+// A dónde va "/". Tiene que ser una pantalla VISIBLE, o la app abre en algo que
+// su propio menú dice que no existe.
+const INICIO = "/review";
+
 export default function App() {
   return (
     <div className="app">
       <nav className="nav">
         <h1>foveal-vision</h1>
-        <div className="group">Datos</div>
-        <NavLink to="/sources">Fuentes</NavLink>
-        <NavLink to="/window-datasets">Ventanas</NavLink>
-        <div className="group">Modelo</div>
-        <NavLink to="/networks">Redes</NavLink>
-        <NavLink to="/recipes">Recetas</NavLink>
-        <div className="group">Entrenar</div>
-        <NavLink to="/train">Entrenar</NavLink>
-        <NavLink to="/sweeps">Recorridos</NavLink>
-        <NavLink to="/studies">Estudios</NavLink>
-        <NavLink to="/runs">Runs</NavLink>
-        <div className="group">Analizar</div>
-        <NavLink to="/diagnostics">Diagnóstico</NavLink>
-        <NavLink to="/predict">Predecir</NavLink>
-        <NavLink to="/review">Revisar</NavLink>
+        {NAV.map(({ grupo, items }) => {
+          const vis = items.filter(([to]) => !VISIBLES || VISIBLES.has(to));
+          // un grupo sin pantallas visibles no deja su título huérfano
+          if (!vis.length) return null;
+          return (
+            <React.Fragment key={grupo}>
+              <div className="group">{grupo}</div>
+              {vis.map(([to, label]) => <NavLink key={to} to={to}>{label}</NavLink>)}
+            </React.Fragment>
+          );
+        })}
         <SessionBar />
       </nav>
       <main className="main">
         <Boundary>
         <Routes>
-          <Route path="/" element={<Navigate to="/sources" replace />} />
+          <Route path="/" element={<Navigate to={INICIO} replace />} />
           <Route path="/sources" element={<Sources />} />
           <Route path="/window-datasets" element={<WindowDatasets />} />
           <Route path="/window-datasets/:name" element={<WindowDatasetDetail />} />

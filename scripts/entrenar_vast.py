@@ -63,6 +63,7 @@ sys.path.insert(0, str(LANZADOR / "scripts"))
 import vast_instance as V                              # noqa: E402
 
 from fv import settings                                # noqa: E402
+from fv.inference import catalogo                      # noqa: E402
 from fv.training.registry import RunStore              # noqa: E402
 from fv.windows.store import WindowDatasetStore        # noqa: E402
 
@@ -71,8 +72,8 @@ EXCLUYE = {"__pycache__", ".pytest_cache", ".venv", ".git", "node_modules"}
 # Lo que se baja en CADA sonda. Los `.pt` estan aqui y esa es toda la diferencia
 # con el libro de la flota: son 2,7 MB por sonda, y es lo que hace que una
 # maquina que se cae no se lleve el modelo.
-TRAER = ("metrics.jsonl", "status.json", "config.json", "summary.json",
-         "best.pt", "last.pt")
+DESCRIPCION = ("metrics.jsonl", "status.json", "config.json", "summary.json")
+TRAER = DESCRIPCION + catalogo.PESOS
 
 INSTALL = """set -eu
 cd /root/bench
@@ -280,10 +281,18 @@ def traer(host: str, port: int, name: str, destino: Path, remoto_dir: str) -> li
     if not remoto_dir:
         return []
     destino.mkdir(parents=True, exist_ok=True)
+    # ⚠ Los PESOS no bajan al repo de datos, bajan a la ANTESALA (regla del dueno,
+    # 2026-08-31): ahi se pueden mirar con el entrenamiento en marcha, y NO
+    # ensucian el repo de datos con una version por sonda -- git guarda todas las
+    # que se commitean. Al terminar, `promover` los pasa Y aprueba la red, que es
+    # una sola decision. La DESCRIPCION si baja directa: es texto pequeno y es lo
+    # que hace que el run exista y se pueda seguir su progreso.
+    antesala = catalogo.staging_dir(name)
+    antesala.mkdir(parents=True, exist_ok=True)
     traidos = []
     for f in TRAER:
         remoto = f"{remoto_dir}/{f}"
-        local = destino / f
+        local = (antesala if f in catalogo.PESOS else destino) / f
         # ⚠ El temporal va AL LADO del destino, no en /tmp, y no es un detalle:
         # `Path.replace` es `os.replace`, que solo es atomico DENTRO del mismo
         # sistema de ficheros. Con el temporal en /tmp --que en muchas maquinas es
@@ -295,7 +304,7 @@ def traer(host: str, port: int, name: str, destino: Path, remoto_dir: str) -> li
         # reemplaza -- la pantalla de revision usa el modelo con el
         # entrenamiento en marcha. Con un rename atomico, quien lee obtiene la
         # version vieja o la nueva, nunca media.
-        with tempfile.NamedTemporaryFile(delete=False, dir=str(destino),
+        with tempfile.NamedTemporaryFile(delete=False, dir=str(local.parent),
                                          prefix=f".{f}.") as tmp:
             p = subprocess.run(
                 V.ssh_command(host, port) + [f"cat {remoto} 2>/dev/null || true"],
@@ -549,6 +558,9 @@ def main() -> int:
     ap.add_argument("--max-cambios", type=int, default=6)
     ap.add_argument("--aviso-cada", type=float, default=1.0, help="horas entre avisos")
     ap.add_argument("--prefijo", default="tv-")
+    ap.add_argument("--sin-promover", action="store_true",
+                    help="deja los pesos en la antesala en vez de copiarlos al "
+                         "repo de datos y aprobar la red para inferencia")
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
 
@@ -611,10 +623,35 @@ def main() -> int:
             f"mediana {h['mediana'] and round(h['mediana'])} s · "
             f"{h['gasto']:.4f} $ · salio por {h['motivo']}")
     log(f"\n  el run esta en: {destino}")
-    for f in TRAER:
+    for f in DESCRIPCION:
         pth = destino / f
         log(f"    {'ok ' if pth.exists() else '-- '} {f}"
             + (f"  ({pth.stat().st_size} B)" if pth.exists() else ""))
+
+    # Los pesos: de la ANTESALA al repo de datos, y con ellos la aprobacion para
+    # inferir. Se hace aqui y no a mano porque el run se lanzo PARA obtener el
+    # modelo -- es el caso en que promover es exactamente lo que se pidio. Un
+    # entrenamiento cuyos pesos se quedan en la antesala los pierde al rehacer la
+    # maquina, que es como se perdio `fov-optimo-p20`.
+    if args.sin_promover:
+        log(f"\n  pesos en la antesala (--sin-promover): "
+            f"{catalogo.staging_dir(args.name)}")
+        log(f"    para aprobarlos: POST /api/inference/staging/{args.name}/promote")
+    else:
+        try:
+            r = catalogo.promover(args.name, ctx["store"],
+                                  motivo=f"entrenada en Vast: {resumen}",
+                                  origen="entrenar_vast.py")
+            log(f"\n  pesos promovidos a {r['destino']}: {r['copiados']}")
+            log(f"  aprobada para inferencia en {r['catalogo']}")
+            # ⚠ NO se commitea desde aqui: lo que no esta empujado no existe, pero
+            # escribir en el historial sin que lo pidan tampoco es de este script.
+            log(f"\n  FALTA EMPUJARLO, o se pierde con la maquina:\n    {r['commit']}")
+        except catalogo.CatalogoError as e:
+            log(f"\n  ⚠ NO se pudieron promover los pesos [{e.code}]: {e.message}")
+            log(f"     {e.hint}")
+            log(f"     siguen en la antesala: {catalogo.staging_dir(args.name)}")
+
     avisar(f"entrenamiento terminado. {resumen}")
     return 0
 
