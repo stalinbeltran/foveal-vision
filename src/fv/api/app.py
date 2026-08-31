@@ -951,6 +951,20 @@ def create_app() -> FastAPI:
                                 max(0, len(indices) - 1)))
             trozo = indices[offset:offset + count]
 
+        # Las DETECCIONES (esquinas post-NMS y la nube cruda) van a peticion,
+        # no siempre, y el motivo es el tamano: la rejilla pide hasta
+        # REVIEW_MAX imagenes de golpe y la etapa cruda son decenas de puntos
+        # por imagen -- con el umbral bajo, cientos. Mandarlas siempre cargaria
+        # el movil con lo que una miniatura no puede ni dibujar. La pagina de
+        # detalle pide UNA imagen y si las quiere: ahi el punto es justo mirar
+        # de cerca que vio la red antes de la caja.
+        #
+        # Se DECLARA en la peticion en vez de deducirse de len(indices)==1: una
+        # regla implicita obliga al cliente a adivinar cuando recibira el campo,
+        # y el dia que la rejilla pida una sola imagen cambiaria de payload sin
+        # que nadie lo hubiera pedido.
+        con_detecciones = bool(body.get("with_detections"))
+
         run_name = body.get("run") or None
         model = None
         if run_name:
@@ -967,7 +981,7 @@ def create_app() -> FastAPI:
                 else {int(a): i for i, a in enumerate(arrays["images_sample_idx"])})
         kinds = set(manifest["config"]["target_kinds"])
         marcadas = set(review_mod.marked_in(ds_name, split))
-        knobs, imgs = None, []
+        knobs, orden, imgs = None, None, []
         for idx in trozo:
             if source is not None:
                 s = source.sample_at(int(idx))
@@ -991,7 +1005,11 @@ def create_app() -> FastAPI:
                     stride=body.get("stride"), nms_radius=body.get("nms_radius"),
                     min_size=body.get("min_size"))
                 knobs = out["knobs"]
+                orden = out["corner_order"]
                 fila_img["paragraphs"] = out["paragraphs"]
+                if con_detecciones:
+                    fila_img["corners"] = out["corners"]
+                    fila_img["raw"] = out["raw"]
                 if source is not None:
                     pred = [(p["x0"], p["y0"], p["x1"], p["y1"])
                             for p in out["paragraphs"]]
@@ -1014,6 +1032,12 @@ def create_app() -> FastAPI:
             "source": manifest.get("source_id"),
             "truth_available": source is not None,
             "inferred": model is not None,
+            # el vocabulario de esquinas viaja con la respuesta indexada por el
+            # (`fv.metrics` es su UNICA definicion): un lector que guarde su
+            # copia se desincroniza en silencio. `None` sin modelo, porque sin
+            # inferencia no hay ranuras de que hablar -- y ausente no es lista
+            # vacia (formatos.md 1).
+            "corner_order": orden,
             "image_base": _image_base(ds_name, manifest, source),
             "offset": offset, "count": len(imgs),
             "total": len(indices), "images": imgs, "knobs": knobs,

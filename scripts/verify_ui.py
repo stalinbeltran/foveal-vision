@@ -220,6 +220,14 @@ def main() -> int:
             # que comprueba que el boton hace algo, y no solo que esta pintado
             page.locator("[data-testid=infer-now]").click()
             page.wait_for_timeout(2000)
+            # las esquinas de la inferencia y su filtro: se apaga una ranura y
+            # se vuelven a encender todas. Solo estan en el DETALLE (la rejilla
+            # no las pide), asi que este es el unico sitio donde comprobarlo
+            page.wait_for_selector("[data-testid=review-corners]", timeout=30000)
+            page.locator("[data-testid=review-corners] input").first.uncheck()
+            page.wait_for_timeout(500)
+            page.locator("[data-testid=review-corners] button").click()
+            page.wait_for_timeout(500)
         check(page, "/review", "text=Revisar detecciones", "12-revisar", review_extra)
 
         # ⚠ Este literal existe para el catalogo de rutas (U7.9) y depende de los

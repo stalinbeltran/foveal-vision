@@ -6,7 +6,9 @@ import {
   CLAVE_KNOBS, CLAVE_RUN, KNOBS_DEFECTO, SIN_ELEGIR, cuerpoKnobs,
 } from "../reviewPrefs";
 import { BoxedImage } from "../components/BoxedImage";
+import { CornerFilter, CornerFilterAviso } from "../components/CornerDots";
 import { ErrorBox, Field, Working } from "../components/ui";
+import { Corner } from "../api";
 
 // Una imagen sola, grande, con sus numeros. Es la pagina a la que se llega
 // tocando una miniatura, y existe porque en un movil la rejilla sirve para
@@ -34,6 +36,14 @@ export default function ReviewDetail() {
   const [knobs, setKnobs] = usePersistedState(CLAVE_KNOBS, KNOBS_DEFECTO);
   const [showTruth, setShowTruth] = usePersistedState("review.truth", true);
   const [showPred, setShowPred] = useState(true);
+  // Las esquinas de la inferencia, que es lo que la caja NO enseña: una caja
+  // corrida y una esquina que se fue son fallos distintos con la misma pinta.
+  const [showCorners, setShowCorners] = usePersistedState("review.corners", true);
+  const [showRaw, setShowRaw] = usePersistedState("review.raw", false);
+  // Se recuerdan las ranuras OCULTAS, no las visibles: si el vocabulario del
+  // payload creciera, una lista de «visibles» guardada dejaría la ranura nueva
+  // invisible y en silencio. Lo que no se conoce, se DIBUJA.
+  const [ocultas, setOcultas] = usePersistedState<Corner[]>("review.slotsOff", []);
   const [ctx, setCtx] = useState<any>(null);
   const [data, setData] = useState<any>(null);
   const [busy, setBusy] = useState(false);
@@ -60,7 +70,10 @@ export default function ReviewDetail() {
     setBusy(true);
     api.post("/review/batch", {
       run: elRun || undefined, window_dataset: dataset, split,
-      indices: [idx], ...cuerpoKnobs(knobs),
+      // aqui SI se piden las detecciones: es una imagen sola y grande, que es
+      // justo donde mirar lo que la red vio antes de la caja tiene sentido. La
+      // rejilla no las pide (ver `with_detections` en el API)
+      indices: [idx], with_detections: true, ...cuerpoKnobs(knobs),
     }).then((r) => { setData(r); setError(null); setSucia(false); })
       .catch((e) => { setError(e); })
       .finally(() => setBusy(false));
@@ -82,6 +95,19 @@ export default function ReviewDetail() {
   const hayVerdad = data?.truth_available ?? ctx?.truth_available ?? false;
   const runs: any[] = ctx?.runs ?? [];
   const dims: [number, number] | null = ctx?.image_size ?? null;
+
+  // el vocabulario lo sirve el payload (U4.2); sin modelo llega `null` y
+  // entonces no hay ranuras de que hablar ni filtro que enseñar
+  const orden: Corner[] = data?.corner_order ?? [];
+  const alternar = (c: Corner) =>
+    setOcultas(ocultas.includes(c) ? ocultas.filter((x) => x !== c) : [...ocultas, c]);
+  const cuenta: Record<string, number> = Object.fromEntries(orden.map((c) => [c,
+    (img?.corners ?? []).filter((d: any) => d.corner === c).length]));
+  // cuántas detecciones se traga el filtro, contando SOLO las capas encendidas:
+  // un número que no cuadra con lo que se ve se deja de creer
+  const tapadas = (showCorners
+      ? (img?.corners ?? []).filter((d: any) => ocultas.includes(d.corner)).length : 0)
+    + (showRaw ? (img?.raw ?? []).filter((d: any) => ocultas.includes(d.corner)).length : 0);
 
   const marcar = async () => {
     if (!img) return;
@@ -107,7 +133,10 @@ export default function ReviewDetail() {
             width={img?.width ?? dims?.[0] ?? 80}
             height={img?.height ?? dims?.[1] ?? 60}
             paragraphs={img?.paragraphs} truth={img?.truth}
-            showTruth={showTruth} showPred={showPred} />
+            showTruth={showTruth} showPred={showPred}
+            corners={img?.corners} raw={showRaw ? img?.raw : []}
+            showCorners={showCorners} hiddenCorners={ocultas}
+            windowSize={ventana} />
         </div>
       ) : <Working on label="cargando la imagen…" />}
 
@@ -177,6 +206,14 @@ export default function ReviewDetail() {
               <input type="checkbox" checked={showPred}
                 onChange={(e) => setShowPred(e.target.checked)} /> párrafos detectados
             </label>
+            <label className="inline">
+              <input type="checkbox" checked={showCorners}
+                onChange={(e) => setShowCorners(e.target.checked)} /> esquinas
+            </label>
+            <label className="inline">
+              <input type="checkbox" checked={showRaw}
+                onChange={(e) => setShowRaw(e.target.checked)} /> crudas (pre-NMS)
+            </label>
             {hayVerdad ? (
               <label className="inline">
                 <input type="checkbox" checked={showTruth}
@@ -188,6 +225,13 @@ export default function ReviewDetail() {
               {img.marked ? "★ marcada" : "☆ marcar para volver"}
             </button>
           </div>
+          {showCorners && orden.length ? (
+            <div data-testid="review-corners">
+              <CornerFilter order={orden} hidden={ocultas}
+                onToggle={alternar} onAll={() => setOcultas([])} counts={cuenta} />
+              <CornerFilterAviso hidden={ocultas} tapadas={tapadas} />
+            </div>
+          ) : null}
           <dl className="kv">
             {typeof img.f1 === "number" ? (
               <>
@@ -201,6 +245,21 @@ export default function ReviewDetail() {
             {hayVerdad ? (
               <><dt>párrafos reales</dt><dd>{img.truth.length}</dd></>
             ) : null}
+            {orden.map((c) => {
+              const ss = (img.corners ?? []).filter((d: any) => d.corner === c)
+                .map((d: any) => d.score);
+              return (
+                <React.Fragment key={c}>
+                  <dt className={`corner-${c}`}>
+                    {c}{ocultas.includes(c) ? " (oculta)" : ""}</dt>
+                  {/* ausente ≠ cero (U5.3): sin esquinas no hay rango, y un
+                      «0,000–0,000» se leería como una medida */}
+                  <dd>{ss.length} · score {ss.length
+                    ? `${Math.min(...ss).toFixed(3)}–${Math.max(...ss).toFixed(3)}`
+                    : "—"}</dd>
+                </React.Fragment>
+              );
+            })}
             <dt>run</dt><dd className="mono">{data.run ?? "— ninguno —"}</dd>
             <dt>knobs</dt>
             <dd className="mono">{data.knobs ? JSON.stringify(data.knobs) : "—"}</dd>

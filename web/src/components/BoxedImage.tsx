@@ -1,4 +1,5 @@
 import React from "react";
+import { CornerDots, Deteccion } from "./CornerDots";
 
 // COMO se dibuja una deteccion, definido UNA vez: la miniatura de la rejilla y
 // la pagina de detalle son la misma imagen a dos tamanos, no dos dibujos. Dos
@@ -29,6 +30,16 @@ export function BoxedImage(props: {
   /** ancho que se le pide al backend; sin el, la imagen entera */
   fetchWidth?: number;
   alt?: string;
+  /** las esquinas de la inferencia, dibujadas por `CornerDots` (una sola
+      definicion de como se pinta un punto, igual que aqui la hay de la caja).
+      Llegan solo si se pidieron: ver `with_detections` en /review/batch. */
+  corners?: Deteccion[];
+  raw?: Deteccion[];
+  hiddenCorners?: string[];
+  windowSize?: number;
+  showCorners?: boolean;
+  /** en una miniatura las letras TL/TR no caben: el punto si */
+  cornerLabels?: boolean;
 }) {
   const { base, index, width: W, height: H } = props;
   const q = props.fetchWidth ? `?w=${props.fetchWidth}` : "";
@@ -46,7 +57,7 @@ export function BoxedImage(props: {
         width={W}
         height={H}
       />
-      <svg viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+      <svg viewBox={`0 0 ${W} ${H}`}>
         {showTruth && (props.truth ?? []).map((quad, i) => (
           <polygon
             key={`t${i}`}
@@ -69,6 +80,11 @@ export function BoxedImage(props: {
             strokeWidth={sw}
           />
         ))}
+        {(props.showCorners ?? true) ? (
+          <CornerDots corners={props.corners} raw={props.raw}
+            windowSize={props.windowSize ?? 16} hidden={props.hiddenCorners}
+            width={W} height={H} labels={props.cornerLabels} />
+        ) : null}
       </svg>
     </div>
   );

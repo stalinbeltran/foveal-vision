@@ -117,6 +117,14 @@ Numeración del hermano donde la vista se hereda; se marca lo que cambia.
   rangos se miraron ya y qué imágenes quedaron marcadas—, así que es una entidad con su artefacto,
   no un cruce recalculable (por eso tiene pantalla, como `Diagnóstico`). El registro lo escribe el
   servidor **al inferir**, no un botón de guardar.
+  ⚠ **El detalle ensena las ESQUINAS, la rejilla no** — y es la misma asimetria: alli la unidad
+  es la imagen entera para triar, aqui es una imagen sola y grande para diagnosticar. Los puntos de
+  la inferencia (post-NMS, y la nube cruda si se pide) van con el **tamano por `score`** en escala
+  absoluta 0→1 y se **filtran por ranura**; el rango de score por ranura va en la tabla de numeros,
+  porque con una red entrenada los scores se saturan (mediana 0,998 *medido 2026-08-31*) y todos
+  los circulos salen iguales. Viajan **a peticion** (`with_detections`), que es lo que evita
+  mandarle a un movil las decenas de puntos por imagen de un lote de 60.
+
   ⚠ En la rejilla la inferencia sale **sola** al elegir el split; en el detalle va **a botón**, y
   la asimetría es deliberada: allí se pueden cambiar el run y el umbral, así que repetir significa
   algo. La imagen se pinta antes y aparte, de modo que un fallo del modelo (sin `best.pt`, por

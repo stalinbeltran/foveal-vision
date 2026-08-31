@@ -13,6 +13,8 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from fv.metrics import CORNER_NAMES
+
 from tests.conftest import TINY_NET
 
 
@@ -578,3 +580,51 @@ def test_subir_el_umbral_no_puede_anadir_cajas(client):
         return len(r.json()["images"][0]["paragraphs"])
 
     assert cajas(0.99) <= cajas(0.05)
+
+
+def test_las_detecciones_van_a_peticion_y_no_por_defecto(client):
+    """El detalle pide los puntos; la rejilla NO los recibe.
+
+    Es una decision de tamano: la rejilla trae hasta REVIEW_MAX imagenes y la
+    etapa cruda son decenas de puntos por imagen. Que se declare en la peticion
+    (y no se deduzca de `len(indices) == 1`) es lo que impide que la rejilla
+    cambie de payload el dia que pida una sola imagen."""
+    c, w = client
+    cuerpo = {"window_dataset": w["dataset"], "run": w["run"], "split": "val",
+              "count": 1, "threshold": 0.05}
+
+    callado = c.post("/review/batch", json=cuerpo).json()
+    assert "corners" not in callado["images"][0]
+    assert "raw" not in callado["images"][0]
+    # ...pero las cajas siguen estando: lo que cambia es el detalle, no la caja
+    assert "paragraphs" in callado["images"][0]
+
+    pedido = c.post("/review/batch", json={**cuerpo, "with_detections": True}).json()
+    img = pedido["images"][0]
+    assert "corners" in img and "raw" in img
+    # el vocabulario viaja CON la respuesta indexada por el (U4.2): sin esto el
+    # front tendria que guardar su copia del orden de esquinas
+    assert pedido["corner_order"] == list(CORNER_NAMES)
+    assert callado["corner_order"] == list(CORNER_NAMES)
+    # cada punto trae lo que se dibuja: su ranura, su score y donde cae
+    for d in img["corners"] + img["raw"]:
+        assert d["corner"] in pedido["corner_order"]
+        assert 0.0 <= d["score"] <= 1.0
+        assert 0 <= d["x"] <= img["width"] and 0 <= d["y"] <= img["height"]
+    # el NMS es lo unico que separa las dos etapas: nunca puede haber MAS
+    # esquinas que ventanas crudas de las que salieron
+    assert len(img["corners"]) <= len(img["raw"])
+
+
+def test_sin_modelo_no_hay_ranuras_de_que_hablar(client):
+    """`corner_order` a None y no lista vacia: ausente no es cero (formatos 1).
+
+    La pantalla lo usa para decidir si ensena el filtro de esquinas, y una lista
+    vacia diria 'este dataset no tiene esquinas' en vez de 'no se infirio'."""
+    c, w = client
+    r = c.post("/review/batch", json={"window_dataset": w["dataset"], "split": "val",
+                                      "count": 1, "with_detections": True}).json()
+    assert r["inferred"] is False
+    assert r["corner_order"] is None
+    assert r["images"][0]["paragraphs"] == []
+    assert "corners" not in r["images"][0]
