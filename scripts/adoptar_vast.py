@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Adopta una instancia de Vast HUERFANA: vigila, se trae los pesos y la destruye.
+
+Por que existe
+--------------
+`entrenar_vast.py` destruye la instancia en un `finally` de SU proceso, y su
+propio docstring ya avisaba del agujero: *"Si el droplet de control muere de
+golpe, el `finally` no corre y la instancia sigue facturando"*. Hasta el
+2026-08-31 eso era una advertencia sin salida: si el vigilante moria, no habia
+forma de volver a engancharse -- `--continuar` **alquila otra maquina** y ademas
+exige un `last.pt` local que un vigilante muerto nunca llego a bajar.
+
+PASO DE VERDAD ese dia. El entrenamiento `fov16-edge-p20` seguia corriendo en la
+maquina (1 h 38 min de reloj cuando se descubrio) y el proceso local habia
+desaparecido: el trabajo intacto, el que lo recoge muerto, y la factura corriendo.
+
+⚠ POR QUE murio, que es la leccion y no el sintoma
+---------------------------------------------------
+Se lanzo con `telegram-coordinator/scripts/desacoplar.sh`, que usa
+`systemd-run --scope`. Eso da **cgroup propio** --y por tanto sobrevive a un
+`systemctl restart` del coordinador, que es para lo que se escribio-- pero el
+proceso **sigue siendo hijo del que lo lanzo**. Un tree-kill al padre (al cerrar
+la sesion que lo arranco) se lo lleva.
+
+O sea: "sobrevive" llevaba complemento, y era otro. Contra el restart del
+servicio, si; contra la muerte de su padre, no. Lo que si sobrevive a las dos
+cosas es una **unidad transitoria** (`systemd-run` SIN `--scope`), cuyo padre es
+PID 1. Por eso este script se lanza asi -- ver el bloque de uso.
+
+Que hace
+--------
+Sondea la maquina; mientras `fv-train` viva se trae los pesos a la antesala (lo
+mismo que hace `entrenar_vast`, con la misma funcion); cuando muere, promueve y
+**destruye la instancia en un `finally`**.
+
+    python3 scripts/adoptar_vast.py --iid 49406152 --name fov16-edge-p20
+
+⚠ Y este script tiene EL MISMO agujero que el que rescata: si el muere, la
+instancia se queda. No se arregla desde aqui --destruirse a si misma pediria el
+token de Vast dentro de la maquina alquilada, y ahi no viaja ningun secreto a
+proposito. Lo que hay es lo de siempre: el comando de destruccion impreso antes
+de nada, `--horas-max` como tope, y `cerrable.mjs`, que desde el 2026-08-31
+cuenta tambien este proceso.
+"""
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT.parent / "digital-ocean-dropplet-auto-launching" / "scripts"))
+
+
+def _cargar(nombre: str, ruta: Path):
+    spec = importlib.util.spec_from_file_location(nombre, ruta)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[nombre] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+EV = _cargar("entrenar_vast", ROOT / "scripts" / "entrenar_vast.py")
+V = EV.V
+
+from fv.inference import catalogo          # noqa: E402
+from fv.training.registry import RunStore   # noqa: E402
+
+
+def log(msg: str = "") -> None:
+    print(msg, flush=True)
+
+
+def vive_el_entrenamiento(host: str, port: int) -> bool:
+    """¿Sigue `fv-train` en la maquina?
+
+    ⚠ Un fallo de SSH NO es "termino". Una red que parpadea diria que el
+    entrenamiento acabo, y entonces este script destruiria la maquina con el
+    trabajo dentro -- el fallo mas caro que puede cometer. Ante la duda,
+    devuelve True: seguir vigilando cuesta un sondeo; destruir de mas cuesta el
+    entrenamiento entero.
+    """
+    try:
+        p = subprocess.run(
+            V.ssh_command(host, port) + ["pgrep -f 'fv-train' >/dev/null && echo VIVO || echo FIN"],
+            capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        log("  (sondeo: timeout de SSH; NO lo tomo por terminado)")
+        return True
+    if p.returncode != 0:
+        log(f"  (sondeo: SSH rc={p.returncode}; NO lo tomo por terminado)")
+        return True
+    return "VIVO" in p.stdout
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Adopta una instancia de Vast huerfana")
+    ap.add_argument("--iid", required=True, help="id de la instancia ya alquilada")
+    ap.add_argument("--name", required=True, help="nombre del run que entrena dentro")
+    ap.add_argument("--cada", type=float, default=120, help="segundos entre sondeos")
+    ap.add_argument("--horas-max", type=float, default=8.0)
+    ap.add_argument("--sin-promover", action="store_true")
+    ap.add_argument("--no-destruir", action="store_true",
+                    help="deja la instancia viva al terminar (para depurar)")
+    args = ap.parse_args()
+
+    V.load_env()
+    inst = V.buscar_instancia(str(args.iid))
+    if not inst:
+        log(f"no existe la instancia {args.iid}")
+        return 2
+    host, port = V.ssh_destino(inst)
+
+    # Lo primero de todo, antes de cualquier espera: como se corta la factura a
+    # mano si esto tambien muere.
+    log(f"adoptando instancia {args.iid} ({host}:{port}) para el run '{args.name}'")
+    log(f"  si esto muere, la factura se corta con:\n"
+        f"    python3 {ROOT.parent}/digital-ocean-dropplet-auto-launching/scripts/"
+        f"vast_instance.py destroy {args.iid} --yes")
+
+    store = RunStore()
+    destino = store.path(args.name) if store.exists(args.name) else store.destino(args.name)
+    destino.mkdir(parents=True, exist_ok=True)
+    rdir = EV.dir_remoto(host, port, args.name)
+    if not rdir:
+        log("  ⚠ no encuentro el directorio del run EN la maquina; sigo sondeando")
+
+    t_fin = time.time() + args.horas_max * 3600
+    try:
+        while True:
+            rdir = rdir or EV.dir_remoto(host, port, args.name)
+            traidos = EV.traer(host, port, args.name, destino, rdir)
+            log(f"  {time.strftime('%H:%M:%S')} sonda: {traidos or 'nada todavia'}")
+            if not vive_el_entrenamiento(host, port):
+                log("  el entrenamiento termino en la maquina")
+                break
+            if time.time() > t_fin:
+                log(f"  ⚠ tope de {args.horas_max} h: dejo de esperar y recojo lo que haya")
+                break
+            time.sleep(args.cada)
+
+        # una ultima recogida: la epoca final se escribe DESPUES del ultimo sondeo
+        EV.traer(host, port, args.name, destino, rdir or EV.dir_remoto(host, port, args.name))
+
+        if args.sin_promover:
+            log(f"\n  pesos en la antesala: {catalogo.staging_dir(args.name)}")
+        else:
+            try:
+                r = catalogo.promover(args.name, store,
+                                      motivo="entrenada en Vast (instancia adoptada)",
+                                      origen="adoptar_vast.py")
+                log(f"\n  pesos promovidos: {r['copiados']} -> {r['destino']}")
+                log(f"  FALTA EMPUJARLO, o se pierde con la maquina:\n    {r['commit']}")
+            except catalogo.CatalogoError as e:
+                log(f"\n  ⚠ no se pudieron promover [{e.code}]: {e.message}\n     {e.hint}")
+    finally:
+        if args.no_destruir:
+            log(f"\n  ⚠ --no-destruir: la instancia {args.iid} SIGUE FACTURANDO")
+        else:
+            log(f"\n  destruyendo instancia {args.iid}...")
+            try:
+                V.destruir(args.iid)
+                log("  destruida")
+            except Exception as e:
+                log(f"  ⚠⚠ NO se pudo destruir: {e}\n"
+                    f"     HAZLO A MANO: vast_instance.py destroy {args.iid} --yes")
+
+    try:
+        EV.avisar(f"run {args.name}: recogido y la instancia {args.iid} destruida")
+    except Exception:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
