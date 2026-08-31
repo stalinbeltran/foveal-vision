@@ -46,11 +46,17 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
+import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+# Los estados en que un run YA no entrena. Mismo vocabulario que el resto del
+# proyecto (`fv.training.registry`), no una lista propia que pueda divergir.
+TERMINALES = {"done", "error", "cancelled", "interrupted"}
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -77,26 +83,66 @@ def log(msg: str = "") -> None:
     print(msg, flush=True)
 
 
-def vive_el_entrenamiento(host: str, port: int) -> bool:
-    """¿Sigue `fv-train` en la maquina?
+def _morir_con_finally(sig, _frame):
+    """SIGTERM/SIGINT -> excepcion, para que el `finally` LLEGUE A CORRER.
 
-    ⚠ Un fallo de SSH NO es "termino". Una red que parpadea diria que el
-    entrenamiento acabo, y entonces este script destruiria la maquina con el
-    trabajo dentro -- el fallo mas caro que puede cometer. Ante la duda,
-    devuelve True: seguir vigilando cuesta un sondeo; destruir de mas cuesta el
-    entrenamiento entero.
+    ⚠⚠ Sin esto, `systemctl stop` de este vigilante mataba el proceso sin
+    destruir la instancia -- y "paro el vigilante" es justo lo que uno hace
+    cuando quiere terminar. Medido el 2026-08-31: se paro la unidad y la maquina
+    siguio facturando; hubo que destruirla a mano.
+
+    El `finally` de Python cubre EXCEPCIONES, no senales: SIGTERM termina el
+    proceso sin desenrollar la pila. `SystemExit` si la desenrolla, asi que
+    convertir la senal en excepcion es lo que hace que el unico sitio donde se
+    destruye la instancia se ejecute SIEMPRE que este proceso acabe por su
+    cuenta.
+
+    (Contra SIGKILL no hay nada que hacer, y por eso ademas estan el comando
+    impreso al principio y el aviso de `cerrable.mjs`.)
     """
+    log(f"\n  recibida senal {signal.Signals(sig).name}: recojo y destruyo antes de salir")
+    raise SystemExit(143 if sig == signal.SIGTERM else 130)
+
+
+def vive_el_entrenamiento(destino: Path) -> bool:
+    """¿Sigue entrenando? Se lo pregunta al ARTEFACTO, no al sistema operativo.
+
+    `status.json` lo escribe el propio bucle de entrenamiento (`RunStore`) y sus
+    estados terminales estan declarados en un sitio. Se lee del fichero que la
+    sonda acaba de bajar, asi que no cuesta ni una conexion mas.
+
+    ⚠⚠ ANTES ESTO PREGUNTABA `pgrep -f 'fv-train'` POR SSH, Y NO FUNCIONABA
+    NUNCA. Medido el 2026-08-31: el entrenamiento habia terminado --`pgrep -af
+    'fv-train'` en la maquina no devolvia NADA-- y la comprobacion seguia
+    diciendo VIVO. El motivo es que `pgrep -f` casa contra la linea de comando
+    COMPLETA de cada proceso, y el shell que ssh abre para ejecutar el sondeo
+    lleva la cadena 'fv-train' en la suya: se encontraba a si mismo.
+
+    Consecuencia: el vigilante sondeo UNA HORA un run terminado y habria seguido
+    hasta `--horas-max` (6 h), facturando 0,05 $/h por nada. El error que se
+    penso al escribir esto fue el falso NEGATIVO (destruir con el trabajo
+    dentro), y se cubrio; el falso POSITIVO --no enterarse nunca de que
+    termino-- se quedo sin cubrir, y es el que paso.
+
+    Es exactamente la trampa que `cerrable.mjs` ya tenia documentada y resuelta
+    ("un shell cuya linea MENCIONA el nombre de un trabajo casa igual que el
+    trabajo"), repetida aqui por no mirarla. Preguntar por el artefacto la quita
+    de raiz: `status.json` no puede confundirse consigo mismo.
+
+    ⚠ Y la duda sigue resolviendose hacia SEGUIR VIGILANDO: si el fichero no
+    esta o no se puede leer, se devuelve True. Un sondeo de mas cuesta nada;
+    destruir de mas cuesta el entrenamiento entero.
+    """
+    p = destino / "status.json"
     try:
-        p = subprocess.run(
-            V.ssh_command(host, port) + ["pgrep -f 'fv-train' >/dev/null && echo VIVO || echo FIN"],
-            capture_output=True, text=True, timeout=120)
-    except subprocess.TimeoutExpired:
-        log("  (sondeo: timeout de SSH; NO lo tomo por terminado)")
+        estado = json.loads(p.read_text(encoding="utf-8")).get("status")
+    except (OSError, json.JSONDecodeError) as e:
+        log(f"  (sondeo: no puedo leer status.json ({e}); NO lo tomo por terminado)")
         return True
-    if p.returncode != 0:
-        log(f"  (sondeo: SSH rc={p.returncode}; NO lo tomo por terminado)")
-        return True
-    return "VIVO" in p.stdout
+    if estado in TERMINALES:
+        log(f"  status.json dice '{estado}'")
+        return False
+    return True
 
 
 def main() -> int:
@@ -109,6 +155,10 @@ def main() -> int:
     ap.add_argument("--no-destruir", action="store_true",
                     help="deja la instancia viva al terminar (para depurar)")
     args = ap.parse_args()
+
+    # antes de nada: que una senal pase por el `finally` que destruye
+    signal.signal(signal.SIGTERM, _morir_con_finally)
+    signal.signal(signal.SIGINT, _morir_con_finally)
 
     V.load_env()
     inst = V.buscar_instancia(str(args.iid))
@@ -137,7 +187,7 @@ def main() -> int:
             rdir = rdir or EV.dir_remoto(host, port, args.name)
             traidos = EV.traer(host, port, args.name, destino, rdir)
             log(f"  {time.strftime('%H:%M:%S')} sonda: {traidos or 'nada todavia'}")
-            if not vive_el_entrenamiento(host, port):
+            if not vive_el_entrenamiento(destino):
                 log("  el entrenamiento termino en la maquina")
                 break
             if time.time() > t_fin:
@@ -148,6 +198,13 @@ def main() -> int:
         # una ultima recogida: la epoca final se escribe DESPUES del ultimo sondeo
         EV.traer(host, port, args.name, destino, rdir or EV.dir_remoto(host, port, args.name))
 
+    except SystemExit:
+        # cortado por senal: los pesos que haya en la antesala se quedan ahi (no
+        # se promueve algo a medias), pero el `finally` de abajo SI destruye.
+        log(f"  lo bajado esta en {catalogo.staging_dir(args.name)}; no promuevo "
+            f"un run cortado a mano")
+        raise
+    else:
         if args.sin_promover:
             log(f"\n  pesos en la antesala: {catalogo.staging_dir(args.name)}")
         else:
