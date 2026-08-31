@@ -9,7 +9,8 @@ sweep walks through.
 
 from __future__ import annotations
 
-from fv.fovea import FoveaError, REGIONS, check_dims, dims_of, normalize_geometry
+from fv.fovea import (EDGE_MODES, FoveaError, REGIONS, check_dims, dims_of,
+                      normalize_geometry)
 
 
 def check_network(net: dict) -> list[dict]:
@@ -87,6 +88,30 @@ def check_network(net: dict) -> list[dict]:
             "message": f"dropout={net.get('dropout')!r} no es una probabilidad en [0, 1)",
             "hint": "usa 0.0 (apagado) hasta 0.9; 1.0 apagaria TODAS las neuronas "
                     "y la cabeza no veria nada"})
+    # edge_inputs: entradas extra a la CABEZA sobre el borde de la IMAGEN. Se
+    # rechaza aqui por lo mismo que `regions`: un valor desconocido que cayera a
+    # 'off' entrenaria una red SIN la senal mientras la config -- y el punto del
+    # barrido construido sobre ella -- dice que la tiene.
+    edge = net.get("edge_inputs", "off")
+    if edge not in EDGE_MODES:
+        problems.append({
+            "code": "unknown_edge_inputs",
+            "message": f"edge_inputs '{edge}' no existe",
+            "hint": f"usa uno de {sorted(EDGE_MODES)}: 'off' (nada), 'pad' "
+                    f"(que fraccion del margen es relleno, por lado) o 'dist' "
+                    f"(a que distancia esta el borde de la imagen, en foveas)"})
+    elif edge == "pad":
+        try:
+            border = int(normalize_geometry(net).get("border_px", 0))
+        except FoveaError:
+            border = None      # la geometria ya se quejo arriba; no se duplica
+        if border == 0:
+            problems.append({
+                "code": "edge_pad_needs_border",
+                "message": "edge_inputs='pad' con border_px=0 mide siempre 0: sin "
+                           "margen no hay relleno del que dar una fraccion",
+                "hint": "usa edge_inputs='dist' (mide contra la fovea y funciona "
+                        "tambien en la CNN plana) o dale un border_px > 0"})
     if not problems and not single:
         dims = dims_of(net)
         if int(net.get("k_periph", 3)) > 2 * dims.periph_band + 1:

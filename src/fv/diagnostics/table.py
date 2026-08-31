@@ -79,15 +79,16 @@ def diagnostics_table(run_name: str, split: str = "val",
         arrays = wstore.arrays(ds_name)
         ds = FoveatedWindowDataset(arrays, dims, split=SPLITS[split],
                                    pool_mode=net["pool_mode"],
-                                   pad_mode=net["pad_mode"])
+                                   pad_mode=net["pad_mode"],
+                                   edge_inputs=net.get("edge_inputs", "off"))
         if len(ds) == 0:
             raise RunError("split_empty", f"el split '{split}' esta vacio",
                            "reconstruye el dataset con ese split > 0")
         loader = torch.utils.data.DataLoader(ds, batch_size=256, num_workers=0)
         logits_all, y_all = [], []
         with torch.no_grad():
-            for x, y in loader:
-                logits_all.append(model(x).numpy())
+            for x, e, y in loader:
+                logits_all.append(model(x, e).numpy())
                 y_all.append(y.numpy())
         logits = np.concatenate(logits_all)
         y_true = np.concatenate(y_all)

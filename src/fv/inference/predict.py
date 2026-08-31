@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from fv.fovea import build_view
+from fv.fovea import build_view, edge_features
 from fv.metrics import CORNER_NAMES
 
 
@@ -37,19 +37,27 @@ def predict_image(model, image: np.ndarray, threshold: float = 0.5,
 
     xs = _positions(W, n, stride)
     ys = _positions(H, n, stride)
-    views, origins = [], []
+    views, edges, origins = [], [], []
     for wy0 in ys:
         for wx0 in xs:
             v, _cov = build_view(image, wx0, wy0, dims,
                                  pool_mode=model.cfg["pool_mode"],
                                  pad_mode=model.cfg["pad_mode"])
             views.append(v)
+            # the SAME fv.fovea function the dataloader calls (contract (5)).
+            # Here it matters more than for the view: these windows come from a
+            # sliding grid over a WHOLE image, so the edge ones are a fixed
+            # fraction of every prediction, and getting the signal wrong at
+            # inference would show up as a border artefact, not as an error.
+            edges.append(edge_features(image.shape, wx0, wy0, dims,
+                                       model.cfg["edge_inputs"]))
             origins.append((wx0, wy0))
     raw = []
     if views:
         batch = torch.from_numpy(np.stack(views)).unsqueeze(1)
+        edge = torch.from_numpy(np.stack(edges))
         with torch.no_grad():
-            out = model(batch).numpy()
+            out = model(batch, edge).numpy()
         scores = 1.0 / (1.0 + np.exp(-out[:, :, 0]))
         for i, (wx0, wy0) in enumerate(origins):
             for ci in range(4):

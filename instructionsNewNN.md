@@ -440,6 +440,114 @@ class FoveatedRegionalNN(nn.Module):
 
 ---
 
+## 6bis. Entradas de borde: lo que la vista NO puede decir (`edge_inputs`)
+
+**Añadido el 2026-08-31.** Cuatro números por ventana que van **directos a la
+cabeza**, sin pasar por ninguna convolución.
+
+### El problema que resuelve
+
+`pad_mode: edge` replica la fila/columna del borde al salirse de la imagen
+(decisión C11: nunca ceros a secas, porque cero significa «no hay tinta» y
+enseña una regla falsa). **Esa réplica es, por construcción, indistinguible de
+imagen real que casualmente se parece a más de lo mismo.** Consecuencia:
+
+| Lo que hay en la imagen | Lo que la red ve | Lo que la etiqueta dice |
+|---|---|---|
+| párrafo **pegado** al borde superior | banda replicada arriba | TL/TR **existen** ahí |
+| párrafo **cortado** por el borde de la vista | banda de contexto arriba | TL/TR están **más arriba**, fuera |
+
+Las dos entradas son (casi) la misma y las dos etiquetas son opuestas. Ninguna
+combinación de kernels puede separarlas, porque **la información no está en la
+entrada**: está en dónde cae la ventana dentro de la imagen. Es un límite del
+muestreo, no de la capacidad de la red.
+
+⚠ **`edge` (borde de la IMAGEN) no es `border` (el anillo periférico de la
+vista).** El español dice «borde» para los dos y por eso el código no: `border_px`
+es un ancho de anillo, `edge_inputs` es quedarse sin imagen. Confundirlos hace
+leer `border_px: 0` como «no hay borde de imagen», que es falso para **todas** las
+ventanas de un control plano.
+
+### Los modos (`fv.fovea.EDGE_MODES`)
+
+Los cuatro valores van en el orden de `EDGE_SIDES = (L, T, R, B)`, y los dos
+modos se orientan igual: **0 = no hay borde de imagen por este lado, 1 = el borde
+está justo aquí.**
+
+| valor | qué mide, por lado | alcance |
+|---|---|---|
+| `off` *(default)* | nada. Cero entradas extra | — |
+| `pad` | qué **fracción del margen** de esta vista es relleno en vez de imagen | se apaga a `border_px` del borde |
+| `dist` | a qué **distancia** está el borde de la imagen, en fóveas, saturado a 1 | una fóvea |
+
+#### Cuánto alcanza cada uno — **medido, no supuesto**
+
+Sobre `dirty1000-80px-16px-r20260827` (1000 imágenes de 80×60, fóvea 16, stride 8,
+140.000 ventanas), *medido el 2026-08-31 recorriendo el `.npz` con
+`fv.fovea.edge_features`*:
+
+| | ventanas donde la señal se enciende | esquinas positivas dentro de ellas |
+|---|---:|---:|
+| `pad` (`border_px` = 4) | **31,4 %** | **30,4 %** |
+| `dist` (satura a 1 fóvea) | **91,4 %** | **87,5 %** |
+
+*(idéntico en train, val y test al 0,1 %: el reparto es por imagen, así que la
+proporción de ventanas de borde no se mueve entre splits)*
+
+Y el caso literal —**esquinas etiquetadas a ≤ 1 px del borde de la imagen**— son
+**2.183, el 3,02 %** de las 72.380 positivas.
+
+⚠ **Estos números reordenan lo que parecía obvio, y en las dos direcciones:**
+
+1. **`pad` NO es «demasiado corto».** Con `border_px` = 4 sobre imágenes de 80×60
+   alcanza a **casi un tercio** de las ventanas: el borde es una fracción grande de
+   una imagen pequeña. La intuición contraria (que 4 px sobre una ventana de 16
+   apenas roza nada) es correcta por ventana y falsa por dataset.
+2. ⚠ **`dist` está encendida en el 91 % de las ventanas, y eso es un problema de
+   interpretación, no de potencia.** En una imagen de 5×3,75 fóveas, «cerca de un
+   borde» y «en qué parte de la página estoy» son casi la misma variable. Si
+   `dist` gana, **no se podrá decir por cuál de las dos**. `pad` no tiene esa
+   ambigüedad: se enciende sólo cuando la vista **realmente** contiene relleno.
+
+**Por eso `pad` es el modo que contesta la pregunta y `dist` el que la desborda.**
+Con imágenes grandes la relación se invertiría, y por eso son dos modos y no una
+constante: el alcance útil depende del dataset, así que es un dato. Además `dist`
+funciona con `border_px = 0` (la CNN plana), donde `pad` sería una constante 0 —
+esa combinación **se rechaza en la puerta** en vez de entrenar una entrada muerta.
+
+### Por qué a la cabeza y no como canal de entrada
+
+Esto es una decisión, no una comodidad. Un quinto canal `N×N` con la máscara era
+la otra opción (F7 la dejó abierta desde 2026-07-27) y aquí se descarta por dos
+motivos, el segundo decisivo:
+
+1. **No es una señal espacial.** «Arriba no hay más imagen» es *un* número sobre
+   toda la vista; como canal sería el mismo valor pintado en `N×N` celdas, y las
+   ramas gastarían kernels en volver a derivar una constante.
+2. **Las ramas están ENMASCARADAS por región (§6).** La rama central no ve el
+   anillo en absoluto, así que una señal que entrase por el input sería invisible
+   justo para la rama que predice las esquinas.
+
+Coste: `n_layers`, `channels` y la geometría **no se mueven**; la cabeza pasa de
+`Linear(flat, 12)` a `Linear(flat + 4, 12)`, o sea **+48 pesos** — +0,03 % sobre
+los 159.372 de la base vigente *(medido 2026-08-31 con `network_trace`)*. Con
+`off` son `flat + 0`: la red es **bit-idéntica** a la de antes y los checkpoints
+cargan `strict` (tiene test).
+
+El vector se concatena **después** del ReLU y **después** del dropout:
+
+- fuera del ReLU porque la cabeza debe leer el número tal cual. Hoy es ≥ 0 y el
+  ReLU sería la identidad — pero un modo futuro con signo perdería medio rango
+  contra un clamp que nadie recuerda que está ahí.
+- fuera del dropout porque es una **medición**, no una activación aprendida.
+  Apagarla al azar no regulariza 4 entradas: le dice a la cabeza «no hay borde»
+  en una ventana que sí lo tiene. Ruido con forma de hecho.
+
+**No barrido todavía.** El campo existe, es un eje de C y entrena; que **mejore**
+el f1 no está medido. Ver `docs/plan-edge-inputs-2026-08-31.md`.
+
+---
+
 ## 7. Suma vs. concatenación cuando los strides difieren
 
 Con `stride > 1`, la salida deja de ser `N×N`:
@@ -534,8 +642,17 @@ lr, dropout.
 - La **fóvea** es fija por experimento: es la ventana etiquetada de B
   (contrato ①a). Lo que antes se decía de `N` se dice ahora de ella; `N` ya no es
   un parámetro, es una consecuencia.
+- **El borde de la imagen se le dice a la cabeza, no se le enseña por el input**
+  (2026-08-31, §6bis): `edge_inputs` ∈ {`off`, `pad`, `dist`}, cuatro escalares
+  concatenados a las features justo antes de la `Linear`. Cierra la mitad de **F7**
+  que quedaba abierta desde C11 — y la cierra por el lado barato: el canal de
+  máscara `N×N` sigue sin construirse, y ahora hay que justificar por qué haría
+  falta habiendo 48 pesos que hacen el trabajo.
 
 **Pendientes / a experimentar:**
+- **`edge_inputs` no se ha barrido.** Existe y entrena; que mueva el f1 es la
+  hipótesis, no un resultado. El criterio está escrito antes de mirar en
+  `docs/plan-edge-inputs-2026-08-31.md`.
 - `avg_pool2d` vs `max_pool2d` para reducir el borde (trazos finos EMNIST).
 - **Suma vs. concatenación** de ramas (decide si se pueden buscar strides por
   rama independientes). Recomendado concat si strides difieren.

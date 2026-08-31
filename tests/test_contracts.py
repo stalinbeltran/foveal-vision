@@ -199,19 +199,26 @@ def test_contract_05_dataloader_and_inference_build_the_same_view(world):
     views are bit-identical for the same window."""
     import fv.inference.predict as predict_mod
     import fv.windows.dataset as dataset_mod
-    from fv.fovea import build_view, dims_of
+    from fv.fovea import build_view, dims_of, edge_features
     assert dataset_mod.build_view is predict_mod.build_view is build_view
+    # ...y lo mismo para las entradas de borde, que son la OTRA mitad de lo que
+    # cada ventana le da a la red. Si el dataloader y la inferencia calcularan
+    # su version, el fallo no seria un error: seria una red entrenada con una
+    # convencion y aplicada con otra.
+    assert dataset_mod.edge_features is predict_mod.edge_features is edge_features
 
     from fv.windows.store import WindowDatasetStore
     from fv.windows.dataset import FoveatedWindowDataset
     arrays = WindowDatasetStore().arrays(world["dataset"])
     dims = dims_of(TINY_NET)
-    ds = FoveatedWindowDataset(arrays, dims, split=0)
-    x, _y = ds[0]
+    ds = FoveatedWindowDataset(arrays, dims, split=0, edge_inputs="pad")
+    x, e, _y = ds[0]
     img = arrays["images"][ds.image_row[0]]
     wx0, wy0 = (int(v) for v in ds.window_xy[0])
     view, _cov = build_view(img, wx0, wy0, dims)
     np.testing.assert_array_equal(x.numpy()[0], view)
+    np.testing.assert_array_equal(
+        e.numpy(), edge_features(img.shape, wx0, wy0, dims, "pad"))
 
 
 def test_contract_07_import_directions():

@@ -17,7 +17,8 @@
 El flujo real de trabajo hasta hoy ha sido **manual y lento**: para probar una variante de red el
 usuario escribe a mano una definición C completa (~14 campos: `fovea_px, border_px,
 border_reduce, overlap_fovea_px, overlap_border_px, n_layers,
-k_center, k_periph, s_center, s_periph, channels, merge, pool_mode, pad_mode, dropout`), la nombra, lanza
+k_center, k_periph, s_center, s_periph, channels, merge, pool_mode, pad_mode, dropout,
+edge_inputs`), la nombra, lanza
 un recorrido de un solo eje, mira el ranking, y repite. La evidencia está en
 [sweeps/](../sweeps/): `dirty-80px-fast_kcenter`, `_kperiph_1`, `_s_center_1`, `_s_periph_1`,
 `_14-k_center_1`… cada uno es un barrido de **un eje** con todo lo demás fijo. Eso es **descenso
@@ -185,6 +186,7 @@ Tabla de defaults (valores actuales de `NETWORK_DEFAULTS`, salvo `N`):
 | `pool_mode` | `avg` | trazos finos |
 | `pad_mode` | `edge` | decisión C10/C11 |
 | `dropout` | `0.0` | apagado: es lo que se entrenó siempre hasta 2026-08-27 |
+| `edge_inputs` | `off` | sin entradas de borde: es lo que se entrenó siempre hasta 2026-08-31. `pad`/`dist` añaden 4 escalares **a la cabeza** (instructionsNewNN.md §6bis) |
 
 **Contradicción aparente U2 ↔ U3, documentada:** los defaults dan el contexto de **arranque**;
 el arrastre del ganador (U3) **muta** ese contexto a medida que se desciende. Por tanto **el

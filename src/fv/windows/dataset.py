@@ -12,12 +12,13 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from fv.fovea import FoveaDims, build_view
+from fv.fovea import FoveaDims, build_view, edge_features, n_edge_features
 
 
 class FoveatedWindowDataset(Dataset):
     def __init__(self, arrays: dict, dims: FoveaDims, split: int,
-                 pool_mode: str = "avg", pad_mode: str = "edge"):
+                 pool_mode: str = "avg", pad_mode: str = "edge",
+                 edge_inputs: str = "off"):
         mask = arrays["split"] == split
         self.y = arrays["y"][mask]
         self.sample_idx = arrays["sample_idx"][mask]
@@ -26,6 +27,11 @@ class FoveatedWindowDataset(Dataset):
         self.dims = dims
         self.pool_mode = pool_mode
         self.pad_mode = pad_mode
+        # C's extra head inputs about the IMAGE edge. Read here and not derived
+        # from `dims`, because it is a choice of the net and not of the geometry:
+        # two nets over the same dataset can disagree about it.
+        self.edge_inputs = edge_inputs
+        self.n_edge = n_edge_features(edge_inputs)
         # sample_idx does NOT index images: images_sample_idx maps rows to A indexes
         lookup = {int(a): i for i, a in enumerate(arrays["images_sample_idx"])}
         self.image_row = np.asarray([lookup[int(s)] for s in self.sample_idx],
@@ -41,4 +47,11 @@ class FoveatedWindowDataset(Dataset):
                                 pool_mode=self.pool_mode, pad_mode=self.pad_mode)
         x = torch.from_numpy(view).unsqueeze(0)          # (1, N, N)
         y = torch.from_numpy(self.y[i].copy())           # (4, 3)
-        return x, y
+        # ALWAYS three items, even with edge_inputs='off' -- then `e` is (0,) and
+        # the batch is (B, 0), which concatenates to nothing in the head. One
+        # unpacking shape for every caller: a loader that yields 2-tuples
+        # sometimes and 3-tuples other times is a `for x, y in loader` that
+        # breaks in whichever branch nobody ran.
+        e = torch.from_numpy(edge_features(self.images.shape[1:], wx0, wy0,
+                                           self.dims, self.edge_inputs))
+        return x, e, y

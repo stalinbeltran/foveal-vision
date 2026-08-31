@@ -156,6 +156,12 @@ export default function Networks() {
               <option>avg</option><option>max</option>
             </select></Field>
           {num("dropout", 0.05, "regularización: fracción de features apagadas al azar antes de la cabeza (0 = apagado)")}
+          <Field label="edge_inputs"
+            help="entradas extra que van DIRECTAS a la cabeza (no a las convoluciones) diciendo si la imagen se acaba por cada lado: pad = qué fracción del margen es relleno · dist = a qué distancia está el borde, en fóveas · off = nada">
+            <select value={form.edge_inputs ?? "off"}
+              onChange={(e) => setForm({ ...form, edge_inputs: e.target.value })}>
+              <option>off</option><option>pad</option><option>dist</option>
+            </select></Field>
           {exists ? (
             <button onClick={() => setConfirming(true)} data-testid="update-btn"
               disabled={!form.name || !validation?.valid}>Actualizar «{form.name}»</button>
@@ -189,6 +195,7 @@ export default function Networks() {
                   <dt>entrada compuesta (N, derivada)</dt><dd>{validation.trace.dims.N}×{validation.trace.dims.N}</dd>
                   <dt>recorte original</dt><dd>{validation.trace.dims.original_size}px</dd>
                   <dt>salida ramas</dt><dd>c {validation.trace.branch_out.center.join("×")} · p {validation.trace.branch_out.periph.join("×")}</dd>
+                  <dt>entradas de la cabeza</dt><dd>{validation.trace.head_inputs?.toLocaleString()}{validation.trace.edge_features ? ` (${validation.trace.flat_features.toLocaleString()} de las ramas + ${validation.trace.edge_features} de borde «${validation.trace.edge_inputs}»)` : ""}</dd>
                   <dt>parámetros</dt><dd>{validation.trace.num_params.toLocaleString()}</dd>
                 </dl>
                 <h4>Rangos calculados (los que usará un recorrido con "auto")</h4>

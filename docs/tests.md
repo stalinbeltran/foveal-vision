@@ -46,7 +46,7 @@ de [plan.md](plan.md) que quita cada xfail:
 | ②b | rangos calculados | `kernel_range`/`stride_range`/`build_search_space` reproducen los ejemplos numéricos de instructionsNewNN.md §3 (N=20 → k_center [3,5,7], s_center [1,2], s_periph [1]) | 2 |
 | ③ | procedencia | el run registra red/receta **por nombre y valor** + huella de B; `DELETE` de un B en uso → 409 con la lista (**control**: uno libre → 204) | 4 (y 2 el DELETE) |
 | ④ | checkpoint autodescriptivo | `load_model(ckpt)` reconstruye la red foveada sin YAML, geometría incluida | 4 |
-| ⑤ | vista única | dataloader e inferencia usan **el mismo** `fv.fovea` y producen vistas bit-idénticas sobre la misma ventana; las máscaras de rama, ídem | 3 (dataloader) / 6 (inferencia) |
+| ⑤ | vista única | dataloader e inferencia usan **el mismo** `fv.fovea` y producen vistas bit-idénticas sobre la misma ventana; las máscaras de rama, ídem. **Y desde 2026-08-31 también las entradas de borde** (`edge_features`), que son la otra mitad de lo que cada ventana le da a la red: si cada lado calculara la suya, el fallo no sería un error sino una red entrenada con una convención y aplicada con otra | 3 (dataloader) / 6 (inferencia) |
 | ⑦ | dirección de imports | `fovea`, `metrics`, `validation`, `matrixview` no importan nada de `fv`; `models` solo de `fovea`; leído de los imports (§4) | 2 |
 | ⑧ | comparabilidad | reconstruir B con otro contenido cambia la huella (y con el mismo, no); el seed de B solo decide el split; el split es **por imagen** | 2 |
 | ⑨ | objetivo del recorrido | spec con `objective` dependiente de un peso barrido → `objective_varies_with_space`; con objetivo de tarea → pasa; validación **sin cargar optuna** | 7 |

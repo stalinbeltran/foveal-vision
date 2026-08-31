@@ -105,7 +105,8 @@ def main() -> int:
     arrays = wstore.arrays(spec["window_dataset"])
     net = punto["network"]
     ds = FoveatedWindowDataset(arrays, dims_of(net), split=0,
-                               pool_mode=net["pool_mode"], pad_mode=net["pad_mode"])
+                               pool_mode=net["pool_mode"], pad_mode=net["pad_mode"],
+                               edge_inputs=net.get("edge_inputs", "off"))
     g = torch.Generator()
     g.manual_seed(int(receta.seed))
     loader = DataLoader(ds, batch_size=receta.batch_size, shuffle=True,
@@ -118,10 +119,10 @@ def main() -> int:
 
     tiempos: list[float] = []
     t_inicio = time.monotonic()
-    for i, (x, y) in enumerate(loader):
+    for i, (x, e, y) in enumerate(loader):
         t0 = time.monotonic()
         opt.zero_grad()
-        loss = corner_loss(model(x), y, receta.lambda_pos, receta.pos_weight,
+        loss = corner_loss(model(x, e), y, receta.lambda_pos, receta.pos_weight,
                            receta.smooth_l1_beta)
         loss.backward()
         opt.step()

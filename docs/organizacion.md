@@ -113,6 +113,9 @@ pool_mode: avg   # avg | max  para reducir la periferia (decisión abierta, se b
 dropout: 0.0     # regularización DENTRO de C: fracción de features apagadas al azar
                  # justo antes de la cabeza. 0.0 = apagado, y apagado es el default
                  # porque todo lo que hay en disco se entrenó sin él (2026-08-27)
+edge_inputs: off # off | pad | dist. Entradas extra A LA CABEZA (no a las convs)
+                 # diciendo si la IMAGEN se acaba por cada lado (§6bis de la spec).
+                 # 'off' es el default por el mismo motivo que dropout=0.0
 head: corners    # 4×[exists, x, y] por tipo TL/TR/BR/BL (C9, decisiones.md)
 ```
 

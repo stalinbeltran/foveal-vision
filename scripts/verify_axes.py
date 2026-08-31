@@ -47,6 +47,7 @@ NETWORK_AXES = [
     ("pool_mode", ["avg", "max"], 0),
     ("pad_mode", ["edge", "mean", "zero"], 0),
     ("dropout", [0.0, 0.25], 0),
+    ("edge_inputs", ["off", "pad", "dist"], 0),
 ]
 RECIPE_AXES = [
     ("lr", [0.001, 0.003], 0),

@@ -193,6 +193,17 @@ export default function Diagnostics() {
               <MatrixCanvas key={i} payload={ch} scale={7} />
             ))}
           </div>
+          {probe.inputView.edge ? (
+            // los 4 escalares no son un canal: no tienen forma espacial. Se
+            // enseñan igual porque F0 es «qué recibe exactamente la red», y
+            // desde que hay una entrada que no está en la imagen, enseñar sólo
+            // píxeles enseña media entrada.
+            <p className="sub">
+              entradas de borde («{probe.inputView.edge_inputs}», van directas a la cabeza):{" "}
+              {Object.entries(probe.inputView.edge)
+                .map(([lado, v]: any) => `${lado} ${v}`).join(" · ")}
+            </p>
+          ) : null}
           <h4 data-view="V1" data-fixes="E" data-varies="la rama" data-measures="los pesos">V1 — kernels de capa 1, por rama (divergente ±0: el signo es lo que un kernel es)</h4>
           <div className="row">
             {/* las ramas son las que trae el payload, no una lista escrita aqui:

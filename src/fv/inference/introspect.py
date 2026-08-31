@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from fv.fovea import build_view
+from fv.fovea import EDGE_SIDES, build_view, edge_features
 from fv.matrixview import map_payload, maps_payload
 
 
@@ -64,4 +64,14 @@ def input_view_payload(model, image: np.ndarray, wx0: int, wy0: int) -> dict:
         "channels": channels,
         "coverage_min": float(coverage.min()),
         "coverage_mean": float(coverage.mean()),
+        # Lo que esta ventana le dice a la CABEZA sobre el borde de la imagen, si
+        # esta red pide que se lo digan. No es un canal: son 4 escalares y no
+        # tienen forma espacial. Va aqui porque F0 es "que recibe exactamente la
+        # red", y desde que hay una entrada que no se ve en la imagen, una F0 que
+        # solo ensene pixeles ensena media entrada.
+        "edge_inputs": model.cfg["edge_inputs"],
+        "edge": None if not model.n_edge else dict(zip(
+            EDGE_SIDES,
+            (round(float(v), 4) for v in edge_features(
+                image.shape, wx0, wy0, dims, model.cfg["edge_inputs"])))),
     }

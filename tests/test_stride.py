@@ -205,14 +205,14 @@ def test_windows_per_epoch_caps_the_epoch(world):
     """Una epoca consume `windows_per_epoch` ventanas, no el pool entero."""
     ds, loader = _train_loader(world, 50)
     assert len(ds) > 50                                  # control: el pool es mayor
-    vistas = sum(x.shape[0] for x, _ in loader)
+    vistas = sum(x.shape[0] for x, _e, _y in loader)
     assert vistas == 50
 
 
 def test_windows_per_epoch_above_pool_repeats(world):
     """Con W mayor que el pool, la epoca sigue entregando exactamente W."""
     ds, loader = _train_loader(world, len(_train_loader(world, 0)[0]) * 3)
-    vistas = sum(x.shape[0] for x, _ in loader)
+    vistas = sum(x.shape[0] for x, _e, _y in loader)
     assert vistas == len(ds) * 3
 
 
@@ -221,7 +221,7 @@ def test_windows_per_epoch_zero_keeps_the_old_loader(world):
     from fv.training.recipe import Recipe
     assert Recipe().windows_per_epoch == 0
     ds, loader = _train_loader(world, 0)
-    vistas = sum(x.shape[0] for x, _ in loader)
+    vistas = sum(x.shape[0] for x, _e, _y in loader)
     assert vistas == len(ds)
 
 

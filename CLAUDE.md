@@ -23,6 +23,43 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 
 ## Estado actual — léelo primero
 
+> **🔧 2026-08-31 — `edge_inputs`: la red ya puede saber DÓNDE SE ACABA LA IMAGEN.
+> Implementado y probado; NO medido.**
+> Pedido por el usuario, y con el sitio elegido por él: **las entradas nuevas van directas a la
+> cabeza final, no a las capas convolucionales.**
+> 1. **El problema es un límite del muestreo, no de capacidad.** `pad_mode: edge` replica la fila
+>    del borde al salirse de la imagen (C11), y esa réplica es **por construcción**
+>    indistinguible de imagen real parecida. Un párrafo **pegado** al borde superior y uno
+>    **cortado** por el borde de la vista producen casi la misma entrada con etiquetas opuestas
+>    (en el primero TL/TR existen; en el segundo están fuera, más arriba). Ninguna arquitectura
+>    puede separarlas: **la información no está en la entrada**.
+> 2. **`edge_inputs` ∈ {`off` · `pad` · `dist`}** añade **4 escalares** por ventana (orden
+>    `EDGE_SIDES = L, T, R, B`, `0` = no hay borde por ahí, `1` = está aquí **en los dos modos**)
+>    concatenados a las features **justo antes de la `Linear`**, fuera del ReLU y fuera del
+>    dropout. **+48 pesos, +0,03 %** *(medido con `network_trace`)*. `off` es el default y es
+>    **bit-idéntico** a la red anterior: los checkpoints en disco cargan `strict`.
+> 3. ⚠ **Por qué a la cabeza y no como canal** (que es lo que F7 dejó abierto desde C11): la
+>    señal **no es espacial** —como canal sería una constante pintada en N×N celdas— y sobre todo
+>    **las ramas están enmascaradas por región**, así que una señal que entrara por el input sería
+>    invisible justo para la rama central, que es la que predice las esquinas. F7 queda **cerrada
+>    a medias**, por el lado barato (C15).
+> 4. ⚠ **Lo que ya se sabe SIN gastar nada** *(medido el 2026-08-31 sobre
+>    `dirty1000-80px-16px-r20260827`, 140.000 ventanas)*: `pad` se enciende en el **31,4 %** de las
+>    ventanas (30,4 % de las esquinas positivas) y `dist` en el **91,4 %**. Las esquinas
+>    etiquetadas a ≤1 px del borde son **3,02 %**. Dos lecturas que reordenan lo obvio: **`pad` no
+>    es «demasiado corto»** (el borde es una fracción grande de una imagen de 80×60), y **`dist`
+>    encendida en el 91 % es ambigua** — en 5×3,75 fóveas, «cerca del borde» y «dónde estoy en la
+>    página» son casi la misma variable, así que un `dist` ganador **no se podría citar como que
+>    el borde importa** sin una medida más.
+> 5. ⚠ **NO se ha barrido: que exista y entrene no es que mejore.** El criterio está escrito
+>    **antes de mirar** en [docs/plan-edge-inputs-2026-08-31.md](docs/plan-edge-inputs-2026-08-31.md)
+>    (tanteo `ei-t`, 6 runs, ≈0,4 $ estimado), y va **detrás de `do-v`**, que sigue siendo lo
+>    pendiente.
+> **Dónde quedó escrito**: [instructionsNewNN.md §6bis](instructionsNewNN.md) (la spec manda sobre
+> la arquitectura) · decisiones.md (F7 cerrada a medias, C15) · barrido-por-ejes.md (tabla de
+> defaults) · organizacion.md · glosario.md (⚠ la colisión **`edge` ≠ `border`**, que el español
+> fabrica). **18 tests** en `tests/test_edge_inputs.py`; suite **382 pasan** (eran 364).
+
 > **✅ 2026-08-26 — LAS DOS SEMILLAS, DOCUMENTADAS: EL SPLIT ES POR IMAGEN Y ES DE B.**
 > El usuario pidió verificar dónde se separan las muestras, sospechando que se repartieran las
 > **ventanas** ya recortadas (lo que filtraría la misma imagen a train y val). **No es el caso, y

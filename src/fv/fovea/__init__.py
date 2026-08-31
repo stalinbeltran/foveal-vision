@@ -51,6 +51,34 @@ def round_to_even(x: float) -> int:
 # still needs the vocabulary to refuse an unknown value at the gate.
 REGIONS = ("split", "single")
 
+# What C feeds STRAIGHT INTO THE HEAD about the image edge, bypassing the conv
+# branches. Lives here, next to REGIONS and for the same reason: `fv.validation`
+# is a pure torch-free leaf and still has to refuse an unknown value at the gate.
+#
+# ⚠ "edge" is the edge OF THE SOURCE IMAGE; "border" is the blurry ring of the
+# foveated view. Spanish says `borde` for both and that is exactly why the code
+# does not: `border_px` is a ring width, `edge_inputs` is about running out of
+# image. Mixing them would make `border_px=0` read as "no image edge", which is
+# false for every window of a flat control.
+#
+#   off   nothing: the head sees only what the branches produce (the net that
+#         every artefact on disk was trained with)
+#   pad   per side, the fraction of THIS VIEW's margin that is replicated
+#         padding instead of real image. Saturates at the crop: it is 0 as soon
+#         as the window sits `border_px` away from the edge
+#   dist  per side, how close the LABELLED WINDOW is to the image edge, in
+#         fovea units and capped at one fovea. Reaches further than `pad` and
+#         works with `border_px=0`
+#
+# Both spellings are oriented the same way on purpose: 0 = no image edge on this
+# side, 1 = the edge is right here. A reader (or a kernel weight) does not have
+# to remember which mode inverts the sign.
+EDGE_MODES = ("off", "pad", "dist")
+
+# The order of the four numbers, declared ONCE — the same reason CORNER_NAMES is
+# declared once in fv.metrics. Left, Top, Right, Bottom.
+EDGE_SIDES = ("L", "T", "R", "B")
+
 # The canonical geometry, in real pixels. `border_reduce` is the only one that
 # is not a length: it is the current reduction METHOD's factor, kept apart from
 # the two lengths on purpose (that separation is the point of this spelling).
@@ -448,6 +476,83 @@ def build_foveated_input(crop: np.ndarray, dims: FoveaDims,
     return a
 
 
+def pad_sides(image_shape: tuple, wx0: int, wy0: int,
+              dims: FoveaDims) -> tuple[int, int, int, int]:
+    """How many px of the crop fall OUTSIDE the image, per side (L, T, R, B).
+
+    ONE definition, two readers: `build_view` pads by exactly this much, and
+    `edge_features` turns it into what the head is told. Computing it twice --
+    the same arithmetic in two places -- is the failure this project keeps
+    paying for, and here it would be silent: the net would be told about an
+    edge the view does not actually have.
+    """
+    H, W = image_shape
+    m, s = dims.border_px, dims.original_size
+    x0, y0 = int(wx0) - m, int(wy0) - m
+    return (max(0, -x0), max(0, -y0), max(0, x0 + s - W), max(0, y0 + s - H))
+
+
+def n_edge_features(mode: str) -> int:
+    """How many extra head inputs `mode` produces. 0 for 'off' -- and 0 is not a
+    special case anywhere downstream: an empty vector concatenates to nothing,
+    so the net built with the default is the net that was already on disk."""
+    if mode not in EDGE_MODES:
+        raise FoveaError("unknown_edge_inputs", f"edge_inputs '{mode}' no existe",
+                         f"usa uno de {sorted(EDGE_MODES)}")
+    return 0 if mode == "off" else len(EDGE_SIDES)
+
+
+def edge_features(image_shape: tuple, wx0: int, wy0: int, dims: FoveaDims,
+                  mode: str = "off") -> np.ndarray:
+    """Is there an image edge on each side of this window, and how close?
+
+    The composite view CANNOT say this by itself. `pad_mode: edge` replicates
+    the border row/col (C11: never plain zeros, because zero means "no ink" and
+    teaches a false rule) -- and that replication is, by construction,
+    indistinguishable from real image that happens to look like more of the
+    same. So a paragraph flush against the top of the page and a paragraph cut
+    in half by the top of the VIEW produce the same input, while their labels
+    differ: in the first the TL/TR corners are really there, in the second the
+    real corners are somewhere above and the window is seeing the middle.
+
+    Returns float32 (n_edge_features(mode),) in [0, 1], in EDGE_SIDES order,
+    with 0 = no image edge on this side in both modes (see EDGE_MODES).
+
+    Pure arithmetic on the geometry: no image is read. That is what lets the
+    dataloader and `predict_image` get the vector from the SAME function
+    (contract (5)) without either of them owning the definition.
+    """
+    n = n_edge_features(mode)
+    if n == 0:
+        return np.zeros(0, dtype=np.float32)
+    H, W = image_shape
+    if mode == "pad":
+        # the fraction of each side's margin that is padding rather than image.
+        # `border_px == 0` leaves no margin to be padding, so this mode would be
+        # a constant zero -- an input that says "no edge anywhere", always, on a
+        # net asking to be told about edges. The gate refuses it (fv.validation)
+        # instead of training on a dead feature.
+        m = dims.border_px
+        if m <= 0:
+            raise FoveaError(
+                "edge_pad_needs_border",
+                "edge_inputs='pad' con border_px=0 no puede medir nada: sin "
+                "margen no hay relleno que fraccionar",
+                "usa edge_inputs='dist' (mide contra la fovea, no contra el "
+                "margen) o dale un border_px > 0")
+        return (np.asarray(pad_sides((H, W), wx0, wy0, dims), dtype=np.float32)
+                / float(m)).clip(0.0, 1.0)
+    # 'dist': how close the labelled window is to each edge, in fovea units.
+    # Capped at one fovea because the effect is local -- past the next window
+    # along, "how far from the edge am I" stops being about the edge and starts
+    # being absolute position in the page, which is not what is being asked.
+    f = float(dims.fovea_px)
+    d = np.asarray((int(wx0), int(wy0),
+                    W - (int(wx0) + dims.fovea_px),
+                    H - (int(wy0) + dims.fovea_px)), dtype=np.float32)
+    return (1.0 - np.clip(d, 0.0, f) / f).astype(np.float32)
+
+
 def build_view(image: np.ndarray, wx0: int, wy0: int, dims: FoveaDims,
                pool_mode: str = "avg", pad_mode: str = "edge") -> tuple[np.ndarray, np.ndarray]:
     """Composite view + coverage mask for the labelled window at (wx0, wy0).
@@ -466,10 +571,7 @@ def build_view(image: np.ndarray, wx0: int, wy0: int, dims: FoveaDims,
     m = dims.border_px
     x0, y0 = wx0 - m, wy0 - m
     s = dims.original_size
-    pad_l = max(0, -x0)
-    pad_t = max(0, -y0)
-    pad_r = max(0, x0 + s - W)
-    pad_b = max(0, y0 + s - H)
+    pad_l, pad_t, pad_r, pad_b = pad_sides((H, W), wx0, wy0, dims)
     sl = image[max(0, y0):min(H, y0 + s), max(0, x0):min(W, x0 + s)]
     if pad_l or pad_t or pad_r or pad_b:
         if pad_mode == "edge":

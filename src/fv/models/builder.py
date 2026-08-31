@@ -25,8 +25,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from fv.fovea import (GEOMETRY_FIELDS, REGIONS, build_masks, dims_of,
-                      is_single_region, normalize_geometry)
+from fv.fovea import (EDGE_MODES, EDGE_SIDES, GEOMETRY_FIELDS, REGIONS,
+                      FoveaError, build_masks, dims_of, is_single_region,
+                      n_edge_features, normalize_geometry)
 
 DEFAULT_CHANNEL = 16  # D-C2: a derived net defaults to [16]*n_layers (constant 16)
 
@@ -36,8 +37,9 @@ DEFAULT_CHANNEL = 16  # D-C2: a derived net defaults to [16]*n_layers (constant 
 # input — the flat CNN of protocolo.md §6, built as a declared degeneration of C
 # and not as a separate architecture (F12, docs/plan-cnn-plana.md §2). The default
 # keeps every artefact already on disk meaning exactly what it meant.
-__all__ = ["REGIONS", "NETWORK_DEFAULTS", "full_config", "build_model",
-           "network_trace", "resolve_channels", "FoveatedRegionalNN"]
+__all__ = ["REGIONS", "EDGE_MODES", "EDGE_SIDES", "NETWORK_DEFAULTS",
+           "full_config", "build_model", "network_trace", "resolve_channels",
+           "FoveatedRegionalNN"]
 
 # The geometry is stated in REAL PIXELS (fv.fovea): the fovea and the border are
 # independent lengths, and `border_reduce` is the reduction method's factor. The
@@ -58,6 +60,14 @@ NETWORK_DEFAULTS = {
     # existed -- the module has no parameters, so checkpoints keep loading
     # strict (tested).
     "dropout": 0.0,
+    # Extra head inputs about the IMAGE edge (fv.fovea.EDGE_MODES). They skip the
+    # conv branches entirely and are concatenated to the flattened features right
+    # before the Linear -- see `forward` for why that is the only place they can
+    # go. 'off' is the default for the same reason `dropout` is 0.0: the net
+    # built from a stored config has to keep meaning what it meant, and with 0
+    # extra inputs the head has exactly the shape it had (checkpoints load
+    # strict, the forward is bit-identical -- tested).
+    "edge_inputs": "off",
 }
 
 
@@ -132,7 +142,20 @@ class FoveatedRegionalNN(nn.Module):
         # governs it through the one switch the training loop already flips,
         # and so `p` is visible in repr() and in the module tree.
         self.drop = nn.Dropout(float(cfg["dropout"]))
-        self.head = nn.Linear(flat, 12)  # 4 corners x [exists, x, y]
+        # The image-edge inputs widen the head and NOTHING else: they are not a
+        # channel, they never reach a convolution. Two reasons, and the second is
+        # the one that matters:
+        #  - they are not spatial. "there is no more image above this window" is
+        #    one number about the whole view; as a channel it would be the same
+        #    value painted on N*N cells, and the branches would spend kernels
+        #    re-deriving a constant.
+        #  - a conv branch is MASKED by region. The centre branch cannot see the
+        #    ring at all, so an edge signal entering through the input would be
+        #    invisible to exactly the branch that predicts the corners.
+        # `flat + 0` when off, so the head is bit-identical to the old one.
+        self.edge_inputs = str(cfg["edge_inputs"])
+        self.n_edge = n_edge_features(self.edge_inputs)
+        self.head = nn.Linear(flat + self.n_edge, 12)  # 4 corners x [exists, x, y]
 
     @staticmethod
     def _make_branch(channels: list[int], k: int, pad: int, stride: int) -> nn.ModuleList:
@@ -178,13 +201,46 @@ class FoveatedRegionalNN(nn.Module):
             dummy = torch.zeros(1, 1, self.dims.N, self.dims.N)
             return int(self._merge(self._branches(dummy)).shape[1])
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, edge: torch.Tensor | None = None) -> torch.Tensor:
         feat = self._merge(self._branches(x))
         # after the ReLU, so what is zeroed are the activations the head reads;
         # with dropout=0.0 (the default) this is the identity in both modes and
         # the forward is bit-identical to the pre-dropout one (tested).
-        out = self.head(self.drop(F.relu(feat)))
+        feat = self.drop(F.relu(feat))
+        if self.n_edge:
+            feat = torch.cat([feat, self._edge_batch(edge, x)], dim=1)
+        out = self.head(feat)
         return out.view(-1, 4, 3)
+
+    def _edge_batch(self, edge: "torch.Tensor | None", x: torch.Tensor) -> torch.Tensor:
+        """The edge vector, checked. It joins AFTER the ReLU and AFTER the
+        dropout, on purpose:
+          - not through the ReLU, because the head should read the number as it
+            is. It happens to be >= 0 today, so the ReLU would be the identity --
+            and a mode added later that signs the sides would silently lose half
+            its range against a clamp nobody remembered was there.
+          - not through the dropout, because it is a MEASUREMENT, not a learned
+            activation. Zeroing it at random does not regularise 4 inputs, it
+            tells the head "no edge here" on a window that has one -- noise with
+            the shape of a fact.
+        """
+        if edge is None:
+            raise FoveaError(
+                "edge_inputs_missing",
+                f"la red se construyo con edge_inputs='{self.edge_inputs}' y el "
+                f"forward no recibio el vector de borde",
+                "pasa model(x, edge) con fv.fovea.edge_features(...); un vector "
+                "de ceros NO es el defecto: significaria 'no hay borde por "
+                "ningun lado', que es falso justo en las ventanas que lo tienen")
+        if edge.ndim != 2 or edge.shape[0] != x.shape[0] or edge.shape[1] != self.n_edge:
+            raise FoveaError(
+                "edge_inputs_shape",
+                f"el vector de borde es {tuple(edge.shape)} y la red espera "
+                f"({x.shape[0]}, {self.n_edge})",
+                f"un valor por lado {list(EDGE_SIDES)} y por muestra del lote")
+        # the dataloader hands float32; `x` carries the dtype/device the branches
+        # ran in, so the concat never silently upcasts or crosses devices
+        return edge.to(device=x.device, dtype=x.dtype)
 
     # ------------------------------------------------------------------
     # introspection (V1/V2): per-branch, in_channels=1 per branch means the
@@ -241,5 +297,12 @@ def network_trace(cfg: dict) -> dict:
         # keyed by the branches this net ACTUALLY has: 'single' brings one
         "branch_out": {b: list(t.shape[2:]) for b, t in outs.items()},
         "flat_features": model.flat_features,
+        # what reaches the head, split into where it came from: the branches
+        # produce `flat_features`, the image edge adds `edge_features` straight
+        # in. Reported apart because "the head grew" and "the net saw more
+        # pixels" are different facts and the param count alone conflates them.
+        "edge_inputs": cfg["edge_inputs"],
+        "edge_features": model.n_edge,
+        "head_inputs": model.flat_features + model.n_edge,
         "num_params": n_params,
     }

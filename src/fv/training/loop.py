@@ -55,9 +55,9 @@ def evaluate(model, loader, recipe: Recipe, window_size: int, device: str) -> di
     model.eval()
     losses, all_logits, all_targets = [], [], []
     with torch.no_grad():
-        for x, y in loader:
-            x, y = x.to(device), y.to(device)
-            logits = model(x)
+        for x, e, y in loader:
+            x, e, y = x.to(device), e.to(device), y.to(device)
+            logits = model(x, e)
             losses.append(float(corner_loss(
                 logits, y, recipe.lambda_pos, recipe.pos_weight,
                 recipe.smooth_l1_beta)))
@@ -249,9 +249,11 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
     dims = dims_of(net)
     arrays = wstore.arrays(window_dataset)
     train_ds = FoveatedWindowDataset(arrays, dims, split=0,
-                                     pool_mode=net["pool_mode"], pad_mode=net["pad_mode"])
+                                     pool_mode=net["pool_mode"], pad_mode=net["pad_mode"],
+                                     edge_inputs=net["edge_inputs"])
     val_ds = FoveatedWindowDataset(arrays, dims, split=1,
-                                   pool_mode=net["pool_mode"], pad_mode=net["pad_mode"])
+                                   pool_mode=net["pool_mode"], pad_mode=net["pad_mode"],
+                                   edge_inputs=net["edge_inputs"])
     g = torch.Generator()
     g.manual_seed(recipe.seed)
     if estado is not None and estado.get("rng_loader") is not None:
@@ -315,10 +317,10 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
         t0 = time.monotonic()
         model.train()
         epoch_losses = []
-        for x, y in train_loader:
-            x, y = x.to(device), y.to(device)
+        for x, e, y in train_loader:
+            x, e, y = x.to(device), e.to(device), y.to(device)
             opt.zero_grad()
-            loss = corner_loss(model(x), y, recipe.lambda_pos, recipe.pos_weight,
+            loss = corner_loss(model(x, e), y, recipe.lambda_pos, recipe.pos_weight,
                                recipe.smooth_l1_beta)
             loss.backward()
             opt.step()
