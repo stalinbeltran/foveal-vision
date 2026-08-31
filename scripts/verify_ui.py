@@ -195,6 +195,13 @@ def main() -> int:
             sliders = page.locator("input[type=range]")
             sliders.nth(1).fill("0.35")
             page.wait_for_timeout(1500)
+            # el filtro por ranura: se APAGA una y se vuelve a encender. Sin el
+            # click solo se comprobaria que la leyenda esta pintada, que es lo
+            # que ya dice el selector de arriba
+            page.locator("[data-testid=predict-corners] input").first.uncheck()
+            page.wait_for_timeout(600)
+            page.locator("[data-testid=predict-corners] input").first.check()
+            page.wait_for_timeout(600)
         check(page, "/predict", "text=Predecir", "11-predecir", predict_extra)
 
         # Revisar: la rejilla infiere SOLA al entrar (no hay boton), y marcar

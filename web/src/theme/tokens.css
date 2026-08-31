@@ -196,6 +196,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .legenditem.off { opacity: 0.5; }
 .legenditem .swatch { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
 .legenditem input[type="checkbox"] { margin: 0; }
+/* `.sub` es un parrafo (margin-bottom 16px) y dentro de un flex ese margen
+   centra el texto mas arriba: el conteo salia como un exponente. */
+.curvelegend .sub { margin: 0; }
 
 /* ---------------------------------------------------------------- Revisar */
 /* Imagen + cajas: el <svg> va en coordenadas de la IMAGEN (viewBox), asi que

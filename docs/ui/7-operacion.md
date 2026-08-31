@@ -158,6 +158,7 @@ verificación en silencio (el selector expira por timeout y parece lentitud). Lo
 `task-score`, `task-row`,
 `task-split`, `task-dataset`, `task-small-sample`, `task-holdout-warn`, `task-holdout-touches`,
 `diag-summary`, `gallery`, `nine-block`, `probes`, `predict-stage`, `predict-numbers`,
+`predict-corners`,
 `runs-table`, `session-bar`, `screen-error`, `review-grid`, `review-detail`,
 `infer-now`, `review-missing`.
 
