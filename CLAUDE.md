@@ -1580,7 +1580,15 @@ Aquí queda sólo lo que se dispara **en este repo**, que es lo que cuesta diner
   deuda de merge que ya se cobró: ver el bloque de «Servidores efímeros» de abajo, y el
   desfase de **74 commits** que tenía `origin/dev` el 2026-08-26.
   ⚠ **`origin/dev` sigue existiendo** y quedó al día ese día. Es historia: no se le empuja más.
-  Misma regla en el proyecto hermano `image-text-sample-generator`.
+  Misma regla en el proyecto hermano `image-text-sample-generator` — que **no se actualizó hasta
+  el 2026-09-01**, o sea que durante cinco semanas los dos repos se contradijeron por escrito.
+  ⚠ **La ÚNICA excepción, y este bloque no la decía**: los **trabajos paralelos** —otras sesiones
+  de Claude, con sus propias conversaciones, en **workspaces separados** del mismo dev— usan la
+  rama de su workspace, para que dos líneas que tocan los mismos ficheros no se pisen. **Si no
+  estás dentro de `~/ws/<algo>`, no es tu caso: vas a `main`.** El mecanismo, en
+  [`telegram-coordinator/CLAUDE.md` § «Varias sesiones a la vez»](https://github.com/stalinbeltran/telegram-coordinator/blob/main/CLAUDE.md).
+  Y esa rama **tiene que acabar en `main`**: mientras no llegue, su trabajo es invisible para el
+  server siguiente — el mismo fallo con otro nombre de rama.
 - **Servidores efímeros: lo que no está empujado, no existe.** La máquina se rehace sin
   aviso, así que **todo cambio y toda documentación se empuja en cuanto queda terminado**,
   no al final del encargo. **Un clon limpio saca `main`**, y por eso hoy se trabaja
