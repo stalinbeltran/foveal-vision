@@ -33,6 +33,37 @@ creado** (fuente, dataset, red, run, recorrido, análisis) desde una web app.
 | 4 | **Endpoint** que reciba esos pesos | ✅ `PUT /api/inference/staging/<run>/<best\|last>.pt` | [api.md](docs/api.md) |
 | 5 | Al terminar, **copiar temporal → repo de datos** | ✅ `POST …/promote` — copia **y aprueba**, es una decisión | ídem |
 | 6 | **Entrenar** una nn | ⏸ **no lanzado**: faltan 5 decisiones del dueño (§ abajo) | [entrenar.md](docs/entrenar.md) |
+| 7 | Que el relleno del borde **no desvíe** el entrenamiento | ✅ `mask_channel` hecho · ⚠ **NO medido** · entrenando `fov16-mask-p20` | [plan-mask-channel](docs/plan-mask-channel-2026-09-01.md) |
+| 8 | Las **medidas de seguridad** de todo entrenamiento para inferir | ✅ las siete, con su comprobación y su lista | [entrenar-para-inferencia.md](docs/entrenar-para-inferencia.md) |
+
+## ⚠ Si vas a entrenar una red que se va a USAR, lee esto primero
+
+**No es lo mismo entrenar un punto de un barrido que entrenar un modelo.** En el
+primero lo que se conserva es el número y perder la máquina cuesta un punto; en el
+segundo lo que se conserva es el `.pt`, y perder la máquina cuesta el encargo
+entero. Las siete obligaciones —y por qué cada una, con lo que costó— están en
+**[docs/entrenar-para-inferencia.md](docs/entrenar-para-inferencia.md)**. Resumen
+operativo:
+
+```bash
+# se lanza SIEMPRE así: unidad de systemd (padre PID 1), nunca hijo de la sesión
+"$COORD_HOME/scripts/desacoplar-persistente.sh" entrenar-<run> \
+  /bin/bash -lc "cd ~/src/foveal-vision && scripts/entrenar_para_inferencia.sh <run> <red> \
+                 --horas-max 6 --presupuesto 1.50 --cada 60 --max-cambios 4"
+
+# y un celador que avisa a Telegram cuando el veredicto CAMBIA
+"$COORD_HOME/scripts/desacoplar-persistente.sh" celador-<run> \
+  /bin/bash -lc "cd ~/src/foveal-vision && scripts/celador.sh <run> 300 300"
+
+# ¿va bien, y SE ESTAN GUARDANDO los pesos?  (o /use vigilar-entrenamiento)
+.venv/bin/python scripts/vigilar_entrenamiento.py --name <run> --max-edad 300
+```
+
+⚠ **`entrenar_para_inferencia.sh` y no `entrenar_vast.py` a pelo**: la unidad lleva
+`Restart=on-failure`, y un reintento a ciegas es **peor** que ninguno — sin
+`--continuar` entra en bucle de alquilar-fallar, y con `--continuar` alquila **otra**
+máquina aunque la de antes siga viva. El wrapper mira el estado y elige entre
+**adoptar / continuar / arrancar**.
 
 ### ❌ Lo que NO se puede (no es una limitación de esta implementación)
 
