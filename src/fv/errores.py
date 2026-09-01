@@ -46,6 +46,7 @@ Las cuatro decisiones que hay que respetar si se toca
 """
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import re
@@ -80,10 +81,27 @@ PATRONES = (
     (re.compile(r"([?&]t=)[A-Za-z0-9_-]{8,}"), r"\1[TOKEN]"),
 )
 
-# Ventana de agrupacion (decision 2). 60 s es el mismo numero que usa
-# `review._repetida`, y por el mismo motivo: es lo que dura un dedo nervioso o un
-# sondeo del front.
-VENTANA_S = 60.0
+# LA CADENCIA. Una ventana fija no sirve para las dos cosas que hay que cubrir:
+#
+#   · una racha corta (un dedo nervioso, un sondeo que falla tres veces) quiere
+#     resolucion fina -- saber que empezo y cuando paro;
+#   · algo roto de forma permanente NO quiere resolucion ninguna: con 60 s fijos,
+#     un fallo que se repite cada 3 s durante una semana escribe 1.440 lineas al
+#     dia, o sea 10.000 en la semana. Un log asi no se lee, y ademas es un repo
+#     de git.
+#
+# Asi que la ventana CRECE mientras el problema siga: 1 min -> 5 -> 15 -> 1 h.
+# La primera vez se escribe SIEMPRE en el acto; el resumen llega pronto (1 min)
+# para que se vea que es recurrente, y luego se espacia. Peor caso de algo roto
+# todo el dia: ~27 lineas en vez de 1.440.
+#
+# ⚠ Y si una ventana se cierra SIN repeticiones, la clave vuelve al primer
+# escalon: el problema paro, y si reaparece es una noticia nueva y no la cola de
+# una vieja. Sin esa vuelta atras, un fallo de la manana silenciaria una hora del
+# mismo fallo por la tarde.
+TOPE_TRAZA = 16_000
+VENTANAS_S = (60.0, 300.0, 900.0, 3600.0)
+VENTANA_S = VENTANAS_S[0]          # el primer escalon, que es el que se cita fuera
 _repeticiones: dict[tuple, dict] = {}
 _version: str | None = None
 
@@ -144,31 +162,91 @@ def registrar(code: str, message: str, *, hint: str = "", nivel: str = "error",
             "pid": os.getpid(),
         }
         if traza:
-            linea["traza"] = _redactar(str(traza))[-4000:]
+            # ⚠ Se conserva el FINAL, no el principio: la causa esta abajo
+            # (`RuntimeError: ...`) y la cabecera del stack es lo prescindible.
+            #
+            # El tope es 16 KB y no los 4.000 que tenia: aquello lo elegi por un
+            # limite de atomicidad que NO existe --medido el 2026-09-01, 8
+            # procesos escribiendo lineas de 100 KB a la vez, 0 corrompidas: los
+            # 4.096 de PIPE_BUF son garantia para pipes, no para ficheros
+            # regulares--. Una traza real de torch son 2.037 bytes, pero una
+            # excepcion encadenada o una recursion pasan de eso facil.
+            # ⚠ En NFS esto SI se rompe. Si el repo de datos acaba en un montaje
+            # de red, hay que volver a mirarlo.
+            t = _redactar(str(traza))
+            if len(t) > TOPE_TRAZA:
+                # una traza cortada que no dice que esta cortada te hace buscar
+                # un marco que nunca estuvo
+                t = (f"[... traza recortada: se guardan los ultimos "
+                     f"{TOPE_TRAZA} de {len(t)} bytes ...]\n" + t[-TOPE_TRAZA:])
+            linea["traza"] = t
         if extra:
             linea["extra"] = json.loads(_redactar(json.dumps(extra, default=str))[:2000])
 
         clave = (linea["nivel"], linea["code"], linea["origen"], linea["donde"])
         t = time.time()
         prev = _repeticiones.get(clave)
-        if prev and t - prev["desde"] < VENTANA_S:
+        escalon = prev["escalon"] if prev else 0
+        if prev and t - prev["desde"] < VENTANAS_S[escalon]:
             prev["n"] += 1
             return None                       # se agrupa: no escribe (decision 2)
         if prev and prev["n"]:
-            # la ventana se cerro con repeticiones: se dice cuantas, en UNA linea
-            _escribir({**prev["linea"],
+            # La ventana se cerro con repeticiones: UNA linea que dice cuantas.
+            # Lleva `repeticiones` para que la cuenta de sucesos sea cierta: una
+            # linea NO es un suceso, y quien agregue tiene que sumar 1 + esto.
+            _escribir({**prev["linea"],      # arrastra traza, hint y lo demas
                        "cuando": ahora.isoformat(timespec="seconds"),
-                       "code": prev["linea"]["code"],
                        "message": f"y {prev['n']} vez/veces mas en "
-                                  f"{VENTANA_S:.0f} s: {prev['linea']['message']}",
+                                  f"{VENTANAS_S[escalon]:.0f} s: "
+                                  f"{prev['linea']['message']}",
                        "repeticiones": prev["n"]})
-        _repeticiones[clave] = {"desde": t, "n": 0, "linea": linea}
+            escalon = min(escalon + 1, len(VENTANAS_S) - 1)   # sigue roto: espacia
+        else:
+            escalon = 0                       # paro: la proxima vez es noticia
+        _repeticiones[clave] = {"desde": t, "n": 0, "linea": linea,
+                                "escalon": escalon}
         _escribir(linea)
         return linea
     except Exception as e:                               # noqa: BLE001
         # la ultima red: registrar no puede tumbar a quien lo llama
         print(f"[errores] no pude registrar '{code}': {e}", file=sys.stderr, flush=True)
         return None
+
+
+def cerrar_ventanas() -> int:
+    """Vuelca las repeticiones que quedan en memoria. Devuelve cuantas lineas.
+
+    ⚠ EL LIMITE QUE ESTO TAPA A MEDIAS, y hay que decirlo entero: mientras una
+    ventana esta abierta, sus repeticiones viven en memoria y **el contador del
+    log no las incluye todavia**. O sea que el numero de sucesos va con hasta una
+    ventana de retraso.
+
+    Lo que NUNCA se pierde es la NOTICIA: la primera vez se escribe en el acto,
+    asi que "esto paso" siempre esta. Lo que se puede perder es la MULTIPLICIDAD
+    --"paso 25 veces"-- si el proceso muere a mitad de ventana.
+
+    Por eso esto se engancha a la salida del proceso: un `systemctl restart` es
+    un SIGTERM y ahi si corre, que es el caso comun. Contra SIGKILL no hay nada
+    que hacer, como siempre.
+    """
+    n = 0
+    ahora = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for clave, prev in list(_repeticiones.items()):
+        if prev.get("n"):
+            try:
+                _escribir({**prev["linea"], "cuando": ahora,
+                           "message": f"y {prev['n']} vez/veces mas (ventana "
+                                      f"cerrada al salir el proceso): "
+                                      f"{prev['linea']['message']}",
+                           "repeticiones": prev["n"]})
+                n += 1
+            except Exception:                            # noqa: BLE001
+                pass
+        prev["n"] = 0
+    return n
+
+
+atexit.register(cerrar_ventanas)
 
 
 def _escribir(linea: dict) -> None:
@@ -186,7 +264,8 @@ def _ficheros() -> list[Path]:
 def consultar(*, nivel: str | None = None, code: str | None = None,
               origen: str | None = None, q: str | None = None,
               desde: str | None = None, hasta: str | None = None,
-              limit: int = 100, offset: int = 0) -> dict:
+              limit: int = 100, offset: int = 0,
+              sin_traza: bool = False) -> dict:
     """Los errores que casan, lo mas reciente primero, PAGINADOS.
 
     ⚠ El filtrado y el conteo van aqui y no en el navegador (U4.3): el dueno pidio
@@ -233,19 +312,38 @@ def consultar(*, nivel: str | None = None, code: str | None = None,
         return True
 
     casan = [r for r in filas if casa(r)]
+
+    # ⚠ UNA LINEA NO ES UN SUCESO. Al agrupar las repeticiones, una linea con
+    # `repeticiones: 340` son 341 veces que paso eso. Contar lineas diria "3"
+    # donde pasaron 900 -- y un contador que miente es peor que no tenerlo,
+    # porque se usa para decidir que se mira primero.
+    def veces(r: dict) -> int:
+        return 1 + int(r.get("repeticiones", 0) or 0)
+
     facetas = {"nivel": {}, "code": {}, "origen": {}, "version": {}}
     for r in casan:
+        n = veces(r)
         for campo in facetas:
             v = r.get(campo)
             if v:
-                facetas[campo][v] = facetas[campo].get(v, 0) + 1
+                facetas[campo][v] = facetas[campo].get(v, 0) + n
     for campo, cuenta in facetas.items():
         facetas[campo] = dict(sorted(cuenta.items(), key=lambda kv: -kv[1]))
+
+    pagina = casan[offset:offset + limit]
+    if sin_traza:
+        # La lista no manda las trazas: la pantalla solo las enseña al ABRIR una
+        # fila, y con el sondeo cada 5 s serian kilobytes por vuelta que nadie
+        # mira. Se dice que existe, y se piden aparte.
+        pagina = [{**r, "traza": None, "tiene_traza": bool(r.get("traza"))}
+                  for r in pagina]
     return {
-        "errores": casan[offset:offset + limit],
-        "total": len(casan),
+        "errores": pagina,
+        "total": len(casan),                 # LINEAS que casan
+        "sucesos": sum(veces(r) for r in casan),          # VECES que pasaron
         "total_sin_filtro": len(filas),
-        "facetas": facetas,
+        "sucesos_sin_filtro": sum(veces(r) for r in filas),
+        "facetas": facetas,                  # contadas en SUCESOS, no en lineas
         "meses": [f.stem for f in _ficheros()],
         "donde": str(settings.errores_root()),
     }

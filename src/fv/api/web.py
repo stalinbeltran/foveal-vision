@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import hmac
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -184,9 +185,29 @@ def create_web_app(dist: Path | None = None, token: str = "") -> FastAPI:
             "constrúyelo con: cd web && npm ci && npm run build "
             "(o `python3 scripts/web_app.py preparar`)")
 
-    app = FastAPI(title="foveal-vision")
+    # ⚠ EL CICLO DE VIDA VA AQUI, en el app EXTERIOR, y no en `create_app`.
+    # Los eventos de una sub-app MONTADA no se propagan: un `shutdown` puesto
+    # dentro del API no corre NUNCA cuando se sirve asi. Costo un rato el
+    # 2026-09-01 -- el hook funcionaba con TestClient sobre el API a secas y no
+    # en el servicio, que es donde importa.
+    #
+    # Al apagar se vuelcan las repeticiones de errores que quedan en memoria: sin
+    # esto el contador va con hasta una ventana de retraso y un `systemctl
+    # restart` se la lleva (medido: 30 peticiones fallidas se quedaban en 1).
+    @asynccontextmanager
+    async def ciclo(_app):
+        yield
+        from fv import errores                          # noqa: PLC0415
+        n = errores.cerrar_ventanas()
+        if n:
+            print(f"errores: {n} ventana(s) de repeticiones volcada(s) al apagar",
+                  flush=True)
+
+    app = FastAPI(title="foveal-vision", lifespan=ciclo)
     if token:
         install_door(app, token)
     app.mount("/api", create_app())
+
+
     app.mount("/", _FrontFiles(directory=str(dist), html=True), name="front")
     return app

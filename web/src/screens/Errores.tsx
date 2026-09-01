@@ -32,6 +32,18 @@ export default function Errores() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
+  // La traza NO viaja en la lista (serían kilobytes por vuelta de sondeo que
+  // nadie mira): se pide al abrir la fila y se recuerda mientras dure la página.
+  const [trazas, setTrazas] = useState<Record<string, string | null>>({});
+  const abrir = (id: string, e: any) => {
+    if (abierta === id) { setAbierta(null); return; }
+    setAbierta(id);
+    if (e.tiene_traza && trazas[id] === undefined) {
+      api.post("/errores/traza", { cuando: e.cuando, code: e.code, donde: e.donde })
+        .then((r) => setTrazas((t) => ({ ...t, [id]: r.traza })))
+        .catch(() => setTrazas((t) => ({ ...t, [id]: null })));
+    }
+  };
   const LIMIT = 50;
 
   const cargar = () => {
@@ -99,11 +111,18 @@ export default function Errores() {
 
         {data ? (
           <p className="sub" style={{ marginTop: 6 }} data-testid="errores-cuenta">
-            {data.total} de {data.total_sin_filtro} · meses con log: {data.meses.join(", ") || "—"}
+            {/* ⚠ SUCESOS y no líneas: al agrupar repeticiones, una línea con
+                `repeticiones: 340` son 341 veces. Contar líneas diría «3» donde
+                pasaron 900, y este número se usa para decidir qué se mira
+                primero. Se enseñan los dos porque son dos hechos. */}
+            <b>{data.sucesos}</b> suceso(s) en {data.total} línea(s)
+            {data.sucesos_sin_filtro !== data.sucesos
+              ? ` · de ${data.sucesos_sin_filtro} en total` : ""}
+            {" "}· meses con log: {data.meses.join(", ") || "—"}
             {/* ⚠ Un filtro que esconde tiene que decir cuánto esconde: si no,
                 "no hay errores" y "los filtré todos" se leen igual. */}
-            {data.total < data.total_sin_filtro
-              ? ` · el filtro oculta ${data.total_sin_filtro - data.total}`
+            {data.sucesos < data.sucesos_sin_filtro
+              ? ` · el filtro oculta ${data.sucesos_sin_filtro - data.sucesos}`
               : ""}
             {f.nivel !== "rechazo" && (facetas.nivel?.rechazo ?? 0) === 0 && f.nivel === "error"
               ? " · (los rechazos —la puerta funcionando— se ven quitando el filtro de nivel)"
@@ -130,13 +149,16 @@ export default function Errores() {
                 const id = `${e.cuando}#${i}`;
                 return (
                   <React.Fragment key={id}>
-                    <tr onClick={() => setAbierta(abierta === id ? null : id)}
+                    <tr onClick={() => abrir(id, e)}
                       style={{ cursor: "pointer" }}>
                       <td className="mono">{e.cuando.replace("T", " ").replace("+00:00", "")}</td>
                       <td><span className={`badge ${e.nivel === "error" ? "error" : ""}`}>
                         {e.nivel}</span></td>
                       <td className="mono">{e.code}
-                        {e.repeticiones ? <span className="sub"> ×{e.repeticiones + 1}</span> : null}</td>
+                        {e.repeticiones
+                          ? <span className="sub" title="veces que pasó, no líneas">
+                              {" "}×{e.repeticiones + 1}</span>
+                          : null}</td>
                       <td className="mono sub">{e.origen} · {e.donde || "—"}</td>
                       <td className="mono sub">{e.version}</td>
                       <td className="sub">{abierta === id ? "▾" : "▸"}</td>
@@ -150,8 +172,13 @@ export default function Errores() {
                           {e.hint ? <><dt>arreglo</dt><dd>{e.hint}</dd></> : null}
                           <dt>máquina · pid</dt><dd className="mono">{e.maquina} · {e.pid}</dd>
                         </dl>
-                        {e.traza ? (
-                          <pre className="traza">{e.traza}</pre>
+                        {e.tiene_traza ? (
+                          trazas[id] === undefined
+                            ? <Working on label="trayendo la traza…" />
+                            : trazas[id]
+                              ? <pre className="traza">{trazas[id]}</pre>
+                              // ausente ≠ vacío: se dice que la había y no llegó
+                              : <p className="sub">no pude traer la traza</p>
                         ) : null}
                       </td></tr>
                     ) : null}

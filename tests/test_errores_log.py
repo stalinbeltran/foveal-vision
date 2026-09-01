@@ -171,3 +171,120 @@ def test_el_endpoint_devuelve_facetas_y_pagina(tmp_path, monkeypatch):
     d = c.get("/errores?limit=5").json()
     assert d["total"] >= 1 and "facetas" in d and "meses" in d
     assert d["facetas"]["origen"].get("prueba") == 1
+
+
+# --------------------------------------------- la cadencia y el CONTADOR
+
+def test_la_ventana_CRECE_mientras_el_problema_siga():
+    """Una ventana fija no sirve para las dos cosas: una racha corta quiere
+    resolucion fina, y algo roto todo el dia no quiere ninguna. Con 60 s fijos,
+    un fallo cada 3 s escribe 1.440 lineas al dia."""
+    clave = ("error", "en_bucle", "api", "GET /runs")
+    escalones = []
+    for _ in range(4):
+        for _ in range(5):
+            errores.registrar("en_bucle", "otra vez", origen="api", donde="GET /runs")
+        errores._repeticiones[clave]["desde"] -= errores.VENTANAS_S[
+            errores._repeticiones[clave]["escalon"]] + 1
+        errores.registrar("en_bucle", "otra vez", origen="api", donde="GET /runs")
+        escalones.append(errores._repeticiones[clave]["escalon"])
+    assert escalones == [1, 2, 3, 3], escalones      # crece y se queda en el tope
+
+
+def test_si_el_problema_PARA_la_ventana_vuelve_al_principio():
+    """Sin esa vuelta atras, un fallo de la manana silenciaria una hora del mismo
+    fallo por la tarde -- y esa hora es justo la que querrias ver."""
+    clave = ("error", "va_y_viene", "api", "X")
+    errores.registrar("va_y_viene", "a", origen="api", donde="X")
+    for _ in range(5):
+        errores.registrar("va_y_viene", "a", origen="api", donde="X")
+    errores._repeticiones[clave]["desde"] -= errores.VENTANAS_S[0] + 1
+    errores.registrar("va_y_viene", "a", origen="api", donde="X")
+    assert errores._repeticiones[clave]["escalon"] == 1          # subio
+    # ...y ahora pasa una ventana entera SIN repeticiones
+    errores._repeticiones[clave]["desde"] -= errores.VENTANAS_S[1] + 1
+    errores.registrar("va_y_viene", "a", origen="api", donde="X")
+    assert errores._repeticiones[clave]["escalon"] == 0          # vuelve al principio
+
+
+def test_el_contador_cuenta_SUCESOS_y_no_lineas():
+    """Una linea con `repeticiones: 340` son 341 veces. Contar lineas diria '3'
+    donde pasaron 900, y este numero se usa para decidir que se mira primero."""
+    clave = ("error", "muchas", "api", "X")
+    for _ in range(201):
+        errores.registrar("muchas", "otra vez", origen="api", donde="X")
+    errores._repeticiones[clave]["desde"] -= errores.VENTANAS_S[0] + 1
+    errores.registrar("muchas", "otra vez", origen="api", donde="X")
+    d = errores.consultar()
+    assert d["total"] == 3                       # lineas
+    assert d["sucesos"] == 203                   # veces que paso
+    assert d["facetas"]["code"]["muchas"] == 203  # las facetas, en sucesos
+    assert d["sucesos_sin_filtro"] == 203
+
+
+def test_la_traza_se_guarda_por_el_FINAL_y_dice_si_corta():
+    larga = "INICIO" + "x" * 30000 + "LA-CAUSA-ESTA-AQUI"
+    errores.registrar("traza_larga", "y", traza=larga)
+    l = _lineas()[-1]
+    assert "LA-CAUSA-ESTA-AQUI" in l["traza"], "perdio el final, que es la causa"
+    assert "INICIO" not in l["traza"], "guardo el principio en vez del final"
+    assert "traza recortada" in l["traza"]
+    assert len(l["traza"]) < errores.TOPE_TRAZA + 200
+
+
+def test_una_traza_normal_de_torch_NO_se_corta():
+    """Medido el 2026-09-01: la traza real que salio ese dia son 2.037 bytes."""
+    errores.registrar("normal", "y", traza="T" * 2037)
+    assert "recortada" not in _lineas()[-1]["traza"]
+
+
+def test_la_lista_no_manda_las_trazas_pero_dice_que_las_hay():
+    errores.registrar("con_traza", "y", traza="T" * 500)
+    d = errores.consultar(sin_traza=True)
+    assert d["errores"][0]["traza"] is None
+    assert d["errores"][0]["tiene_traza"] is True
+    # ...y sin el flag siguen estando, que es como las lee quien las necesita
+    assert errores.consultar()["errores"][0]["traza"]
+
+
+def test_lo_que_escribe_NODE_lo_lee_PYTHON(tmp_path, monkeypatch):
+    """El contrato entre lenguajes, ejecutado: el formato es la interfaz.
+
+    Si esto falla, el coordinador esta escribiendo a un log que la web app no
+    puede leer -- y nadie se enteraria, porque cada lado funciona solo."""
+    import subprocess
+    casa = tmp_path / "telegram-coordinator"
+    casa.mkdir(parents=True)
+    (tmp_path / "foveal-vision-data" / ".git").mkdir(parents=True)
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "foveal-vision-data"))
+    real = "/home/deploy/src/telegram-coordinator/scripts"
+    r = subprocess.run(
+        ["node", "-e",
+         f"process.env.COORD_HOME='{casa}';"
+         f"import('{real}/errores.mjs').then(m=>m.registrar("
+         f"'desde_node','hola',{{donde:'humo',traza:'T'.repeat(50)}}))"],
+        capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    d = errores.consultar()
+    assert d["total"] == 1, d
+    e = d["errores"][0]
+    assert e["code"] == "desde_node" and e["origen"] == "coordinador"
+    assert e["traza"] and e["maquina"] and e["version"]
+
+
+def test_al_salir_el_proceso_no_se_pierde_la_cuenta():
+    """Mientras la ventana esta abierta las repeticiones viven en memoria y el
+    contador va con retraso. Un `systemctl restart` es SIGTERM, o sea el caso
+    comun, y ahi no hay por que perder la multiplicidad.
+
+    ⚠ Lo que NUNCA se pierde es la NOTICIA (la primera se escribe en el acto);
+    lo que se puede perder --contra SIGKILL-- es el 'paso 25 veces'."""
+    for _ in range(25):
+        errores.registrar("racha", "x", origen="api", donde="Y")
+    assert errores.consultar()["sucesos"] == 1        # 24 aun en memoria
+    assert errores.cerrar_ventanas() == 1
+    d = errores.consultar()
+    assert d["total"] == 2 and d["sucesos"] == 26
+    # y volver a cerrar no duplica
+    assert errores.cerrar_ventanas() == 0
+    assert errores.consultar()["sucesos"] == 26

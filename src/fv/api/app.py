@@ -1141,7 +1141,25 @@ def create_app() -> FastAPI:
         """
         return errores.consultar(
             nivel=nivel, code=code, origen=origen, q=q, desde=desde, hasta=hasta,
-            limit=max(1, min(int(limit), 500)), offset=max(0, int(offset)))
+            limit=max(1, min(int(limit), 500)), offset=max(0, int(offset)),
+            sin_traza=True)
+
+    @app.post("/errores/traza")
+    def traza_de(body: dict):
+        """La traza de UN error, a peticion.
+
+        No viaja en la lista porque la pantalla solo la enseña al abrir una fila
+        y el sondeo es cada 5 s. Va por POST y no por GET con la clave en la URL
+        porque la clave es (cuando, code, donde) --con rutas dentro-- y meter eso
+        en una query string lo deja en el log de acceso de este proceso.
+        """
+        d = errores.consultar(code=body.get("code"), desde=body.get("cuando"),
+                              hasta=body.get("cuando"), limit=20)
+        for e in d["errores"]:
+            if e.get("cuando") == body.get("cuando") and e.get("donde") == body.get("donde"):
+                return {"traza": e.get("traza") or None}
+        # ausente != vacio: "no la encuentro" y "no tenia" son cosas distintas
+        return {"traza": None, "motivo": "no encuentro ese error en el log"}
 
     # ---------------------------------------------------------------- sweeps (H)
     @app.get("/sweeps")
