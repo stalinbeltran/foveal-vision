@@ -63,6 +63,29 @@ def view_of(crop01: torch.Tensor, P: torch.Tensor) -> torch.Tensor:
     return P @ crop01 @ P.T
 
 
+def tabla_geometria(dims) -> None:
+    """Cuantos px REALES promedia cada celda de la vista. Decide en que espacio
+    tiene sentido medir "el minimo cambio": en el centro vista<->pixel es 1:1,
+    asi que un cambio ahi es una edicion de la imagen; en la periferia una celda
+    es la media de varios px, y ahi puedes mover esos px conservando la media
+    sin que la red vea NADA. Un minimo en el espacio de la vista no corresponde
+    a ninguna imagen -- por eso el delta se optimiza sobre el recorte."""
+    import collections
+    w = np.diff(_axis_edges(dims))
+    A = np.outer(w, w)
+    print(f"geometria: fovea_px={dims.fovea_px} border_px={dims.border_px} "
+          f"border_reduce={dims.border_reduce} -> N={dims.N}, recorte "
+          f"{dims.original_size}x{dims.original_size}")
+    for px, n in sorted(collections.Counter(A.ravel().tolist()).items()):
+        print(f"  {n:4d} celdas promedian {px:4d} px reales -> {n * px:6d} px")
+    centro = int((A == 1).sum())
+    print(f"  total: {A.size} celdas / {int(A.sum())} px")
+    print(f"  centro 1:1 = {centro} celdas ({100 * centro / A.size:.0f} % de las entradas)")
+    print(f"  la periferia ve {int(A.sum()) - centro} px "
+          f"({100 * (A.sum() - centro) / A.sum():.0f} % del recorte) "
+          f"con el {100 * (A > 1).sum() / A.size:.0f} % de las entradas")
+
+
 def net_input(crop01, P, mask_channel):
     v = view_of(crop01, P)
     if n_input_channels(mask_channel) == 1:
@@ -206,11 +229,14 @@ def panel(crop0, columnas, P, out_path, titulo, pie):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--dataset", required=True, help="ruta al windows.npz")
+    ap.add_argument("--dataset", help="ruta al windows.npz")
     ap.add_argument("--out", default="data/demo-contrafactico")
     ap.add_argument("--n", type=int, default=3)
     ap.add_argument("--split", type=int, default=1)
     ap.add_argument("--max-scan", type=int, default=6000)
+    ap.add_argument("--geometria", action="store_true",
+                    help="solo la tabla de cuantos px reales promedia cada celda "
+                         "de la vista, y sale")
     a = ap.parse_args()
 
     outdir = Path(a.out); outdir.mkdir(parents=True, exist_ok=True)
@@ -224,6 +250,10 @@ def main() -> int:
     edge_mode = cfg.get("edge_inputs", "off")
     print(f"red: {Path(a.ckpt).parent.name} · N={dims.N} · recorte={dims.original_size} "
           f"· mask_channel={mask_channel} · edge_inputs={edge_mode}")
+
+    if a.geometria:
+        tabla_geometria(dims)
+        return 0
 
     z = np.load(a.dataset)
     sel = z["split"] == a.split
