@@ -9,8 +9,8 @@ sweep walks through.
 
 from __future__ import annotations
 
-from fv.fovea import (EDGE_MODES, FoveaError, REGIONS, check_dims, dims_of,
-                      normalize_geometry)
+from fv.fovea import (EDGE_MODES, MASK_MODES, FoveaError, REGIONS, check_dims,
+                      dims_of, normalize_geometry)
 
 
 def check_network(net: dict) -> list[dict]:
@@ -112,6 +112,26 @@ def check_network(net: dict) -> list[dict]:
                            "margen no hay relleno del que dar una fraccion",
                 "hint": "usa edge_inputs='dist' (mide contra la fovea y funciona "
                         "tambien en la CNN plana) o dale un border_px > 0"})
+    modo_mascara = net.get("mask_channel", "off")
+    if modo_mascara not in MASK_MODES:
+        problems.append({
+            "code": "unknown_mask_channel",
+            "message": f"mask_channel '{modo_mascara}' no existe",
+            "hint": f"usa uno de {sorted(MASK_MODES)}: 'off' (un canal, lo de "
+                    f"siempre) o 'coverage' (un segundo canal que dice que "
+                    f"fraccion de cada celda es relleno inventado)"})
+    elif modo_mascara != "off":
+        try:
+            borde = int(normalize_geometry(net).get("border_px", 0))
+        except FoveaError:
+            borde = None       # la geometria ya se quejo arriba; no se duplica
+        if borde == 0:
+            problems.append({
+                "code": "mask_needs_border",
+                "message": "mask_channel='coverage' con border_px=0 mide siempre "
+                           "0: sin margen no hay relleno que declarar",
+                "hint": "dale un border_px > 0, o usa edge_inputs='dist', que "
+                        "mide contra la fovea y funciona tambien sin margen"})
     if not problems and not single:
         dims = dims_of(net)
         if int(net.get("k_periph", 3)) > 2 * dims.periph_band + 1:

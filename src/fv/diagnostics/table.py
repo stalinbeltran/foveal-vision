@@ -80,7 +80,8 @@ def diagnostics_table(run_name: str, split: str = "val",
         ds = FoveatedWindowDataset(arrays, dims, split=SPLITS[split],
                                    pool_mode=net["pool_mode"],
                                    pad_mode=net["pad_mode"],
-                                   edge_inputs=net.get("edge_inputs", "off"))
+                                   edge_inputs=net.get("edge_inputs", "off"),
+                                   mask_channel=net.get("mask_channel", "off"))
         if len(ds) == 0:
             raise RunError("split_empty", f"el split '{split}' esta vacio",
                            "reconstruye el dataset con ese split > 0")

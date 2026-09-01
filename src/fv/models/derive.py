@@ -33,7 +33,7 @@ from fv.models.builder import NETWORK_DEFAULTS, full_config
 STATIC_FIELDS = ("border_px", "border_reduce", "overlap_fovea_px",
                  "overlap_border_px", "n_layers", "k_center", "k_periph",
                  "s_center", "s_periph", "merge", "pool_mode", "pad_mode",
-                 "regions", "dropout", "edge_inputs")
+                 "regions", "dropout", "edge_inputs", "mask_channel")
 DEFAULT_BORDER_PX = NETWORK_DEFAULTS["border_px"]
 # the tolerance the pre-2026-08-25 derivation used when loosening c_frac (D-G3)
 LEGACY_C_FRAC_TOLERANCE = 0.15

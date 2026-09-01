@@ -1,0 +1,52 @@
+format_version: 2
+# `fov16-optimo` MAS el canal de relleno a la rama periferica
+# (`mask_channel: coverage`).
+#
+# Encargada por el dueno el 2026-09-01 para entrenarla y USARLA en inferencia,
+# despues de que la revision a ojo encontrara que el relleno del borde desvia el
+# entrenamiento: hace parecer que el parrafo se extiende.
+#
+# EL FALLO QUE ATACA, MEDIDO (2026-09-01, val de dirty1000-80px-16px-r20260827):
+#   esquina a 0-1 px del borde de la imagen -> recall 0,608 y err 2,30 px
+#   esquina a mas de 8 px                   -> recall 0,939 y err 1,20 px
+# El recall se hunde 33 puntos en el ultimo pixel, y solo ahi.
+#
+# POR QUE UN CANAL Y NO SOLO LOS 4 ESCALARES DE `edge_inputs`:
+#   `pad_mode: edge` replica la fila del borde, y esa replica es por
+#   construccion indistinguible de imagen real que sigue. La informacion que
+#   falta es "que celdas son inventadas", y ya se calcula en cada paso
+#   (`build_view` devuelve la cobertura) y se tiraba en todos los caminos.
+#   `edge_inputs` la resume en 4 numeros y la entrega a la CABEZA, despues de
+#   las convoluciones; el canal la entrega celda a celda DENTRO de la
+#   convolucion, que es donde nace la ambiguedad.
+#
+# ⚠ Y EL CANAL VA SOLO A LA PERIFERIA, que no es una economia:
+#   MEDIDO 2026-09-01 con las dos geometrias vivas: bajo la mascara del CENTRO la
+#   cobertura es 1,000 en todas las celdas, tambien en la ventana (0,0). La fovea
+#   esta dentro de la imagen por construccion. Darselo al centro serian 144 pesos
+#   equivalentes a un sesgo.
+#   168.700 -> 168.844 parametros: +144, +0,085 % (medido 2026-09-01 con
+#   network_trace sobre ESTA config; los 167.852 de otras notas son la
+#   geometria chica, no esta).
+#
+# ⚠ NADA DE ESTO ESTA MEDIDO COMO MEJORA. Que el mecanismo exista y entrene no
+# es que suba el f1 ni que recupere el recall del borde. El criterio con el que
+# se leera esta red esta escrito ANTES de mirarla, en
+# docs/plan-mask-channel-2026-09-01.md. Esta red se entrena para USARLA.
+fovea_px: 16
+border_px: 8
+border_reduce: 4
+overlap_fovea_px: 7
+overlap_border_px: 0
+n_layers: 4
+k_center: 3
+k_periph: 3
+s_center: 1
+s_periph: 1
+channels: [16, 16, 16, 16]
+merge: concat
+pool_mode: avg
+pad_mode: edge
+regions: split
+edge_inputs: pad
+mask_channel: coverage

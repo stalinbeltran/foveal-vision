@@ -75,6 +75,10 @@ REGIONS = ("split", "single")
 # to remember which mode inverts the sign.
 EDGE_MODES = ("off", "pad", "dist")
 
+# El segundo canal de ENTRADA: que parte de cada celda de la vista es relleno
+# inventado en vez de imagen real. `off` = un solo canal, que es lo que habia.
+MASK_MODES = ("off", "coverage")
+
 # The order of the four numbers, declared ONCE — the same reason CORNER_NAMES is
 # declared once in fv.metrics. Left, Top, Right, Bottom.
 EDGE_SIDES = ("L", "T", "R", "B")
@@ -551,6 +555,40 @@ def edge_features(image_shape: tuple, wx0: int, wy0: int, dims: FoveaDims,
                     W - (int(wx0) + dims.fovea_px),
                     H - (int(wy0) + dims.fovea_px)), dtype=np.float32)
     return (1.0 - np.clip(d, 0.0, f) / f).astype(np.float32)
+
+
+def n_input_channels(mask_channel: str = "off") -> int:
+    """Cuantos canales recibe la rama que VE el anillo. 1 con 'off'."""
+    if mask_channel not in MASK_MODES:
+        raise FoveaError("unknown_mask_channel",
+                         f"mask_channel '{mask_channel}' no existe",
+                         f"usa uno de {sorted(MASK_MODES)}")
+    return 1 if mask_channel == "off" else 2
+
+
+def input_stack(view: np.ndarray, coverage: np.ndarray,
+                mask_channel: str = "off") -> np.ndarray:
+    """(C, N, N) float32: la vista y, si se pide, cuanto de cada celda es RELLENO.
+
+    UNA definicion de como se arma la entrada, para el dataloader, `predict_image`,
+    la tabla de diagnostico y las sondas. Tres copias de esto divergen en si el
+    canal es cobertura o su complemento, y ese fallo entrena una red que lee la
+    senal al reves sin que nada falle.
+
+    ⚠ El canal es `1 - coverage` (RELLENO), no la cobertura. Dos razones, y la
+    segunda es la que obliga:
+      - orientacion igual que `edge_features`: 0 = no hay borde aqui, 1 = todo
+        esto es inventado. Dos entradas sobre lo mismo con signos opuestos es
+        una trampa gratis.
+      - la rama se MULTIPLICA por su mascara de region antes de convolucionar, y
+        eso pone a 0 lo que cae fuera. Con la cobertura, ese 0 significaria
+        "inventado" justo donde en realidad significa "no es mio"; con el
+        relleno significa "nada que declarar", que es lo mismo que dicen los
+        pixeles de imagen que ahi tambien van a 0.
+    """
+    if n_input_channels(mask_channel) == 1:
+        return view[None].astype(np.float32)
+    return np.stack([view, 1.0 - coverage]).astype(np.float32)
 
 
 def build_view(image: np.ndarray, wx0: int, wy0: int, dims: FoveaDims,

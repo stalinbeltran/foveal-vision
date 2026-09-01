@@ -1,0 +1,12 @@
+{
+  "name": "entrenar-inferencia",
+  "descripcion": "Lanza un entrenamiento en Vast cuyo producto es EL MODELO, con las siete medidas de docs/entrenar-para-inferencia.md: unidad de systemd (sobrevive a que muera quien lo lanza), techo de gasto Y de reloj, pesos bajando en cada sonda, y re-arranque que ADOPTA la instancia viva en vez de alquilar otra. Argumentos: <run> <red>.",
+  "ejemplos": [
+    "fov16-mask-p20 fov16-optimo-mask",
+    "fov16-mask-p20 fov16-optimo-mask --presupuesto 2 --horas-max 8"
+  ],
+  "command": "set -- {{input}}; RUN=\"$1\"; RED=\"$2\"; shift 2 || true; if [ -z \"$RUN\" ] || [ -z \"$RED\" ]; then echo 'uso: <run> <red> [args]'; exit 0; fi; \"$COORD_HOME/scripts/desacoplar-persistente.sh\" \"entrenar-$RUN\" /bin/bash -lc \"cd '$PWD' && scripts/entrenar_para_inferencia.sh $RUN $RED $*\" 2>&1; echo; echo \"Comprueba con: /use vigilar-entrenamiento -> $RUN\"",
+  "encargados": ["echo"],
+  "requiere": ["python3"],
+  "timeoutMs": 120000
+}

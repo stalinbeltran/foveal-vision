@@ -715,10 +715,10 @@ def create_app() -> FastAPI:
         model = _model_para_mirar(name)
         img, wx0, wy0 = _probe_window(body)
         from fv.fovea import build_view
-        view, _cov = build_view(img, wx0, wy0, model.dims,
-                                pool_mode=model.cfg["pool_mode"],
-                                pad_mode=model.cfg["pad_mode"])
-        return feature_maps_payload(model, view)
+        view, cov = build_view(img, wx0, wy0, model.dims,
+                               pool_mode=model.cfg["pool_mode"],
+                               pad_mode=model.cfg["pad_mode"])
+        return feature_maps_payload(model, view, cov)
 
     @app.post("/runs/{name}/input-view")
     def run_input_view(name: str, body: dict):

@@ -25,9 +25,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from fv.fovea import (EDGE_MODES, EDGE_SIDES, GEOMETRY_FIELDS, REGIONS,
+from fv.fovea import (EDGE_MODES, EDGE_SIDES, GEOMETRY_FIELDS, MASK_MODES, REGIONS,
                       FoveaError, build_masks, dims_of, is_single_region,
-                      n_edge_features, normalize_geometry)
+                      n_edge_features, n_input_channels, normalize_geometry)
 
 DEFAULT_CHANNEL = 16  # D-C2: a derived net defaults to [16]*n_layers (constant 16)
 
@@ -68,6 +68,13 @@ NETWORK_DEFAULTS = {
     # extra inputs the head has exactly the shape it had (checkpoints load
     # strict, the forward is bit-identical -- tested).
     "edge_inputs": "off",
+    # El segundo canal de ENTRADA: cuanto de cada celda de la vista es relleno
+    # inventado (`fv.fovea.MASK_MODES`). 'off' por la misma razon que los dos de
+    # arriba: una red construida desde una config guardada tiene que seguir
+    # significando lo que significaba, y con un canal la primera conv de la rama
+    # periferica cambia de forma -- o sea que los checkpoints en disco dejarian
+    # de cargar `strict`. Con 'off' el forward es bit-identico.
+    "mask_channel": "off",
 }
 
 
@@ -119,12 +126,28 @@ class FoveatedRegionalNN(nn.Module):
         # L conv layers per branch, same kernel in all of them. The branch stride
         # goes on the FIRST layer only; the rest are stride 1 (D-S1), so the total
         # subsampling is `s` regardless of depth -> n_layers stays out of stride_range.
-        self.center_convs = self._make_branch(channels, kc, pc, cfg["s_center"])
+        # ⚠ El canal de relleno va SOLO a la rama que ve el anillo, y eso no es
+        # una economia: es lo unico que tiene sentido. MEDIDO el 2026-09-01
+        # sobre `dirty1000-80px-16px-r20260827` con las dos geometrias vivas
+        # (borde 4/solape 2 y borde 8/solape 7): bajo la mascara del CENTRO la
+        # cobertura es 1,000 en todas las celdas, tambien en la ventana (0,0) --
+        # las 76 celdas con relleno caen enteras bajo la periferia. Es por
+        # construccion: la fovea siempre esta dentro de la imagen.
+        #
+        # Darselo tambien al centro seria un canal constante a 0, que en una
+        # conv es exactamente equivalente a un termino de sesgo: 144 pesos
+        # muertos que duplican los que ya hay. Es el primer argumento del
+        # comentario de mas abajo sobre `edge_inputs`, y aqui aplica entero.
+        self.mask_channel = str(cfg["mask_channel"])
+        cin = n_input_channels(self.mask_channel)
+        self.center_convs = self._make_branch(channels, kc, pc, cfg["s_center"],
+                                              in_ch=1 if not self.single else cin)
         # 'single': no second branch and NO MASKS AT ALL — build_masks is never
         # called, so the geometry every other domain imports stays untouched. The
         # module names of 'split' are unchanged, so existing checkpoints load.
         if not self.single:
-            self.periph_convs = self._make_branch(channels, kp, pp, cfg["s_periph"])
+            self.periph_convs = self._make_branch(channels, kp, pp, cfg["s_periph"],
+                                                  in_ch=cin)
             cm, pm = build_masks(dims)
             self.register_buffer("center_mask", torch.from_numpy(cm)[None, None])
             self.register_buffer("periph_mask", torch.from_numpy(pm)[None, None])
@@ -158,9 +181,11 @@ class FoveatedRegionalNN(nn.Module):
         self.head = nn.Linear(flat + self.n_edge, 12)  # 4 corners x [exists, x, y]
 
     @staticmethod
-    def _make_branch(channels: list[int], k: int, pad: int, stride: int) -> nn.ModuleList:
+    def _make_branch(channels: list[int], k: int, pad: int, stride: int,
+                     in_ch: int = 1) -> nn.ModuleList:
         layers = nn.ModuleList()
-        in_ch = 1  # the masked composite image is one channel per branch
+        # 1 canal (la composicion enmascarada) salvo que esta rama reciba ademas
+        # el canal de relleno -- ver el porque en __init__
         for i, out_ch in enumerate(channels):
             s = stride if i == 0 else 1
             layers.append(nn.Conv2d(in_ch, out_ch, k, stride=s, padding=pad))
@@ -186,8 +211,27 @@ class FoveatedRegionalNN(nn.Module):
             return {"single": self._branch_forward(self.center_convs, x)}
         # option A: mask the input, then convolve — strides act on data already
         # separated by region, and masks stay N x N.
-        return {"center": self._branch_forward(self.center_convs, x * self.center_mask),
-                "periph": self._branch_forward(self.periph_convs, x * self.periph_mask)}
+        #
+        # El centro se queda con el canal 0 (la imagen) aunque lleguen dos: el
+        # canal de relleno es constante bajo su mascara y no le dice nada.
+        return {"center": self._branch_forward(self.center_convs, self._para("center", x)),
+                "periph": self._branch_forward(self.periph_convs, self._para("periph", x))}
+
+    def _para(self, rama: str, x: torch.Tensor) -> torch.Tensor:
+        """La entrada que recibe UNA rama: sus canales por su mascara.
+
+        ⚠ Existe porque el reparto estaba escrito DOS veces -- aqui y en
+        `feature_maps`-- y con un solo canal las dos copias daban lo mismo, asi
+        que la divergencia no se veia. Al llegar el segundo canal la sonda
+        reventaba con `expected input to have 1 channels`: el fallo ruidoso, por
+        suerte. Una definicion, dos lectores.
+
+        El centro se queda con el canal 0 (la imagen): el de relleno es constante
+        bajo su mascara y no le dice nada (ver __init__).
+        """
+        if rama == "center":
+            return x[:, :1] * self.center_mask
+        return x * self.periph_mask
 
     def _merge(self, outs: dict) -> torch.Tensor:
         if self.single:
@@ -198,7 +242,8 @@ class FoveatedRegionalNN(nn.Module):
 
     def _infer_flat_features(self) -> int:
         with torch.no_grad():
-            dummy = torch.zeros(1, 1, self.dims.N, self.dims.N)
+            dummy = torch.zeros(1, n_input_channels(self.mask_channel),
+                                self.dims.N, self.dims.N)
             return int(self._merge(self._branches(dummy)).shape[1])
 
     def forward(self, x: torch.Tensor, edge: torch.Tensor | None = None) -> torch.Tensor:
@@ -273,8 +318,8 @@ class FoveatedRegionalNN(nn.Module):
         with torch.no_grad():
             if self.single:
                 return {"single": self._branch_maps(self.center_convs, x)}
-            return {"center": self._branch_maps(self.center_convs, x * self.center_mask),
-                    "periph": self._branch_maps(self.periph_convs, x * self.periph_mask)}
+            return {"center": self._branch_maps(self.center_convs, self._para("center", x)),
+                    "periph": self._branch_maps(self.periph_convs, self._para("periph", x))}
 
 
 def build_model(cfg: dict) -> FoveatedRegionalNN:
@@ -288,7 +333,7 @@ def network_trace(cfg: dict) -> dict:
     model = build_model(cfg)
     dims = model.dims
     with torch.no_grad():
-        dummy = torch.zeros(1, 1, dims.N, dims.N)
+        dummy = torch.zeros(1, n_input_channels(cfg["mask_channel"]), dims.N, dims.N)
         outs = model._branches(dummy)
     n_params = sum(int(np.prod(t.shape)) for t in model.state_dict().values())
     return {
@@ -302,6 +347,7 @@ def network_trace(cfg: dict) -> dict:
         # in. Reported apart because "the head grew" and "the net saw more
         # pixels" are different facts and the param count alone conflates them.
         "edge_inputs": cfg["edge_inputs"],
+        "mask_channel": cfg["mask_channel"],
         "edge_features": model.n_edge,
         "head_inputs": model.flat_features + model.n_edge,
         "num_params": n_params,

@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from fv.fovea import build_view, edge_features
+from fv.fovea import build_view, edge_features, input_stack
 from fv.metrics import CORNER_NAMES
 
 
@@ -40,10 +40,10 @@ def predict_image(model, image: np.ndarray, threshold: float = 0.5,
     views, edges, origins = [], [], []
     for wy0 in ys:
         for wx0 in xs:
-            v, _cov = build_view(image, wx0, wy0, dims,
-                                 pool_mode=model.cfg["pool_mode"],
-                                 pad_mode=model.cfg["pad_mode"])
-            views.append(v)
+            v, cov = build_view(image, wx0, wy0, dims,
+                                pool_mode=model.cfg["pool_mode"],
+                                pad_mode=model.cfg["pad_mode"])
+            views.append(input_stack(v, cov, model.cfg.get("mask_channel", "off")))
             # the SAME fv.fovea function the dataloader calls (contract (5)).
             # Here it matters more than for the view: these windows come from a
             # sliding grid over a WHOLE image, so the edge ones are a fixed
@@ -54,7 +54,8 @@ def predict_image(model, image: np.ndarray, threshold: float = 0.5,
             origins.append((wx0, wy0))
     raw = []
     if views:
-        batch = torch.from_numpy(np.stack(views)).unsqueeze(1)
+        # ya vienen con su eje de canal desde `input_stack`
+        batch = torch.from_numpy(np.stack(views))
         edge = torch.from_numpy(np.stack(edges))
         with torch.no_grad():
             out = model(batch, edge).numpy()

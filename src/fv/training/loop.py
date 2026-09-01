@@ -250,10 +250,12 @@ def _train_inner(run_name, run_dir: Path, manifest, net, recipe: Recipe,
     arrays = wstore.arrays(window_dataset)
     train_ds = FoveatedWindowDataset(arrays, dims, split=0,
                                      pool_mode=net["pool_mode"], pad_mode=net["pad_mode"],
-                                     edge_inputs=net["edge_inputs"])
+                                     edge_inputs=net["edge_inputs"],
+                                     mask_channel=net["mask_channel"])
     val_ds = FoveatedWindowDataset(arrays, dims, split=1,
                                    pool_mode=net["pool_mode"], pad_mode=net["pad_mode"],
-                                   edge_inputs=net["edge_inputs"])
+                                   edge_inputs=net["edge_inputs"],
+                                   mask_channel=net["mask_channel"])
     g = torch.Generator()
     g.manual_seed(recipe.seed)
     if estado is not None and estado.get("rng_loader") is not None:

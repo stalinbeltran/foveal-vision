@@ -12,7 +12,8 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from fv.fovea import EDGE_SIDES, build_view, edge_features
+from fv.fovea import (EDGE_SIDES, FoveaError, build_view, edge_features,
+                      input_stack)
 from fv.matrixview import map_payload, maps_payload
 
 
@@ -27,8 +28,21 @@ def kernels_payload(model) -> dict:
     }
 
 
-def feature_maps_payload(model, view: np.ndarray) -> dict:
-    x = torch.from_numpy(view).float()[None, None]
+def feature_maps_payload(model, view: np.ndarray, coverage=None) -> dict:
+    """⚠ `coverage` no es opcional cuando la red lleva canal de relleno: sin el
+    la sonda convolucionaria una entrada con menos canales de los que la rama
+    periferica espera, y reventaria. Se pide aqui en vez de rellenarlo con ceros
+    porque ceros significaria 'no hay relleno en ninguna celda', que es falso
+    justo en las ventanas del borde -- que son las que se miran con esta sonda."""
+    modo = model.cfg.get("mask_channel", "off")
+    if modo != "off" and coverage is None:
+        raise FoveaError(
+            "mask_channel_missing",
+            f"la red se construyo con mask_channel='{modo}' y la sonda no "
+            f"recibio la cobertura",
+            "pasa el segundo valor que devuelve fv.fovea.build_view")
+    cov = coverage if coverage is not None else np.ones_like(view)
+    x = torch.from_numpy(input_stack(view, cov, modo)).float()[None]
     fm = model.feature_maps(x)
     out = {}
     for branch, layers in fm.items():

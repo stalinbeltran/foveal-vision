@@ -1,0 +1,12 @@
+{
+  "name": "vigilar-entrenamiento",
+  "descripcion": "¿Va bien un entrenamiento para inferencia, y SE ESTAN GUARDANDO los pesos? Mira la unidad de systemd, la edad del .pt mas nuevo en la antesala, si hay instancia de Vast viva (y si tiene vigilante) y por que epoca va. Sale en rojo si algo falla.",
+  "ejemplos": [
+    "fov16-mask-p20",
+    "fov16-mask-p20 --max-edad 600"
+  ],
+  "command": "set -a; [ -f \"$HOME/.config/dev-secrets.env\" ] && . \"$HOME/.config/dev-secrets.env\"; set +a; .venv/bin/python scripts/vigilar_entrenamiento.py --name {{input}} 2>&1 | grep -v NNPACK; exit 0",
+  "encargados": ["echo"],
+  "requiere": ["python3"],
+  "timeoutMs": 120000
+}
