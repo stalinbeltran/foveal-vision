@@ -174,6 +174,43 @@ args:
 strength: strong
 ```
 
+**U5.12 — Toda negativa se puede PRODUCIR, y la que todavía no, está en una lista que
+sólo encoge.** U5.2 obliga a que el error lleve `code + message + hint` y hay validador que lo
+comprueba — pero eso mira la **forma**, y **un diagnóstico falso cumple la forma perfectamente**.
+Un `raise` que ningún test ejecuta es una conjetura sobre un estado que nadie ha visto.
+
+*Medido el 2026-09-01: de los **109** códigos declarados en `src/`, **44 (40 %)** no los producía
+ningún test.* Uno era `checkpoint_incompatible`, que ese día dijo **«reentrena el run»** —gastar en
+Vast— cuando lo que hacía falta era **reiniciar el servicio**: el proceso llevaba vivo desde antes
+de que existiera el campo que el checkpoint declaraba. El mensaje afirmaba una **causa** a partir de
+un **síntoma que tiene varias**, y eso no es un texto mal escrito: es un fallo de lógica disfrazado
+de mensaje.
+
+Tres cosas que la regla exige, y la tercera es la que encuentra los diagnósticos falsos:
+
+1. **un código nuevo no puede nacer sin un test que lo produzca**;
+2. **la lista congelada sólo encoge**: cubrir uno es borrarlo de ella en el mismo commit — si no,
+   es un cementerio que sólo crece de nombre;
+3. ⚠ **si el error nombra una CAUSA, se escribe también el test de la OTRA causa que da el mismo
+   síntoma.** Sentarse a escribir ese segundo test es lo que revela que el primero mentía. Aquí
+   fueron `checkpoint_incompatible` (los pesos no encajan de verdad → reentrenar, caro) y
+   `checkpoint_de_codigo_mas_nuevo` (el proceso se quedó atrás → reiniciar, gratis).
+
+⚠ **Y el `hint` es una ACCIÓN, así que tiene coste: se ordenan de barata a cara.** Un error que
+propone gastar sin haber descartado lo gratis no es impreciso, es caro.
+
+⚠ **Lo que esta regla NO compra**: que la rama se haya ejecutado de verdad (comprueba que un test
+la *nombra* como dato, no como prosa — lo distingue con `ast`), y mucho menos que el diagnóstico
+sea **cierto**. Eso es juicio. Lo que compra es que **exista un sitio donde ese juicio se pudo
+ejercer**.
+
+```check U5.12
+substrate: delegated
+target: "tests/test_errores.py::test_ningun_codigo_de_error_nuevo_se_queda_sin_test"
+reason: "el trinquete vive en la suite, que es lo que se corre de verdad aqui (no hay CI);
+  duplicarlo en el validador serian dos definiciones de la misma lista congelada"
+```
+
 **U5.11 — Una definición (C/D) se edita; la pantalla ofrece hacerlo, y lo pide aparte.** Es el
 reverso de U5.8: un run es un artefacto y **no** se sobrescribe, pero una red y una receta son
 **fuente** (formatos.md §4.3) y cambiarles un número es trabajo normal. Abrir una guardada y

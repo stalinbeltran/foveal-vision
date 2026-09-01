@@ -185,3 +185,30 @@ def test_un_proceso_viejo_lo_dice_y_NO_manda_a_reentrenar(tmp_path):
     # y el checkpoint normal sigue cargando
     torch.save({"config": {"model": cfg}, "model": m.state_dict()}, p)
     assert load_model(p).cfg["mask_channel"] == "off"
+
+
+def test_los_pesos_que_de_verdad_no_encajan_SI_mandan_a_reentrenar(tmp_path):
+    """La OTRA causa del mismo sintoma, y la que da el consejo caro.
+
+    Este test es el par del de arriba, y escribirlo es la tecnica: dos causas que
+    producen la misma excepcion tienen que dar codigos DISTINTOS y consejos
+    distintos --uno gratis (reiniciar), otro caro (reentrenar)--. Mientras existia
+    una sola de las dos, el mensaje afirmaba una causa que no habia comprobado.
+    """
+    import torch
+    from fv.inference.checkpoint import CheckpointError, load_model
+
+    # pesos de una red de 2 capas guardados bajo una config que dice 4: encajan
+    # tan poco como los de un builder anterior, y aqui NO sobra ningun campo
+    viejo = build_model(full_config({**BASE, "n_layers": 2, "channels": [16, 16]}))
+    cfg = full_config(BASE)
+    p = tmp_path / "best.pt"
+    torch.save({"config": {"model": cfg}, "model": viejo.state_dict()}, p)
+
+    with pytest.raises(CheckpointError) as e:
+        load_model(p)
+    assert e.value.code == "checkpoint_incompatible"
+    # y aqui el consejo caro SI es el correcto
+    assert "reentrena" in e.value.hint
+    # ...pero manda a mirar antes lo barato, que es lo que fallo el 2026-09-01
+    assert "proceso" in e.value.hint
