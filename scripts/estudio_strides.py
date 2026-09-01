@@ -37,7 +37,19 @@ CINCO COSAS QUE HAY QUE RESPETAR SI SE TOCA ESTO
    (`sweep_trials` + `aggregate_seeds`), para que el pico que elige el rango sea
    el mismo que sale en la tabla. `--pico` lo fuerza y AVISA EN VOZ ALTA.
 
-5. **El control ISO-FEATURES es un recorrido APARTE y se corre solo si hace
+5. ⚠ **ESTO NO SE PUEDE PROBAR EN SECO: `crear` ESCRIBE EN EL REPO DE DATOS.**
+   Pasarle un `SweepStore(root=<tmp>)` NO aisla nada -- `SweepStore.destino()`
+   delega en `artefactos.destino_agrupado()`, que resuelve la carpeta del mes
+   contra la raiz REAL e ignora el `root` del store (comprobado el 2026-09-01:
+   una prueba con store temporal dejo `sc-t`, `sp-t` e `if-c` escritos en
+   `foveal-vision-data/2026/09-septiembre/sweeps/`, y hubo que borrarlos a
+   mano). Crear un recorrido no gasta dinero -- solo `estudio_flota.py` gasta --
+   pero si deja artefactos con nombre reservado: `store.exists()` los ve, asi
+   que el intento siguiente dice "ya existe, se deja" y NO rehace el recorrido
+   aunque el rango haya cambiado. Para probar el camino sin persistir, usa
+   `build_generated_spec` + `expand_points`, que no escriben.
+
+6. **El control ISO-FEATURES es un recorrido APARTE y se corre solo si hace
    falta** (plan §4.3 y criterio R5). Aisla capacidad de resolucion: la misma
    cabeza que el brazo con stride, pero con la resolucion entera. Los canales
    estan CALCULADOS, no tecleados, y se reduce solo la ultima capa: ver
