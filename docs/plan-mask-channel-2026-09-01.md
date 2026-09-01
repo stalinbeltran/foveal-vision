@@ -94,6 +94,10 @@ hacían `view, _cov = ...`. Sólo la usaba la vista de depuración F0.
   `dropout`), con **puerta**: `mask_channel` desconocido y `border_px = 0` se
   rechazan *antes* de entrenar. **11 tests** en `tests/test_mask_channel.py`.
 
+**El dibujo**, generado del propio código (`scripts/diagrama_red.py`, así que no
+puede quedarse desfasado): [`red-fov16-optimo-mask.svg`](red-fov16-optimo-mask.svg)
+— y el mismo sin el canal, para comparar: [`red-fov16-optimo.svg`](red-fov16-optimo.svg).
+
 ### Por qué un canal y no sólo los 4 escalares de `edge_inputs`
 
 `edge_inputs` resume la misma información en 4 números y la entrega a la

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="536" viewBox="0 0 1180 536" font-family="ui-sans-serif, system-ui, sans-serif">
+<defs><marker id="punta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#6b675f"/></marker></defs>
+<rect width="1180" height="536" fill="#ffffff"/>
+<text x="28" y="38" font-size="22" fill="#23211d" text-anchor="start" font-weight="700" font-family="ui-sans-serif, system-ui, sans-serif">fov16-optimo-mask</text>
+<text x="28" y="60" font-size="13" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">168.044 pesos entrenables · fovea 16 px · borde 8 px (reduce ×4) · solape 7 px</text>
+<rect x="28" y="92" width="210" height="150" rx="8" fill="#efede8" stroke="#d8d4cc" stroke-width="1.5"/>
+<text x="40" y="116" font-size="13" fill="#23211d" text-anchor="start" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">1 · lo que se recorta</text>
+<text x="40" y="140" font-size="12" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">recorte 32×32 px</text>
+<rect x="40" y="152" width="90" height="90" fill="#ffffff" stroke="#6b675f" stroke-width="1.5" stroke-dasharray="4 3"/>
+<rect x="62.5" y="174.5" width="45.0" height="45.0" fill="#2757a8" opacity="0.16" stroke="#2757a8" stroke-width="1.5"/>
+<text x="148" y="182" font-size="11" fill="#2757a8" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">ventana</text>
+<text x="148" y="197" font-size="11" fill="#2757a8" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">etiquetada</text>
+<text x="148" y="214" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">margen:</text>
+<text x="148" y="228" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">contexto</text>
+<rect x="288" y="92" width="232" height="176" rx="8" fill="#efede8" stroke="#d8d4cc" stroke-width="1.5"/>
+<text x="300" y="116" font-size="13" fill="#23211d" text-anchor="start" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">2 · muestreo foveado</text>
+<text x="300" y="138" font-size="12" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">vista 20×20 — centro a resolución</text>
+<text x="300" y="154" font-size="12" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">plena, anillo reducido ×4</text>
+<text x="300" y="178" font-size="12" fill="#23211d" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">canal 1: la imagen</text>
+<rect x="300" y="192" width="208" height="64" rx="6" fill="#a8312e" opacity="0.10"/>
+<text x="308" y="212" font-size="12" fill="#a8312e" text-anchor="start" font-weight="700" font-family="ui-sans-serif, system-ui, sans-serif">canal 2: EL RELLENO</text>
+<text x="308" y="230" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">1 − cobertura, celda a celda:</text>
+<text x="308" y="246" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">0 = imagen real · 1 = inventado</text>
+<rect x="570" y="92" width="268" height="140" rx="8" fill="#ffffff" stroke="#d8d4cc" stroke-width="1.5"/>
+<text x="584" y="118" font-size="13" fill="#2757a8" text-anchor="start" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">rama CENTRO</text>
+<text x="584" y="138" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">máscara: 256 de 400 celdas</text>
+<text x="584" y="156" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">entra 1 canal</text>
+<rect x="584" y="168" width="44" height="40" rx="5" fill="#2757a8" opacity="0.14" stroke="#2757a8" stroke-width="1"/>
+<text x="606.0" y="186" font-size="12" fill="#2757a8" text-anchor="middle" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">16</text>
+<text x="606.0" y="200" font-size="9" fill="#6b675f" text-anchor="middle" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">3×3</text>
+<rect x="636" y="168" width="44" height="40" rx="5" fill="#2757a8" opacity="0.2" stroke="#2757a8" stroke-width="1"/>
+<text x="658.0" y="186" font-size="12" fill="#2757a8" text-anchor="middle" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">16</text>
+<text x="658.0" y="200" font-size="9" fill="#6b675f" text-anchor="middle" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">3×3</text>
+<rect x="688" y="168" width="44" height="40" rx="5" fill="#2757a8" opacity="0.26" stroke="#2757a8" stroke-width="1"/>
+<text x="710.0" y="186" font-size="12" fill="#2757a8" text-anchor="middle" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">16</text>
+<text x="710.0" y="200" font-size="9" fill="#6b675f" text-anchor="middle" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">3×3</text>
+<rect x="740" y="168" width="44" height="40" rx="5" fill="#2757a8" opacity="0.32" stroke="#2757a8" stroke-width="1"/>
+<text x="762.0" y="186" font-size="12" fill="#2757a8" text-anchor="middle" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">16</text>
+<text x="762.0" y="200" font-size="9" fill="#6b675f" text-anchor="middle" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">3×3</text>
+<text x="584" y="224" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">salida 20×20×16</text>
+<rect x="570" y="246" width="268" height="140" rx="8" fill="#ffffff" stroke="#d8d4cc" stroke-width="1.5"/>
+<text x="584" y="272" font-size="13" fill="#a05a12" text-anchor="start" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">rama PERIFERIA</text>
+<text x="584" y="292" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">máscara: 396 de 400 celdas</text>
+<text x="584" y="310" font-size="11" fill="#a8312e" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">entra 2 canales (imagen + relleno)</text>
+<rect x="584" y="322" width="44" height="40" rx="5" fill="#a05a12" opacity="0.14" stroke="#a05a12" stroke-width="1"/>
+<text x="606.0" y="340" font-size="12" fill="#a05a12" text-anchor="middle" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">16</text>
+<text x="606.0" y="354" font-size="9" fill="#6b675f" text-anchor="middle" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">3×3</text>
+<rect x="636" y="322" width="44" height="40" rx="5" fill="#a05a12" opacity="0.2" stroke="#a05a12" stroke-width="1"/>
+<text x="658.0" y="340" font-size="12" fill="#a05a12" text-anchor="middle" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">16</text>
+<text x="658.0" y="354" font-size="9" fill="#6b675f" text-anchor="middle" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">3×3</text>
+<rect x="688" y="322" width="44" height="40" rx="5" fill="#a05a12" opacity="0.26" stroke="#a05a12" stroke-width="1"/>
+<text x="710.0" y="340" font-size="12" fill="#a05a12" text-anchor="middle" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">16</text>
+<text x="710.0" y="354" font-size="9" fill="#6b675f" text-anchor="middle" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">3×3</text>
+<rect x="740" y="322" width="44" height="40" rx="5" fill="#a05a12" opacity="0.32" stroke="#a05a12" stroke-width="1"/>
+<text x="762.0" y="340" font-size="12" fill="#a05a12" text-anchor="middle" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">16</text>
+<text x="762.0" y="354" font-size="9" fill="#6b675f" text-anchor="middle" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">3×3</text>
+<text x="584" y="378" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">salida 20×20×16</text>
+<rect x="872" y="150" width="280" height="262" rx="8" fill="#efede8" stroke="#d8d4cc" stroke-width="1.5"/>
+<text x="886" y="176" font-size="13" fill="#23211d" text-anchor="start" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">4 · la cabeza</text>
+<text x="886" y="200" font-size="12" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">concat → 12.800 features</text>
+<text x="886" y="218" font-size="12" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">ReLU · dropout 0.0</text>
+<rect x="886" y="230" width="252" height="46" rx="6" fill="#a05a12" opacity="0.12"/>
+<text x="894" y="249" font-size="12" fill="#a05a12" text-anchor="start" font-weight="700" font-family="ui-sans-serif, system-ui, sans-serif">+ 4 escalares de BORDE</text>
+<text x="894" y="266" font-size="10" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">edge_inputs: pad — no pasan por</text>
+<text x="894" y="278" font-size="10" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">ninguna convolución</text>
+<text x="886" y="302" font-size="13" fill="#23211d" text-anchor="start" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">Linear 12.804 → 12</text>
+<text x="886" y="322" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">153.660 pesos (91 % del total)</text>
+<rect x="888" y="338" width="58" height="30" rx="5" fill="#2757a8" opacity="0.16" stroke="#2757a8" stroke-width="1"/>
+<text x="917" y="358" font-size="12" fill="#2757a8" text-anchor="middle" font-weight="700" font-family="ui-sans-serif, system-ui, sans-serif">TL</text>
+<rect x="954" y="338" width="58" height="30" rx="5" fill="#2b7a3d" opacity="0.16" stroke="#2b7a3d" stroke-width="1"/>
+<text x="983" y="358" font-size="12" fill="#2b7a3d" text-anchor="middle" font-weight="700" font-family="ui-sans-serif, system-ui, sans-serif">TR</text>
+<rect x="1020" y="338" width="58" height="30" rx="5" fill="#a05a12" opacity="0.16" stroke="#a05a12" stroke-width="1"/>
+<text x="1049" y="358" font-size="12" fill="#a05a12" text-anchor="middle" font-weight="700" font-family="ui-sans-serif, system-ui, sans-serif">BR</text>
+<rect x="1086" y="338" width="58" height="30" rx="5" fill="#7b3fa0" opacity="0.16" stroke="#7b3fa0" stroke-width="1"/>
+<text x="1115" y="358" font-size="12" fill="#7b3fa0" text-anchor="middle" font-weight="700" font-family="ui-sans-serif, system-ui, sans-serif">BL</text>
+<text x="886" y="398" font-size="11" fill="#6b675f" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">4 esquinas × [existe, x, y]</text>
+<line x1="240" y1="167" x2="284" y2="167" stroke="#6b675f" stroke-width="2" marker-end="url(#punta)"/>
+<line x1="522" y1="150" x2="566" y2="150" stroke="#6b675f" stroke-width="2" marker-end="url(#punta)"/>
+<line x1="522" y1="210" x2="566" y2="300" stroke="#6b675f" stroke-width="2" marker-end="url(#punta)"/>
+<path d="M 500 224 C 545 224 530 300 566 316" fill="none" stroke="#a8312e" stroke-width="2.5" marker-end="url(#punta)"/>
+<line x1="842" y1="160" x2="868" y2="200" stroke="#6b675f" stroke-width="2" marker-end="url(#punta)"/>
+<line x1="842" y1="316" x2="868" y2="268" stroke="#6b675f" stroke-width="2" marker-end="url(#punta)"/>
+<rect x="28" y="426" width="1124" height="86" rx="8" fill="#a8312e" opacity="0.07"/>
+<text x="44" y="452" font-size="13" fill="#a8312e" text-anchor="start" font-weight="700" font-family="ui-sans-serif, system-ui, sans-serif">El canal de relleno va SOLO a la periferia, y no es una economía</text>
+<text x="44" y="474" font-size="12" fill="#23211d" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">Medido: bajo la máscara del centro la cobertura es 1,000 en TODAS las celdas, también en la ventana (0,0) — la fóvea está dentro de la imagen por construcción.</text>
+<text x="44" y="494" font-size="12" fill="#23211d" text-anchor="start" font-weight="normal" font-family="ui-sans-serif, system-ui, sans-serif">Dárselo al centro serían 144 pesos equivalentes a un término de sesgo. Coste real: +144 (14.384 en las convoluciones)</text>
+</svg>
