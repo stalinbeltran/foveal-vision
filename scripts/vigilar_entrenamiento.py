@@ -104,9 +104,19 @@ def main() -> int:
     problemas: list[str] = []
     info: dict = {"run": args.name, "unidad": unidad}
 
+    # 0. ¿YA TERMINO? Se pregunta lo PRIMERO, porque cambia el significado de
+    # todo lo demas: con el run terminado, la unidad muerta y unos pesos de hace
+    # horas son exactamente lo que tiene que haber. Juzgarlos como averia es la
+    # otra mitad del fallo que arreglo la gracia -- un aviso que salta cuando
+    # todo fue bien es un aviso que se deja de leer.
+    from fv.training.registry import RunStore                  # noqa: PLC0415
+    store = RunStore(settings.runs_root())
+    info["status"] = (store.status(args.name) or {}).get("status")
+    terminado = info["status"] in ("done", "error", "cancelled")
+
     # 1. el vigilante
     info["unidad_viva"] = _unidad_viva(unidad)
-    if not info["unidad_viva"]:
+    if not info["unidad_viva"] and not terminado:
         problemas.append(f"la unidad '{unidad}' NO esta activa")
 
     # 2. ¿bajan los pesos? -- la pregunta que da nombre a este script
@@ -117,7 +127,24 @@ def main() -> int:
     pts = sorted(antesala.glob("*.pt")) if antesala.exists() else []
     if not pts:
         info["pesos"] = None
-        if arrancando:
+        if terminado:
+            # ⚠ Con el run TERMINADO la antesala vacia es lo NORMAL: al promover,
+            # los pesos pasan al repo de datos y la antesala se limpia. La
+            # pregunta deja de ser "¿estan bajando?" y pasa a ser la unica que
+            # importa entonces: "¿sobrevivio el modelo?". Se le pregunta al
+            # catalogo, que es quien lo sabe.
+            #
+            # Preguntar por la antesala daba ROJO sobre `fov16-edge-p20`, que
+            # esta aprobada y commiteada desde ayer. Un vigilante que llama
+            # averia a un exito es un vigilante que se apaga.
+            ck, origen = catalogo.checkpoint_de(args.name, store)
+            info["pesos_definitivos"] = None if ck is None else {
+                "origen": origen, "ruta": str(ck)}
+            if ck is None:
+                problemas.append(
+                    f"el run acabo en '{info['status']}' y NO tiene pesos en "
+                    f"ninguna parte (ni antesala ni catalogo): el modelo se perdio")
+        elif arrancando:
             # ⚠ se DICE que se esta en gracia, no se calla: "aun no toca mirar"
             # y "mire y esta bien" no pueden leerse igual.
             info["gracia"] = (f"sin pesos todavia, pero la unidad lleva "
@@ -133,7 +160,7 @@ def main() -> int:
             "edad_s": round(edad, 1),
             "max_edad_s": args.max_edad,
         }
-        if edad > args.max_edad:
+        if edad > args.max_edad and not terminado:
             problemas.append(
                 f"el peso mas nuevo tiene {edad / 60:.1f} min "
                 f"(tope {args.max_edad / 60:.0f} min): NO se esta guardando")
@@ -154,8 +181,7 @@ def main() -> int:
 
     # 4. por donde va
     # RunStore y no runs_root(): resuelve el mes en que se creo el run
-    from fv.training.registry import RunStore          # noqa: PLC0415
-    runs = RunStore(settings.runs_root()).path(args.name)
+    runs = store.path(args.name)
     mj = runs / "metrics.jsonl"
     if mj.exists():
         filas = [json.loads(l) for l in mj.read_text().splitlines() if l.strip()]
@@ -165,24 +191,20 @@ def main() -> int:
             info["ultima"] = {"epoch": u.get("epoch"),
                               "val_loss": (u.get("val") or {}).get("loss"),
                               "f1": (u.get("val") or {}).get("f1")}
-    st = runs / "status.json"
-    if st.exists():
-        try:
-            info["status"] = json.loads(st.read_text()).get("status")
-        except json.JSONDecodeError:
-            info["status"] = None
-
     if args.json:
         print(json.dumps({**info, "problemas": problemas}, indent=1, ensure_ascii=False))
     else:
-        icono = "🔴" if problemas else "🟢"
-        print(f"{icono} {args.name} · unidad {'viva' if info['unidad_viva'] else 'MUERTA'}"
+        icono = "🔴" if problemas else ("✅" if terminado else "🟢")
+        print(f"{icono} {args.name} · "
+              + (f"TERMINADO ({info['status']})" if terminado
+                 else ("unidad viva" if info["unidad_viva"] else "unidad MUERTA"))
               + (f" · epoca {info['ultima']['epoch']}"
                  f" f1={info['ultima']['f1']:.3f}" if info.get("ultima") else "")
               + (f" · pesos hace {info['pesos']['edad_s'] / 60:.1f} min"
                  if info.get("pesos")
                  else (" · arrancando (sin pesos aun)" if info.get("gracia")
-                       else " · SIN PESOS")))
+                       else (f" · pesos en el {info['pesos_definitivos']['origen']}"
+                             if info.get("pesos_definitivos") else " · SIN PESOS"))))
         if info.get("gracia"):
             print(f"    · {info['gracia']}")
         if isinstance(info.get("vast"), list):

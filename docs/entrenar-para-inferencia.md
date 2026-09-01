@@ -68,6 +68,14 @@ entrenamiento sigue tan campante. La comprobación es el `mtime`:
 *Medido el 2026-08-30:* no guardar ningún peso costó `fov-optimo-p20` entero — 69
 épocas en Vast, reentrenadas desde cero.
 
+⚠ **Y cuando el run TERMINA, la pregunta cambia de sitio.** La antesala vacía pasa
+a ser lo normal —al promover, los pesos van al repo de datos y la antesala se
+limpia—, así que lo que hay que preguntar deja de ser *«¿están bajando?»* y pasa a
+ser *«¿sobrevivió el modelo?»*, que se le pregunta al **catálogo**. El vigilante lo
+hace solo. *Se descubrió el 2026-09-01 porque daba rojo sobre `fov16-edge-p20`, que
+estaba aprobada y commiteada desde el día anterior: un vigilante que llama avería a
+un éxito es un vigilante que se apaga.*
+
 ### 4. La red se aprueba para inferencia al terminar, y eso es una ORDEN del dueño
 
 `entrenar_vast.py` promueve al terminar (antesala → repo de datos + catálogo) salvo
