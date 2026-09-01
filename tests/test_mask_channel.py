@@ -155,3 +155,33 @@ def test_la_sonda_se_niega_sin_cobertura():
         feature_maps_payload(m, v)
     assert e.value.code == "mask_channel_missing"
     assert feature_maps_payload(m, v, cov)["branches"]
+
+
+def test_un_proceso_viejo_lo_dice_y_NO_manda_a_reentrenar(tmp_path):
+    """Las dos averias tienen el mismo sintoma y arreglos opuestos.
+
+    Paso el 2026-09-01: la web app llevaba viva desde antes de que existiera
+    `mask_channel`, y el mensaje generico mandaba a REENTRENAR --gastar en Vast
+    para arreglar un modelo que estaba perfecto-- cuando lo que hacia falta era
+    reiniciar el servicio.
+    """
+    import torch
+    from fv.inference.checkpoint import CheckpointError, load_model
+
+    cfg = full_config(BASE)
+    m = build_model(cfg)
+    # un checkpoint escrito por un codigo MAS NUEVO: trae un campo que este
+    # proceso no conoce
+    p = tmp_path / "best.pt"
+    torch.save({"config": {"model": {**cfg, "campo_del_futuro": "x"}},
+                "model": m.state_dict()}, p)
+    with pytest.raises(CheckpointError) as e:
+        load_model(p)
+    assert e.value.code == "checkpoint_de_codigo_mas_nuevo"
+    assert "campo_del_futuro" in e.value.message
+    assert "reinicia" in e.value.hint.lower()
+    assert "NO reentrenes" in e.value.hint
+
+    # y el checkpoint normal sigue cargando
+    torch.save({"config": {"model": cfg}, "model": m.state_dict()}, p)
+    assert load_model(p).cfg["mask_channel"] == "off"

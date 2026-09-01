@@ -8,7 +8,8 @@ from pathlib import Path
 
 import torch
 
-from fv.models.builder import FoveatedRegionalNN, build_model
+from fv.models.builder import (NETWORK_DEFAULTS, FoveatedRegionalNN,
+                              build_model)
 
 
 class CheckpointError(ValueError):
@@ -33,6 +34,29 @@ def load_model(ckpt_path: Path, device: str = "cpu") -> FoveatedRegionalNN:
             "vuelve a subirlo (una subida cortada deja bytes validos pero "
             "incompletos), o borra la antesala con DELETE "
             "/inference/staging/<run>") from e
+    # ⚠ ANTES de construir: ¿declara este checkpoint campos que este proceso no
+    # conoce? Entonces no es el checkpoint el que se quedo atras -- es el CODIGO
+    # QUE CORRE AQUI, y las dos averias tienen el mismo sintoma con arreglos
+    # opuestos: una pide reiniciar (gratis), la otra reentrenar (dinero).
+    #
+    # Paso el 2026-09-01: la web app llevaba corriendo desde antes de que
+    # existiera `mask_channel`, construia la rama periferica con un canal, y los
+    # pesos traian dos. El mensaje generico decia "reentrena el run" -- o sea,
+    # gastar en Vast para arreglar un modelo que estaba perfecto.
+    #
+    # Y se mira aqui y no en el `except` porque un campo nuevo que NO cambie
+    # ninguna forma se cargaria sin protestar y la red haria otra cosa que la
+    # que su config declara: silencioso, que es peor que el fallo ruidoso.
+    desconocidos = sorted(set(cfg) - set(NETWORK_DEFAULTS))
+    if desconocidos:
+        raise CheckpointError(
+            "checkpoint_de_codigo_mas_nuevo",
+            f"{ckpt_path.name} declara campos que este proceso no conoce: "
+            f"{', '.join(desconocidos)}. El checkpoint es mas nuevo que el codigo "
+            f"que esta corriendo",
+            "reinicia el servicio para que cargue el codigo actual "
+            "(sudo systemctl restart foveal-vision-web) o, en desarrollo, el "
+            "proceso de fv-api. NO reentrenes: los pesos estan bien")
     model = build_model(cfg)
     try:
         model.load_state_dict(ckpt["model"])
@@ -45,7 +69,9 @@ def load_model(ckpt_path: Path, device: str = "cpu") -> FoveatedRegionalNN:
             "este checkpoint es de un builder anterior y sus pesos ya no encajan "
             "en la red parametrica",
             "reentrena el run (fv-train / un recorrido): no se migra state_dict "
-            "(barrido-por-ejes.md §13)") from e
+            "(barrido-por-ejes.md §13). ⚠ Si el run es RECIENTE, mira antes si "
+            "el proceso lleva vivo desde antes que el: reiniciarlo es gratis y "
+            "reentrenar cuesta") from e
     model.to(device)
     model.eval()
     return model

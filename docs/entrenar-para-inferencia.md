@@ -110,6 +110,25 @@ Contra SIGKILL no hay `finally` que valga. Por eso:
 **Comprobación:** `node ~/src/telegram-coordinator/scripts/cerrable.mjs` tiene que
 nombrar el entrenamiento mientras corra. Si no lo nombra, el freno no lo ve.
 
+### 6 bis. Si el cambio toca el MODELO, se reinicia la app antes de darla por buena
+
+Un campo nuevo en la red (`mask_channel`, `edge_inputs`, `dropout`…) cambia la
+**forma** de los pesos. El servicio `foveal-vision-web` es un proceso de larga
+vida: si lleva corriendo desde antes de tu commit, construye la red **vieja** y el
+checkpoint nuevo no le encaja.
+
+```bash
+sudo systemctl restart foveal-vision-web     # y comprobar que la red carga
+```
+
+⚠ **Y el síntoma engaña**: sale `[checkpoint_incompatible] … reentrena el run`, que
+manda a **gastar en Vast para arreglar un modelo que está perfecto**. *Pasó el
+2026-09-01 con `fov16-mask-p20`: el servicio llevaba vivo desde 2 h 26 min antes
+del commit.* Desde entonces el cargador **distingue las dos averías** —si el
+checkpoint declara campos que el proceso no conoce, el que se quedó atrás es el
+proceso— y lo dice: `[checkpoint_de_codigo_mas_nuevo] … reinicia el servicio. NO
+reentrenes`. Un test lo fija.
+
 ### 7. El criterio se escribe ANTES de mirar
 
 Un documento de plan con **qué se entrena, con qué se compara y qué desenlace
@@ -132,6 +151,7 @@ ruido: una red entrenada para usarla es un artefacto, no un resultado.
 [ ] --cada <= 300 s                                      (3)
 [ ] promoción pedida por el dueño (o --sin-promover)     (4)
 [ ] --max-cambios con tope                               (5)
+[ ] si el cambio toca el modelo, reiniciar fv-api        (6 bis)
 [ ] cerrable.mjs lo nombra tras lanzar                   (6)
 [ ] vigilar_entrenamiento.py dice que los pesos bajan    (3)
 ```
