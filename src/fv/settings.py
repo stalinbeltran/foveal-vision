@@ -119,6 +119,26 @@ def studies_root() -> Path:
     return data_root() / "studies"
 
 
+def errores_root() -> Path:
+    """Donde vive el LOG DE ERRORES: lo que se rompio y nadie estaba mirando.
+
+    En el repo de DATOS y no en el de codigo (R7): lo produce el sistema al
+    correr, no el que lo escribio, y **un error que ya ocurrio no se puede
+    re-derivar** (R9) -- si se pierde con la maquina, la unica forma de volver a
+    tenerlo es que vuelva a fallar.
+
+    Es historial puro: solo se anade, un fichero por mes, nunca se reescribe
+    (R8). El estado --que esta roto AHORA-- lo contesta el autochequeo de
+    arranque, que es otra cosa y vive en otro sitio.
+
+    ⚠ El repo es PRIVADO desde el 2026-09-01, y esta ruta lo da por hecho: aqui
+    caen mensajes y trazas, que llevan rutas, nombres y valores. Aun asi se
+    redacta por patron antes de escribir, porque "privado" es un permiso, no un
+    borrado: git no olvida y un secreto que se cuela hay que ROTARLO.
+    """
+    return data_root() / "errores"
+
+
 def reviews_root() -> Path:
     """Donde vive la REVISION A OJO: que rangos ya se miraron y que imagenes
     quedaron marcadas para volver.

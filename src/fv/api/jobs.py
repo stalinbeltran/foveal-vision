@@ -47,6 +47,18 @@ class JobQueue:
                                      "message": str(e),
                                      "hint": getattr(e, "hint", ""),
                                      "trace": traceback.format_exc()}
+                # ⚠ Y AL LOG, que es el unico sitio donde sobrevive. Un job vive
+                # en la memoria de ESTE proceso: al reiniciar el servicio, un
+                # entrenamiento que reventó hace dos horas no deja rastro en
+                # ninguna parte. Es justo el caso que el dueño describio -- "si
+                # algo ocurre hoy y no salta a la vista nunca me entero" -- y el
+                # peor, porque quien lo lanzo se fue hace rato.
+                from fv import errores                    # noqa: PLC0415
+                errores.registrar(
+                    getattr(e, "code", type(e).__name__), str(e),
+                    hint=getattr(e, "hint", ""), origen="job",
+                    donde=f"{kind} {job_id}", traza=traceback.format_exc(),
+                    extra={"describe": describe or {}})
             finally:
                 info["finished_at"] = time.time()
 

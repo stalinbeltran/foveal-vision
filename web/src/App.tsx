@@ -15,6 +15,7 @@ import Diagnostics from "./screens/Diagnostics";
 import Predict from "./screens/Predict";
 import Review from "./screens/Review";
 import ReviewDetail from "./screens/ReviewDetail";
+import Errores from "./screens/Errores";
 
 // The app-wide session control: filters/forms live in localStorage per browser;
 // "Guardar" snapshots them to a committable JSON, "Cargar" pulls it back (and
@@ -107,11 +108,16 @@ const NAV: { grupo: string; items: [string, string][] }[] = [
                                ["/studies", "Estudios"], ["/runs", "Runs"]] },
   { grupo: "Analizar", items: [["/diagnostics", "Diagnóstico"], ["/predict", "Predecir"],
                                ["/review", "Revisar"]] },
+  // ⚠ «Operación» NO es un dominio, y por eso es un grupo aparte y no una
+  // pantalla colgada de «Analizar». U1.1 dice «una pantalla, un dominio» y
+  // Errores no es ningún sustantivo de organizacion.md §1: es transversal a
+  // todos. La excepción está anotada en 1-estructura.md con su motivo.
+  { grupo: "Operación", items: [["/errores", "Errores"]] },
 ];
 
 // Lo único que se ofrece hoy. Para volver a enseñar una pantalla, añade su ruta
 // aquí; para enseñarlas todas, pon `null`.
-const VISIBLES: Set<string> | null = new Set(["/review"]);
+const VISIBLES: Set<string> | null = new Set(["/review", "/errores"]);
 
 // A dónde va "/". Tiene que ser una pantalla VISIBLE, o la app abre en algo que
 // su propio menú dice que no existe.
@@ -153,6 +159,7 @@ export default function App() {
           <Route path="/predict" element={<Predict />} />
           <Route path="/review" element={<Review />} />
           <Route path="/review/:dataset/:split/:index" element={<ReviewDetail />} />
+          <Route path="/errores" element={<Errores />} />
         </Routes>
         </Boundary>
       </main>

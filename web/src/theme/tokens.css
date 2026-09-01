@@ -316,3 +316,12 @@ button:disabled { opacity: 0.5; cursor: default; }
    leeria como "la red no detecta nada", que es la conclusion equivocada */
 .review .avisobox { border-left: 3px solid var(--warn); }
 .review .avisobox code { font-family: ui-monospace, monospace; font-size: 12px; }
+
+/* ------------------------------------------------------------------ Errores */
+/* La traza va en un bloque con scroll PROPIO y tope de altura: una traza de
+   torch son 40 lineas, y sin tope la fila abierta empuja toda la tabla fuera de
+   la pantalla justo cuando estas comparando dos errores. */
+.traza { font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.35;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; margin: 6px 0 0; max-height: 260px; overflow: auto;
+  white-space: pre-wrap; word-break: break-word; }

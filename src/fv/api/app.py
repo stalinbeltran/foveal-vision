@@ -16,7 +16,7 @@ import numpy as np
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from fv import settings
+from fv import errores, settings
 from fv.api.jobs import JobQueue
 from fv.ioutils import read_json_retrying, write_json_atomic
 from fv.datasets.loader import SourceDataset, SourceError, discover_sources
@@ -110,8 +110,14 @@ def create_app() -> FastAPI:
         _arranque = [{"run": "?", "ok": False, "code": "autochequeo_fallido",
                       "message": str(e), "hint": "mira el log del servicio"}]
     _rotas = [f for f in _arranque if not f["ok"]]
+    for _f in _rotas:
+        # queda en el log ADEMAS de en el arranque: el log del proceso se pierde
+        # al reiniciar, y esto es justo lo que hay que poder mirar tres dias
+        # despues ("¿desde cuando no cargaba?")
+        errores.registrar(_f["code"], _f["message"], hint=_f.get("hint", ""),
+                          origen="arranque", donde=f"red {_f['run']}")
     if _rotas:
-        print(f"\n⚠ {len(_rotas)} de {len(_arranque)} redes servibles NO CARGAN "
+        print(f"\n[AVISO] {len(_rotas)} de {len(_arranque)} redes servibles NO CARGAN "
               f"con este proceso:", flush=True)
         for f in _rotas:
             print(f"    {f['run']}: [{f['code']}] {f['message']}\n"
@@ -124,10 +130,24 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     async def _domain_handler(request, exc):
         from fastapi.responses import JSONResponse
+        donde = f"{request.method} {request.url.path}"
         if isinstance(exc, DOMAIN_ERRORS):
             he = _http_error(exc)
+            d = he.detail
+            # `rechazo` y no `error`: una negativa con su razon es la puerta
+            # FUNCIONANDO, y hay 109 codigos de esos. Mezclarlos con los fallos
+            # inesperados haria un log que nadie lee. Van los dos, y la pantalla
+            # filtra a `error` por defecto.
+            errores.registrar(d.get("code", "?"), d.get("message", ""),
+                              hint=d.get("hint", ""), nivel="rechazo",
+                              origen="api", donde=donde)
             return JSONResponse(status_code=he.status_code,
                                 content={"detail": he.detail})
+        # lo INESPERADO: esto es un 500, nadie lo ha declarado y sin log se
+        # pierde en cuanto el proceso se reinicie
+        errores.registrar(type(exc).__name__, str(exc), nivel="error",
+                          origen="api", donde=donde, traza=exc,
+                          hint="no es una negativa declarada: mira la traza")
         raise exc
 
     # ------------------------------------------------------------- sources (A)
@@ -1101,6 +1121,27 @@ def create_app() -> FastAPI:
             index=int(body["index"]), marked=bool(body.get("marked", True)),
             note=str(body.get("note", "")), source=str(body.get("source", "")),
             run=str(body.get("run", "")))
+
+    # ----------------------------------------------------------- errores (X)
+    @app.get("/errores")
+    def list_errores(nivel: str | None = None, code: str | None = None,
+                     origen: str | None = None, q: str | None = None,
+                     desde: str | None = None, hasta: str | None = None,
+                     limit: int = 100, offset: int = 0):
+        """El log de errores, filtrado y PAGINADO en el servidor.
+
+        ⚠ El filtro y las cuentas van aqui y no en el navegador (U4.3). El dueno
+        pidio esto contando con que habra muchos: mandar el fichero entero para
+        filtrarlo en el front es exactamente lo que deja de funcionar el dia que
+        de verdad haga falta.
+
+        Devuelve tambien las FACETAS (cuantos por nivel/code/origen/version)
+        porque con un log grande la pregunta no es "ensenamelos" sino "de que
+        hay": sin ellas, filtrar es adivinar un valor a ciegas.
+        """
+        return errores.consultar(
+            nivel=nivel, code=code, origen=origen, q=q, desde=desde, hasta=hasta,
+            limit=max(1, min(int(limit), 500)), offset=max(0, int(offset)))
 
     # ---------------------------------------------------------------- sweeps (H)
     @app.get("/sweeps")

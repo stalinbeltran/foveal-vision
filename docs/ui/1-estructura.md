@@ -138,6 +138,29 @@ strength: strong
 | **Analizar** | Diagnóstico | `/diagnostics` | E×B |
 | | Predecir | `/predict` | F |
 | | Revisar | `/review` · `/review/:dataset/:split/:index` | F×B (mirar a ojo un split; deja registro de lo revisado en el repo de datos) |
+| **Operación** | Errores | `/errores` | ⚠ **ninguno — y es la excepción declarada a U1.1/U1.4** (ver abajo) |
+
+### ⚠ La excepción a U1.1/U1.4: «Errores» no es un dominio, y por eso es un grupo aparte
+
+U1.1 dice *una pantalla, un dominio* y U1.4 que *una pantalla nueva se justifica por un dominio
+nuevo*. **Errores no es ningún sustantivo de [organizacion.md](../organizacion.md) §1**, así que
+por la letra de las dos reglas no debería existir. Se hace igualmente, **por decisión del dueño del
+2026-09-01** (*«si algo ocurre hoy y no salta a la vista nunca me entero»*), y la excepción se anota
+aquí con su motivo, que es lo que las reglas piden cuando se rompen a propósito.
+
+**Por qué no rompe lo que esas reglas protegen.** Lo que U1.1 impide es que un dominio se desparrame
+por pantallas ad-hoc, y lo que U1.4 impide es inventar pantallas para conceptos que en realidad son
+paneles de otra cosa. Un log de errores no es ninguna de las dos: es **transversal a todos los
+dominios** y no es panel de ninguno — la pregunta *«¿de qué dominio es un panel?»* que manda hacer
+U1.4 **no tiene respuesta** aquí, y ésa es exactamente la señal de que no es un dominio.
+
+Por eso va en un grupo propio, **Operación**, y no colgada de «Analizar»: la nav ya tenía una
+sección que no es de dominio (SESIÓN, con Guardar/Cargar). Meterla en «Analizar» sería fingir que es
+un análisis del modelo, que es justo el desparrame que U1.1 existe para evitar.
+
+⚠ **Y lo que esta excepción NO autoriza:** que cualquier cosa incómoda de clasificar se resuelva
+con un grupo nuevo. El criterio para volver a hacerlo es el de arriba —*la pregunta de U1.4 no tiene
+respuesta*— y hay que escribirlo aquí igual que esto.
 
 **Cumplimiento (verificado 2026-07-27; 14 rutas desde 2026-08-29)**: existen en
 [web/src/App.tsx](../../web/src/App.tsx#L114-L128) con esas etiquetas de nav.

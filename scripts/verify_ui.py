@@ -230,6 +230,16 @@ def main() -> int:
             page.wait_for_timeout(500)
         check(page, "/review", "text=Revisar detecciones", "12-revisar", review_extra)
 
+        # Errores: la pantalla se prueba FILTRANDO, que es su razon de ser. Con
+        # el log vacio no hay facetas que pulsar, asi que se comprueba lo que
+        # siempre esta: la cuenta y la tabla.
+        def errores_extra(page):
+            page.wait_for_selector("[data-testid=errores-cuenta]", timeout=20000)
+            page.wait_for_selector("[data-testid=errores-tabla]", timeout=20000)
+            page.fill("input[placeholder*='checkpoint']", "zzz-no-existe")
+            page.wait_for_timeout(1200)
+        check(page, "/errores", "text=Errores", "13-errores", errores_extra)
+
         # ⚠ Este literal existe para el catalogo de rutas (U7.9) y depende de los
         # MISMOS fixtures que el resto del fichero (`synth-b16`, `fov-16-param`):
         # si esa maquina no los tiene, falla en voz alta, como los demas.
