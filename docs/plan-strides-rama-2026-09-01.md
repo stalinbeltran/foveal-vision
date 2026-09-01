@@ -15,20 +15,23 @@ desproporcionado para lo simple del problema**.
 
 ---
 
-## 0. ⚠ SUPUESTOS PENDIENTES DE CONFIRMAR — este plan NO está congelado
+## 0. Los seis supuestos — CINCO CONFIRMADOS el 2026-09-01, uno abierto
 
-Seis decisiones están tomadas **por defecto** abajo y esperan confirmación. Hasta que se
-confirmen, este documento es un borrador: **congelarlo es responder §0**. Se listan aquí
-arriba, y no enterradas, porque cambiar cualquiera de ellas cambia lo que el estudio mide.
+El plan nació con seis decisiones tomadas por defecto y marcadas como pendientes. **El dueño
+confirmó cinco el 2026-09-01**; queda **una abierta**, y mientras lo esté, el §6 se puede
+aplicar entero salvo su regla R5.
 
-| # | Decisión | Defecto tomado aquí | Dónde se discute |
+| # | Decisión | Resuelto | Dónde |
 |---|---|---|---|
-| 1 | rango del tanteo | `{1, 2, 3, 4}` | §5.2 |
-| 2 | ancla de `s_periph` | **independiente**: `s_center` = 1 (el vigente), no el ganador | §5.4 |
-| 3 | control iso-features | **NO se corre** (+4 runs) | §4.3 |
-| 4 | tope de épocas | **300**, no 150 | §5.3 |
-| 5 | brazo diagonal `s_center` = `s_periph` | **NO se corre** | §7 |
-| 6 | prioridad | **detrás de `do-v`**; no adelanta nada | §8 |
+| 1 | rango del tanteo | ✅ **`{1, 2, 3, 4}`**, con el 4 acotando por la derecha | §5.2 |
+| 2 | ancla del segundo eje | ✅ **independiente**: `s_center` = 1 (el vigente), no el ganador | §5.4 |
+| 3 | control iso-features | ⏳ **ABIERTO** — apagado por defecto; el dueño pidió la explicación antes de decidir | §4.3 |
+| 4 | tope de épocas | ✅ **300**, no 150 | §5.3 |
+| 5 | brazo diagonal `s_center` = `s_periph` | ✅ **SE CORRE** — tercer recorrido, `sd-t` | §5.6 |
+| 6 | prioridad | ✅ **detrás de `do-v`**, y **delante de `ei-t`** | §8 |
+
+⚠ **Lo único que depende del #3 es la regla R5** («si el f1 baja, se corre el control antes de
+concluir»). Todo lo demás está congelado y es lanzable.
 
 ---
 
@@ -118,12 +121,13 @@ tiene respuesta.
 repeticiones tras 3 de calentamiento). El **absoluto no es transferible** a la máquina de
 Vast; la **razón** sí, aproximadamente.*
 
-| `s` (ambas ramas) | ms/paso | ratio |
-|---:|---:|---:|
-| 1 | 104,9 | 1,00× |
-| 2 | 28,4 | **0,27×** |
-| 3 | 17,2 | 0,16× |
-| 4 | 13,2 | 0,13× |
+| `s` | `s_center`=s, `s_periph`=1 | `s_center`=1, `s_periph`=s | **diagonal** (las dos) |
+|---:|---:|---:|---:|
+| 1 | 101,5 | 96,3 | 96,9 |
+| 2 | 50,5 (0,50×) | 48,8 (0,51×) | **23,2 (0,24×)** |
+| 3 | 40,5 (0,40×) | 48,8 (0,51×) | 15,5 (0,16×) |
+| 4 | 42,2 (0,42×) | 45,0 (0,47×) | 12,5 (0,13×) |
+| **recorrido entero** | 1,00× | 1,02× | **0,63×** |
 
 ⚠ **Ese ratio es un techo, no una promesa.** Mide **sólo el modelo**: el dataloader, que no
 baja con el stride, no está incluido. En el entrenamiento real el ahorro será menor.
@@ -132,6 +136,13 @@ baja con el stride, no está incluido. En el entrenamiento real el ahorro será 
 cost-NEGATIVO.** Es el único de la cola así — `dropout` y `edge_inputs` son neutrales,
 `patience` y `border_reduce` son caros. Un empate aquí **ya es una victoria**, y eso cambia
 el criterio de §6.
+
+⚠ **Y hay una asimetría que no era obvia: los recorridos simples apenas aceleran.** Un brazo
+con un stride deja **la otra rama a resolución entera**, y esa rama domina el reloj: 0,50×
+como mucho, por más que se suba el stride del otro lado. **Sólo la diagonal acelera de
+verdad** (0,24× ya con `s`=2). Es un argumento independiente para el brazo diagonal — y la
+razón de que el recorrido diagonal, con los mismos 8 runs, **cueste 0,63× lo que cuesta
+cualquiera de los simples**.
 
 ### 3.3 Campo receptivo
 
@@ -281,6 +292,7 @@ sin forzar nada.
 |---|---|---|---|---:|---|
 | 1 | **`sc-t`** | `s_center` | `s_periph` = 1 | 4 × 2 = **8** | `sc-` |
 | 2 | **`sp-t`** | `s_periph` | **`s_center` = 1** | 4 × 2 = **8** | `sp-` |
+| 3 | **`sd-t`** | **diagonal** (§5.6) | — (las dos ramas se mueven) | 4 × 2 = **8** | `sd-` |
 
 ⚠ **La fase 2 ancla en `s_center` = 1 (el vigente), NO en el ganador de la fase 1.** Es una
 decisión, no un descuido:
@@ -292,15 +304,44 @@ decisión, no un descuido:
 - **En contra: no mide el efecto marginal.** Si los dos ganan por separado, **no está
   demostrado que sumen**: el brazo diagonal es otro punto (§7, supuesto #5).
 
-**Coste estimado del conjunto: 16 runs, ≈0,5 $ y ~3 h de reloj** *(estimado, no medido: se
-extrapola de `do-t` — 8 runs, 5 máquinas, 0,3626 $, 3 h 21 min — aplicando el ahorro de
-§3.2 sólo en parte, porque el dataloader no baja).*
+**Coste estimado del conjunto: 24 runs, ≈0,7 $ y ~4 h de reloj** *(estimado, no medido: se
+extrapola de `do-t` —8 runs, 5 máquinas, 0,3626 $, 3 h 21 min, mismo dataset y misma base—
+ponderando cada brazo por su ratio de §3.2 y **sin** aplicar el ahorro entero, porque el
+dataloader no baja. Sale ≈0,21 $ por recorrido simple y ≈0,13 $ el diagonal; se redondea
+hacia arriba porque `epochs` sube a 300.)*
+
+⚠ **El tercer recorrido sale más barato que los otros dos**, pese a tener los mismos 8 runs
+(§3.2). Añadirlo no era el «+4 runs» que se estimó al proponerlo: son **+8 runs y ≈+0,13 $**,
+menos de lo que costaría media fase simple.
 
 ### 5.5 Las semillas: 2 en el tanteo, con lo que eso implica
 
 **Un tanteo NO declara ganador.** Con 2 contra 2, el `p` mínimo alcanzable es **0,333**;
 hacen falta 5v5 para bajar a 0,0079. El tanteo **acota**; la validación (`sc-v` / `sp-v`,
 5 semillas, 20 runs) sólo se corre si §6 lo pide.
+
+### 5.6 El brazo diagonal (`sd-t`) — supuesto #5, confirmado
+
+Los dos recorridos simples miden cada rama por separado, y eso deja **una pregunta que
+ninguno de los dos puede contestar: ¿los efectos SUMAN?** Dos ganadores por separado no
+demuestran que juntos funcionen — y juntos es donde está el recorte que motiva el estudio.
+
+| `s` | `s_center` | `s_periph` | features | params | vs base |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 1 | 1 | 12.800 | 168.652 | 1,000× |
+| 2 | 2 | 2 | **3.200** | 53.452 | 0,317× |
+| 3 | 3 | 3 | 1.568 | 33.868 | 0,201× |
+| 4 | 4 | 4 | 800 | 24.652 | 0,146× |
+
+**No es un tercer eje.** Es el eje `s_center` con **`s_periph` atado a él** (`couple` de
+`fv.sweeps.spec`), o sea una **diagonal** y no un producto cartesiano: 4 puntos, no 16. Sigue
+siendo «un eje cada vez» y el validador **se niega** si la atadura trae más o menos valores
+que el eje — una diagonal desalineada entrenaría redes que nadie pidió con una tabla igual de
+creíble. *Verificado el 2026-09-01: 8 runs, 0 descartados, y los pares salen (1,1) (2,2)
+(3,3) (4,4).*
+
+⚠ **`merge` sigue en `concat`, aunque a strides iguales `sum` ya sea legal.** Cambiar las dos
+cosas a la vez haría que el resultado no dijese cuál lo movió. `sum` es otro estudio (§7).
 
 ## 6. El criterio, escrito ANTES de mirar
 
@@ -343,17 +384,47 @@ Submuestrear ahí contradice menos la hipótesis del proyecto que submuestrear l
 **R5 — Si el f1 baja, ANTES de concluir se corre el control iso-features** de §4.3
 (+2 runs). Sin él, «la resolución importa» y «la capacidad importa» son indistinguibles, y
 la primera es una afirmación sobre la visión foveada que este estudio no puede sostener sola.
+⏳ **Es la única regla que depende del supuesto #3, todavía abierto.**
+
+**R6 — ¿Suman? El criterio del diagonal, escrito antes de mirar.** Sea `Δ(x)` la caída de f1
+respecto a `s`=1 en cada recorrido. Para cada `s`, se compara `Δ(sd)` con `Δ(sc) + Δ(sp)`:
+
+- **`Δ(sd)` ≈ `Δ(sc) + Δ(sp)`** (dentro de δ) → **los efectos son aditivos**: cada rama aporta
+  su parte y se pueden decidir por separado. Es la lectura más simple y la que permite elegir
+  el stride de cada rama con su propia tabla.
+- **`Δ(sd)` < `Δ(sc) + Δ(sp)`** → **hay redundancia entre ramas**: parte de lo que pierde una
+  ya lo estaba aportando la otra. Sería el mejor desenlace posible — recortar las dos sale más
+  barato de lo que sugieren los dos estudios simples.
+- **`Δ(sd)` > `Δ(sc) + Δ(sp)`** → **hay interacción negativa**: las dos ramas juntas pierden
+  más que la suma, y entonces **el estudio simple no basta para decidir** y cualquier
+  recomendación tiene que salir del diagonal.
+
+⚠ **R6 no puede declarar con 2 semillas**: compara diferencias de diferencias, que es
+justo donde el ruido se acumula. En el tanteo **acota**; declarar pide la fase de 5.
 
 ## 7. Lo que este estudio NO contesta
 
 - **No mide la métrica de tarea**, sólo el f1 por ventana. El proxy ya exageró una vez por un
   factor de dos (`n_layers`). Un ganador aquí es candidato, no adopción.
-- **No mide el brazo diagonal** (`s_center` = `s_periph`), que es el que de verdad recorta
-  (3.200 features con 2, 800 con 4). Dos ganadores por separado **no demuestran que sumen**.
-  Es +4 runs y es el supuesto **#5**.
-- **No toca `merge`.** `sum` exige strides iguales y **nunca se ha medido**; si el diagonal
-  entra alguna vez, `merge` entra con él, porque a formas iguales `sum` divide la cabeza por
-  dos otra vez. Es un plano, no una recta.
+- **No toca `merge` — y `merge` es el competidor directo de este estudio.** *Medido el
+  2026-09-01:* `merge: sum` deja **6.400 features y 91.852 parámetros (0,545×)** **sin tocar
+  la resolución de salida**. Recorta la cabeza a la mitad por una vía completamente distinta
+  a la del stride, y **ya está medido a medias en disco**:
+
+  | recorrido | semillas | `concat` | `sum` | |
+  |---|---|---:|---:|---|
+  | `mrg-t` | 1-2 | 0,9271 | **0,9327** | gana `sum` (+0,0056) |
+  | `mrg-v` | 3-4 *(**4/6**, falta la 5 entera)* | **0,9395** | 0,9364 | gana `concat` (+0,0031) |
+
+  **Se dan la vuelta**, ninguno declara (2 semillas → `p` mínimo 0,333), y `mrg-v` **nunca
+  terminó** — el mismo patrón que `pat-v`. ⚠ Y las cuatro medidas son sobre el dataset
+  anterior, así que **no se pueden sumar a nada nuevo**. Lo que sí queda establecido sin
+  pagar nada: **`sum` no es peor de forma evidente, y divide la cabeza por dos**. Si el
+  objetivo declarado es «menos features», `sum` merece su propia vuelta.
+
+  ⚠ **Pero no aquí.** Cambiar `merge` y los strides a la vez haría que el resultado no dijese
+  cuál lo movió. Y combinados (`sum` + diagonal `s`=2) darían **1.600 features, 0,203×** —
+  que es un plano, no una recta.
 - **No toca `channels`** salvo como control (§4.3). `channels` es el **otro** mando que
   encoge la cabeza, medido con 1 semilla y borrado igual que éstos. Si el objetivo declarado
   es «menos features», los dos compiten por el mismo puesto y merecen compararse.
@@ -365,11 +436,19 @@ la primera es una afirmación sobre la visión foveada que este estudio no puede
 
 ## 8. Prioridad y cierre — supuesto #6
 
-⚠ **Va DETRÁS de `do-v`**, que es lo que estaba pendiente y ya tiene su plan escrito (ver el
-`CLAUDE.md` del coordinador). Este documento **no lo adelanta**. Frente a `ei-t`, que está
-en la misma cola sin prioridad asignada, hay un argumento para ponerlo antes —es
-cost-negativo, así que abarata todo lo que venga detrás— y otro para ponerlo después —`ei-t`
-ataca un límite del muestreo y esto ataca el coste—. **Lo decide el dueño.**
+**Resuelto el 2026-09-01 (supuesto #6): detrás de `do-v`, delante de `ei-t`.**
+
+⚠ **`do-v` sigue siendo lo primero, y NO está hecho.** *Verificado el 2026-09-01 con
+`estudio_progreso.py --sweep do-v --tabla`:* el recorrido existe desde el 2026-08-31 20:54,
+con `status: queued` y **0/20 runs, 0 épocas escritas**; no hay ni un run con `dropout=0.05`,
+que es el valor que sólo existe en `do-v`. Lo que **sí** se corrió es el **tanteo `do-t`**
+(8 runs, reporte #17), y el propio índice del repo central ya lo dice: *«el estudio de 5
+semillas (`do-v`) queda creado y sin lanzar»*. **No se ha perdido nada** — está en cola, y
+`estudio_flota.py` continúa por donde iba.
+
+**Delante de `ei-t`**, y el motivo es el de §3.2: éste es el único eje **cost-negativo** de la
+cola, así que si sale bien **abarata todos los estudios que vengan detrás**, `ei-t` incluido.
+Un eje que hace más barato el resto se cobra antes que uno que sólo aporta señal.
 
 Al terminar: reporte en
 `estudios-redes-neuronales/reportes/estudios/2026/<mes>/<fecha>-strides-rama-tanteo.md`, con

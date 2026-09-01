@@ -10,6 +10,7 @@ alquila ni se entrena nada. Lo que gasta es `estudio_flota.py`.
 
     .venv/bin/python scripts/estudio_strides.py --dataset <B> --eje s_center --fase tanteo
     .venv/bin/python scripts/estudio_strides.py --dataset <B> --eje s_periph --fase tanteo
+    .venv/bin/python scripts/estudio_strides.py --dataset <B> --eje diagonal --fase tanteo
     .venv/bin/python scripts/estudio_strides.py --dataset <B> --eje s_center --fase completo
     .venv/bin/python scripts/estudio_strides.py --dataset <B> --control          # §4.3
 
@@ -97,9 +98,19 @@ CANALES_BASE = 16
 # distingue TUS maquinas de las de otra sesion (CLAUDE.md § "Varias sesiones").
 EJES = {
     "s_center": {"tanteo": "sc-t", "completo": "sc-v", "prefijo": "sc-",
-                 "otro": "s_periph"},
+                 "otro": "s_periph", "espacio": "s_center", "couple": None},
     "s_periph": {"tanteo": "sp-t", "completo": "sp-v", "prefijo": "sp-",
-                 "otro": "s_center"},
+                 "otro": "s_center", "espacio": "s_periph", "couple": None},
+    # El brazo DIAGONAL: las dos ramas al mismo stride. Es el unico que recorta
+    # de verdad (3.200 features con s=2, 800 con s=4) y el unico que acelera de
+    # verdad -- los simples dejan una rama a stride 1, que domina el reloj:
+    # MEDIDO el 2026-09-01, s=2 cuesta 0,50x en simple y 0,24x en diagonal.
+    #
+    # No es un tercer eje: es el eje `s_center` con `s_periph` ATADO a el
+    # (`couple`), o sea una diagonal y no un producto cartesiano. Sigue siendo
+    # "un eje cada vez" (OAT) y sigue costando 4 puntos, no 16.
+    "diagonal": {"tanteo": "sd-t", "completo": "sd-v", "prefijo": "sd-",
+                 "otro": None, "espacio": "s_center", "couple": "s_periph"},
 }
 CONTROL = "if-c"            # el iso-FEATURES de §4.3
 PREFIJO_CONTROL = "if-"
@@ -173,6 +184,9 @@ def canales_iso(stride: int) -> list[int] | None:
 
 
 def pico_del_tanteo(eje: str, store: SweepStore) -> tuple[int, int, float]:
+    # `eje` es la clave de EJES; la del PUNTO es cfg["espacio"] -- en el
+    # diagonal son distintas (el eje se llama "diagonal", el campo es
+    # `s_center` con `s_periph` atado).
     """El mejor valor del eje en su tanteo, leido del disco con las MISMAS
     funciones que usa `estudio_informe.py`.
 
@@ -208,12 +222,12 @@ def pico_del_tanteo(eje: str, store: SweepStore) -> tuple[int, int, float]:
             f"es lo que quieres.")
     grupos = aggregate_seeds(medidos, tabla["direction"], "seconds_per_epoch")
     mejor = grupos[0]
-    return int(mejor["point"][eje]), len(medidos), float(mejor["value"])
+    return int(mejor["point"][EJES[eje]["espacio"]]), len(medidos), float(mejor["value"])
 
 
 def crear(name: str, espacio_eje: str, rango: list, semillas: int, dataset: str,
           receta: dict, store: SweepStore, motivo: str,
-          overrides: dict | None = None) -> bool:
+          overrides: dict | None = None, atado: str | None = None) -> bool:
     # `store.exists`, y no un listado de `store.root`: la raiz plana puede no
     # existir todavia, y un recorrido puede vivir en el archivo fechado
     # <anio>/<mes>/, donde un iterdir de la raiz NO lo ve. Un "no existe" falso
@@ -223,13 +237,18 @@ def crear(name: str, espacio_eje: str, rango: list, semillas: int, dataset: str,
               f"quieres rehacerlo (sus runs son dinero ya gastado).")
         return False
     net = dict(FOVEADA, **(overrides or {}))
+    # La atadura da UN valor por valor del eje -- el propio `check_sweep` se
+    # niega si las longitudes no casan, porque una diagonal desalineada entrena
+    # redes que nadie pidio con una tabla igual de creible.
+    couple = ({atado: {"axis": espacio_eje, "values": list(rango)}}
+              if atado else None)
     try:
         spec = generate_sweep(
             name, dataset, espacio_eje, list(rango),
             base_recipe=RECIPE, base_recipe_value=receta,
             objective=OBJECTIVE, budget={"epochs": EPOCHS},
             seeds=semillas, device="cpu",
-            overrides=net, border_px=BORDER_PX,
+            overrides=net, border_px=BORDER_PX, couple=couple,
             study=ESTUDIO, sstore=store,
         )
     except SweepError as e:
@@ -244,11 +263,14 @@ def crear(name: str, espacio_eje: str, rango: list, semillas: int, dataset: str,
     print(f"      motivo: {motivo}")
     # Lo que de verdad se esta comprando, en features: es el objetivo declarado
     # del estudio, asi que sale impreso al crear y no hay que ir a buscarlo.
+    if atado:
+        print(f"      atado:  {atado} = {espacio_eje} (diagonal, no producto)")
     print("      cabeza:")
     for v in rango:
-        tr = network_trace(dict(net, fovea_px=16, border_px=BORDER_PX,
-                                **{espacio_eje: v}))
-        print(f"        {espacio_eje}={v}: {tr['flat_features']:>6} features -> "
+        campos = {espacio_eje: v} | ({atado: v} if atado else {})
+        tr = network_trace(dict(net, fovea_px=16, border_px=BORDER_PX, **campos))
+        etiqueta = f"{espacio_eje}={v}" + (f",{atado}={v}" if atado else "")
+        print(f"        {etiqueta:>22}: {tr['flat_features']:>6} features -> "
               f"{tr['num_params']:>7} params")
     for d in spec.get("discarded") or []:
         print(f"      descartado {d['point']}: {d['problems'][0]['message']}")
@@ -261,7 +283,7 @@ def main() -> int:
     ap.add_argument("--eje", choices=sorted(EJES))
     ap.add_argument("--fase", choices=["tanteo", "completo"])
     ap.add_argument("--control", action="store_true",
-                    help="crea el recorrido iso-parametros del plan §4.3. Solo "
+                    help="crea el recorrido iso-features del plan §4.3. Solo "
                          "hace falta si el f1 baja (criterio R5)")
     ap.add_argument("--control-stride", type=int, default=2,
                     help="a que brazo con stride iguala el control (defecto 2)")
@@ -299,10 +321,15 @@ def main() -> int:
         if args.fase == "tanteo":
             print(f"Fase 1 -- TANTEO de `{args.eje}`. 2 semillas: ACOTA, no "
                   f"declara (p minimo alcanzable 0,333).")
-            print(f"  Ancla: `{cfg['otro']}` = 1, el VIGENTE -- no el ganador "
-                  f"de la otra rama (plan §5.4).")
-            ok = crear(cfg["tanteo"], args.eje, RANGO_TANTEO, 2, args.dataset,
-                       receta, store, MOTIVO_TANTEO)
+            if cfg["otro"]:
+                print(f"  Ancla: `{cfg['otro']}` = 1, el VIGENTE -- no el "
+                      f"ganador de la otra rama (plan §5.4).")
+            else:
+                print(f"  Las DOS ramas al mismo stride. Contesta lo que los "
+                      f"dos simples no pueden: si los efectos SUMAN (plan §5.6).")
+            ok = crear(cfg["tanteo"], cfg["espacio"], RANGO_TANTEO, 2,
+                       args.dataset, receta, store, MOTIVO_TANTEO,
+                       atado=cfg["couple"])
             siguiente, horas = cfg["tanteo"], 6
         else:
             if args.pico is not None:
@@ -327,8 +354,8 @@ def main() -> int:
             print(f"Fase 2 -- ESTUDIO COMPLETO de `{args.eje}`. 5 semillas: con "
                   f"5 contra 5 el p minimo alcanzable es 0,0079, o sea que SI "
                   f"puede declarar al 5 %.")
-            ok = crear(cfg["completo"], args.eje, rango, 5, args.dataset, receta,
-                       store, motivo)
+            ok = crear(cfg["completo"], cfg["espacio"], rango, 5, args.dataset,
+                       receta, store, motivo, atado=cfg["couple"])
             siguiente, horas = cfg["completo"], 8
         prefijo = cfg["prefijo"]
 
