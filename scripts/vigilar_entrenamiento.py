@@ -47,6 +47,29 @@ def _unidad_viva(unidad: str) -> bool:
         return False
 
 
+def _edad_unidad(unidad: str) -> float | None:
+    """Segundos desde que la unidad esta activa, o None si no se sabe.
+
+    Hace falta para la GRACIA: entre que se alquila la maquina y cae la primera
+    epoca pasan minutos (alquilar, esperar al ssh, subir el payload, instalar).
+    Durante ese rato NO hay pesos, y eso es lo normal, no una averia. Sin gracia
+    el celador avisa en rojo en su primera vuelta -- y un aviso que salta siempre
+    se deja de leer, que es lo unico que no le puede pasar a un aviso.
+    """
+    try:
+        r = subprocess.run(
+            ["systemctl", "show", "-p", "ActiveEnterTimestampMonotonic", "--value", unidad],
+            capture_output=True, text=True, timeout=20)
+        us = int((r.stdout or "0").strip() or 0)
+        if us <= 0:
+            return None
+        with open("/proc/uptime") as fh:
+            ahora = float(fh.read().split()[0])
+        return max(0.0, ahora - us / 1e6)
+    except Exception:                        # noqa: BLE001
+        return None
+
+
 def _instancias_vast() -> list[dict] | None:
     """Las instancias vivas, o None si NO SE PUEDE saber.
 
@@ -71,6 +94,9 @@ def main() -> int:
                     help="unidad de systemd (por defecto entrenar-<name>)")
     ap.add_argument("--max-edad", type=float, default=300.0,
                     help="segundos que se aceptan sin un peso nuevo (300 = 5 min)")
+    ap.add_argument("--gracia", type=float, default=900.0,
+                    help="segundos desde que arranco la unidad en los que NO "
+                         "tener pesos todavia es normal (alquilar+instalar)")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     unidad = args.unidad or f"entrenar-{args.name}"
@@ -84,11 +110,21 @@ def main() -> int:
         problemas.append(f"la unidad '{unidad}' NO esta activa")
 
     # 2. ¿bajan los pesos? -- la pregunta que da nombre a este script
+    edad_unidad = _edad_unidad(unidad)
+    info["edad_unidad_s"] = None if edad_unidad is None else round(edad_unidad)
+    arrancando = edad_unidad is not None and edad_unidad < args.gracia
     antesala = catalogo.staging_dir(args.name)
     pts = sorted(antesala.glob("*.pt")) if antesala.exists() else []
     if not pts:
         info["pesos"] = None
-        problemas.append(f"NO hay ningun .pt en la antesala ({antesala})")
+        if arrancando:
+            # ⚠ se DICE que se esta en gracia, no se calla: "aun no toca mirar"
+            # y "mire y esta bien" no pueden leerse igual.
+            info["gracia"] = (f"sin pesos todavia, pero la unidad lleva "
+                              f"{edad_unidad / 60:.1f} min de los "
+                              f"{args.gracia / 60:.0f} de gracia")
+        else:
+            problemas.append(f"NO hay ningun .pt en la antesala ({antesala})")
     else:
         edad = min(time.time() - p.stat().st_mtime for p in pts)
         info["pesos"] = {
@@ -144,7 +180,11 @@ def main() -> int:
               + (f" · epoca {info['ultima']['epoch']}"
                  f" f1={info['ultima']['f1']:.3f}" if info.get("ultima") else "")
               + (f" · pesos hace {info['pesos']['edad_s'] / 60:.1f} min"
-                 if info.get("pesos") else " · SIN PESOS"))
+                 if info.get("pesos")
+                 else (" · arrancando (sin pesos aun)" if info.get("gracia")
+                       else " · SIN PESOS")))
+        if info.get("gracia"):
+            print(f"    · {info['gracia']}")
         if isinstance(info.get("vast"), list):
             for i in info["vast"]:
                 print(f"    vast {i['id']} ({i['label']}) {i['usd_h']} $/h")
