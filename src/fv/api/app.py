@@ -94,6 +94,33 @@ def create_app() -> FastAPI:
     sstore = SweepStore()
     studies_store = StudyStore()
 
+    # AUTOCHEQUEO DE ARRANQUE. La clase de averia que ningun test encuentra es la
+    # que aparece porque este PROCESO lleva vivo desde antes que el artefacto: un
+    # test corre siempre una version de todo. Cargar aqui lo que la app dice poder
+    # inferir convierte "lo descubre el usuario al pulsar, 8 horas despues" en
+    # "lo dice el log a los 3 segundos" (2026-09-01).
+    #
+    # ⚠ No impide arrancar: la app sirve datasets, runs, recorridos y estudios, y
+    # un `.pt` que no carga no puede tumbar todo eso. Degrada y lo DECLARA (R2).
+    try:
+        _arranque = catalogo.autochequeo(runs)
+    except Exception as e:                              # noqa: BLE001
+        # ni siquiera el chequeo puede tumbar el arranque; pero se dice que no se
+        # pudo hacer, que no es lo mismo que "todo bien"
+        _arranque = [{"run": "?", "ok": False, "code": "autochequeo_fallido",
+                      "message": str(e), "hint": "mira el log del servicio"}]
+    _rotas = [f for f in _arranque if not f["ok"]]
+    if _rotas:
+        print(f"\n⚠ {len(_rotas)} de {len(_arranque)} redes servibles NO CARGAN "
+              f"con este proceso:", flush=True)
+        for f in _rotas:
+            print(f"    {f['run']}: [{f['code']}] {f['message']}\n"
+                  f"      -> {f['hint']}", flush=True)
+        print("", flush=True)
+    else:
+        print(f"inferencia: {len(_arranque)} red(es) servible(s), todas cargan",
+              flush=True)
+
     @app.exception_handler(Exception)
     async def _domain_handler(request, exc):
         from fastapi.responses import JSONResponse
@@ -623,8 +650,15 @@ def create_app() -> FastAPI:
             cat = catalogo.leer()
         except CatalogoError as e:
             raise _http_error(e)
+        # El autochequeo se REPITE aqui en vez de servir el del arranque: entre
+        # medias se promueve, se sube a la antesala y se retira del catalogo, asi
+        # que el del arranque envejece. Lo que no envejece es el del arranque
+        # como AVISO -- por eso estan los dos y dicen cosas distintas.
+        chequeo = catalogo.autochequeo(runs)
         return {
             "aprobadas": cat["runs"],
+            "cargan": chequeo,
+            "rotas": [f for f in chequeo if not f["ok"]],
             "antesala": catalogo.antesala_completa(),
             "antesala_root": str(settings.inference_staging_root()),
             "catalogo": str(catalogo.catalogo_path()),

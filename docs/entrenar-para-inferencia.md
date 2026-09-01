@@ -121,6 +121,23 @@ checkpoint nuevo no le encaja.
 sudo systemctl restart foveal-vision-web     # y comprobar que la red carga
 ```
 
+**Y desde el 2026-09-01 no hace falta acordarse**: al arrancar, la app **carga
+todo lo que dice poder inferir** y lo dice en su log:
+
+```
+inferencia: 3 red(es) servible(s), todas cargan
+⚠ 1 de 3 redes servibles NO CARGAN con este proceso:
+    fov16-mask-p20: [checkpoint_de_codigo_mas_nuevo] … → reinicia el servicio
+```
+
+Es la red que caza la clase de avería que **ningún test puede encontrar**: la que
+aparece porque el proceso lleva vivo desde antes que el artefacto — un test corre
+siempre una versión de todo. Convierte *«lo descubre el usuario al pulsar, 8 horas
+después»* en *«lo dice el log a los 3 segundos»*. ⚠ **No impide arrancar** (R2:
+degrada con un defecto declarado) y el diagnóstico viaja también en
+`GET /api/inference` → `rotas`, para que la pantalla lo marque en vez de fallar al
+pulsar.
+
 ⚠ **Y el síntoma engaña**: sale `[checkpoint_incompatible] … reentrena el run`, que
 manda a **gastar en Vast para arreglar un modelo que está perfecto**. *Pasó el
 2026-09-01 con `fov16-mask-p20`: el servicio llevaba vivo desde 2 h 26 min antes

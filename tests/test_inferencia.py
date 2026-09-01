@@ -312,3 +312,95 @@ def test_la_antesala_esta_ignorada_por_git():
     p = subprocess.run(["git", "check-ignore", "-q", "data/inferencia/x/best.pt"],
                        cwd=raiz)
     assert p.returncode == 0, "data/inferencia/ NO está ignorado en el repo de código"
+
+
+# ------------------------------------ 4. el autochequeo de arranque (skew)
+
+def _aprobar(nombre: str) -> None:
+    cat = catalogo.leer()
+    cat["runs"][nombre] = {"cuando": "2026-09-01T00:00:00Z",
+                           "ficheros": ["best.pt"], "motivo": "test"}
+    catalogo.catalogo_path().write_text(json.dumps(cat), encoding="utf-8")
+
+
+def test_el_autochequeo_dice_cual_no_carga_y_no_revienta(app_limpia):
+    """La avería que ningún test puede encontrar por dentro: el PROCESO más viejo
+    que el artefacto. Un test corre siempre una versión de todo, así que lo que
+    se prueba aquí no es el skew --es imposible-- sino la RED que lo caza: que al
+    arrancar se intente cargar todo lo servible y se diga qué falla."""
+    from fv.training.registry import RunStore
+
+    _run_falso("rota", con_pesos=True)     # `best.pt` con basura dentro
+    _aprobar("rota")
+    filas = catalogo.autochequeo(RunStore())
+    assert [f["run"] for f in filas] == ["rota"]
+    mala = filas[0]
+    assert mala["ok"] is False
+    assert mala["code"] == "checkpoint_ilegible"
+    assert mala["message"] and mala["hint"]
+
+
+def test_una_red_aprobada_SIN_pesos_se_declara(app_limpia):
+    """Aprobada y sin fichero en ninguna parte: el catálogo promete algo que no
+    existe, y callarlo deja un run que falla sólo al pulsarlo."""
+    from fv.training.registry import RunStore
+
+    _run_falso("prometida", con_pesos=False)
+    _aprobar("prometida")
+    fila = catalogo.autochequeo(RunStore())[0]
+    assert fila["ok"] is False and fila["code"] == "sin_pesos"
+    assert "reentrenalo" in fila["hint"]
+
+
+def test_la_app_ARRANCA_aunque_una_red_no_cargue(app_limpia, tmp_path, monkeypatch):
+    """R2: degrada con un defecto declarado. Un `.pt` que no carga no puede
+    tumbar los datasets, los runs, los recorridos ni los estudios."""
+    _run_falso("rota", con_pesos=True)
+    _aprobar("rota")
+    from fv.api.app import create_app
+    cliente = TestClient(create_app(), raise_server_exceptions=False)
+    assert cliente.get("/runs").status_code == 200      # la app vive
+    d = cliente.get("/inference").json()
+    assert [f["run"] for f in d["rotas"]] == ["rota"]
+    assert d["rotas"][0]["code"] == "checkpoint_ilegible"
+
+
+def test_con_todo_sano_no_hay_rotas(app_limpia):
+    d = app_limpia.get("/inference").json()
+    assert d["rotas"] == [] and d["cargan"] == []
+
+
+def test_una_excepcion_INESPERADA_al_cargar_tambien_se_declara(app_limpia, monkeypatch):
+    """Un autochequeo que se traga lo que no esperaba es un autochequeo que
+    miente: diria 'todas cargan' sobre una red que no carga."""
+    from fv.training.registry import RunStore
+    import fv.inference.checkpoint as chk
+
+    _run_falso("rara", con_pesos=True)
+    _aprobar("rara")
+    monkeypatch.setattr(chk, "load_model",
+                        lambda *a, **k: (_ for _ in ()).throw(MemoryError("sin RAM")))
+    fila = catalogo.autochequeo(RunStore())[0]
+    assert fila["ok"] is False and fila["code"] == "carga_fallida"
+    assert "sin RAM" in fila["message"]
+
+
+def test_si_el_autochequeo_MISMO_revienta_la_app_arranca_y_lo_dice(tmp_path, monkeypatch,
+                                                                    capsys):
+    """La ultima red: ni el chequeo puede tumbar el arranque. Y 'no se pudo
+    comprobar' se dice, porque no es lo mismo que 'todo bien' -- misma regla que
+    el NO SE de cerrable.mjs."""
+    monkeypatch.setenv("FV_ROOT", str(tmp_path / "codigo"))
+    monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "datos"))
+    (tmp_path / "datos").mkdir(parents=True)
+    (tmp_path / "codigo").mkdir(parents=True)
+    monkeypatch.setattr(catalogo, "autochequeo",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("disco raro")))
+    from fv.api.app import create_app
+    cliente = TestClient(create_app(), raise_server_exceptions=False)
+    assert cliente.get("/runs").status_code == 200      # arranca igual
+    # ...y lo DICE en el log del arranque, que es todo el punto de este camino:
+    # "no se pudo comprobar" tiene que verse distinto de "todas cargan"
+    salida = capsys.readouterr().out
+    assert "autochequeo_fallido" in salida
+    assert "disco raro" in salida

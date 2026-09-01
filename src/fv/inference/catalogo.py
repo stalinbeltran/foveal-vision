@@ -208,6 +208,65 @@ def checkpoint_de(run: str, runs_store, fichero: str = CHECKPOINT_INFERENCIA
 
 # ------------------------------------------------------------- la promocion
 
+def autochequeo(runs_store) -> list[dict]:
+    """¿Puede la app cargar HOY todo lo que dice poder inferir?
+
+    Una fila por red servible --las aprobadas y las que estan en la antesala--
+    con `ok` y, si no, el `code`/`message`/`hint` de la negativa.
+
+    ⚠ POR QUE AL ARRANCAR Y NO SOLO AL PULSAR
+    ------------------------------------------
+    Hay una clase de averia que NINGUN test puede encontrar: la que aparece
+    porque el PROCESO lleva vivo desde antes que el artefacto. Un test corre
+    siempre una version de todo; un servicio de larga vida, no.
+
+    Paso el 2026-09-01: el servicio llevaba corriendo desde las 23:42 y
+    `mask_channel` se commiteo a las 02:08. La red nueva no cargaba, y el fallo
+    espero **8 horas** a que el dueno la eligiera en el movil -- que es el peor
+    sitio para enterarse y el que hace que un sistema parezca de mala calidad.
+    Cargarlas al arrancar convierte eso en una linea del log a los 3 segundos.
+
+    ⚠ NO se niega a arrancar si algo falla, y es deliberado (R2: o degrada con un
+    defecto DECLARADO, o falla antes de empezar). La app sirve datasets, runs,
+    recorridos y estudios; que un `.pt` no cargue no puede tumbar todo eso. Se
+    degrada --esa red no se puede usar-- y se DICE, en el log y en el payload de
+    `GET /inference`, para que la pantalla lo marque en vez de fallar al pulsar.
+
+    ⚠ Y no toca `MODEL_CACHE`: comprueba con `load_model`, que es el mismo codigo
+    de carga sin el efecto de dejar N modelos residentes. Un chequeo que cambia
+    el consumo de memoria del proceso es otra cosa distinta de un chequeo.
+    """
+    from fv.inference.checkpoint import CheckpointError, load_model  # noqa: PLC0415
+
+    filas = []
+    for run in sorted(set(aprobadas()) | set(antesala_completa())):
+        ck, origen = checkpoint_de(run, runs_store)
+        if ck is None:
+            filas.append({"run": run, "origen": None, "ok": False,
+                          "code": "sin_pesos",
+                          "message": f"'{run}' esta en el catalogo y no tiene "
+                                     f"pesos en ninguna parte",
+                          "hint": "reentrenalo, o retiralo del catalogo con "
+                                  "DELETE /inference/approved/<run>"})
+            continue
+        try:
+            load_model(ck)
+            filas.append({"run": run, "origen": origen, "ok": True})
+        except CheckpointError as e:
+            filas.append({"run": run, "origen": origen, "ok": False,
+                          "code": e.code, "message": e.message, "hint": e.hint})
+        except Exception as e:                          # noqa: BLE001
+            # cualquier otra cosa tambien se declara: un autochequeo que se traga
+            # una excepcion inesperada es un autochequeo que miente
+            filas.append({"run": run, "origen": origen, "ok": False,
+                          "code": "carga_fallida", "message": f"{type(e).__name__}: {e}",
+                          "hint": "si el run es RECIENTE, mira primero si este "
+                                  "proceso lleva vivo desde antes que el: "
+                                  "reiniciar es gratis. Si no, el log del "
+                                  "servicio tiene la traza"})
+    return filas
+
+
 def promover(run: str, runs_store, motivo: str = "", origen: str = "") -> dict:
     """Antesala -> repo de datos, y ADEMAS aprueba: es la misma decision.
 
