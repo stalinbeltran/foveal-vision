@@ -117,13 +117,25 @@ Numeración del hermano donde la vista se hereda; se marca lo que cambia.
   rangos se miraron ya y qué imágenes quedaron marcadas—, así que es una entidad con su artefacto,
   no un cruce recalculable (por eso tiene pantalla, como `Diagnóstico`). El registro lo escribe el
   servidor **al inferir**, no un botón de guardar.
-  ⚠ **El detalle ensena las ESQUINAS, la rejilla no** — y es la misma asimetria: alli la unidad
-  es la imagen entera para triar, aqui es una imagen sola y grande para diagnosticar. Los puntos de
-  la inferencia (post-NMS, y la nube cruda si se pide) van con el **tamano por `score`** en escala
-  absoluta 0→1 y se **filtran por ranura**; el rango de score por ranura va en la tabla de numeros,
-  porque con una red entrenada los scores se saturan (mediana 0,998 *medido 2026-08-31*) y todos
-  los circulos salen iguales. Viajan **a peticion** (`with_detections`), que es lo que evita
-  mandarle a un movil las decenas de puntos por imagen de un lote de 60.
+  ⚠ **Las dos ensenan las ESQUINAS; la nube CRUDA solo el detalle** — y es la misma asimetria de
+  siempre: en la rejilla la unidad es la imagen entera para triar, en el detalle es una imagen sola
+  y grande para diagnosticar. Los puntos van con el **tamano por `score`** en escala absoluta 0→1 y
+  se **filtran por ranura**; el rango de score por ranura va en la tabla de numeros, porque con una
+  red entrenada los scores se saturan (mediana 0,998 *medido 2026-08-31*) y todos los circulos
+  salen iguales.
+
+  ⚠ **En la rejilla el defecto son las ESQUINAS y los recuadros van a peticion** (decision del
+  dueno, 2026-09-01): en una miniatura de 320 px un parrafo es un rectangulo grande que tapa lo que
+  se esta mirando, y lo que se tria es si la red puso las esquinas donde tocaba. Sin etiquetas
+  `TL`/`TR`, que a ese tamano tapan la esquina que vienen a ensenar. Y **el pie cuenta lo que se
+  esta VIENDO** (`4 esq`, `4 esq · 2 cajas`, `sin overlay`): decia «2 cajas» con los recuadros
+  apagados, o sea un numero de algo que no esta en la imagen.
+
+  ⚠ **Las detecciones viajan en DOS niveles, por lo que cuestan** *(medido 2026-09-01, lote de 10
+  imagenes: sin nada **2 KB** · con esquinas **10 KB** · con esquinas y crudas **35 KB**)*. Las
+  crudas son ~3/4 del payload y son justo lo que una miniatura no puede dibujar, asi que
+  `with_detections` trae las **esquinas** (las pide tambien la rejilla) y `with_raw` anade la
+  **nube pre-NMS**, que solo pide el detalle.
 
   ⚠ En la rejilla la inferencia sale **sola** al elegir el split; en el detalle va **a botón**, y
   la asimetría es deliberada: allí se pueden cambiar el run y el umbral, así que repetir significa
