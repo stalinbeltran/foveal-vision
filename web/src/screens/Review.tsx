@@ -8,7 +8,8 @@ import {
 import { BoxedImage } from "../components/BoxedImage";
 import { ErrorBox, Field, Working } from "../components/ui";
 
-// F x B -- mirar a ojo un SPLIT del dataset, con las cajas encima si hay modelo.
+// F x B -- mirar a ojo un SPLIT del dataset, con las ESQUINAS encima si hay
+// modelo (y los recuadros si se piden: ver `verEsquinas`/`verCajas`).
 //
 // ⚠ La pregunta de esta pantalla es "QUE DATASET del repo de datos quiero
 // mirar", no "que run". Empezo al reves --el select principal era el run-- y en
@@ -55,6 +56,15 @@ export default function Review() {
   const [n, setN] = usePersistedState("review.n", 10);
   const [offset, setOffset] = usePersistedState("review.offset", 0);
   const [showTruth, setShowTruth] = usePersistedState("review.truth", true);
+  // Lo que se dibuja sobre la miniatura. Por decisión del dueño (2026-09-01) el
+  // defecto es **las esquinas**, no los recuadros: en una miniatura de 320 px un
+  // párrafo es un rectángulo grande que tapa lo que se está mirando, y lo que se
+  // triA es si la red puso las esquinas donde tocaba. Los recuadros siguen a un
+  // clic. ⚠ Claves propias y NO las del detalle: allí se mira UNA imagen grande
+  // y lo que conviene ver es distinto — compartirlas haría que elegir en una
+  // pantalla cambiara la otra sin pedirlo.
+  const [verEsquinas, setVerEsquinas] = usePersistedState("review.grid.corners", true);
+  const [verCajas, setVerCajas] = usePersistedState("review.grid.boxes", false);
   const [abierto, setAbierto] = usePersistedState("review.form", false);
   const [ctx, setCtx] = useState<any>(null);
   const [batch, setBatch] = useState<any>(null);
@@ -100,6 +110,10 @@ export default function Review() {
       api.post("/review/batch", {
         window_dataset: ctx.window_dataset, split, offset, count: n,
         run: run && run !== SIN_ELEGIR ? run : undefined,
+        // las ESQUINAS sí, la nube cruda NO: medido el 2026-09-01, un lote de 10
+        // pasa de 2 KB a 35 con las dos, y ~3/4 de eso son crudas que una
+        // miniatura no puede ni dibujar. El detalle sí las pide.
+        with_detections: true,
         ...cuerpoKnobs(knobs),
       })
         .then((r) => { if (seq.current === mio) { setBatch(r); setError(null); } })
@@ -175,9 +189,9 @@ export default function Review() {
       <h2 data-domain="F×B" data-view="FR1" data-fixes="dataset + split"
         data-varies="el rango" data-measures="que detecta y que se le escapa">
         Revisar detecciones</h2>
-      <p className="sub">Las imágenes del split, con las cajas de la red encima si
-        eliges un run. Lo que se mire queda registrado, para poder elegir otras la
-        próxima vez.</p>
+      <p className="sub">Las imágenes del split, con las <b>esquinas</b> de la red
+        encima si eliges un run —y los recuadros si los pides—. Lo que se mire queda
+        registrado, para poder elegir otras la próxima vez.</p>
 
       <div className="card revbar">
         {/* El formulario va PLEGADO por defecto y la navegación no.
@@ -294,6 +308,14 @@ export default function Review() {
           <button className="secondary" disabled={busy || !pendientes}
             onClick={() => setOffset(vista?.next_offset ?? 0)}>sin revisar</button>
         </div>
+        <label className="inline">
+          <input type="checkbox" checked={verEsquinas}
+            onChange={(e) => setVerEsquinas(e.target.checked)} /> esquinas
+        </label>
+        <label className="inline">
+          <input type="checkbox" checked={verCajas}
+            onChange={(e) => setVerCajas(e.target.checked)} /> recuadros
+        </label>
         {hayVerdad ? (
           <label className="inline">
             <input type="checkbox" checked={showTruth}
@@ -348,10 +370,17 @@ export default function Review() {
           {loteVigente.images.map((img: any) => (
             <div className={`revthumb${img.marked ? " marked" : ""}`} key={img.index}>
               <Link to={`/review/${encodeURIComponent(loteVigente.window_dataset)}/${loteVigente.split}/${img.index}${run ? `?run=${encodeURIComponent(run)}` : ""}`}>
+                {/* ⚠ `cornerLabels={false}`: «TL» sobre una miniatura de 320 px
+                    tapa la esquina que viene a enseñar. El color ya la
+                    identifica y el nombre está en el detalle. */}
                 <BoxedImage base={base} index={img.index}
                   width={img.width} height={img.height}
                   paragraphs={img.paragraphs} truth={img.truth}
-                  showTruth={showTruth} fetchWidth={320} />
+                  showTruth={showTruth} showPred={verCajas}
+                  corners={img.corners} showCorners={verEsquinas}
+                  windowSize={loteVigente.knobs?.window_size ?? 16}
+                  cornerLabels={false}
+                  fetchWidth={320} />
               </Link>
               <div className="revcap">
                 <span className="mono">#{img.index}</span>
@@ -360,7 +389,16 @@ export default function Review() {
                     f1 {img.f1.toFixed(2)}
                   </span>
                 ) : conModelo ? (
-                  <span className="sub2">{img.paragraphs.length} cajas</span>
+                  // ⚠ Se cuenta lo que se está VIENDO. Decía «2 cajas» con los
+                  // recuadros apagados, o sea un número de algo que no está en
+                  // la imagen — y el pie de una miniatura es justo lo que se lee
+                  // para decidir si abrirla.
+                  <span className="sub2">
+                    {verEsquinas ? `${(img.corners ?? []).length} esq` : ""}
+                    {verEsquinas && verCajas ? " · " : ""}
+                    {verCajas ? `${img.paragraphs.length} cajas` : ""}
+                    {!verEsquinas && !verCajas ? "sin overlay" : ""}
+                  </span>
                 ) : null}
                 <button className={`markbtn${img.marked ? " on" : ""}`}
                   aria-pressed={img.marked}

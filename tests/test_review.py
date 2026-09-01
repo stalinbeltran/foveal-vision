@@ -599,21 +599,31 @@ def test_las_detecciones_van_a_peticion_y_no_por_defecto(client):
     # ...pero las cajas siguen estando: lo que cambia es el detalle, no la caja
     assert "paragraphs" in callado["images"][0]
 
+    # `with_detections` son las ESQUINAS, que son baratas (~10 por imagen) y las
+    # pide tambien la rejilla para las miniaturas
     pedido = c.post("/review/batch", json={**cuerpo, "with_detections": True}).json()
     img = pedido["images"][0]
-    assert "corners" in img and "raw" in img
+    assert "corners" in img
+    assert "raw" not in img, "la nube cruda es ~3x las esquinas: va aparte"
+
+    # ...y la nube PRE-NMS es el segundo nivel, solo para el detalle
+    con_crudas = c.post("/review/batch",
+                        json={**cuerpo, "with_detections": True,
+                              "with_raw": True}).json()["images"][0]
+    assert "corners" in con_crudas and "raw" in con_crudas
     # el vocabulario viaja CON la respuesta indexada por el (U4.2): sin esto el
     # front tendria que guardar su copia del orden de esquinas
     assert pedido["corner_order"] == list(CORNER_NAMES)
     assert callado["corner_order"] == list(CORNER_NAMES)
     # cada punto trae lo que se dibuja: su ranura, su score y donde cae
-    for d in img["corners"] + img["raw"]:
+    for d in con_crudas["corners"] + con_crudas["raw"]:
         assert d["corner"] in pedido["corner_order"]
         assert 0.0 <= d["score"] <= 1.0
-        assert 0 <= d["x"] <= img["width"] and 0 <= d["y"] <= img["height"]
+        assert (0 <= d["x"] <= con_crudas["width"]
+                and 0 <= d["y"] <= con_crudas["height"])
     # el NMS es lo unico que separa las dos etapas: nunca puede haber MAS
     # esquinas que ventanas crudas de las que salieron
-    assert len(img["corners"]) <= len(img["raw"])
+    assert len(con_crudas["corners"]) <= len(con_crudas["raw"])
 
 
 def test_sin_modelo_no_hay_ranuras_de_que_hablar(client):

@@ -73,7 +73,7 @@ export default function ReviewDetail() {
       // aqui SI se piden las detecciones: es una imagen sola y grande, que es
       // justo donde mirar lo que la red vio antes de la caja tiene sentido. La
       // rejilla no las pide (ver `with_detections` en el API)
-      indices: [idx], with_detections: true, ...cuerpoKnobs(knobs),
+      indices: [idx], with_detections: true, with_raw: true, ...cuerpoKnobs(knobs),
     }).then((r) => { setData(r); setError(null); setSucia(false); })
       .catch((e) => { setError(e); })
       .finally(() => setBusy(false));

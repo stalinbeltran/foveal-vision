@@ -1005,19 +1005,28 @@ def create_app() -> FastAPI:
                                 max(0, len(indices) - 1)))
             trozo = indices[offset:offset + count]
 
-        # Las DETECCIONES (esquinas post-NMS y la nube cruda) van a peticion,
-        # no siempre, y el motivo es el tamano: la rejilla pide hasta
-        # REVIEW_MAX imagenes de golpe y la etapa cruda son decenas de puntos
-        # por imagen -- con el umbral bajo, cientos. Mandarlas siempre cargaria
-        # el movil con lo que una miniatura no puede ni dibujar. La pagina de
-        # detalle pide UNA imagen y si las quiere: ahi el punto es justo mirar
-        # de cerca que vio la red antes de la caja.
+        # Las DETECCIONES van a peticion, y en DOS niveles, porque cuestan muy
+        # distinto. MEDIDO el 2026-09-01 sobre un lote de 10 imagenes:
+        #
+        #   sin nada                 2 KB
+        #   con esquinas y crudas   35 KB   (102 esquinas · 316 crudas)
+        #
+        # o sea que la nube cruda es ~3x las esquinas -- y es justo lo que una
+        # miniatura no puede ni dibujar. Por eso:
+        #
+        #   `with_detections` -> las ESQUINAS (post-NMS). Baratas: ~10 por
+        #        imagen. Las pide tambien la rejilla, que es lo que permite ver
+        #        las esquinas en las miniaturas sin cargar el movil.
+        #   `with_raw`        -> ademas la nube PRE-NMS. Solo la pagina de
+        #        detalle, que mira UNA imagen grande y ahi el punto es ver que
+        #        vio la red antes de la caja.
         #
         # Se DECLARA en la peticion en vez de deducirse de len(indices)==1: una
         # regla implicita obliga al cliente a adivinar cuando recibira el campo,
         # y el dia que la rejilla pida una sola imagen cambiaria de payload sin
         # que nadie lo hubiera pedido.
         con_detecciones = bool(body.get("with_detections"))
+        con_crudas = bool(body.get("with_raw"))
 
         run_name = body.get("run") or None
         model = None
@@ -1063,6 +1072,7 @@ def create_app() -> FastAPI:
                 fila_img["paragraphs"] = out["paragraphs"]
                 if con_detecciones:
                     fila_img["corners"] = out["corners"]
+                if con_crudas:
                     fila_img["raw"] = out["raw"]
                 if source is not None:
                     pred = [(p["x0"], p["y0"], p["x1"], p["y1"])
