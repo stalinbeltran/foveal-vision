@@ -1311,6 +1311,27 @@ cuando ya no hay remedio.
 Cuesta poco: **~3-6 MB por dataset**, y sólo se añaden — dato nuevo = nombre nuevo, nunca se
 reescribe uno.
 
+#### Un B puede salir de otro B: los datasets de **fallos** (2026-09-02)
+
+`scripts/dataset_fallidos.py` pasa una red por un dataset de ventanas, puntúa cada imagen a nivel
+de **párrafo**, y escribe un B nuevo con las peores — entrenable con `fv-train` sin tocar nada.
+Hay tres, con `--verdad ventanas`: `optimo-fallidos` (427 img), `edge-fallidos` (481) y
+`mask-fallidos` (346). Desde Telegram, `/use fallidos`.
+
+⚠ **Dos cosas que hay que saber antes de usarlos**, y las dos están medidas el 2026-09-02:
+
+1. **La mayor parte de lo que parece «la red falla» es el EMPAREJADO, no la red.** Las tres redes
+   detectan esquinas casi perfectamente (`fov16-mask-p20` recupera el 99,25 %) y aun así 35-49 % de
+   las imágenes tienen error de párrafo: en el 43-75 % de ésas **todas las esquinas están bien** y
+   lo que junta mal es el voraz TL→BR de `fv/inference/predict.py:_reconstruct`. Cada imagen lleva
+   su `solo_emparejado` para no confundir las dos averías, que piden arreglos opuestos.
+2. **Su verdad está RECOMPUESTA desde las etiquetas de ventana**, no leída de la fuente — la de
+   `dirty-1000-80px` se perdió con la máquina anterior. Es la excepción declarada al contrato ⑬ y
+   pierde los párrafos cortados por el borde (13 de 1000). Queda escrito en cada `manifest.json`.
+
+El detalle, el criterio escrito antes de mirar y las tolerancias medidas, en
+[docs/dataset-fallidos.md](docs/dataset-fallidos.md).
+
 ⚠ **El fallback aquí no es cosmético: es el contrato con la máquina alquilada.** Sin repo de datos,
 `window_datasets_root()` cae a `<código>/data/window-datasets`, que es **exactamente** donde
 `construir_payload()` mete los datasets en el tar y donde `bench_fleet.py` los copia por `scp`. Las

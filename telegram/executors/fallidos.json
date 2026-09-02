@@ -1,0 +1,18 @@
+{
+  "name": "fallidos",
+  "descripcion": "Crea un dataset de ventanas con los casos donde una red FALLA: infiere sobre todas las imagenes, puntua por PARRAFO y guarda las peores como <red>-fallidos en el repo de datos. Sale entrenable con fv-train. ~40 s por red y por cada 1000 imagenes; no alquila nada. NO commitea: el comando de push sale al final.",
+  "ejemplos": [
+    "--verdad ventanas --seco   (mide y ensena el reparto, no escribe)",
+    "--nn fov16-mask-p20 --verdad ventanas",
+    "--nn fov16-mask-p20 --verdad ventanas --max-imagenes 50 --png",
+    "--verdad ventanas --split val --min-errores 2"
+  ],
+  "command": ".venv/bin/python scripts/dataset_fallidos.py {{input}} 2>&1 | grep -v NNPACK",
+  "encargados": [
+    "echo"
+  ],
+  "timeoutMs": 0,
+  "requiere": [
+    "python3"
+  ]
+}

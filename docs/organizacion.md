@@ -421,6 +421,16 @@ esquina por ventana, que son otra cosa. El fingerprint de B protege el split; la
 resuelve por `manifest["source_id"]`. Si la fuente no existe, se falla con razón
 (`task_needs_source`) — **nunca se puntúa contra las etiquetas de ventana**.
 
+⚠ **La excepción declarada, 2026-09-02** (`fv.fallidos`, `--verdad ventanas`): las etiquetas de
+esquina de B guardan la esquina **verbatim** (`y[ci] = (1, (cx−wx0)/n, (cy−wy0)/n)`), así que los
+párrafos se pueden **recomponer** y puntuar contra *eso*. No es lo que esta regla prohíbe —prohíbe
+tratar las etiquetas de ventana *como si fueran* párrafos—, pero es un camino **degradado** y por
+eso **hay que pedirlo**: el defecto sigue siendo fallar. Existe porque la fuente de
+`dirty1000-80px-16px-r20260827` se perdió al rehacer la máquina y su `windows.npz` sí está
+commiteado. Cuesta los párrafos **cortados por el borde**, cuya esquina no ve ninguna ventana
+(13 de 1000, medido). `fv.task` **no** lo usa y sigue fallando como siempre. Detalle y el test que
+compara las dos verdades: [dataset-fallidos.md](dataset-fallidos.md).
+
 Consecuencias que el módulo hace explícitas:
 
 - La verdad se filtra por `manifest["config"]["target_kinds"]`: un dataset extraído de párrafos

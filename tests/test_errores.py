@@ -76,7 +76,7 @@ SIN_TEST = {
     "sweep_exists",
     "recipe_in_use", "recipe_not_found", "run_not_found",
     "run_without_provenance", "sample_not_found", "source_empty",
-    "source_not_found", "study_exists", "study_not_found", "sweep_not_found",
+    "study_exists", "study_not_found", "sweep_not_found",
     "unknown_cost_metric", "unknown_merge", "unknown_optimizer",
     "unknown_pad_mode", "unknown_pool_mode", "unknown_scheduler",
     "window_dataset_exists", "window_dataset_in_use", "window_dataset_missing",

@@ -23,6 +23,13 @@ def _nunca_el_repo_de_datos_real(tmp_path, monkeypatch):
     Hace cierto por construccion lo que el docstring de arriba ya prometia
     ("never touch real data/"). Un test que quiera otro sitio sigue poniendo
     FV_DATA_ROOT el mismo; esto solo rellena el defecto.
+
+    ⚠ Y por eso NINGUN test puede llamar a `monkeypatch.undo()`: el `monkeypatch`
+    de un test es el MISMO objeto que este fixture, asi que deshacer "lo mio"
+    deshace tambien esta variable, y a partir de esa linea el test escribe en el
+    repo de datos de VERDAD -- en silencio, que es lo peor. Para quitar un parche
+    a mitad, apagalo con una bandera (ver tests/test_fallidos.py, el del dataset a
+    medias). Casi paso el 2026-09-02.
     """
     monkeypatch.setenv("FV_DATA_ROOT", str(tmp_path / "_repo-datos"))
 
