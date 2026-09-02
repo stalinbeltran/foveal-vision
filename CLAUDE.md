@@ -104,6 +104,50 @@ la vigila y la **destruye** no se contaría. Si se va por Vast, **esa línea va 
 
 ## Estado actual — léelo primero
 
+> **⏳ 2026-09-02 — SONDA L1: implementada entera y probada; la rejilla NO se ha lanzado.**
+> El encargo ([`instruccioneslargas.md`](instruccioneslargas.md)) pregunta si los kernels de L1
+> podrían aprender filtros genéricos **cuando sí hay presión sobre ellos** — en
+> `fov16-optimo-mask` no lo hicieron (energía en el subespacio clásico **0,688** contra **0,667**
+> de un kernel aleatorio: **1,03×**, o sea nada). La sonda es un autoencoder de **una capa por
+> lado** sobre la MISMA vista 20×20; el modelo *son* los kernels.
+> 1. **Dónde vive:** módulo aislado **`src/fv/probe/`** (modelo · datos · gabor · métricas · run ·
+>    figuras · tabla) y la CLI en `scripts/sonda_l1.py`. Desde Telegram, `/use sonda-l1`.
+>    ⚠ **`fv.probe` NO importa `fv.models`**, y de `fv.fovea` sólo `build_view`/`dims_of` (el
+>    cargador de ventanas). Es el §6 del encargo y **tiene test**: un import de más ata el
+>    experimento a la red que estudia y no rompe nada visible.
+> 2. **El criterio está escrito ANTES de mirar** en
+>    [`docs/plan-sonda-l1-2026-09-02.md`](docs/plan-sonda-l1-2026-09-02.md), y sus umbrales están
+>    **PENDIENTES de que el dueño los confirme**. Ahí están también las tres enmiendas que las
+>    medidas previas obligan a proponer.
+> 3. ⚠⚠ **La rejilla de λ del encargo `{0 · 0,03 · 0,1 · 0,3}` NO alcanza la banda de activación
+>    5-15 % que el propio criterio exige.** *Medido el 2026-09-02* (k=7, K=16, 6 épocas,
+>    `--limite 8000`): λ=0,3 deja la activación en **39,9 %**, y la banda vive en **λ ≈ 6-40**,
+>    o sea **20× a 130×** más arriba. Con la rejilla tal cual, **el éxito es inalcanzable por
+>    construcción**, no por el resultado.
+> 4. ⚠ **El nulo del ajuste a Gabor en 3×3 es 0,879** *(medido: mediana del R² sobre 64 kernels
+>    aleatorios)*, así que el techo de `Gabor Δ` ahí es **0,121** — **menos** que el umbral de
+>    éxito propuesto (0,25). El ancla k=3 se lee por el **enriquecimiento**, no por el Gabor.
+>    Un Gabor tiene 7 parámetros libres: en 3×3 ajusta cualquier cosa. **La métrica se lee
+>    siempre como diferencia contra su nulo, nunca en absoluto.**
+> 5. **Coste MEDIDO**, no estimado *(2026-09-02, este droplet, 2 vCPU)*: la combinación más cara
+>    (k=9, K=32) va a **101,3 s/época**; la rejilla de 48 runs × 30 épocas son **~12,0 h**, o
+>    **~4,0 h** con `--limite 20000` (34,0 s/época). **No alquila nada**, y `sonda_l1.py` ya está
+>    en la lista `TRABAJOS` del freno (`telegram-coordinator/scripts/cerrable.mjs`): comprobado
+>    en vivo, el veredicto dice `🔴 NO CERRAR — 1 trabajo(s) vivo(s): sonda_l1.py`.
+> 7. ⚠ **El aviso ya NO decide el código de salida del trabajo desacoplado.** `/use sonda-l1` con
+>    `--rejilla`/`--solo`/`--repetir-mejores` levanta una unidad de systemd con
+>    `Restart=on-failure`, y el `notify.mjs` iba al final de la tubería: *medido el 2026-09-02*,
+>    la sonda **terminó bien**, el aviso falló y la unidad se quedó **reiniciándose cada 30 s** —
+>    12 h de rejilla relanzadas por un aviso. Y al revés, un trabajo que reventara salía como
+>    `success` y no se reintentaba. Ahora manda el código del **trabajo**, en
+>    `scripts/sonda_l1_desacoplada.sh` (un fichero, no una línea escapada dentro de un JSON),
+>    **con un test por cada dirección del fallo**. La unidad corre en su propio cgroup
+>    (`/system.slice/sonda-l1.service`, comprobado), o sea que sí sobrevive al reinicio del bot.
+> 6. **La fase 2** (congelar el codificador ganador como L1 de la rama central y reentrenar
+>    contra el f1 0,954 de `fov16-mask-p20`) **no está implementada, a propósito**: depende de
+>    qué `k` y `K` ganen.
+> **50 tests** en `tests/test_sonda_l1.py`; suite **557 pasan** (eran 533).
+
 > **🔒 2026-08-31 — REGLA DEL DUEÑO: los pesos de un run NO se guardan por defecto.**
 > Sólo se conservan —y **sólo ésas puede usar la web app para inferir**— las redes que
 > **el dueño aprueba una a una**. **Hoy la lista es exactamente una: `demo-fov16-optimo`**
