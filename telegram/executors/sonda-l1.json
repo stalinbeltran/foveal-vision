@@ -1,0 +1,16 @@
+{
+  "name": "sonda-l1",
+  "descripcion": "Sonda L1: entrena un autoencoder de UNA capa sobre la vista 20x20 para ver si los kernels de la primera capa pueden aprender filtros genericos cuando SI hay presion. Corre en ESTA maquina (no alquila nada) pero tarda HORAS y satura los 2 vCPU. 'estado' y 'parar' no cuestan nada; --cronometrar mide una combinacion y estima la rejilla sin lanzarla.",
+  "ejemplos": [
+    "--cronometrar",
+    "--cronometrar --limite 20000",
+    "--solo k9-K32-l0.1 --limite 20000",
+    "--rejilla --limite 20000",
+    "estado",
+    "parar"
+  ],
+  "command": "case \"{{input}}\" in parar) sudo systemctl stop sonda-l1 2>/dev/null && echo 'sonda detenida. Lo ya escrito en foveal-vision-data/sondas/l1/ se conserva.' || echo 'no habia ninguna sonda corriendo';; estado|'') echo '--- unidad sonda-l1 ---'; systemctl is-active sonda-l1 2>/dev/null || echo inactive; echo '--- runs terminados ---'; ls -1 \"$HOME/src/foveal-vision-data/sondas/l1/\" 2>/dev/null | wc -l; echo '--- ultimas lineas del log ---'; tail -c 2000 /tmp/sonda-l1.log 2>/dev/null || echo '(sin log: un log VACIO no significa que no arranque, se comprueba con is-active)';; *--cronometrar*|*--dry*) PYTHONUNBUFFERED=1 .venv/bin/python scripts/sonda_l1.py {{input}} 2>&1 | tail -30;; *) \"$COORD_HOME/scripts/desacoplar-persistente.sh\" sonda-l1 sh -c 'PYTHONUNBUFFERED=1 .venv/bin/python scripts/sonda_l1.py {{input}}; node \"$COORD_HOME/scripts/notify.mjs\" \"sonda L1 terminada. Resultados: foveal-vision-data/sondas/l1/resumen.json, log en /tmp/sonda-l1.log\"' && echo 'Sonda lanzada como UNIDAD de systemd (padre PID 1: sobrevive a este turno y a un reinicio del bot). Tarda HORAS y satura los 2 vCPU de esta maquina, pero NO alquila nada. Estado: /use sonda-l1 -> estado. Log: /tmp/sonda-l1.log. Resultados: foveal-vision-data/sondas/l1/';; esac",
+  "encargados": ["echo"],
+  "timeoutMs": 0,
+  "requiere": ["python3"]
+}
