@@ -37,7 +37,7 @@ from fv.datasets.loader import (SourceDataset, SourceError, resolve_source,
                                 source_meta)
 from fv.diagnostics.table import SPLITS   # ONE split vocabulary, two readers
 from fv.inference.checkpoint import MODEL_CACHE
-from fv.inference.predict import predict_image
+from fv.inference.predict import RECONSTRUCT_DEFAULT, predict_image
 from fv.ioutils import read_json_retrying, read_text_retrying, write_json_atomic
 from fv.metrics import paragraph_f1
 from fv.training.registry import RunError, RunStore
@@ -163,6 +163,8 @@ def task_score(run_name: str, split: str = "val", *,
                threshold: float = 0.5, stride: int | None = None,
                nms_radius: float | None = None, min_size: float | None = None,
                iou_threshold: float = 0.5, window_dataset: str | None = None,
+               reconstruct: str = RECONSTRUCT_DEFAULT,
+               corner_tol: float | None = None,
                store: RunStore | None = None) -> dict:
     """Score one run on whole images. Same gates as diagnostics_table, on
     purpose: they are THE door, and a door repeated is a door that holds.
@@ -217,7 +219,13 @@ def task_score(run_name: str, split: str = "val", *,
                        f"el split '{split}' de '{ds_name}' no tiene imagenes",
                        "reconstruye el dataset con ese split > 0")
 
-    knobs = (threshold, stride, nms_radius, min_size, iou_threshold)
+    # ⚠ `reconstruct` y `corner_tol` ENTRAN en la clave, como los demas knobs de
+    # F y por el mismo motivo (§ del docstring: cambiarlos obliga a re-inferir).
+    # Si no entraran, cambiar de reconstruccion --o cambiar su DEFECTO-- serviria
+    # numeros cacheados con la otra, bajo el mismo nombre y sin decirlo, que es
+    # justo el fallo silencioso que esta cache tiene prohibido.
+    knobs = (threshold, stride, nms_radius, min_size, iou_threshold,
+             reconstruct, corner_tol)
     cache_dir = settings.cache_root() / "task"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_file = cache_dir / f"{_cache_key(run_name, manifest['fingerprint'], split, ckpt, knobs)}.json"
@@ -256,7 +264,8 @@ def task_score(run_name: str, split: str = "val", *,
         sample = source.sample_at(int(index))
         out = predict_image(model, sample.load_image(), threshold=threshold,
                             stride=stride, nms_radius=nms_radius,
-                            min_size=min_size)
+                            min_size=min_size, reconstruct=reconstruct,
+                            corner_tol=corner_tol)
         used_knobs = out["knobs"]
         pred = [(p["x0"], p["y0"], p["x1"], p["y1"]) for p in out["paragraphs"]]
         # the kind filter is NOT optional: a dataset extracted from paragraphs

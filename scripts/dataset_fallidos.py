@@ -41,6 +41,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from fv.fallidos import (Criterio, FallidosError, crear, dataset_de,  # noqa: E402
                          nombre_dataset, ordenar)
 from fv.inference.catalogo import aprobadas                           # noqa: E402
+from fv.inference.predict import (RECONSTRUCT_DEFAULT,                # noqa: E402
+                                  RECONSTRUCTS)
 from fv.training.registry import RunStore                             # noqa: E402
 from fv.windows.store import WindowDatasetStore                       # noqa: E402
 
@@ -127,6 +129,13 @@ def main() -> int:
     g.add_argument("--nms-radio", type=float, default=None, dest="nms_radius")
     g.add_argument("--min-tam", type=float, default=None, dest="min_size")
     g.add_argument("--iou", type=float, default=0.5, dest="iou_threshold")
+    g.add_argument("--reconstruir", choices=RECONSTRUCTS, default=RECONSTRUCT_DEFAULT,
+                   dest="reconstruct",
+                   help="como se arman los parrafos con las esquinas: tlbr "
+                        "(heredado, el defecto de F: empareja TL con BR por "
+                        "confianza y TIRA TR y BL) o quad (usa las cuatro). Es lo "
+                        "que mas mueve el resultado")
+    g.add_argument("--tol-esquina", type=float, default=None, dest="corner_tol")
 
     g = ap.add_argument_group("el dataset de salida")
     g.add_argument("--split-salida", choices=("conservar", "rehacer", "train"),
@@ -159,6 +168,7 @@ def main() -> int:
 
     criterio = Criterio(threshold=a.threshold, stride=a.stride,
                         nms_radius=a.nms_radius, min_size=a.min_size,
+                        reconstruct=a.reconstruct, corner_tol=a.corner_tol,
                         iou_threshold=a.iou_threshold,
                         min_errores=a.min_errores, max_imagenes=a.max_imagenes,
                         incluir_gt_parcial=a.incluir_gt_parcial)
@@ -174,7 +184,7 @@ def main() -> int:
             fallos.append(run)
             continue
         print(f"\n=== {run}  ->  {nombre}")
-        print(f"  base: {base}   verdad: {a.verdad}")
+        print(f"  base: {base}   verdad: {a.verdad}   reconstruccion: {a.reconstruct}")
         try:
             res = crear(run, dataset=base, nombre=nombre, criterio=criterio,
                         verdad=a.verdad, split=a.split,

@@ -1320,17 +1320,46 @@ Hay tres, con `--verdad ventanas`: `optimo-fallidos` (427 img), `edge-fallidos` 
 
 ⚠ **Dos cosas que hay que saber antes de usarlos**, y las dos están medidas el 2026-09-02:
 
-1. **La mayor parte de lo que parece «la red falla» es el EMPAREJADO, no la red.** Las tres redes
-   detectan esquinas casi perfectamente (`fov16-mask-p20` recupera el 99,25 %) y aun así 35-49 % de
-   las imágenes tienen error de párrafo: en el 43-75 % de ésas **todas las esquinas están bien** y
-   lo que junta mal es el voraz TL→BR de `fv/inference/predict.py:_reconstruct`. Cada imagen lleva
-   su `solo_emparejado` para no confundir las dos averías, que piden arreglos opuestos.
+1. **La mayor parte de lo que parece «la red falla» es el EMPAREJADO, no la red** — y **ya está
+   arreglado**, ver el apartado de abajo. Cada imagen lleva su `solo_emparejado` para no confundir
+   las dos averías, que piden arreglos opuestos. Los tres datasets se construyeron con la
+   reconstrucción heredada, que sigue siendo el defecto.
 2. **Su verdad está RECOMPUESTA desde las etiquetas de ventana**, no leída de la fuente — la de
    `dirty-1000-80px` se perdió con la máquina anterior. Es la excepción declarada al contrato ⑬ y
    pierde los párrafos cortados por el borde (13 de 1000). Queda escrito en cada `manifest.json`.
 
 El detalle, el criterio escrito antes de mirar y las tolerancias medidas, en
 [docs/dataset-fallidos.md](docs/dataset-fallidos.md).
+
+#### ⚠ La reconstrucción de párrafos estaba rota, y la métrica de tarea con ella (2026-09-02)
+
+**La red predice CUATRO tipos de esquina y `_reconstruct` usaba DOS**: `TR` y `BL` se calculan,
+pasan el NMS y se tiran, así que la única prueba de que un TL y un BR eran del mismo párrafo era
+la confianza. Resultado, visto a ojo: cajas que unen el TL de un párrafo con el BR de otro.
+
+**Lo primero, porque es lo que asusta: `val_f1` NO depende de esto.** El f1 que monitoriza el
+entrenamiento, elige `best.pt` y rankea recorridos sale de `detection_counts` por ventana
+(`training/loop.py:68`) y no llama a `predict_image` ni a la reconstrucción. `OBJECTIVES` sólo
+tiene métricas de ventana. **Ninguna red ha sido mal calificada en su validación ni en ningún
+barrido.**
+
+**Lo que sí estaba contaminado es la métrica de TAREA**, que es la que el proyecto llama «la que
+importa» — y llegaba a **reordenar** redes. Usar las cuatro esquinas (`reconstruct="quad"`) sobre
+las 987 imágenes con verdad completa de `dirty1000-80px-16px-r20260827`:
+
+| red | `tlbr` | `quad` | Δ |
+|---|---|---|---|
+| `demo-fov16-optimo` | 0,7560 ± 0,0108 | 0,9385 ± 0,0044 | **+0,1826** (17 SEM) |
+| `fov16-edge-p20` | 0,6823 ± 0,0120 | 0,9577 ± 0,0038 | **+0,2754** (23 SEM) |
+| `fov16-mask-p20` | 0,7666 ± 0,0111 | 0,9773 ± 0,0030 | **+0,2106** (19 SEM) |
+
+⚠ **El defecto SIGUE siendo `tlbr`, y cambiarlo es decisión del dueño**: movería todos los números
+de métrica de tarea publicados. Lo que ya está hecho para que ese cambio sea seguro es que los dos
+knobs nuevos **entran en la clave de caché** de `fv.task` — si no, cambiar el defecto habría
+servido números viejos bajo el mismo nombre y en silencio.
+
+El porqué de cada decisión, lo que se probó y perdió (el residuo), la meseta de la tolerancia y lo
+que sigue sin arreglar, en [docs/reconstruccion-parrafos.md](docs/reconstruccion-parrafos.md).
 
 ⚠ **El fallback aquí no es cosmético: es el contrato con la máquina alquilada.** Sin repo de datos,
 `window_datasets_root()` cae a `<código>/data/window-datasets`, que es **exactamente** donde

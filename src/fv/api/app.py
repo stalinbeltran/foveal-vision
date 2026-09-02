@@ -27,7 +27,7 @@ from fv.inference.catalogo import CatalogoError
 from fv.inference.checkpoint import MODEL_CACHE, CheckpointError
 from fv.inference.introspect import (feature_maps_payload, input_view_payload,
                                      kernels_payload)
-from fv.inference.predict import predict_image
+from fv.inference.predict import RECONSTRUCT_DEFAULT, predict_image
 from fv.metrics import corner_evidence
 from fv.models.builder import full_config, network_trace
 from fv.models.store import NetworkStore, NetworkStoreError
@@ -792,7 +792,9 @@ def create_app() -> FastAPI:
             threshold=float(body.get("threshold", 0.5)),
             stride=body.get("stride"),
             nms_radius=body.get("nms_radius"),
-            min_size=body.get("min_size"))
+            min_size=body.get("min_size"),
+            reconstruct=body.get("reconstruct", RECONSTRUCT_DEFAULT),
+            corner_tol=body.get("corner_tol"))
         result["truth"] = [{"quad": b.quad.tolist()} for b in s.blocks]
         return result
 
@@ -1066,7 +1068,9 @@ def create_app() -> FastAPI:
                     model, pix,
                     threshold=float(body.get("threshold", 0.5)),
                     stride=body.get("stride"), nms_radius=body.get("nms_radius"),
-                    min_size=body.get("min_size"))
+                    min_size=body.get("min_size"),
+                    reconstruct=body.get("reconstruct", RECONSTRUCT_DEFAULT),
+                    corner_tol=body.get("corner_tol"))
                 knobs = out["knobs"]
                 orden = out["corner_order"]
                 fila_img["paragraphs"] = out["paragraphs"]

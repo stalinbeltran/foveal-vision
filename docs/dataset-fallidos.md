@@ -67,6 +67,12 @@ right»*.
 declaró antes de medir, y cambiarlo después de mirar es lo que este proyecto no hace.
 El diagnóstico informa; no ordena.
 
+✅ **Y ese diagnóstico llevó al arreglo (2026-09-02).** `_reconstruct` usaba dos de los cuatro
+tipos de esquina; usar las cuatro (`--reconstruir quad`) sube el f1 de tarea **+0,18 a +0,28** y
+recorta los errores de párrafo entre un 74 % y un 89 %. El defecto sigue siendo el heredado
+—cambiarlo movería todo lo publicado—, así que los tres datasets de abajo están construidos con
+`tlbr`. Todo, en [reconstruccion-parrafos.md](reconstruccion-parrafos.md).
+
 ## ⚠ La verdad: dos vías, y la segunda hay que pedirla
 
 El [contrato ⑬](organizacion.md) dice que la verdad de párrafos sale de la **fuente**

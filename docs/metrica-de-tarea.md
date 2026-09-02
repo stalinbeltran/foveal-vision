@@ -40,6 +40,18 @@ correlación de rangos entre las dos. Nunca se había hecho.
 
 ---
 
+> ⚠⚠ **TODO NÚMERO DE MÉTRICA DE TAREA DE ESTE DOCUMENTO SE MIDIÓ CON LA RECONSTRUCCIÓN
+> HEREDADA (`reconstruct="tlbr"`), Y ESA RECONSTRUCCIÓN ESTÁ ROTA.** Medido el 2026-09-02:
+> emparejaba el TL de un párrafo con el BR de **otro**, porque usa dos de los cuatro tipos de
+> esquina que la red predice. Arreglarlo (`reconstruct="quad"`) sube el f1 de tarea de las tres
+> redes aprobadas en **+0,18 a +0,28** (17-23 SEM), baja el error estándar a menos de la mitad
+> **y reordena un par de redes**. O sea que las cifras absolutas de aquí abajo miden *la red más
+> el emparejado*, y buena parte de la distancia entre el proxy de ventana y la tarea era esto.
+>
+> Lo que **no** cambia: el proxy de ventana (`val_f1`) no pasa por la reconstrucción, así que las
+> conclusiones de ranking de este documento —y todo `OBJECTIVES`— siguen en pie.
+> Detalle: [reconstruccion-parrafos.md](reconstruccion-parrafos.md).
+
 ## 2. Fase 1 — HECHA: el proxy está validado (para ejes de D)
 
 Medido el 2026-07-26 sobre los **65 runs ya entrenados** de `fast-lr-s0-lr` (13 valores de `lr`

@@ -85,7 +85,7 @@ from fv import settings
 from fv.datasets.loader import SourceDataset, SourceError
 from fv.inference.catalogo import CHECKPOINT_INFERENCIA, checkpoint_de, esta_aprobada
 from fv.inference.checkpoint import load_model
-from fv.inference.predict import predict_image
+from fv.inference.predict import RECONSTRUCT_DEFAULT, predict_image
 from fv.ioutils import write_json_atomic
 from fv.metrics import CORNER_NAMES, paragraph_f1
 from fv.training.registry import RunStore
@@ -125,6 +125,11 @@ class Criterio:
     stride: int | None = None
     nms_radius: float | None = None
     min_size: float | None = None
+    # como se arman los parrafos con las esquinas: 'tlbr' (heredado, el defecto
+    # de F) o 'quad' (usa las cuatro). Es lo que mas mueve el resultado --ver
+    # docs/dataset-fallidos.md-- asi que viaja con el criterio como los demas.
+    reconstruct: str = RECONSTRUCT_DEFAULT
+    corner_tol: float | None = None
     iou_threshold: float = 0.5
     # ...y los tres que deciden la seleccion
     min_errores: int = 1
@@ -409,7 +414,9 @@ def evaluar(run: str, dataset: str, criterio: Criterio, *,
         img = imagenes[fila_de[idx]]
         out = predict_image(model, img, threshold=criterio.threshold,
                             stride=criterio.stride, nms_radius=criterio.nms_radius,
-                            min_size=criterio.min_size)
+                            min_size=criterio.min_size,
+                            reconstruct=criterio.reconstruct,
+                            corner_tol=criterio.corner_tol)
         knobs = out["knobs"]
         pred = [(p["x0"], p["y0"], p["x1"], p["y1"]) for p in out["paragraphs"]]
         v = verdades.get(idx, {"cajas": [], "completa": False, "esquinas": {}})
