@@ -43,7 +43,7 @@ from fv.studies.store import StudyStore, StudyStoreError
 from fv.training.loop import reanudar, train
 from fv.training.recipe import Recipe, RecipeStore, RecipeStoreError
 from fv.training.registry import RunError, RunStore
-from fv.validation import check_network, check_run
+from fv.validation import check_compatible, check_network, check_run
 from fv.windows.extract import ExtractConfig, ExtractError, extract_windows
 from fv.windows.store import WindowDatasetStore, WindowStoreError
 
@@ -848,14 +848,68 @@ def create_app() -> FastAPI:
         except (SourceError, KeyError):
             return manifest, None
 
-    def _runs_de(ds_name: str, todos: list | None = None) -> list[dict]:
-        """Los runs de ESTE dataset, con si tienen checkpoint.
+    def _cfg_red(nombre: str) -> dict | None:
+        """La red de un run POR VALOR, sin cargar el checkpoint.
 
-        Filtrar aqui y no en el front es lo que quita el select de 859 runs: la
-        lista ya trae `window_dataset`, asi que no cuesta una lectura de mas.
+        Del `config.json`, que ya la guarda dos veces (contrato ③: nombre agrupa,
+        valor reproduce). Cargar el `.pt` daria lo mismo y cuesta megabytes en una
+        pantalla que sondea.
+        """
+        try:
+            cfg = runs.config(nombre)
+        except Exception:                                   # noqa: BLE001
+            return None
+        prov = (cfg.get("provenance") or {}).get("network") or {}
+        return prov.get("value") or cfg.get("network") or None
 
-        `todos` existe para no releer los 859 runs una vez por dataset al elegir
-        cual se abre por defecto: quien llame en bucle pasa la lista una vez.
+    def _compatibilidad(manifest: dict, nombre: str) -> tuple:
+        """(compatible, problemas) de ESTA red con ESTE dataset.
+
+        Usa `check_compatible`, que es LA definicion del contrato ① en este
+        proyecto -- no una segunda escrita aqui. Y `check_compatible` y no
+        `check_run`: `check_run` añade `check_measurable`, que exige split de val
+        porque es la puerta de ENTRENAR. Para mirar imagenes con cajas encima no
+        hace falta val, y exigirlo se negaria a abrir un dataset perfectamente
+        mirable.
+        """
+        net = _cfg_red(nombre)
+        if net is None:
+            return None, [{"code": "network_value_missing",
+                           "message": f"'{nombre}' no guarda su red por valor, asi "
+                                      f"que no se puede saber si encaja con este "
+                                      f"dataset",
+                           "hint": "es un run anterior a la procedencia por valor: "
+                                   "reentrenalo, o elige otro"}]
+        problemas = check_compatible(manifest, net)
+        return (not problemas), problemas
+
+    def _runs_para(ds_name: str, manifest: dict,
+                   todos: list | None = None) -> list[dict]:
+        """Las redes que se pueden OFRECER para mirar este dataset.
+
+        ⚠ ANTES ESTO FILTRABA POR PROCEDENCIA, y esa era la regla equivocada.
+        Devolvia solo los runs entrenados con ESTE dataset, asi que un dataset
+        nuevo --uno de fallos, un holdout, cualquiera que no haya entrenado nada--
+        aparecia con CERO redes y la pantalla decia «este dataset no tiene ningun
+        run en esta maquina». Y es que no los tiene: no los necesita. Una red
+        infiere sobre cualquier dataset cuya geometria encaje, y de dónde salio
+        no dice nada sobre eso. (Lo reporto el dueno el 2026-09-02 probando los
+        datasets de fallos en la app.)
+
+        La regla ahora es COMPATIBILIDAD, y la lista es la union de dos cosas:
+
+          1. **las redes que la app puede servir** --aprobadas en `inferencia.json`
+             o en la antesala--, vengan del dataset que vengan. Es la definicion
+             que el propio catalogo ya usa para «con que puede inferir esto», y
+             son 3 hoy contra 908 runs;
+          2. **los runs de ESTE dataset**, como antes, para que no se pierda el
+             camino de «tiene pesos en disco pero no esta aprobada» -- que dice si
+             hay que aprobar algo o reentrenar algo.
+
+        ⚠ La compatibilidad SOLO se calcula para las servibles. Para las demas la
+        respuesta ya la da `inference: null`: una red que no se puede usar no
+        necesita ademas un dictamen de geometria, y calcularlo costaria una
+        lectura por run sobre los 246 que llega a tener un dataset.
         """
         try:
             aprobadas = set(catalogo.leer()["runs"])
@@ -864,8 +918,7 @@ def create_app() -> FastAPI:
         antesala = catalogo.antesala_completa()
         out = []
         for r in (runs.list() if todos is None else todos):
-            if r.get("window_dataset") != ds_name:
-                continue
+            propio = r.get("window_dataset") == ds_name
             # `has_checkpoint` aqui significa "la app PUEDE inferir con el", que
             # desde el 2026-08-31 no es lo mismo que "el fichero esta en disco":
             # una red sin aprobar no se usa aunque tenga pesos. Ese es el filtro
@@ -876,6 +929,14 @@ def create_app() -> FastAPI:
                       else "catalogo" if (r["name"] in aprobadas
                                           and r.get("has_checkpoint"))
                       else None)
+            if not propio and origen is None:
+                continue                    # ni sirve, ni es de aqui: no pinta nada
+            if origen is not None:
+                compatible, problemas = _compatibilidad(manifest, r["name"])
+            else:
+                # se entreno con ESTE dataset: encaja por construccion, y lo que
+                # falta es aprobarla o traerle los pesos
+                compatible, problemas = True, []
             out.append({"name": r["name"], "status": r.get("status"),
                         "best": r.get("best"),
                         "has_checkpoint": origen is not None,
@@ -883,10 +944,18 @@ def create_app() -> FastAPI:
                         # se MARCA, no se esconde: distinguir "no esta aprobada"
                         # de "no tiene pesos" es lo que dice si hay que aprobar
                         # algo o reentrenar algo
-                        "on_disk": bool(r.get("has_checkpoint"))})
-        # los que pueden inferir primero: un select cuyo primer elemento falla
+                        "on_disk": bool(r.get("has_checkpoint")),
+                        # de donde salio, para que se vea que es de otro dataset
+                        "window_dataset": r.get("window_dataset"),
+                        "propio": propio,
+                        # ...y si encaja con ESTE, con la razon si no
+                        "compatible": compatible,
+                        "problems": problemas})
+        # usables y compatibles primero: un select cuyo primer elemento falla
         # ensena un error antes que una imagen
-        out.sort(key=lambda r: (not r["has_checkpoint"], r["name"]))
+        out.sort(key=lambda r: (not (r["has_checkpoint"] and r["compatible"]),
+                                not r["has_checkpoint"], not r["propio"],
+                                r["name"]))
         return out
 
     @app.get("/review/datasets")
@@ -922,13 +991,17 @@ def create_app() -> FastAPI:
             # primero, que es el comportamiento de siempre.
             ds_name = next(
                 (n for n in nombres
-                 if any(r["has_checkpoint"] for r in _runs_de(n, todos))),
+                 if any(r["has_checkpoint"] and r["compatible"]
+                        for r in _runs_para(n, wstore.manifest(n), todos))),
                 nombres[0])
         manifest, source = _review_ctx(ds_name)
         indices = wstore.split_map(ds_name).get(split) or []
         vistos = review_mod.reviewed_indices(ds_name, split)
         n = max(1, min(int(count), REVIEW_MAX))
         pend = [i for i in indices if i not in set(vistos)]
+        # UNA vez: recorre los 908 runs, y antes se recorria dos (la lista y el
+        # sugerido). Esta pantalla sondea.
+        ofrecidas = _runs_para(ds_name, manifest, todos)
         return {
             "datasets": datasets, "window_dataset": ds_name, "split": split,
             "source": manifest.get("source_id"),
@@ -940,15 +1013,15 @@ def create_app() -> FastAPI:
             "image_size": [manifest["images"]["shape"][2],
                            manifest["images"]["shape"][1]]
                           if manifest.get("images", {}).get("shape") else None,
-            "runs": _runs_de(ds_name, todos), "run": run,
+            "runs": ofrecidas, "run": run,
             # Cual abrir si el usuario no ha elegido nunca. Lo decide el servidor
             # -- que ya ordena los runs poniendo delante los que pueden inferir--
             # y no el front, para que no haya dos copias de la regla. Es lo que
             # hace que una maquina recien lanzada ensene CAJAS al abrir en vez de
             # pedir que adivines cual de sus 10 runs trajo pesos.
             "run_sugerido": next(
-                (r["name"] for r in _runs_de(ds_name, todos)
-                 if r["has_checkpoint"]), None),
+                (r["name"] for r in ofrecidas
+                 if r["has_checkpoint"] and r["compatible"]), None),
             "total": len(indices),
             "splits": sorted(wstore.split_map(ds_name).keys()),
             "reviewed": len(vistos), "pending": len(pend),
@@ -1040,6 +1113,18 @@ def create_app() -> FastAPI:
             # abrio la tercera excepcion del .gitignore. Dos sitios que explican
             # lo mismo divergen, y el que se olvida es el que miente.
             model = _model_para_inferir(run_name)
+            # ...y ademas: ¿encaja esta red con ESTE dataset? Desde que la lista
+            # ya no filtra por procedencia, aqui puede llegar una pareja que no
+            # case, y sin esto la respuesta seria una rejilla de imagenes con
+            # cero cajas -- indistinguible de "la red no detecto nada". Se dice
+            # el motivo y no se infiere (R2: fallar ANTES de empezar).
+            compatible, problemas = _compatibilidad(manifest, run_name)
+            if compatible is not True:
+                pr = problemas[0]
+                raise _http_error(RunError(
+                    pr["code"],
+                    f"'{run_name}' no encaja con '{ds_name}': {pr['message']}",
+                    pr.get("hint") or "elige otra red o otro dataset"))
 
         arrays = None if source is not None else wstore.arrays(ds_name)
         fila = ({} if arrays is None

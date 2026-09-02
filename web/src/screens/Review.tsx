@@ -14,9 +14,15 @@ import { ErrorBox, Field, Working } from "../components/ui";
 // ⚠ La pregunta de esta pantalla es "QUE DATASET del repo de datos quiero
 // mirar", no "que run". Empezo al reves --el select principal era el run-- y en
 // el server real eso son 859 opciones, con lo que la pantalla quedaba
-// inservible. Ahora el dataset manda, la lista sale ya filtrada a los que
-// TIENEN `windows.npz` (2 de 18 hoy) y los runs los devuelve el servidor ya
-// reducidos a los de ese dataset.
+// inservible. Ahora el dataset manda y la lista sale ya filtrada a los que
+// TIENEN `windows.npz`.
+//
+// ⚠ Y las redes que ofrece el servidor son las que PUEDEN INFERIR (aprobadas o
+// en antesala), no las entrenadas con este dataset. Filtrar por procedencia era
+// la regla equivocada: un dataset nuevo --uno de fallos, un holdout-- salia con
+// CERO redes y la pantalla decia "este dataset no tiene ningun run en esta
+// maquina", cuando no los necesita. Cada fila trae `compatible` y, si no lo es,
+// `problems` con el motivo: se MARCA, no se esconde.
 //
 // Y el run es OPCIONAL: sin modelo se ven las imagenes sin cajas, que es lo unico
 // que se puede hacer en una maquina que solo tiene el repo de datos y ningun
@@ -244,8 +250,11 @@ export default function Review() {
               onChange={(e) => setRun(e.target.value)}>
               <option value="">— sin modelo (sólo imágenes) —</option>
               {runs.map((r) => (
-                <option key={r.name} value={r.name} disabled={!r.has_checkpoint}>
-                  {r.has_checkpoint ? "" : "⛔ "}{r.name}
+                <option key={r.name} value={r.name}
+                  disabled={!r.has_checkpoint || !r.compatible}>
+                  {!r.has_checkpoint ? "⛔ " : !r.compatible ? "⚠ " : ""}
+                  {r.name}
+                  {r.propio ? "" : ` · de ${r.window_dataset ?? "otro dataset"}`}
                 </option>
               ))}
             </select>
@@ -354,14 +363,21 @@ export default function Review() {
         <div className="card avisobox" data-testid="review-missing">
           <b>Sin modelo:</b> se ven las imágenes del dataset, sin cajas.{" "}
           {runs.length === 0
-            ? <>Este dataset no tiene ningún run en esta máquina.</>
-            : runs.some((r) => r.has_checkpoint)
+            ? <>No hay ninguna red que pueda inferir en esta máquina: ninguna está
+               aprobada en <code>inferencia.json</code> ni hay nada en la antesala.
+               Apruébala en <Link to="/predict">Predecir</Link>.</>
+            : runs.some((r) => r.has_checkpoint && r.compatible)
               ? <>Elige un run arriba.</>
-              : <>Ninguno de sus {runs.length} runs tiene <code>best.pt</code> aquí:
-                 los pesos de un run no viajan por git (<code>*.pt</code> está en el
-                 <code>.gitignore</code> del repo de datos). Los <code>demo-*</code> sí
-                 viajan: si tampoco hay ninguno, este dataset no tiene modelo de
-                 demostración publicado.</>}
+              : runs.some((r) => r.has_checkpoint)
+                ? <>Ninguna de las {runs.filter((r: any) => r.has_checkpoint).length} redes
+                   disponibles encaja con este dataset:{" "}
+                   {runs.filter((r: any) => r.has_checkpoint && !r.compatible)
+                        .slice(0, 3)
+                        .map((r: any) => `${r.name}: ${r.problems?.[0]?.message ?? "sin detalle"}`)
+                        .join(" · ")}</>
+                : <>Ninguno de sus {runs.length} runs tiene <code>best.pt</code> aprobado
+                   aquí: los pesos de un run no viajan por git salvo que se aprueben
+                   (<code>inferencia.json</code> del repo de datos).</>}
         </div>
       ) : null}
 

@@ -477,6 +477,16 @@ def test_un_dataset_que_no_existe_cae_al_primero_valido(client):
     assert ctx["window_dataset"] == w["dataset"]
 
 
+def _extrae(w, nombre, window_size=8, stride=7, seed=3):
+    from fv import settings
+    from fv.windows.extract import ExtractConfig, extract_windows
+    extract_windows(ExtractConfig(source=w["source"], window_size=window_size,
+                                  stride=stride, val_frac=0.2, test_frac=0.2,
+                                  seed=seed),
+                    settings.window_datasets_root() / nombre)
+    return nombre
+
+
 def test_el_dataset_por_defecto_es_uno_QUE_PUEDA_inferir(client):
     """Sin `window_dataset` mandaba el primero de la lista, y eso abria la
     pantalla en el que no tiene con que inferir.
@@ -485,20 +495,90 @@ def test_el_dataset_por_defecto_es_uno_QUE_PUEDA_inferir(client):
     `bench-dirty1000-16-r20260827`, con CERO runs, mientras el de al lado tenia
     un modelo con pesos. La pantalla abria diciendo "este dataset no tiene ningun
     run en esta maquina" -- que se lee como "aqui no hay nada que hacer".
+
+    ⚠ El caso cambio el 2026-09-02: "no tener runs propios" ya NO significa "no
+    se puede inferir", porque las redes se ofrecen por COMPATIBILIDAD y no por
+    procedencia. Asi que el que hay que saltarse es el INCOMPATIBLE -- aqui uno
+    con ventana de 16 px frente a una fovea de 8.
     """
     c, w = client
-    from fv.windows.extract import ExtractConfig, extract_windows
-    from fv import settings
-    # ordena ANTES que `mini-b8`, y no tiene ni un run
-    extract_windows(ExtractConfig(source=w["source"], window_size=8, stride=7,
-                                  val_frac=0.2, test_frac=0.2, seed=3),
-                    settings.window_datasets_root() / "aaa-b8")
+    _extrae(w, "aaa-b16", window_size=16)      # ordena ANTES, y NO encaja
 
     ctx = c.get("/review/context?split=val").json()
     assert ctx["window_dataset"] == w["dataset"]
     # ...y pedirlo explicitamente sigue mandando: esto elige un DEFECTO, no impone
-    ctx2 = c.get("/review/context?window_dataset=aaa-b8&split=val").json()
-    assert ctx2["window_dataset"] == "aaa-b8"
+    ctx2 = c.get("/review/context?window_dataset=aaa-b16&split=val").json()
+    assert ctx2["window_dataset"] == "aaa-b16"
+    assert ctx2["run_sugerido"] is None        # ninguna encaja: no se sugiere
+
+
+def test_un_dataset_SIN_runs_propios_ofrece_igual_las_redes_que_pueden_inferir(client):
+    """El fallo que reporto el dueno el 2026-09-02 probando los datasets de
+    fallos: la pantalla decia «este dataset no tiene ningun run en esta maquina».
+
+    Y no los tiene -- no los necesita. Una red infiere sobre cualquier dataset
+    cuya geometria encaje, y de que dataset SALIO no dice nada sobre eso. Filtrar
+    por procedencia dejaba sin modelo a todo dataset nuevo: un holdout, uno de
+    fallos, cualquiera recien extraido.
+    """
+    c, w = client
+    nuevo = _extrae(w, "sin-runs-b8")
+
+    ctx = c.get(f"/review/context?window_dataset={nuevo}&split=val").json()
+    fila = next(r for r in ctx["runs"] if r["name"] == w["run"])
+    assert fila["has_checkpoint"] is True
+    assert fila["compatible"] is True
+    assert fila["propio"] is False                     # se ve que es de otro
+    assert fila["window_dataset"] == w["dataset"]
+    assert ctx["run_sugerido"] == w["run"]
+
+    # ...y de verdad infiere: la costura entera, no solo la lista
+    r = c.post("/review/batch", json={"window_dataset": nuevo, "run": w["run"],
+                                      "split": "val", "count": 1})
+    assert r.status_code == 200, r.text
+    assert "paragraphs" in r.json()["images"][0]
+
+
+def test_una_red_INCOMPATIBLE_se_marca_con_su_motivo_y_no_se_esconde(client):
+    """Se MARCA, no se esconde -- la misma regla que un run sin pesos. Una red
+    escondida no se distingue de una que no existe, y entonces no sabes si el
+    problema es la geometria o que falta traer algo.
+
+    Y el motivo sale de `check_compatible`, que es LA definicion del contrato ①:
+    escribir aqui una segunda seria tener dos que se pueden desincronizar.
+    """
+    c, w = client
+    otro = _extrae(w, "otra-ventana-b16", window_size=16)
+
+    ctx = c.get(f"/review/context?window_dataset={otro}&split=val").json()
+    fila = next(r for r in ctx["runs"] if r["name"] == w["run"])
+    assert fila["has_checkpoint"] is True              # pesos, si
+    assert fila["compatible"] is False                 # encaje, no
+    assert fila["problems"][0]["code"] == "window_size_mismatch"
+    assert "16" in fila["problems"][0]["message"]
+    assert fila["problems"][0]["hint"]
+
+
+def test_forzar_una_pareja_incompatible_DA_EL_ERROR_en_vez_de_cero_cajas(client):
+    """Sin esto la respuesta seria una rejilla de imagenes sin una sola caja --
+    indistinguible de «la red no detecto nada», que es el fallo silencioso.
+
+    Se falla ANTES de inferir (R2), y con el codigo del validador.
+    """
+    c, w = client
+    otro = _extrae(w, "forzar-b16", window_size=16)
+
+    r = c.post("/review/batch", json={"window_dataset": otro, "run": w["run"],
+                                      "split": "val", "count": 1})
+    assert r.status_code >= 400, r.text
+    cuerpo = r.json()["detail"] if "detail" in r.json() else r.json()
+    assert cuerpo["code"] == "window_size_mismatch"
+    assert w["run"] in cuerpo["message"] and otro in cuerpo["message"]
+
+    # ...y sin red se sigue pudiendo MIRAR: la incompatibilidad es de la pareja
+    ok = c.post("/review/batch", json={"window_dataset": otro, "split": "val",
+                                       "count": 1})
+    assert ok.status_code == 200, ok.text
 
 
 def test_sin_ningun_checkpoint_el_defecto_es_el_de_siempre(client):
@@ -638,3 +718,33 @@ def test_sin_modelo_no_hay_ranuras_de_que_hablar(client):
     assert r["corner_order"] is None
     assert r["images"][0]["paragraphs"] == []
     assert "corners" not in r["images"][0]
+
+
+def test_una_red_que_no_guarda_su_valor_se_dice_en_vez_de_darse_por_buena(client):
+    """La compatibilidad se comprueba con la red POR VALOR (`config.json`), no
+    cargando el `.pt`. Un run viejo que no la guarda no se puede juzgar -- y
+    entonces se dice, en vez de colarlo como compatible.
+
+    Es la regla de siempre aqui: entre un fallo ruidoso y uno silencioso, el
+    ruidoso. Darlo por bueno acabaria en una rejilla sin cajas y sin motivo.
+    """
+    c, w = client
+    from fv.ioutils import write_json_atomic
+
+    otro = _extrae(w, "sin-valor-b8")
+    cfg = w["store"].config(w["run"])
+    cfg["provenance"]["network"].pop("value", None)
+    cfg.pop("network", None)
+    write_json_atomic(w["store"].path(w["run"]) / "config.json", cfg)
+
+    ctx = c.get(f"/review/context?window_dataset={otro}&split=val").json()
+    fila = next(r for r in ctx["runs"] if r["name"] == w["run"])
+    assert fila["compatible"] is None                  # no se sabe, no "si"
+    assert fila["problems"][0]["code"] == "network_value_missing"
+    assert ctx["run_sugerido"] is None                 # no se sugiere lo dudoso
+
+    # y forzarlo tampoco infiere a ciegas
+    r = c.post("/review/batch", json={"window_dataset": otro, "run": w["run"],
+                                      "split": "val", "count": 1})
+    assert r.status_code >= 400
+    assert r.json()["detail"]["code"] == "network_value_missing"

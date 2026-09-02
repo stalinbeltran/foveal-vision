@@ -102,8 +102,31 @@ Numeración del hermano donde la vista se hereda; se marca lo que cambia.
   server real: con el run como selector principal el `select` traía **859 opciones** (medido el
   2026-08-29 en 157.230.221.199). La lista de datasets es corta a propósito: sólo los que traen
   `windows.npz`, o sea los que de verdad viajaron por git (**2 de 18** ese día). Los runs los
-  filtra el servidor a los de ese dataset (8), y se **marcan** los que no tienen `best.pt` en vez
-  de esconderlos.
+  reduce el servidor, y se **marcan** los que no valen en vez de esconderlos.
+
+  ⚠⚠ **Y la regla que los reduce es la COMPATIBILIDAD, no la procedencia** (corregido el
+  2026-09-02). Antes se ofrecían sólo los runs **entrenados con ese dataset**, y eso dejaba
+  cualquier dataset nuevo —uno de fallos, un holdout, uno recién extraído— con **cero redes** y la
+  pantalla diciendo *«este dataset no tiene ningún run en esta máquina»*. Lo reportó el dueño
+  probando los datasets de fallos, y tenía razón en el diagnóstico: **no los necesita**. Una red
+  infiere sobre cualquier dataset cuya geometría encaje, y de qué dataset salió no dice nada sobre
+  eso.
+
+  Lo que ofrece ahora es la unión de **las redes que la app puede servir** (aprobadas en
+  `inferencia.json` o en la antesala — 3 hoy, contra 908 runs) y **los runs de ese dataset** (para
+  que no se pierda el camino de *«tiene pesos pero no está aprobada»*). Cada fila trae
+  `compatible` y, si no lo es, `problems` con el código, el mensaje y el arreglo — de
+  `check_compatible`, que es **la** definición del contrato ①, no una segunda escrita en la API.
+  Y `check_compatible` y no `check_run`: éste añade `check_measurable`, que exige split de `val`
+  porque es la puerta de **entrenar**; para mirar imágenes con cajas encima no hace falta.
+
+  ⚠ La compatibilidad **sólo se calcula para las servibles**: una red que no se puede usar ya
+  tiene su motivo (`inference: null`), y calcularla para todas costaría una lectura por run sobre
+  los **246** que llega a tener un dataset.
+
+  ⚠ Y forzar una pareja incompatible por `POST /review/batch` **da el error, no una rejilla
+  vacía**: se falla antes de inferir (R2), porque una rejilla sin cajas es indistinguible de «la
+  red no detectó nada».
 
   ⚠ **El run es OPCIONAL, y sin él se ven las imágenes igual.** Los pesos de un run no viajan por
   git (`*.pt` está en el `.gitignore` del repo de datos), así que exigir un modelo sería no poder
