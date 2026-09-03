@@ -32,8 +32,11 @@ COLUMNS = [
     ("gabor_delta", "  Gabor D"),
     ("gabor_r2_base", "  nulo"),
     ("r2_rec_int", "[1] R2 rec int"),
-    ("frac_activa", "[2] activa %"),
-    ("kernels_muertos", "[3] muertos"),
+    ("frac_activa", "[2] activa % med"),
+    ("frac_activa_vivos", "  de los vivos"),
+    ("kernels_vivos", "[3] vivos"),
+    ("kernels_muertos", "  muertos"),
+    ("kernels_saturados", "  saturados"),
     ("enriquecimiento", "[5] enriq x"),
     ("dim_pca95_frac", "[6] dim95/k2"),
     ("coseno_max", "[7] cos max"),
@@ -64,9 +67,11 @@ def _fmt(key: str, v) -> str:
         return v
     if key.endswith("_supera_p95"):
         return "SI" if v >= 0.999 else ("si" if v > 0 else "no")   # >0 = alguna semilla
-    if key in ("k", "K", "n", "kernels_muertos"):
-        return f"{v:.0f}" if key != "kernels_muertos" else f"{v:.1f}".rstrip("0").rstrip(".")
-    if key == "frac_activa":
+    if key in ("k", "K", "n"):
+        return f"{v:.0f}"
+    if key.startswith("kernels_"):
+        return f"{v:.1f}".rstrip("0").rstrip(".")
+    if key.startswith("frac_activa"):
         return f"{v*100:.1f}"
     if key in ("lambda", "enriquecimiento"):
         return f"{v:.2f}"
@@ -105,6 +110,10 @@ def comparison_table(rows: list[dict], out_md: Path | None = None,
         "**[1] R2 rec int** es la cifra limpia: el anillo exterior de k//2 px lo "
         "reconstruye un decodificador que ve ceros donde el codificador vio "
         "borde replicado (torch no admite `padding_mode` en `ConvTranspose2d`).\n"
+        "⚠ `activa %` es la MEDIA sobre los canales, y con lambda=0 esa media "
+        "esconde dos poblaciones -- medido: nueve canales al 99,97 % y siete "
+        "muertos dan una media de 56,2 %, que no describe a ninguno. Por eso van "
+        "al lado los VIVOS (ni muertos ni saturados) y su activacion.\n"
         "`n` = semillas promediadas.\n")
     md = md + legend + (f"\n{note}\n" if note else "")
     if out_md:

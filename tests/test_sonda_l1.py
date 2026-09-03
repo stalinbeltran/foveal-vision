@@ -704,3 +704,44 @@ def test_la_tabla_encabeza_con_lo_que_decide_y_no_con_el_valor_absoluto():
         "el absoluto no puede ir antes que el normalizado: es lo que se lee primero"
     for c in ("gabor_supera_p95", "conc_orient_delta", "conc_banda_delta"):
         assert c in claves, c
+
+
+# --------------------------------- 9f. la media que escondia dos poblaciones
+
+def test_la_activacion_media_NO_describe_una_distribucion_bimodal():
+    """El hallazgo del 2026-09-02, fijado con el caso que lo destapo.
+
+    Medido en k=5/K=16/λ=0: nueve canales al 99,97 % y siete muertos. La media
+    da 56,2 %, que no describe a NINGUN canal -- y la banda 5-15 % del encargo
+    supone una distribucion unimodal. Un canal abierto en el 99,97 % de las
+    posiciones nunca recorta: es una unidad LINEAL con una ReLU puesta.
+    """
+    m = L1Probe(channels=4, k=3)
+    with torch.no_grad():
+        m.enc.weight.zero_(); m.enc.bias.zero_()
+        m.enc.bias[0] = m.enc.bias[1] = 1.0        # siempre encendidos
+        m.enc.bias[2] = m.enc.bias[3] = -1e6       # siempre apagados
+    r = probe_metrics.final_metrics(m, torch.zeros(4, 1, 20, 20), var=1.0,
+                                    lam=0.0, gabor_steps=30)
+    assert r["kernels_saturados"] == 2
+    assert r["kernels_muertos"] == 2
+    assert r["kernels_vivos"] == 0
+    assert r["frac_activa"] == pytest.approx(0.5, abs=1e-6), \
+        "la media dice 50 % y no hay ningun canal cerca del 50 %"
+    assert r["activa_por_canal"] == sorted(r["activa_por_canal"])
+
+
+def test_un_canal_saturado_NO_cuenta_como_vivo():
+    """`kernels_vivos` es lo que de verdad se quiere saber: cuantos filtros
+    utiles salen. Un canal que nunca se apaga no aporta selectividad."""
+    m = L1Probe(channels=3, k=3)
+    with torch.no_grad():
+        m.enc.weight.zero_(); m.enc.bias.copy_(torch.tensor([1.0, -1e6, 0.0]))
+    val = torch.zeros(4, 1, 20, 20)
+    val[:, :, ::2, ::2] = 5.0                      # el canal 2 se enciende a ratos
+    with torch.no_grad():
+        m.enc.weight[2, 0, 1, 1] = 1.0
+    r = probe_metrics.final_metrics(m, val, var=1.0, lam=0.0, gabor_steps=30)
+    assert r["kernels_saturados"] == 1 and r["kernels_muertos"] == 1
+    assert r["kernels_vivos"] == 1
+    assert 0.0 < r["frac_activa_vivos"] < 1.0

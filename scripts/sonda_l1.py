@@ -160,6 +160,10 @@ def main() -> int:
     p.add_argument("--tolerancia-activa", type=float, default=0.03)
     p.add_argument("--limite-calibrar", type=int, default=8000,
                    help="ventanas para la biseccion (los runs usan el train entero)")
+    p.add_argument("--rehacer-metricas", action="store_true",
+                   help="recalcula summary.json de cada run desde su checkpoint. "
+                        "Para que TODOS los runs tengan los mismos campos cuando se "
+                        "anade una metrica a mitad de un estudio")
     p.add_argument("--tabla", action="store_true",
                    help="rehace tabla.md/tabla.csv desde los runs en disco")
     p.add_argument("--figuras", action="store_true",
@@ -191,6 +195,26 @@ def main() -> int:
         for f in sorted(filas, key=lambda r: -r.get("gabor_delta", -9))[:3]:
             _mapas_z(salida, f, datos["val"])
         print(f"{len(filas)} hoja(s) de contactos y hasta 3 figuras de mapas z en {salida}")
+        return 0
+
+    if a.rehacer_metricas:
+        # Media tanda con una metrica y media sin ella no es un estudio: es dos.
+        # Los checkpoints se guardan justo para poder rehacer esto sin reentrenar.
+        from fv.probe.metrics import final_metrics
+        va = torch.from_numpy(datos["val"])
+        n = 0
+        for ck in sorted(salida.glob("*/checkpoint.pt")):
+            e = torch.load(ck, map_location="cpu", weights_only=True)
+            m = L1Probe(e["K"], e["k"]); m.load_state_dict(e["state_dict"]); m.eval()
+            viejo = json.loads((ck.parent / "summary.json").read_text())
+            r = final_metrics(m, va, datos["var"], viejo["lambda"])
+            r.update({k: v for k, v in viejo.items() if k not in r})
+            (ck.parent / "summary.json").write_text(
+                json.dumps(r, indent=2, ensure_ascii=False))
+            print(f"  {ck.parent.name}: recalculado")
+            n += 1
+        print(f"{n} run(s) al día")
+        _tabla(salida, _leer_runs(salida))
         return 0
 
     if a.cronometrar:

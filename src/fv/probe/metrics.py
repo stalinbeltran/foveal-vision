@@ -33,6 +33,13 @@ from fv.probe.spectrum import (bootstrap_p95, random_spectral_baseline,
 # "active in < 0.1 % of positions", straight from section 5.3 of the brief.
 DEAD_KERNEL_FRAC = 1e-3
 
+# A channel open at more than this fraction of positions never clips, so its
+# ReLU contributes no nonlinearity: it is a LINEAR unit wearing a ReLU. Measured
+# 2026-09-02 at k=5/K=16/lambda=0: nine of the sixteen channels sat at 99.97 %
+# while seven were dead, and the MEAN of that is 56.2 % -- a number no channel
+# is anywhere near. A mean over two populations diagnoses nothing.
+SATURATED_KERNEL_FRAC = 0.99
+
 
 def classic_basis(k: int) -> torch.Tensor:
     """The 6 classic filters at size k, orthonormalised: (6, k*k).
@@ -163,6 +170,7 @@ def final_metrics(m: L1Probe, val: torch.Tensor, var: float, lam: float,
         act = a * b if act is None else act + a * b
         n += b
     act = act / n
+    vivos = (act >= DEAD_KERNEL_FRAC) & (act <= SATURATED_KERNEL_FRAC)
 
     return {
         # 1
@@ -170,11 +178,18 @@ def final_metrics(m: L1Probe, val: torch.Tensor, var: float, lam: float,
         "err_rec_int": err_int / n / var,
         "r2_rec": 1.0 - err / n / var,
         "r2_rec_int": 1.0 - err_int / n / var,
-        # 2
+        # 2 -- `frac_activa` es la MEDIA que pide el encargo, y se conserva; pero
+        #      la distribucion es bimodal, asi que sola miente. Va con su reparto.
         "frac_activa": float(act.mean()),
+        "frac_activa_mediana": float(act.median()),
+        "frac_activa_vivos": (float(act[vivos].mean()) if bool(vivos.any()) else 0.0),
+        "activa_por_canal": [round(float(x), 5) for x in act.sort().values],
         # 3
         "kernels_muertos": int((act < DEAD_KERNEL_FRAC).sum()),
+        "kernels_saturados": int((act > SATURATED_KERNEL_FRAC).sum()),
+        "kernels_vivos": int(vivos.sum()),
         "umbral_muerto": DEAD_KERNEL_FRAC,
+        "umbral_saturado": SATURATED_KERNEL_FRAC,
         # 4 -- the main one. `gabor_delta_rel` and `gabor_supera_p95` are what
         #      the criterion reads; `gabor_delta` is kept because it is what the
         #      brief names, and it is NOT comparable across k on its own.
