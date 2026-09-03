@@ -1,7 +1,7 @@
 # CNN plana de 1 capa y 4 kernels 7×7 — misma entrada y salida que la foveada
 
 **Encargo del 2026-09-03** ([`instrucciones/01-encargo.md`](instrucciones/01-encargo.md)).
-Entrenamiento **en curso, por avances**. Hechos tres: **24 épocas, 15,7 min** en este droplet
+Entrenamiento **en curso, por avances**. Hechos cuatro: **37 épocas, 24,1 min** en este droplet
 (2 vCPU). **0 máquinas alquiladas, 0 $.**
 
 ---
@@ -51,16 +51,32 @@ estado del optimizador y el RNG del barajado, así que la época 2 no vuelve a v
 | `fv-train --epochs 1` | 1 | 37,5 s | 0,5218 | 0,109 | 3,71 px |
 | `fv-continue --more 2` | 2 → 3 | 75,2 s | 0,3749 | 0,582 | 2,89 px |
 | `fv-continue --more 8` | 4 → 11 | 5 min 05 s | 0,2691 | 0,792 | 2,44 px |
-| `fv-continue --more 13` | 12 → 24 | 8 min 42 s | **0,2397** | **0,827** | **2,28 px** |
+| `fv-continue --more 13` | 12 → 24 | 8 min 42 s | 0,2397 | 0,827 | 2,28 px |
+| `fv-continue --more 13` | 25 → 37 | 8 min 24 s | **0,2297** *(ép. 34)* | **0,844** *(ép. 36)* | **2,22 px** |
 
-**Total: 24 épocas, 15,7 min.** El primer avance fue el «~2 minutos» que pedía el encargo; los
-otros dos los eligió el dueño (8 épocas, luego 8 minutos).
+**Total: 37 épocas, 24,1 min.** El primer avance fue el «~2 minutos» que pedía el encargo; los
+otros tres los eligió el dueño.
 
-⚠ **Sigue mejorando, pero cada vez menos, y ya hay ruido.** La mejor `val_loss` es la **última**
-(época 24), así que `patience` no ha llegado a morder — pero la curva ya sube y baja: 0,2537 en
-la 17, 0,2554 en la 20, 0,2475 en la 22, 0,2538 en la 23. Del avance anterior a éste, 13 épocas
-compraron **−0,029 de `val_loss` y +0,035 de f1**; las 8 anteriores habían comprado −0,106 y
-+0,210. **El rendimiento por época ha caído ~4×.**
+### ⚠ La mejora ya es MÁS PEQUEÑA QUE EL RUIDO
+
+| avance | épocas | Δ `val_loss` | Δ f1 | por época |
+|---|---:|---:|---:|---|
+| 2º | 8 | **−0,106** | +0,210 | −0,0133 |
+| 3º | 13 | −0,029 | +0,035 | −0,0022 |
+| **4º** | 13 | **−0,010** | +0,017 | **−0,0008** |
+
+El rendimiento por época ha caído **17×** desde el segundo avance. Y en el cuarto la `val_loss`
+oscila entre **0,2297 y 0,2663** — una banda de **0,037**, que es **casi cuatro veces** lo que ha
+mejorado en todo el avance. Cada época nueva mueve el número más por dónde cae el barajado que
+por aprendizaje.
+
+⚠ **Y la mejor época ya no es la última**: la mejor `val_loss` es la **34** (0,2297) y el run
+acabó en la **37** (0,2377). O sea que `best.pt` ≠ `last.pt`, y **`patience` está a 3 de 10** —
+siete épocas más sin mejorar y el próximo avance para solo.
+
+⚠ **Los stops evalúan `last.pt`, no `best.pt`**, y desde este avance eso importa: `stop-04` es la
+época **37**, no la 34. Es lo correcto para «cómo va el entrenamiento» —es el estado desde el que
+se continúa— pero no es el mejor modelo del run.
 *(la foveada de referencia está en f1 0,954 y 1,05 px, con 8,5× los parámetros y 4 capas)*
 
 ⚠ **La foveada tiene 168.044 parámetros, no los 168.844 que dicen otros documentos del repo.**
@@ -96,6 +112,7 @@ las salidas de la evaluación.
 | `stop-01-3epocas` — tras el primer avance (~2 min) | [`evaluacion/stop-01-3epocas/`](evaluacion/stop-01-3epocas/) |
 | `stop-02-11epocas` — tras el segundo avance (+8 épocas) | [`evaluacion/stop-02-11epocas/`](evaluacion/stop-02-11epocas/) |
 | `stop-03-24epocas` — tras el tercero (+13 épocas, ~8 min) | [`evaluacion/stop-03-24epocas/`](evaluacion/stop-03-24epocas/) |
+| `stop-04-37epocas` — tras el cuarto (+13 épocas, ~8 min) | [`evaluacion/stop-04-37epocas/`](evaluacion/stop-04-37epocas/) |
 
 ### Las entradas
 
@@ -137,9 +154,9 @@ python nn/aplicar_kernels.py --stop 03-Nepocas --run plana-4k7-s1  # tras el sig
 python nn/aplicar_kernels.py --stop 01-3epocas --solo-figuras      # rehacer figuras de un stop viejo
 ```
 
-### Qué se ve, tras 24 épocas
+### Qué se ve, tras 37 épocas
 
-![entrada y salidas](evaluacion/stop-03-24epocas/entrada-y-salidas.png)
+![entrada y salidas](evaluacion/stop-04-37epocas/entrada-y-salidas.png)
 
 **Los kernels cogen las líneas de texto** — claro en las entradas #3, #6 y #8, y el canto
 vertical del bloque en la #4 y la #9.
@@ -154,15 +171,20 @@ stops:
 | norma L2 · **ép. 24** | **1,554** | 0,852 | 1,113 | **1,869** |
 | \|respuesta\| media · ép. 3 | 0,339 | 0,222 | 0,303 | 0,459 |
 | \|respuesta\| media · ép. 11 | 0,686 | 0,154 | 0,420 | 0,962 |
-| \|respuesta\| media · **ép. 24** | **0,838** | **0,142** | 0,432 | **1,125** |
+| \|respuesta\| media · ép. 24 | 0,838 | 0,142 | 0,432 | 1,125 |
+| norma L2 · **ép. 37** | **1,685** | 1,014 | 1,151 | **2,020** |
+| \|respuesta\| media · **ép. 37** | **0,811** | **0,147** | 0,436 | **1,096** |
 
 **El reparto se ha consolidado, no revertido.** k0 y k3 siguen creciendo (respuesta ×2,5 y ×2,5
 desde la época 3) y **k1 sigue apagándose**: su norma sube un poco —0,735 → 0,852— pero su
 respuesta **baja otra vez**, de 0,154 a 0,142, o sea **−36 %** desde la época 3. k2 se ha quedado
 plano desde la 11 (0,420 → 0,432).
 
-⚠ **En la práctica quedan dos kernels y medio.** k3 responde **8× más** que k1. Con sólo 4
-kernels eso importa: si el patrón aguanta, la red está usando la mitad de su primera capa.
+⚠ **En la práctica quedan dos kernels y medio, y el patrón AGUANTA.** De la época 24 a la 37 las
+respuestas están congeladas (k0 0,838 → 0,811; k1 0,142 → 0,147; k2 0,432 → 0,436; k3 1,125 →
+1,096) aunque las **normas siguen creciendo**. O sea: los pesos se hacen más grandes y la
+respuesta no cambia — el reparto es estable. **k3 responde 7,5× más que k1.** Con sólo 4 kernels,
+la red está usando la mitad de su primera capa.
 
 ⚠ Con una semilla y 24 épocas esto **acota, no declara**.
 
