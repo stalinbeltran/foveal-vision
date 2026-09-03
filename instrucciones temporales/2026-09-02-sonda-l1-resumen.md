@@ -1,7 +1,8 @@
 # Resumen de lo dicho sobre el encargo de `instruccioneslargas.md` (sonda L1)
 
-**Fecha:** 2026-09-02 · **Commit:** [`65dd66024`](https://github.com/stalinbeltran/foveal-vision) en `main`
-de `foveal-vision`, empujado.
+**Fecha:** 2026-09-02 · **Última actualización:** tras tu revisión y sus consecuencias
+(`c19cb745b`). Commits en `main` de `foveal-vision`: `65dd66024` → `a9095531c` → `ad4a4b8c6` →
+`c19cb745b`, todos empujados.
 
 > Esto es **un resumen de lo que te conté**, no una fuente nueva. Lo que manda es:
 > el encargo en [`instruccioneslargas.md`](../instruccioneslargas.md), el criterio en
@@ -11,266 +12,230 @@ de `foveal-vision`, empujado.
 
 ---
 
-## 1. En una línea
+## 1. Dónde está esto ahora mismo
 
-**El encargo está implementado entero y probado. La rejilla NO se ha lanzado**, y no debe
-lanzarse hasta que decidas dos cosas (§4 de aquí), porque tal como está escrito el criterio de
-éxito **no lo puede cumplir ninguna configuración**.
+**El encargo está implementado entero, el criterio está congelado, y corre el tanteo del eje `k`**
+(8 runs, ~1,7 h, no alquila nada). La rejilla grande de 12-15 h **sigue sin lanzarse**, y el
+criterio de cierre —escrito antes de ver los números— dice que puede no lanzarse nunca.
+
+El camino fue: implementar el encargo → tú contestaste las cuatro preguntas y encontraste un
+quinto problema → rediseño → lanzar → **el propio tanteo destapó un fallo mío** → parar,
+arreglar, relanzar.
 
 ---
 
-## 2. Lo que ya estaba y lo que faltaba
+## 2. El encargo, y lo que faltaba
 
-Cuando empecé había un commit de 3 h antes (`31ad236b`, 22:07 UTC) con parte del trabajo. El
-fichero `instruccioneslargas.md` entró al repo **después**, a las 22:16 UTC. De las siete
-secciones del encargo:
+De las siete secciones, al empezar faltaban cinco. Lo implementado:
 
-| § | Qué pedía | Estado al empezar |
+| § | Qué | Dónde |
 |---|---|---|
-| 1 | la estructura del autoencoder | ✅ estaba |
-| 2 | normalización de contraste local | ✅ estaba |
-| 3 | esparsidad + renormalización del decodificador | ✅ estaba |
-| 4 | rejilla completa `k × K × λ` | 🟡 a medias (faltaba «repetir las 3 mejores») |
-| 5 | las ocho métricas | ❌ faltaban **tres**, incluida la principal |
-| 6 | módulo aislado + artefactos + figuras + tabla | ❌ faltaba casi todo |
-| 7 | criterio escrito antes de mirar | ❌ no existía |
-| 8 | fase 2 | — sólo si la fase 1 sale bien |
+| 1 | el autoencoder de una capa por lado | `src/fv/probe/model.py` |
+| 2 | normalización de contraste local | `src/fv/probe/data.py` |
+| 3 | esparsidad + renormalización L2 tras **cada** paso | `probe/run.py`, `probe/model.py` |
+| 4 | rejilla, `--cronometrar`, `--repetir-mejores`, `--tanteo-k` | `scripts/sonda_l1.py` |
+| 5 | las ocho métricas, cada una con su nulo | `probe/metrics.py`, `probe/gabor.py` |
+| 5+ | **dos métricas sin plantilla** (tu punto 5) | `probe/spectrum.py` |
+| 6 | artefactos, hojas de contactos, mapas `z`, tabla | `probe/run.py`, `figures.py`, `table.py` |
+| — | **λ calibrada por celda** (tu punto 1) | `probe/calibrate.py` |
+| — | el lanzamiento desacoplado, con su código de salida bien puesto | `scripts/sonda_l1_desacoplada.sh` |
+
+**§6, el aislamiento, tiene test**: `fv.probe` no importa `fv.models`, y de `fv.fovea` sólo
+`build_view`/`dims_of`. Un import de más no rompe nada visible — ata el experimento a la red que
+estudia — así que se comprueba leyendo el código, no la documentación.
 
 ---
 
-## 3. Lo que hice
+## 3. Tu revisión: qué acepté y qué no
 
-### 3.1 §6 — el módulo aislado
+### 3.1 Punto 1 — λ deja de ser eje, se **calibra** por celda ✅
 
-La sonda vivía entera en `scripts/`, que es el antipatrón que este proyecto ya tiene anotado
-(*«`scripts/` adelantando a `src/`»*). Ahora:
+Tu crítica era correcta y yo no la había visto: mi mapa λ→activación salía de **un** punto
+(k=7, K=16), y con la rejilla fija más el filtro por banda, celdas enteras se quedaban sin
+combinación admisible — justo en el eje que lleva la premisa. Ahora se bisecta en log(λ) hasta
+activación 10 % ± 3 y la λ resultante se guarda como dato del run.
 
-```
-src/fv/probe/          model · data · gabor · metrics · run · figures · table
-scripts/sonda_l1.py    SOLO la CLI
-```
+### 3.2 Punto 2 — el umbral normalizado ✅
 
-**El aislamiento que pide el encargo tiene test**: ningún fichero de `fv.probe` importa
-`fv.models`, y de `fv.fovea` entran **exactamente** `build_view` y `dims_of` (el cargador de
-ventanas, que es la excepción que el encargo permite). La geometría de producción viaja como
-`dict` desde el script, así que `NETWORK_DEFAULTS` conserva **una sola definición** sin que el
-módulo dependa de ella.
+Tienes razón en que E3 se quedaba corta. Manda `Δ > p95 de la mediana de K kernels aleatorios`
+(bootstrap, sin unidades) y la magnitud es `Δ/(1−nulo)`. Tu 0,40 queda escrito **como tuyo y
+negociable**.
 
-> Por qué se comprueba leyendo el código y no la documentación: un import de más **no rompe nada
-> visible**. Ata el experimento a la red que estudia, y entonces «es un experimento aparte» deja
-> de ser cierto sin que falle nada.
+**Y midiendo qué puede detectar cada prueba salió lo contrario de lo que yo esperaba** (K=16):
 
-### 3.2 §5.4 — el ajuste a Gabor, la métrica **principal**, y no existía
-
-Ajuste 2D por mínimos cuadrados no lineales, multiarranque (32 arranques fijos ⇒ **determinista**)
-y batcheado en **torch** — no `scipy`, que no está instalado en ninguna máquina de la flota. La
-amplitud se resuelve en forma cerrada, así que `R² = cos²(kernel, gabor)`: 7 parámetros libres en
-vez de 8, y acotado en [0, 1] por construcción.
-
-Con su **línea base aleatoria**, que es lo único que lo hace legible (§4.2 de aquí).
-
-### 3.3 §5.3, §5.6 y §5.8 — tres métricas mal o ausentes
-
-- **Kernels muertos**: el umbral era `1e-4`. El encargo dice *«activos en <0,1 % de las
-  posiciones»*, o sea `1e-3`. Corregido, con test que fija el umbral como **dato del encargo**.
-- **Dimensión efectiva**: faltaban las componentes de PCA al 95 % que pide el §5.6. Ahora se
-  reportan **las dos** — la del encargo y el *participation ratio*, que no está topado por
-  `min(K, k²)` y por eso es el comparable entre columnas.
-- **Alineación codificador/decodificador (§5.8)**: no existía. Se compara **sin voltear**, porque
-  `conv_transpose2d(w)` es el adjunto exacto de `conv2d(w)`. Hay un test que lo comprueba
-  numéricamente: si dejara de ser cierto, la métrica daría ~0 con pesos atados, o sea **la
-  conclusión contraria a la verdadera**.
-
-### 3.4 §6 — artefactos, figuras y tabla
-
-Por run: `config.json`, `metrics.jsonl` (**una línea por época**), `checkpoint.pt` y los kernels
-de **los dos lados** en `.npy`. Más:
-
-- **hoja de contactos** por run, con **escala de color común** a los K kernels — autoescalar cada
-  uno haría que un kernel muerto pareciese tan estructurado como uno vivo;
-- **mapas `z`** de las 3 mejores (la figura que contesta visualmente *«¿es la imagen resultante
-  más genérica?»*);
-- **tabla comparativa** de toda la rejilla con las ocho métricas, en markdown y CSV.
-
-Todo con **Pillow**, no matplotlib: matplotlib no está instalado en ninguna máquina de la flota, y
-una figura que necesita un `pip install` en una máquina que se rehace sin aviso es una figura que
-nadie ve. `scripts/demo_contrafactico.py` ya había sentado ese precedente.
-
-⚠ **`checkpoint.pt` NO entra en git**, y es deliberado: el `.gitignore` del repo de datos tira
-todo `.pt` desde que fijaste (2026-08-31) que los pesos de un run no se guardan por defecto. Aquí
-**no hace falta excepción**: los kernels son el entregable (§1 del encargo: *«el modelo son los
-kernels»*) y viajan en `.npy`, que sí entra. El experimento sigue siendo reproducible desde git.
-
-### 3.5 §4 — `--repetir-mejores`
-
-Rankea agrupando **por combinación**, no por semilla suelta: si ya hay varias semillas, la mejor
-es la de mejor **media**, no la de la semilla más afortunada.
-
-### 3.6 §7 — el criterio, escrito antes de mirar
-
-[`docs/plan-sonda-l1-2026-09-02.md`](../docs/plan-sonda-l1-2026-09-02.md).
-
----
-
-## 4. ⚠ Las dos cosas que tienes que decidir antes de gastar las 12 h
-
-Las dos salieron de **medir antes de lanzar nada**, y las dos afectan a umbrales que el propio
-encargo propone. El plan las deja escritas como **enmiendas propuestas** y **no las aplica**.
-
-### 4.1 ⚠⚠ La rejilla de λ del encargo no llega a la banda de activación que su criterio exige
-
-El §3 del encargo fija el objetivo de activación en **5–15 %** y el §7 lo mete en el criterio de
-éxito. *Medido el 2026-09-02* (k=7, K=16, 6 épocas, `--limite 8000`, semilla 1 — un **tanteo de
-rango**, no un resultado):
-
-| λ | activa % | R² rec int | Gabor Δ |
+| `k` | nulo Gabor | Δ absoluto mínimo para pasar | ...del margen |
 |---:|---:|---:|---:|
-| **0,0** *(control)* | 45,6 | 0,975 | +0,070 |
-| **0,03** | 44,9 | 0,975 | +0,072 |
-| **0,1** | 43,4 | 0,974 | +0,072 |
-| **0,3** *(tope de la rejilla)* | **39,9** | 0,974 | +0,074 |
-| 1,0 | 31,7 | 0,973 | +0,065 |
-| 3,0 | 22,3 | 0,969 | +0,078 |
-| **6,0** | **15,9** | 0,961 | +0,069 |
-| **10,0** | **12,9** | 0,949 | +0,056 |
-| **20,0** | **10,4** | 0,919 | +0,004 |
-| **40,0** | **8,0** | 0,845 | +0,019 |
+| **3** | 0,888 | **0,0402** | **35,7 %** |
+| 5 | 0,523 | 0,0296 | 6,2 % |
+| 7 | 0,327 | 0,0237 | 3,5 % |
+| **9** | 0,226 | **0,0141** | **1,8 %** |
 
-1. **Los cuatro valores de la rejilla caen en la misma zona**: 45,6 % → 39,9 % es todo el
-   recorrido que compran, y el tope queda **por encima del 30 %** que el propio encargo llama
-   *«λ es baja»*. Con la rejilla tal cual, **la cláusula de activación no la cumple nadie**, y
-   entonces el éxito es inalcanzable **por construcción**, no por el resultado.
-2. **La banda 5–15 % vive en λ ≈ 6–40**: **20× a 130×** por encima del tope propuesto.
-3. **Y ahí el Gabor Δ no sube: baja.** Si eso aguanta a 30 épocas, la respuesta a *«¿aporta la
-   esparsidad?»* es **no** — y es un resultado válido. Pero conviene medirlo **en el rango donde
-   la esparsidad existe de verdad**, no en uno donde ni siquiera se ha encendido.
+Yo esperaba que en 3×3, con el nulo pegado al techo, la prueba fuese hipersensible. Es **la más
+estricta de las cuatro**: con sólo 9 números por kernel el ajuste varía mucho entre kernels
+aleatorios, así que el nulo es **ancho**. Y de paso demuestra por qué hacen falta **las dos**
+condiciones: en k=9 el p95 dispararía con efectos triviales (1,8 %), y la de magnitud es la que
+impide leer eso como hallazgo.
 
-⚠ **Lo que ese tanteo NO dice:** son 6 épocas, 8.000 ventanas, **un** punto de (k, K) y **una**
-semilla. Las cifras se moverán con 30 épocas sobre 84.000. Lo estructural es el **orden de
-magnitud** del desajuste, que no lo explica el presupuesto de épocas.
+### 3.3 Punto 3 — el tanteo del eje `k` ✅, pero tu diagnóstico del coste ❌
 
-**Enmienda propuesta:** λ ∈ {0 · 0,3 · 3 · 10 · 30}. Cuesta 60 runs en vez de 48 → **~15,0 h**
-en vez de 12,0.
+**Acepté (a) entero**: `--limite` es variable de confusión justo sobre la métrica principal
+—menos ventanas → kernels más ruidosos → Gabor más bajo— así que sesga hacia el fracaso. El
+tanteo corre con el train entero aunque cueste más.
 
-### 4.2 ⚠ El nulo del Gabor en 3×3 hace **imposible** el umbral propuesto ahí
+**Acepté (c) entero**, y es tu punto más fuerte: todo lo medido cubría **un** punto del eje `k`,
+y el eje `k` es la premisa entera. Es lo que está corriendo.
 
-*Medido el 2026-09-02*, mediana del R² sobre **64 kernels aleatorios** del mismo tamaño:
+**(b) no se sostiene, y lo digo con la medida.** Propusiste que 101 s/época es sobrecarga, «casi
+seguro la normalización de contraste recalculada por época»:
 
-| `k` | nulo (R² del ruido) | techo de `Gabor Δ` = 1 − nulo | ¿alcanza el umbral de **0,25**? |
-|---:|---:|---:|---|
-| **3** | **0,879** | **0,121** | ❌ **imposible por aritmética** |
-| 5 | 0,515 | 0,485 | sí, gastando la mitad del margen |
-| 7 | 0,337 | 0,663 | sí |
-| 9 | 0,228 | 0,772 | sí |
+- `local_contrast_norm` se llama **una vez** en `prepare()` y se cachea en disco. El bucle sólo
+  toca el tensor ya normalizado. No hay nada que cachear.
+- Son **1.045 GFLOP por época**, o **14,3 GFLOP/s** efectivos en 2 vCPU.
+- El `conv2d` de torch **a pelo** ya cuesta **178 ms de los 222 ms** del paso completo: **el 80 %
+  del tiempo está dentro de la convolución**, y renormalizar es el **0,0 %**.
 
-Con 7 parámetros libres sobre 9 muestras, **un Gabor ajusta cualquier 3×3**. El encargo ya avisa
-de que *«un Gabor ajusta ruido mejor de lo que uno espera»*; esto es cuánto.
+No hay un 100× esperando.
 
-**Enmienda propuesta:** el umbral de Gabor Δ se juzga sólo en k ∈ {5, 7, 9}; **k=3 se lee por el
-enriquecimiento** (métrica 5), que es como sigue siendo comparable con el **0,688** de la premisa.
-Si no, el ancla «fracasa» siempre por aritmética y ese falso fracaso contamina la lectura de las
-demás columnas.
+### 3.4 Punto 4 — 0,25 / 0,10 fuera ✅
 
-### 4.3 Y dos preguntas más, menores
+### 3.5 Punto 5 — confirmado, y con el mecanismo medido ✅
 
-- ¿Rejilla entera (84.000 ventanas, **~12-15 h**) o `--limite 20000` (**~4-5 h**)?
-- ¿Los umbrales **0,25 / 0,10** se quedan como están? Con los nulos ya medidos, 0,25 en k=9 es
-  exigir explicar el 45 % del margen disponible.
+Tu hipótesis era exacta. Misma celda, lo único que cambia es la normalización:
+
+| | `enriq` | R² rec int |
+|---|---:|---:|
+| **CON** normalización | **0,47** | 0,975 |
+| **SIN** normalización | **1,01** | 0,154 |
+
+El espectro radial lo cierra: la entrada **cruda** tiene prácticamente toda su potencia en DC
+(1,000 en r=0, 0,000 en el resto); la **normalizada** hace pico en r=7; y la **base clásica** a
+k=7 vive en r ∈ {0, 1} y luego ~0. Base de baja frecuencia contra kernels de alta frecuencia.
+
+⚠⚠ **Y hay una consecuencia mayor que la que planteaste:** *producción no normaliza el contraste*
+— `fv.fovea.build_view` entrega la vista cruda en [0,1] y nada la toca después. Así que el
+**0,688** de `fov16-mask-p20` y el `enriq` de la sonda **nunca fueron comparables**, ni siquiera
+en k=3 — que era justo donde E3 apoyaba la lectura del ancla. **El ancla se lee ahora por
+`conc_orient`**, cuyo nulo en 3×3 es 0,238 (techo 0,762) frente al 0,879 del Gabor (techo 0,121).
+
+**Las dos métricas que pediste**, de la FFT 2D con rejilla de frecuencia común por relleno a
+ceros. Gabor sintético a k=9: `conc_orient` **0,923** contra nulo **0,112**.
+⚠ `conc_banda` **no** sirve en 3×3: un soporte 3×3 no puede ser de banda estrecha (principio de
+incertidumbre), y cae por debajo del nulo incluso para un Gabor sintético. No es defecto de la
+métrica: es la premisa del experimento saliendo por otro lado.
 
 ---
 
-## 5. El coste, medido (no estimado)
+## 4. ⚠ Lo que retiré: el "suelo de activación en k=3" NO existe
 
-*2026-09-02, este droplet, 2 vCPU, con `--cronometrar`:*
+**Lo llegué a escribir en tres sitios y era falso.** Lo destapó el propio tanteo: el run
+`k3-K16` con la λ calibrada predijo **24,3 %** de activación y dio **1,9 %**.
+
+Separé las dos causas posibles con las **mismas** 8.000 ventanas, cambiando sólo los pasos:
+
+| pasos | 64 *(lo que medía la calibración)* | 256 | 640 |
+|---|---:|---:|---:|
+| activación | **24,3 %** | 4,3 % | 3,6 % |
+
+Y el run real (84.000 ventanas, 329 pasos en su primera época) dio **4,1 % en la época 1**.
+**Lo que asienta la activación son los pasos del optimizador**, no las épocas ni el tamaño del
+dataset. «2 épocas sobre un subconjunto» son 64 pasos, y **sobreestiman seis veces**.
+
+Lo grave no fue la imprecisión sino que **invirtió la conclusión**: declaraba «esta celda no
+puede esparcirse hasta la banda» justo donde se esparce de sobra. Con 400 pasos:
+
+| celda | λ | activación | ¿en banda? | ¿satura? |
+|---|---:|---:|---|---|
+| k=3, K=8 | 28,3 | 9,6 % | ✅ | no |
+| k=3, K=16 | 28,3 | 7,5 % | ✅ | no |
+| k=5, K=16 | 28,3 | 8,7 % | ✅ | no |
+| k=9, K=16 | 28,3 | 8,7 % | ✅ | no |
+
+**Ninguna celda medida satura.**
+
+Y un segundo fallo del mismo día, de la misma familia: el desempate «entre λ que empatan gana la
+menor» usaba una tolerancia (1 punto) **más ancha que la banda**, así que cambiaba una λ *dentro*
+de banda por una *fuera*. Un desempate no puede tirar el criterio que lo precede.
+
+**La lección, que es lo que se lleva el plan:** una calibración cuyo proxy **no transfiere** es
+peor que no calibrar, porque hace que la esparsidad *parezca* igualada entre celdas cuando no lo
+está — justo el fallo silencioso que calibrar venía a evitar.
+
+---
+
+## 5. Un resultado parcial, y con cautela
+
+Del primer intento sobreviven dos runs de **λ=0** (no usan calibración, así que siguen siendo
+válidos). En `k3-K16-λ=0`:
+
+| | valor | ¿pasa? |
+|---|---:|---|
+| Gabor Δ/margen | **+0,651** | **sí, supera el p95** |
+| `conc_orient` Δ | −0,023 | no |
+| `conc_banda` Δ | −0,055 | no |
+
+**Es un conflicto entre métricas, y no saco conclusiones de un run.** Si el patrón «Gabor sí,
+espectrales no» aguanta a lo largo del eje, hay que decidir cuál de las dos lecturas manda — y
+esa decisión es tuya. El plan hoy dice `conc_orient` **o** Gabor, y este caso es justo donde esa
+disyunción se vuelve importante.
+
+---
+
+## 6. El criterio, congelado antes de ver nada
+
+**Prueba:** la mediana del run supera el **p95 de la mediana de K kernels aleatorios** (bootstrap
+de 2.000 remuestreos). **Magnitud:** `Δ/(1−nulo) ≥ 0,40`.
+
+**Éxito** = alguna configuración pasa las dos en `conc_orient` **o** en Gabor, con
+`r2_rec_int ≥ 0,80` y cero kernels muertos.
+**Fracaso** = ninguna pasa la prueba en ninguna métrica de forma. Es un resultado válido.
+
+**Y el tanteo puede cerrar el estudio:** si ninguno de los 8 runs pasa, **la rejilla de 12-15 h
+no se lanza**. Si alguno pasa, se lanza **sólo sobre los `k` que pasaron**.
+
+---
+
+## 7. Coste, medido
 
 | Qué | Reloj |
 |---|---:|
-| combinación más cara (k=9, K=32) | **101,3 s/época** |
-| rejilla de 48 runs × 30 épocas | **~12,0 h** *(extrapolado por `K·k²`)* |
-| + las 3 mejores × 3 semillas | ~1,5 h |
-| lo mismo con `--limite 20000` | **~4,0 h** *(34,0 s/época)* |
+| combinación más cara (k=9, K=32), por época | **101,3 s** |
+| **el tanteo del eje `k`** (8 runs, K=16, 30 épocas) | **~1,7 h** ← corriendo |
+| la rejilla completa, si llega a lanzarse | ~12-15 h |
 
-**No alquila nada**: corre en esta máquina y satura sus 2 vCPU. Lo que se pierde al apagar es
-**trabajo, no dinero** — pero son 12 h de él, así que el freno cuenta igual.
+**No alquila nada.** El coste es **reloj** de esta máquina, y el freno lo cuenta:
+`🔴 NO CERRAR — 1 trabajo(s) vivo(s): sonda_l1.py`.
 
 ---
 
-## 6. Lo verificado ejecutando (no razonando)
+## 8. Lo verificado ejecutando
 
 | Qué | Resultado |
 |---|---|
-| suite de `foveal-vision` | **557 pasan**, 3 skip (eran 533) |
-| tests de la sonda | **50** en `tests/test_sonda_l1.py` (eran 26) |
-| run real de punta a punta | artefactos + figuras generados y revisados a ojo |
-| el freno nombra la sonda | `🔴 NO CERRAR — 1 trabajo(s) vivo(s): sonda_l1.py`, con la sonda corriendo |
+| suite de `foveal-vision` | **577 pasan**, 3 skip (eran 533) |
+| tests de la sonda | **70** (eran 26) |
+| los tests de cada arreglo | fallan con el código anterior, comprobado con `git stash` |
 | la unidad de systemd | `active`, cgroup **propio** `/system.slice/sonda-l1.service` |
-| el ejecutor de Telegram | `/use sonda-l1` → `estado`, `--tabla` y el lanzamiento desacoplado, los tres por el arnés real |
+| el freno | nombra la sonda con ella corriendo |
 
-Además pasé el trabajo por el agente `verificador`, que reprodujo de forma independiente los
-nulos del Gabor, la tabla de λ (números **idénticos**: el barrido es determinista) y el
-aislamiento del módulo.
-
-### 6.1 ⚠ Un fallo que encontró esa verificación, ya arreglado
-
-`desacoplar-persistente.sh` registra la unidad con `Restart=on-failure`, y el aviso iba al final
-de la tubería: **el código de salida lo decidía `notify.mjs`**.
-
-- **Medido:** la sonda **terminó bien**, el aviso falló (el arnés no pasa `BOT_TOKEN`), y la
-  unidad se quedó en `Result=exit-code` **reiniciándose cada 30 s**. O sea: **12 h de rejilla
-  relanzadas por un aviso.**
-- **Y al revés también:** un trabajo que reventara salía como `success` y **no** se reintentaba —
-  que es justo cuando el reintento sirve, porque `--rejilla` se reanuda saltando los runs hechos.
-
-Ahora manda el código del **trabajo** y el aviso no puede cambiarlo. Vive en
-`scripts/sonda_l1_desacoplada.sh` — **un fichero, no una línea escapada dentro de un JSON**, que
-es lo que lo hace probable — con **un test por cada dirección del fallo**.
-
-Y el ejecutor ahora **sólo desacopla lo que entrena** (`--rejilla`, `--repetir-mejores`,
-`--solo`): un flag mal escrito ya no puede levantar una unidad de 12 h.
+⚠ Y una cosa que salió al verificar y ya está arreglada: `desacoplar-persistente.sh` usa
+`Restart=on-failure`, y el aviso iba al final de la tubería — **el código de salida lo decidía
+`notify.mjs`**. Medido: la sonda terminó bien, el aviso falló, y la unidad se quedó
+**reiniciándose cada 30 s**. Y al revés, un trabajo que reventara salía como `success` y no se
+reintentaba. Ahora manda el código del **trabajo**, con un test por cada dirección.
 
 ---
 
-## 7. Dos cosas del proceso que te dije, y conviene que queden
+## 9. Qué falta
 
-1. **El §7 del encargo dice «párate a que el dueño confirme los umbrales antes de escribir el
-   entrenamiento», y esa parada no se pudo respetar**: el entrenamiento ya existía cuando el
-   encargo llegó al repo (`31ad236b` a las 22:07 UTC; `instruccioneslargas.md` a las 22:16). La
-   respeté donde quedaba algo que parar: **la rejilla no se lanza**.
-2. **La fase 2 (§8) no está implementada, a propósito.** Depende de qué `k` y `K` ganen, y
-   escribir hoy el cableado de una geometría que aún no se conoce es escribir la mitad que habrá
-   que rehacer.
-
----
-
-## 8. Qué hay que hacer ahora
-
-1. **Contestar el §6 del plan** ([`docs/plan-sonda-l1-2026-09-02.md`](../docs/plan-sonda-l1-2026-09-02.md)):
-   las cuatro preguntas del §4 de aquí.
-2. **Lanzarla**, desde Telegram:
-   ```
-   /use sonda-l1
-   --rejilla                 # las 48/60, ~12-15 h
-   --rejilla --limite 20000  # ~4-5 h
-   estado                    # cómo va
-   parar                     # detenerla; lo escrito se conserva y se reanuda
-   ```
-3. **Cuando termine**, su reporte va al repo central `estudios-redes-neuronales`, en
-   `reportes/estudios/2026/09-septiembre/`, con su fila en la tabla de `reportes/README.md`.
-   Instancias: **0** (no alquila). Coste: **0 $** — aquí el coste es **reloj**.
-
----
-
-## 9. Ficheros tocados
-
-| Fichero | |
-|---|---|
-| `src/fv/probe/{__init__,model,data,gabor,metrics,run,figures,table}.py` | nuevo |
-| `scripts/sonda_l1.py` | reescrito: ahora sólo la CLI |
-| `scripts/sonda_l1_desacoplada.sh` | nuevo |
-| `tests/test_sonda_l1.py` | 26 → 50 tests |
-| `telegram/executors/sonda-l1.json` | rutado y mensajes |
-| `docs/plan-sonda-l1-2026-09-02.md` | nuevo — **el criterio** |
-| `CLAUDE.md` | bloque `⏳ 2026-09-02 — SONDA L1` |
+1. **Que termine el tanteo** (~1,7 h). Resultados en `foveal-vision-data/sondas/l1/`
+   (`tabla.md`, `resumen.json`), log en `/tmp/sonda-l1.log`.
+2. **Leerlo contra el criterio del §6** y decidir si la rejilla se lanza o el estudio se cierra.
+3. **Si el conflicto Gabor/espectrales aguanta**, decidir cuál manda (§5).
+4. **El reporte** al repo central `estudios-redes-neuronales`, en
+   `reportes/estudios/2026/09-septiembre/`, con inicio y fin UTC, **máquinas: 0** y
+   **coste: 0 $** — aquí el coste es reloj.
+5. **La fase 2 (§8 del encargo) no está implementada, a propósito**: depende de qué `k` y `K`
+   ganen, y sólo se paga si la fase 1 sale bien.
 
 ---
 
