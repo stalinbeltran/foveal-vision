@@ -92,6 +92,18 @@ La tabla completa, los matices y el criterio —escrito **antes** de mirar— es
 [`instrucciones/03-plan-y-criterio.md`](instrucciones/03-plan-y-criterio.md) §9.
 Reporte público: [#22](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/estudios/2026/09-septiembre/2026-09-03-sonda-l1-tanteo-eje-k.md).
 
+## 3.bis Verlo: entrada contra salida, 10 ventanas al azar
+
+[`inspeccion/`](inspeccion/) — `nn/reconstruir.py` coge N ventanas de validación al azar, las
+pasa por la red y pinta la ventana, la entrada normalizada, la salida de cada brazo y el error.
+
+![entrada contra salida](inspeccion/entrada-vs-salida.png)
+
+**El que reconstruye perfecto es el que no aprendió.** El brazo λ=0 devuelve su entrada píxel a
+píxel (R² = 1,000 en las 10): es la identidad. El calibrado reconstruye a **R² 0,840** de media
+y ahí está lo interesante — conserva las líneas de texto y descarta la textura de fondo. Detalle
+y los dos avisos para no leer de más, en [`inspeccion/README.md`](inspeccion/README.md).
+
 ## 4. Qué hay aquí
 
 | | |
@@ -104,6 +116,7 @@ Reporte público: [#22](https://github.com/stalinbeltran/estudios-redes-neuronal
 | `resultados/<run>/` | `config.json`, `metrics.jsonl` (una línea por época), `summary.json`, kernels `.npy`, hojas de contactos y mapas `z` |
 | `resultados/tabla.md` · `tabla.csv` · `resumen.json` | la comparativa de los 8 |
 | [`codigo/`](codigo/) | **snapshot congelado** del código. La copia viva está en `src/fv/probe/` |
+| [`nn/reconstruir.py`](nn/reconstruir.py) · [`inspeccion/`](inspeccion/) | entrada contra salida sobre N ventanas al azar: la figura y `resultados.json` |
 
 ## 5. Cómo se usa
 
