@@ -1,13 +1,15 @@
 # Plan — sonda L1: ¿pueden los kernels de la primera capa aprender filtros genéricos? (2026-09-02)
 
-> **Estado: criterio escrito ANTES de mirar ningún número, y PENDIENTE de que el dueño
-> confirme los umbrales.** Es lo que pide el §7 del encargo y el protocolo de este proyecto:
-> quien decide qué cuenta como «gana» tiene que hacerlo sin ver el resultado, o el rango y el
-> umbral acaban ajustándose a lo que salió. Los números se pegan abajo cuando lleguen; **este
-> documento no se reescribe para que cuadre**.
+> **Estado: criterio CONGELADO el 2026-09-02, antes de mirar ningún resultado.** El dueño
+> contestó las cuatro preguntas del §6 en [`instruccioneslargas.md`](../instruccioneslargas.md)
+> (commit `7959c558d`), y sus respuestas cambiaron el diseño lo bastante como para que el §4
+> de aquí se reescribiera **entero** — con la rejilla todavía sin correr, que es lo que hace
+> que siga siendo un criterio y no una explicación de lo que salió.
 >
-> ⚠ **Lo que NO se ha hecho todavía: lanzar la rejilla.** Son 12,0 h *medidas* de esta máquina
-> (§3.1). El código está entero y probado; el gasto espera a la confirmación del §6.
+> **Lo que corre ahora: el tanteo del eje `k`** (8 runs, §4.4). La rejilla grande sigue sin
+> lanzarse, y el §4.5 dice qué tiene que pasar para que valga la pena lanzarla.
+>
+> Los números se pegan abajo cuando lleguen; **este documento no se reescribe para que cuadre**.
 
 ## 0. El encargo, en una línea
 
@@ -87,7 +89,7 @@ parar: **la rejilla no se lanza** hasta el §6 de aquí.
 
 ## 3. Lo que ya está medido SIN gastar, y que cambia el criterio
 
-Las cuatro cosas de aquí abajo se midieron **antes** de lanzar nada. Tres de ellas afectan a los
+Las seis cosas de aquí abajo se midieron **antes** de lanzar nada. Tres de ellas afectan a los
 umbrales que el §7 del encargo propone, y por eso este documento pide confirmarlos en vez de
 darlos por buenos.
 
@@ -194,39 +196,155 @@ la decisión se revise en vez de quedarse.
 
 ---
 
-## 4. El criterio, escrito ANTES de mirar
+### 3.6 ⚠⚠ `enriq` está por DEBAJO de su nulo en toda la sonda — y se sabe por qué
 
-### 4.1 Tal como lo propone el encargo (§7)
+Lo encontró el dueño revisando `metrics.py`: el enriquecimiento va de **0,47 a 0,61** en todo el
+tanteo, cuando **1,0 es «indistinguible de aleatorio»**. Los kernels aprendidos tienen **menos**
+energía en el subespacio clásico que kernels al azar.
 
-- **Éxito** si alguna configuración logra **a la vez**: mediana de R² Gabor **≥ 0,25 por encima
-  de su línea base aleatoria**, R² de reconstrucción **≥ 0,80**, activación **entre 5 % y 15 %**,
-  y **cero kernels muertos**.
-- **Fracaso** si **ninguna** separa el Gabor de su línea base por más de **0,10**. Sería un
-  resultado válido: la reconstrucción tampoco produce filtros genéricos en este dominio.
-- Si el mejor λ=0 **iguala** al mejor λ>0 en la métrica Gabor, **la esparsidad no aportó nada y
-  hay que decirlo**.
+Su hipótesis era que `classic_basis` construye los filtros a k>3 con suavizado binomial —o sea
+plantillas de baja frecuencia— y que la normalización de contraste obligatoria del §2 quita DC y
+las bajas frecuencias de la **entrada**, dejando los kernels aprendidos en alta frecuencia y casi
+ortogonales a esa base. **Comprobada el 2026-09-02**, misma celda (k=7, K=16, 6 épocas,
+`--limite 8000`), lo único que cambia es la normalización:
 
-### 4.2 Las tres enmiendas que las medidas del §3 obligan a proponer
+| | `enriq` | Gabor Δ | activa % | R² rec int |
+|---|---:|---:|---:|---:|
+| **CON** normalización, λ=0 | **0,47** | +0,070 | 45,6 | 0,975 |
+| **CON** normalización, λ=3 | 0,52 | +0,083 | 22,3 | 0,969 |
+| **SIN** normalización, λ=0 | **1,01** | −0,041 | 30,7 | 0,154 |
+| **SIN** normalización, λ=3 | 1,01 | −0,041 | 30,7 | 0,129 |
 
-Se proponen; **no se aplican sin confirmación** (§6). Cada una nace de un número, no de un gusto:
+Y el espectro radial medio lo explica del todo (potencia normalizada a su máximo, `r`=0 es DC):
 
-| # | Enmienda | Por qué | Si NO se aplica |
-|---|---|---|---|
-| **E1** | **λ ∈ {0 · 0,3 · 3 · 10 · 30}** en vez de `{0 · 0,03 · 0,1 · 0,3}` | §3.4: la rejilla propuesta no sale de la zona 40-45 % de activación | el criterio de éxito es **inalcanzable por construcción**, y el estudio no puede contestar «¿aporta la esparsidad?» |
-| **E2** | La cláusula de activación (5-15 %) pasa de **requisito de éxito** a **filtro de admisión**: sólo se juzgan por Gabor las combinaciones que caen en banda; las demás se reportan con su activación al lado | así la métrica principal se lee entre configuraciones **comparables**; el encargo ya llama a la activación «un diagnóstico, no va en la pérdida» | una configuración con Gabor Δ alto y 45 % de activación se descarta sin que nadie sepa si la esparsidad tenía algo que ver |
-| **E3** | El umbral de Gabor Δ (0,25 / 0,10) **se juzga sólo en k ∈ {5,7,9}**; **k=3 se lee por la métrica 5** (enriquecimiento) | §3.3: en 3×3 el techo de Δ es 0,121, o sea **menos** que el propio umbral de éxito | el ancla «fracasa» siempre, por aritmética, y ese falso fracaso contamina la lectura de las otras columnas |
+| | r=0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| entrada **cruda** | **1,000** | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| entrada **normalizada** | 0,673 | 0,554 | 0,759 | 0,870 | 0,858 | 0,670 | 0,877 | **1,000** | 0,867 | 0,573 | 0,298 |
+| **base clásica** k=7 | **1,000** | 0,448 | 0,056 | 0,025 | | | | | | | |
 
-⚠ **E1 cuesta lo mismo**: 5 valores de λ en vez de 4 son 60 runs en lugar de 48, o sea **~15,0 h
-en vez de 12,0**. Si el reloj aprieta, `--limite 20000` lo baja a ~5,0 h *(medido: 34,0 s/época)* — a costa de entrenar
-sobre 20.000 ventanas en vez de 84.000, que es una decisión aparte y también hay que tomarla.
+Una vista de texto cruda tiene **prácticamente toda su potencia en DC** — que es exactamente por
+qué el §2 obliga a normalizar, y lo confirma el `R² rec int` de 0,154 sin normalizar: sin ella la
+sonda ni siquiera reconstruye. Pero normalizada, la entrada hace pico en `r`=7 y la base clásica
+vive en `r` ∈ {0, 1}. Base de baja frecuencia contra kernels de alta frecuencia.
 
-### 4.3 Lo que se reporta pase lo que pase
+**Consecuencia, y es más grande de lo que él planteó:** *producción no normaliza el contraste* —
+`fv.fovea.build_view` entrega la vista cruda en [0,1] y nada la toca después *(comprobado
+2026-09-02)*. O sea que el **0,688** de `fov16-mask-p20` se midió sobre kernels entrenados con
+entrada cruda, y el `enriq` de la sonda sobre entrada normalizada: **nunca fueron comparables**,
+ni siquiera en k=3. Y el plan anterior apoyaba ahí toda la lectura del ancla.
 
-Éxito, fracaso o punto medio, el reporte lleva: la **tabla de las 48/60 combinaciones con las
-ocho métricas**, la **hoja de contactos** de cada run, los **mapas `z`** de las 3 mejores, y el
-apartado de **«lo que quedó pendiente»**. Va al repo central
-`estudios-redes-neuronales/reportes/estudios/2026/09-septiembre/`, con inicio y fin en UTC,
-máquinas (0: no alquila) y coste real (0 $: es CPU propia, el coste es **reloj**).
+Por eso `enriq` pasa a ser **diagnóstico, no criterio**, y entran las dos métricas sin plantilla
+del §4.2. Tiene test: si alguien cambia `classic_basis` y deja de ser de baja frecuencia, falla y
+hay que revisar la lectura en vez de silenciarlo.
+
+---
+
+## 4. El criterio, congelado ANTES de mirar
+
+### 4.1 Lo que proponía el encargo (§7), y por qué no se queda
+
+- **Éxito** si alguna configuración logra a la vez: mediana de R² Gabor **≥ 0,25 por encima de
+  su línea base**, R² de reconstrucción **≥ 0,80**, activación **entre 5 % y 15 %**, y **cero
+  kernels muertos**.
+- **Fracaso** si ninguna separa el Gabor de su base por más de **0,10**.
+- Si el mejor λ=0 **iguala** al mejor λ>0 en Gabor, **la esparsidad no aportó nada y hay que
+  decirlo**.
+
+Los umbrales absolutos **no se quedan**, y no por gusto: con los nulos medidos del §3.3, un
+0,25 absoluto pide explicar el **52 % del margen alcanzable en k=5, el 38 % en k=7 y el 32 % en
+k=9**. Es tres exigencias distintas escritas como si fueran una. La tercera frase —«si λ=0
+iguala a λ>0, dilo»— **sí se queda tal cual**: es la única que ya era comparable.
+
+### 4.2 El criterio que manda, desde el 2026-09-02
+
+**Prueba (¿hay señal?)** — sin unidades, por celda:
+
+> la mediana del run supera el **p95 de la mediana de K kernels aleatorios** del mismo tamaño
+> (bootstrap de 2.000 remuestreos, `fv/probe/spectrum.py:bootstrap_p95`).
+
+El estadístico que se compara es una mediana sobre K, así que el nulo tiene que ser la
+distribución **de esa mediana**, no la de un kernel suelto. Se aplica a las tres métricas de
+forma: `gabor_supera_p95`, `conc_orient_supera_p95`, `conc_banda_supera_p95`.
+
+**Magnitud (¿cuánta?)** — normalizada por lo que es alcanzable en esa celda:
+
+> `Δ / (1 − nulo) ≥ 0,40`
+
+El **0,40 es del dueño y es negociable**; queda escrito aquí antes de mirar para que se sepa que
+no se eligió después.
+
+**Éxito** = alguna configuración pasa **las dos** en `conc_orient` **o** en Gabor, con
+`r2_rec_int ≥ 0,80` y **cero kernels muertos**.
+**Fracaso** = ninguna pasa la prueba en ninguna de las tres métricas de forma. Es un resultado
+válido: la reconstrucción tampoco produce filtros genéricos en este dominio.
+
+### 4.3 λ deja de ser un eje: se **calibra** por celda
+
+`λ` no significa lo mismo en cada celda —el mapa λ→activación del §3.4 sale de **un** punto—, y
+una rejilla fija más el filtro por banda deja celdas enteras sin ninguna combinación admisible,
+justo en el eje que lleva la premisa. Así que se bisecta en log(λ) hasta **activación 10 % ± 3**
+(`fv/probe/calibrate.py`), la λ resultante se guarda como **dato del run**, y λ pasa a ser
+`{0 = control, calibrada}`. La esparsidad queda constante entre celdas y el barrido mide lo que
+dice medir.
+
+⚠⚠ **Y calibrar destapó algo que ninguna rejilla habría enseñado: hay celdas con SUELO de
+activación.** *Medido el 2026-09-02:*
+
+| celda | activación mínima alcanzable | ¿llega a 10 % ± 3? |
+|---|---:|---|
+| k=3, K=8 | **14,4 %** | ❌ no, satura |
+| k=3, K=16 | **24,3 %** | ❌ no, satura |
+| k=5, K=16 | 9,2 % (λ=80) | ✅ |
+| k=7, K=16 | 7,0 % (λ=80) | ✅ |
+| k=9, K=16 | 7,0 % (λ=80) | ✅ |
+| k=9, K=32 | 9,4 % (λ=80) | ✅ |
+
+Por mucho que suba λ, **en k=3 la activación no baja de ahí**. Es una propiedad de la celda, no
+del barrido, y significa que **el ancla no se puede correr con la misma esparsidad que el
+resto**. Se corre igual, y `saturado`/`en_banda` quedan en su `summary.json` para que nadie lo
+lea como si fuera comparable.
+
+### 4.4 ⚠ Y el ancla ya no se puede leer por el enriquecimiento
+
+El §3.6 mide que `enriq` está **por debajo de su nulo** en toda la sonda por la normalización de
+contraste, y que **producción no normaliza**. O sea que el 0,688 de `fov16-mask-p20` y el
+`enriq` de la sonda **nunca fueron comparables**, ni siquiera en k=3 — que era justo donde el
+plan anterior apoyaba la lectura del ancla.
+
+**El ancla se lee ahora por `conc_orient`**, cuyo nulo en 3×3 es 0,238 (techo 0,762) frente al
+0,879 del Gabor (techo 0,121). ⚠ `conc_banda` **no** sirve en 3×3: un kernel de soporte 3×3 no
+puede ser de banda estrecha (principio de incertidumbre), y su valor cae por debajo del nulo
+incluso para un Gabor sintético. Eso no es un defecto de la métrica: es la premisa
+—*«en 3×3 no cabe la estructura»*— saliendo por otro lado.
+
+### 4.5 El tanteo del eje `k` va PRIMERO, y puede cerrar el estudio
+
+**8 runs: k ∈ {3,5,7,9} × λ ∈ {0, calibrada}, K=16, train entero, 30 épocas.** ~1,7 h
+*extrapolado de los 101,3 s/época medidos*. Es el punto 3 de la revisión del dueño, y su razón
+es exacta: **todo lo medido hasta ahora cubre UN punto del eje `k`, y el eje `k` es la premisa
+entera del experimento.**
+
+⚠ Corre con el **train entero**, no con `--limite`: menos ventanas dan kernels más ruidosos y el
+ajuste Gabor baja, así que `--limite` es una variable de confusión **justo sobre la métrica
+principal**, y sesga hacia el fracaso.
+
+**Qué decide, escrito antes:**
+
+- **Si ninguna de las 8 pasa la prueba del §4.2 en ninguna métrica de forma**, el estudio se
+  cierra aquí: la respuesta a *«¿salen filtros genéricos?»* es **no**, y la rejilla de 12-15 h
+  no se lanza. Ya hay un indicio en esa dirección —a k=7 el Δ del Gabor es +0,07, o sea el
+  **10,6 % del margen disponible**, plano entre λ=0 y λ=3 y luego bajando— pero un indicio en
+  un punto no es un resultado en el eje.
+- **Si alguna pasa**, la rejilla se lanza **sólo sobre los `k` que pasaron**, con K ∈ {8,16,32}
+  y λ ∈ {0, calibrada}.
+
+### 4.6 Lo que se reporta pase lo que pase
+
+La **tabla de todas las combinaciones con sus métricas y sus nulos**, la **hoja de contactos** de
+cada run, los **mapas `z`** de las 3 mejores, y el apartado de **«lo que quedó pendiente»**. Va
+al repo central `estudios-redes-neuronales/reportes/estudios/2026/09-septiembre/`, con inicio y
+fin en UTC, **máquinas: 0** (no alquila) y **coste: 0 $** — aquí el coste es **reloj**.
 
 ---
 
@@ -245,18 +363,36 @@ máquinas (0: no alquila) y coste real (0 $: es CPU propia, el coste es **reloj*
 
 ---
 
-## 6. Lo que hace falta confirmar antes de gastar las 12 h
+## 6. Las cuatro preguntas, CONTESTADAS el 2026-09-02
 
-1. **¿Se aplica E1 (λ hasta 30)?** Es la única que cambia lo que se mide; sin ella el criterio de
-   éxito no lo puede cumplir nada.
-2. **¿Se aplican E2 y E3?** Cambian cómo se **lee**, no qué se corre. Se pueden decidir después
-   de ver los números sin contaminar nada, porque están escritas aquí antes.
-3. **¿Rejilla entera (84.000 ventanas, ~12-15 h) o `--limite 20000` (~4-5 h)?**
-4. **¿Los umbrales 0,25 / 0,10 se quedan como están?** Con los nulos del §3.3 medidos, 0,25 en
-   k=9 es exigir explicar el 45 % del margen disponible.
+| # | Pregunta | Respuesta del dueño | Dónde vive ahora |
+|---|---|---|---|
+| 1 | ¿E1 (λ hasta 30)? | **No en esa forma**: λ deja de ser eje y se **calibra por celda** | §4.3 · `fv/probe/calibrate.py` |
+| 2 | ¿E2 y E3? | **Sí**, pero E3 se queda corta: el umbral se normaliza por el margen | §4.2 · §4.4 |
+| 3 | ¿Rejilla entera o `--limite`? | **Ninguna todavía**: primero el tanteo del eje `k`, 8 runs | §4.5 |
+| 4 | ¿Se quedan 0,25 / 0,10? | **No** | §4.2 |
 
-Mientras tanto **no se lanza nada**. Un `--cronometrar` y los dos tanteos del §3.4 es todo lo
-que se ha gastado, y son minutos.
+Y una quinta cosa que él encontró revisando el código, que resultó ser la más importante: el
+**§3.6** de arriba.
+
+### 6.1 Una cosa suya que NO se aplicó, y por qué
+
+En el punto 3(b) propuso que los 101 s/época *«en un modelo de ~1.500 parámetros no es cómputo,
+es sobrecarga, casi seguro la normalización de contraste recalculada por época»*, y que
+cachearla lo llevaría a segundos. **Medido, y no es así:**
+
+- `local_contrast_norm` se llama **una vez** en `prepare()` y el resultado se cachea en disco; el
+  bucle de entrenamiento sólo toca el tensor ya normalizado. No hay nada que cachear.
+- Son **1.045 GFLOP por época** (84.000 ventanas × 400 px × 32 canales × 81 taps × 2 lados ×
+  3 pases), o sea **14,3 GFLOP/s efectivos** en 2 vCPU — una cifra razonable para convolución
+  float32 en CPU.
+- El `conv2d` de torch **a pelo**, sin nada del proyecto en medio, ya cuesta **178 ms** de los
+  **222 ms** del paso completo: **el 80 % del tiempo está dentro de la convolución**, y
+  renormalizar el decodificador es el **0,0 %**.
+
+O sea: no hay un 100× esperando. Lo que **sí** se aplicó entero es su punto 3(a) —`--limite` es
+una variable de confusión sobre la métrica principal— y por eso el tanteo corre con el train
+entero aunque cueste más.
 
 ---
 

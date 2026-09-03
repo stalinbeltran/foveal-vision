@@ -146,7 +146,42 @@ la vigila y la **destruye** no se contaría. Si se va por Vast, **esa línea va 
 > 6. **La fase 2** (congelar el codificador ganador como L1 de la rama central y reentrenar
 >    contra el f1 0,954 de `fov16-mask-p20`) **no está implementada, a propósito**: depende de
 >    qué `k` y `K` ganen.
-> **50 tests** en `tests/test_sonda_l1.py`; suite **557 pasan** (eran 533).
+> **67 tests** en `tests/test_sonda_l1.py`; suite **574 pasan** (eran 533).
+>
+> ### ⚠ La revisión del dueño del 2026-09-02 cambió el diseño. Lee esto antes de tocar la sonda
+>
+> Contestó las cuatro preguntas en `instruccioneslargas.md` (`7959c558d`) y el criterio quedó
+> **congelado** en el plan, con la rejilla todavía sin correr. Cinco cosas:
+> 1. **λ ya NO es un eje: se CALIBRA por celda** (`src/fv/probe/calibrate.py`) hasta activación
+>    10 % ± 3, y la λ resultante se guarda como dato del run. Su motivo, que yo no había visto:
+>    mi mapa λ→activación salía de **un** punto (k=7, K=16), así que una rejilla fija más el
+>    filtro por banda dejaba celdas enteras sin combinación admisible.
+> 2. ⚠⚠ **Hay celdas con SUELO de activación**, y calibrar es lo que lo enseñó. *Medido*:
+>    k=3/K=8 se queda en **14,4 %** y k=3/K=16 en **24,3 %** por mucho que suba λ. En k=3 la
+>    banda **no es alcanzable**, y es una propiedad de la celda, no del barrido. Se declara
+>    (`saturado`, `en_banda`), nunca se devuelve un número que parezca convergido.
+> 3. **El criterio se normaliza**: manda `Δ > p95 de la mediana de K kernels aleatorios`
+>    (bootstrap, sin unidades) y la magnitud es `Δ/(1−nulo)`. Un 0,25 **absoluto** es el 52 %
+>    del margen alcanzable en k=5 y el 32 % en k=9 — tres exigencias escritas como una.
+> 4. ⚠⚠ **`enriq` está por DEBAJO de su nulo en toda la sonda (0,47-0,61) y ya se sabe por qué.**
+>    `classic_basis` es de **baja** frecuencia y la normalización de contraste del §2 deja los
+>    kernels en **alta**. *Medido en la misma celda*: con normalización `enriq` 0,47, sin ella
+>    **1,01**. Y la consecuencia grande: **producción NO normaliza** (`build_view` da la vista
+>    cruda), así que el **0,688** de `fov16-mask-p20` y el `enriq` de la sonda **nunca fueron
+>    comparables** — ni en k=3, que era donde se apoyaba el ancla. `enriq` pasa a diagnóstico.
+> 5. **Dos métricas sin plantilla** (`src/fv/probe/spectrum.py`), de la FFT 2D con rejilla común:
+>    `conc_orient` (concentración a doble ángulo) y `conc_banda`. Tapan el hueco del Gabor: en
+>    3×3 su nulo es 0,238 (techo 0,762) contra el 0,879 del Gabor (techo 0,121). ⚠ `conc_banda`
+>    **no** sirve en 3×3: un soporte 3×3 no puede ser de banda estrecha (incertidumbre).
+>
+> ⚠ **Una propuesta suya que NO se aplicó, y por qué**: dijo que los 101 s/época son sobrecarga,
+> «casi seguro la normalización recalculada por época». **No lo es** — se calcula una vez y se
+> cachea en disco. *Medido*: 1.045 GFLOP/época, 14,3 GFLOP/s en 2 vCPU, y el `conv2d` de torch
+> **a pelo** ya cuesta 178 de los 222 ms del paso. **El 80 % del tiempo está dentro de la
+> convolución**; renormalizar es el 0,0 %. No hay un 100× esperando.
+> Lo que sí se aplicó entero: **`--limite` es variable de confusión JUSTO sobre la métrica
+> principal** (menos ventanas → kernels más ruidosos → Gabor más bajo), así que sesga hacia el
+> fracaso. El tanteo corre con el train entero.
 
 > **🔒 2026-08-31 — REGLA DEL DUEÑO: los pesos de un run NO se guardan por defecto.**
 > Sólo se conservan —y **sólo ésas puede usar la web app para inferir**— las redes que
