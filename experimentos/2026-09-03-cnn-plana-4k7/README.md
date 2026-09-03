@@ -260,12 +260,79 @@ escala ✅** (0,300 contra 0,037, o sea 8,2×). El nivel sí nace de la media de
 casi uniforme, así que la segunda era correcta en el mecanismo — la descarté comparando
 `|suma|/L2` contra su máximo teórico, cuando lo que decide es nivel **contra rizo**.
 
+### ⚠⚠ Y esto PUEDE estar afectando a las redes ya entrenadas — medido en producción
+
+Pedido por el dueño el 2026-09-03. La pregunta no es si el anillo se ve, sino **si importa para
+las redes que ya están entrenadas**. Medido sobre **`fov16-mask-p20`**, la red foveada entrenada
+(62 épocas, f1 0,954), sobre las mismas 10 ventanas y cambiando **sólo** el relleno de sus
+convoluciones (`nn/contaminacion_produccion.py`):
+
+| rama | celdas cuya salida cambia | \|cambio\| medio | ...y en las celdas afectadas |
+|---|---:|---:|---:|
+| centro | 97 / 400 — **24 %** | 4,0 % de la escala | **16 %** |
+| **periferia** | 256 / 400 — **64 %** | 22,3 % de la escala | **35 %** |
+
+**El 64 % del mapa de la periferia depende de con qué se rellena el borde.** No es un efecto de
+un píxel: con 4 capas de 3×3 la contaminación entra 4 px por lado, y `20² − 12² = 256` celdas de
+400 quedan dentro de ese anillo. En el centro entra menos porque su máscara ya lo recorta.
+
+#### El mecanismo, y por qué es una pérdida real y no sólo un artefacto
+
+La vista 20×20 es un **recorte de una imagen más grande**. Para una ventana que no esté pegada al
+borde de la imagen, **los píxeles vecinos EXISTEN**: `build_view` los tiene disponibles y
+`pad_mode: edge` los usaría. Pero `nn.Conv2d(..., padding=p)` no los pide: rellena con **ceros**.
+
+O sea que en el anillo la red **sustituye contexto real por «no hay tinta»**, que es exactamente
+la regla falsa que la decisión C10 del proyecto prohíbe:
+
+> *decisión C10: never plain zeros — zero means "no ink" and teaches a false rule*
+> — `fv/fovea/__init__.py:603`
+
+La vista respeta C10; la convolución no. Es la misma decisión tomada dos veces con criterios
+opuestos, un nivel más adentro — el patrón que este proyecto ya tiene anotado.
+
+#### ⚠ Lo que este número NO dice, y es importante
+
+**Que la red sea SENSIBLE a la elección no significa que la elección le haya HECHO DAÑO.**
+`fov16-mask-p20` se **entrenó** con relleno de ceros, así que ha aprendido a convivir con él;
+cambiárselo al inferir la rompe, y eso es lo único que mide la tabla de arriba. La pregunta de
+verdad —*«¿habría salido mejor entrenada con `replicate`?»*— **no está medida, y no se puede
+responder sin correr el control.**
+
+Hay un argumento en contra de que importe, y hay que ponerlo: el artefacto es **idéntico en todas
+las ventanas** (siempre es el borde de la vista), así que la cabeza —una `Linear` sobre las 12.800
+features— puede aprender a descontarlo. Lo que cuesta seguro es **capacidad**: 256 de 400 celdas
+de la periferia llevan una señal que en parte es el relleno, no la imagen.
+
+⚠ Y **no explica** la caída de recall en el borde de la IMAGEN (0,608 contra 0,939) que motivó
+`mask_channel: coverage`: ese efecto sí depende de dónde esté la ventana, y éste no.
+
+#### Cuatro soluciones, ordenadas por lo que cuestan. NINGUNA implementada
+
+| | qué | coste | qué se rompe |
+|---|---|---|---|
+| **A** | **Medirlo antes de tocar nada.** Un run de control idéntico a `fov16-mask-p20` con `replicate`, y comparar f1 y `val_loss` | **~45 min** *(medido: 43,3 s/época × 62)* | nada |
+| **B** | **`conv_pad_mode` como DATO de la config**, con defecto `zeros` = lo de hoy. Una línea en `_make_branch` (`builder.py:191`) más el campo en `NETWORK_DEFAULTS` | ~1 h de código + tests | nada si el defecto es `zeros`: toda red existente sigue significando lo mismo |
+| **C** | **Cambiar el defecto a `replicate`** | 1 línea | ⚠ **todas** las redes del repo cambian de significado. Los checkpoints siguen cargando —no cambia ni un parámetro— y por eso el fallo sería **silencioso**: las tablas publicadas dejarían de ser reproducibles sin que nada falle |
+| **D** | **Vista con margen y convolución `valid`**: construir la vista con `L·(k//2)` px extra de imagen REAL, convolucionar sin relleno y quedarse con las 20×20 centrales. Es la única que no inventa nada | alto: toca `build_view`, el dataloader, la inferencia y la geometría | ⚠ cambia el tamaño del tensor de entrada; y **no vale para ventanas pegadas al borde de la imagen**, donde el contexto no existe y hay que rellenar igual |
+
+**El orden recomendado es A → B → decidir.** A responde la única pregunta que importa y no rompe
+nada; B es la forma que este repo usa para todo lo demás —el mando es un dato, no un `if`— y deja
+el eje barrible. **C es la trampa**: es la más fácil de escribir y la única cuyo fallo no avisa.
+
+⚠ Y si se hace A, el control tiene que ser **`replicate` en el ENTRENAMIENTO**, no sólo al
+inferir. Cambiar el relleno a una red ya entrenada mide otra cosa —lo de la tabla de arriba— y
+leerlo como «el relleno es malo» sería justo el error que este experimento acaba de cometer con
+las dos primeras hipótesis del anillo.
+
 ## 4. Qué hay aquí
 
 | | |
 |---|---|
 | [`instrucciones/01-encargo.md`](instrucciones/01-encargo.md) | el encargo tal como llegó (commit `9926bd0b2`) |
 | [`nn/aplicar_kernels.py`](nn/aplicar_kernels.py) | la evaluación: congela el set, aplica los kernels, guarda las 40 imágenes y los montajes |
+| [`nn/porque_el_anillo.py`](nn/porque_el_anillo.py) | separa las tres causas del anillo (máscaras · canal de relleno · padding) |
+| [`nn/contaminacion_produccion.py`](nn/contaminacion_produccion.py) | cuánto del mapa de `fov16-mask-p20` depende del relleno |
 | [`evaluacion/entradas/`](evaluacion/entradas/) | las 10 entradas en PNG: vista y canal de relleno |
 | `evaluacion/stop-*/` | un directorio por stop |
 | los pesos | **fuera de git**, en `foveal-vision-data/2026/09-septiembre/runs/plana-4k7-s1/` |
