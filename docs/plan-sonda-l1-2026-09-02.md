@@ -276,6 +276,29 @@ no se eligió después.
 
 **Éxito** = alguna configuración pasa **las dos** en `conc_orient` **o** en Gabor, con
 `r2_rec_int ≥ 0,80` y **cero kernels muertos**.
+
+#### Qué puede detectar cada prueba, medido (2026-09-02, K=16)
+
+Las dos condiciones son complementarias, y esta tabla dice por qué hacen falta **las dos**:
+
+| `k` | nulo Gabor | p95(mediana de 16) | **Δ absoluto mínimo para pasar** | ...y eso es, del margen |
+|---:|---:|---:|---:|---:|
+| **3** | 0,888 | 0,928 | **0,0402** | **35,7 %** |
+| 5 | 0,523 | 0,553 | 0,0296 | 6,2 % |
+| 7 | 0,327 | 0,351 | 0,0237 | 3,5 % |
+| 9 | 0,226 | 0,240 | **0,0141** | **1,8 %** |
+
+⚠ **Lo contrario de lo que se esperaba, y por eso está medido.** Parecía que en 3×3, con el nulo
+pegado al techo, la prueba se volvería hipersensible y dispararía con cualquier ruido. Es al
+revés: **en k=3 es la MÁS estricta de las cuatro**. Con sólo 9 números por kernel la calidad del
+ajuste varía mucho entre kernels aleatorios, así que la distribución del nulo es **ancha** en
+términos absolutos (0,0402 contra 0,0141 en k=9) y pasar exige el **35,7 % del margen**.
+
+**La consecuencia para leer la tabla:** la prueba del p95 es un test al 5 % en los cuatro `k`
+—eso es lo que la hace correcta— pero el **tamaño de efecto** que detecta va de 1,8 % a 35,7 %
+del margen. O sea que en k=9 dispararía con efectos triviales, y por eso **la condición de
+magnitud (`Δ/(1−nulo) ≥ 0,40`) no es redundante**: es la que impide leer un 1,8 % como hallazgo.
+Y en k=3 pasar la prueba ya implica un efecto grande de por sí.
 **Fracaso** = ninguna pasa la prueba en ninguna de las tres métricas de forma. Es un resultado
 válido: la reconstrucción tampoco produce filtros genéricos en este dominio.
 
