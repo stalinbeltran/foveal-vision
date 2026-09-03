@@ -62,10 +62,15 @@ def _val_pass(m: L1Probe, val: torch.Tensor, var: float, batch: int) -> tuple[fl
     return err / n / var, act / n
 
 
-def train(data: dict, channels: int, k: int, lam: float, seed: int,
-          epochs: int, batch: int, lr: float, out_dir: Path | None = None,
-          val_log: int = 4096, verbose: bool = True, gabor_steps: int = 400) -> dict:
-    """Train one probe and return its final metrics.
+def fit(data: dict, channels: int, k: int, lam: float, seed: int,
+        epochs: int, batch: int, lr: float, out_dir: Path | None = None,
+        val_log: int = 4096, verbose: bool = True,
+        name: str | None = None) -> tuple[L1Probe, list[dict], dict]:
+    """The training loop alone: returns the model and its per-epoch curve.
+
+    Split out from `train` so that `fv.probe.calibrate` can reuse it without a
+    second copy of the loop. Two copies of a loop whose invariant is "renormalise
+    after EVERY step" is exactly the shape of a silent divergence.
 
     `val_log` subsamples validation for the PER-EPOCH line of `metrics.jsonl`
     (a full 28,000-window pass every epoch is ~11 % overhead for a curve nobody
@@ -82,7 +87,7 @@ def train(data: dict, channels: int, k: int, lam: float, seed: int,
     opt = torch.optim.Adam(m.parameters(), lr=lr)
     g = torch.Generator().manual_seed(seed)
 
-    name = f"{run_name(channels, k, lam)}-s{seed}"
+    name = name or f"{run_name(channels, k, lam)}-s{seed}"
     lines: list[dict] = []
     jsonl = None
     if out_dir is not None:
@@ -128,11 +133,23 @@ def train(data: dict, channels: int, k: int, lam: float, seed: int,
                   f"({time.time()-t0:.0f} s)")
     if jsonl is not None:
         jsonl.close()
+    return m, lines, {"salida": out_dir, "segundos": time.time() - t0, "nombre": name}
 
-    r = final_metrics(m, va, var, lam, gabor_steps=gabor_steps)
+
+def train(data: dict, channels: int, k: int, lam: float, seed: int,
+          epochs: int, batch: int, lr: float, out_dir: Path | None = None,
+          val_log: int = 4096, verbose: bool = True, gabor_steps: int = 400,
+          name: str | None = None, extra: dict | None = None) -> dict:
+    """One full run: train, measure the eight metrics, leave the artefacts."""
+    m, lines, meta = fit(data, channels, k, lam, seed, epochs, batch, lr,
+                         out_dir=out_dir, val_log=val_log, verbose=verbose, name=name)
+    va = torch.from_numpy(data["val"])
+    out_dir, name = meta["salida"], meta["nombre"]
+
+    r = final_metrics(m, va, data["var"], lam, gabor_steps=gabor_steps)
     r.update(nombre=name, K=channels, k=k, semilla=seed, epocas=epochs,
              params=sum(p.numel() for p in m.parameters()),
-             segundos=round(time.time() - t0, 1))
+             segundos=round(meta["segundos"], 1), **(extra or {}))
 
     if out_dir is not None:
         torch.save({"state_dict": m.state_dict(), "K": channels, "k": k},

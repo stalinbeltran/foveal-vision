@@ -482,3 +482,185 @@ def test_el_freno_del_coordinador_conoce_la_sonda():
     trabajos = [l for l in freno.read_text().splitlines() if l.startswith("const TRABAJOS")]
     assert trabajos, "cerrable.mjs ya no declara TRABAJOS"
     assert "sonda_l1" in trabajos[0]
+
+
+# ============================================================================
+# 9. La revision del dueno del 2026-09-02
+# ============================================================================
+#
+# Cinco cosas que cambiaron el estudio, y las cinco romperian en SILENCIO:
+# el criterio dejaria de ser comparable entre `k`, o una celda usaria un lambda
+# de dos millones, o `enriq` seguiria leyendose como si significase lo mismo.
+
+from fv.probe import calibrate as probe_cal            # noqa: E402
+from fv.probe import spectrum as probe_spec            # noqa: E402
+
+
+# --------------------------------- 9a. el criterio, comparable entre k
+
+def test_un_umbral_ABSOLUTO_es_tres_exigencias_distintas():
+    """La razon de existir de `gabor_delta_rel`, en numeros MEDIDOS.
+
+    Con los nulos de cada k, un 0,25 absoluto pide explicar el 52 % del margen
+    alcanzable en k=5 y el 32 % en k=9. Si alguien vuelve a poner un umbral
+    absoluto, este test dice por que no.
+    """
+    exigencia = {}
+    for k in (5, 7, 9):
+        nulo = float(probe_gabor.random_baseline_r2(k, 64).median())
+        exigencia[k] = 0.25 / (1.0 - nulo)
+    assert exigencia[5] > 0.50 and exigencia[9] < 0.35
+    assert exigencia[5] > exigencia[7] > exigencia[9]
+
+
+def test_gabor_delta_rel_normaliza_por_el_margen_alcanzable():
+    m = L1Probe(channels=4, k=7)
+    r = probe_metrics.final_metrics(m, torch.randn(8, 1, 20, 20), var=1.0,
+                                    lam=0.0, gabor_steps=40)
+    esperado = r["gabor_delta"] / (1.0 - r["gabor_r2_base"])
+    assert r["gabor_delta_rel"] == pytest.approx(esperado, rel=1e-6)
+
+
+def test_el_p95_es_el_de_la_MEDIANA_de_K_no_el_de_un_kernel_suelto():
+    """El estadistico que se compara es una mediana de K, asi que el nulo tiene
+    que ser la distribucion de esa mediana. Con el p95 de valores sueltos la
+    prueba seria mucho mas laxa de lo que aparenta, y con mas K se estrecha."""
+    g = torch.Generator().manual_seed(1)
+    nulos = torch.rand(400, generator=g)
+    p95_suelto = float(nulos.quantile(0.95))
+    p95_8, p95_64 = probe_spec.bootstrap_p95(nulos, 8), probe_spec.bootstrap_p95(nulos, 64)
+    mediana = float(nulos.median())
+    assert mediana < p95_64 < p95_8 < p95_suelto
+
+
+# --------------------------------- 9b. por que `enriq` dejo de significar
+
+def test_la_base_clasica_es_de_BAJA_frecuencia_y_por_eso_enriq_se_hunde():
+    """El mecanismo del hallazgo del dueno, fijado.
+
+    `classic_basis` construye los filtros a k>3 con suavizado binomial: son
+    plantillas de baja frecuencia. La normalizacion de contraste del §2 quita DC
+    y las bajas frecuencias de la ENTRADA, asi que los kernels aprendidos viven
+    en alta frecuencia y salen casi ortogonales a esa base -- `enriq` 0,47-0,61,
+    por DEBAJO de su nulo de 1,0 (medido 2026-09-02; sin normalizar vuelve a 1,01).
+
+    Si alguien cambia la base y este test falla, es que la lectura de la
+    metrica 5 ha cambiado y hay que revisarla, no silenciarlo.
+    """
+    for k in (5, 7, 9):
+        B = probe_metrics.classic_basis(k)
+        centro_base = float(probe_spec.spectral_metrics(B, k)["frec_central"].median())
+        centro_azar = float(probe_spec.random_spectral_baseline(k, 128)["frec_central"].median())
+        assert centro_base < centro_azar * 0.75, (k, centro_base, centro_azar)
+
+
+# --------------------------------- 9c. las metricas sin plantilla
+
+@pytest.mark.parametrize("k", [5, 7, 9])
+def test_un_gabor_de_verdad_supera_el_nulo_de_orientacion(k):
+    G = torch.stack([_gabor(k, 0.4, 0.25, 0.0, k / 4, k / 3)])
+    m = probe_spec.spectral_metrics(G, k)
+    b = probe_spec.random_spectral_baseline(k, 128)
+    assert float(m["conc_orient"]) > float(b["conc_orient"].median()) * 2
+
+
+def test_la_orientacion_SI_es_legible_en_3x3_donde_el_gabor_no_lo_es():
+    """El hueco que estas metricas vienen a tapar.
+
+    En 3x3 el nulo del ajuste Gabor es 0,879, o sea que el techo de la
+    diferencia es 0,121 y el ancla no se puede juzgar por ahi. El nulo de la
+    orientacion en 3x3 es ~0,24: queda margen de sobra.
+    """
+    nulo_gabor = float(probe_gabor.random_baseline_r2(3, 64).median())
+    nulo_orient = float(probe_spec.random_spectral_baseline(3, 128)["conc_orient"].median())
+    assert 1 - nulo_gabor < 0.20          # el Gabor no deja margen en 3x3...
+    assert 1 - nulo_orient > 0.70         # ...y la orientacion si
+
+
+@pytest.mark.parametrize("k", [3, 5, 9])
+def test_las_metricas_espectrales_estan_acotadas_en_0_1(k):
+    g = torch.Generator().manual_seed(4)
+    m = probe_spec.spectral_metrics(torch.randn(20, k * k, generator=g), k)
+    for n in ("conc_banda", "conc_orient"):
+        assert float(m[n].min()) >= 0.0 and float(m[n].max()) <= 1.0
+
+
+def test_el_relleno_a_ceros_deja_la_MISMA_rejilla_de_frecuencia_en_todo_k():
+    """Sin esto, un bin radial significaria otra frecuencia en cada `k` y las
+    columnas de la tabla no serian comparables -- que es justo lo que estas
+    metricas vienen a arreglar."""
+    centros = [float(probe_spec.random_spectral_baseline(k, 128)["frec_central"].median())
+               for k in (3, 5, 7, 9)]
+    assert max(centros) - min(centros) < 0.01, centros
+
+
+# --------------------------------- 9d. la calibracion de lambda
+
+def _calibrador_falso(mapa):
+    """Sustituye el entrenamiento por una funcion lambda -> activacion."""
+    def fake(data, channels, k, lam, seed, epochs, batch, lr, val_log):
+        return mapa(lam)
+    return fake
+
+
+def test_la_calibracion_encuentra_la_lambda_de_la_banda(monkeypatch):
+    # activacion que baja suave con log(lambda), como la medida
+    mapa = lambda lam: max(0.02, 0.46 - 0.085 * math.log10(max(lam, 1e-6) * 1e3))
+    monkeypatch.setattr(probe_cal, "_activacion", _calibrador_falso(mapa))
+    r = probe_cal.calibrate_lambda({}, 16, 7, verbose=False)
+    assert r["en_banda"] is True
+    assert abs(r["activa_calibrada"] - 0.10) <= 0.03
+    assert r["n_evaluaciones"] <= 7
+
+
+def test_una_celda_que_SATURA_se_declara_en_vez_de_irse_a_lambda_dos_millones(monkeypatch):
+    """Medido en k=3/K=8: la activacion se queda en 14,4 % y no baja mas.
+
+    Sin detectar el suelo, la expansion multiplicaba por 8 hasta λ=2,6e6 --
+    un valor que aplasta la reconstruccion-- por 0,6 puntos de activacion.
+    """
+    mapa = lambda lam: max(0.144, 0.46 - 0.085 * math.log10(max(lam, 1e-6) * 1e3))
+    monkeypatch.setattr(probe_cal, "_activacion", _calibrador_falso(mapa))
+    r = probe_cal.calibrate_lambda({}, 8, 3, verbose=False)
+    assert r["saturado"] is True
+    assert r["en_banda"] is False, "no llega a la banda, y tiene que decirlo"
+    assert r["lambda"] < 1e4, f"λ absurda: {r['lambda']}"
+
+
+def test_entre_lambdas_que_EMPATAN_gana_la_mas_pequena(monkeypatch):
+    """El objetivo es una esparsidad; entre dos λ que la consiguen, la menor
+    distorsiona menos la reconstruccion.
+
+    La curva es la MEDIDA: baja suave y se acerca a un suelo (14,4 % en
+    k=3/K=8), asi que las ultimas evaluaciones empatan y sin esta regla ganaria
+    la mayor -- que fue como salio λ=2,6e6.
+    """
+    mapa = lambda lam: 0.144 + 0.32 / (1 + (max(lam, 1e-9) / 20) ** 0.8)
+    monkeypatch.setattr(probe_cal, "_activacion", _calibrador_falso(mapa))
+    r = probe_cal.calibrate_lambda({}, 8, 3, verbose=False)
+    ev = r["evaluaciones"]
+    cerca = min(abs(e["activa"] - 0.10) for e in ev)
+    empatan = [e["lambda"] for e in ev
+               if abs(e["activa"] - 0.10) <= cerca + probe_cal.EMPATE]
+    assert len(empatan) > 1, "el caso no reproduce el empate que se quiere probar"
+    assert r["lambda"] == min(empatan)
+    assert r["lambda"] < max(e["lambda"] for e in ev), "no se va al extremo"
+
+
+def test_la_calibracion_corre_de_verdad_sobre_datos(tmp_path):
+    """El cableado, no la logica: que `fit` + `_val_pass` se enganchan."""
+    datos = _datos_sinteticos(n_train=128, n_val=64)
+    r = probe_cal.calibrate_lambda(datos, 4, 3, epochs=1, batch=64, val_log=64,
+                                   max_evals=2, verbose=False)
+    assert 0.0 <= r["activa_calibrada"] <= 1.0
+    assert r["n_evaluaciones"] >= 1
+
+
+# --------------------------------- 9e. la tabla lleva el criterio nuevo
+
+def test_la_tabla_encabeza_con_lo_que_decide_y_no_con_el_valor_absoluto():
+    claves = [c[0] for c in COLUMNS]
+    assert claves.index("gabor_delta_rel") < claves.index("gabor_delta"), \
+        "el absoluto no puede ir antes que el normalizado: es lo que se lee primero"
+    for c in ("gabor_supera_p95", "conc_orient_delta", "conc_banda_delta"):
+        assert c in claves, c

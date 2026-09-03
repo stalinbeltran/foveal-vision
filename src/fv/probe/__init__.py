@@ -28,18 +28,25 @@ as an ANCHOR: it is the only arm comparable with the 0.688 already measured on
 `fov16-mask-p20`.
 """
 
+from fv.probe.calibrate import calibrate_lambda
 from fv.probe.data import local_contrast_norm, prepare
 from fv.probe.figures import contact_sheet, code_maps
 from fv.probe.gabor import fit_gabor_r2, random_baseline_r2
 from fv.probe.metrics import classic_basis, final_metrics
 from fv.probe.model import L1Probe
-from fv.probe.run import GRID_CHANNELS, GRID_KS, GRID_KS_ANCHOR, GRID_LAMBDAS, run_name, train
+from fv.probe.run import (GRID_CHANNELS, GRID_KS, GRID_KS_ANCHOR, GRID_LAMBDAS,
+                          fit, run_name, train)
+from fv.probe.spectrum import random_spectral_baseline, spectral_metrics
 from fv.probe.table import comparison_table
 
 __all__ = [
     "L1Probe",
     "local_contrast_norm",
     "prepare",
+    "calibrate_lambda",
+    "fit",
+    "spectral_metrics",
+    "random_spectral_baseline",
     "classic_basis",
     "final_metrics",
     "fit_gabor_r2",

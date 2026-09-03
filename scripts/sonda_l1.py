@@ -50,8 +50,8 @@ import torch                                    # noqa: E402
 from fv import settings                         # noqa: E402
 from fv.models.builder import NETWORK_DEFAULTS  # noqa: E402  (aquí, no en fv.probe)
 from fv.probe import (GRID_CHANNELS, GRID_KS, GRID_KS_ANCHOR, GRID_LAMBDAS,  # noqa: E402
-                      L1Probe, code_maps, comparison_table, contact_sheet,
-                      prepare, run_name, train)
+                      L1Probe, calibrate_lambda, code_maps, comparison_table,
+                      contact_sheet, prepare, run_name, train)
 
 DATASET = "dirty1000-80px-16px-r20260827"
 
@@ -148,6 +148,18 @@ def main() -> int:
     p.add_argument("--rejilla", action="store_true", help="lanza la rejilla completa")
     p.add_argument("--repetir-mejores", type=int, default=0, metavar="N",
                    help="relanza las N mejores (por Gabor D) con --semillas")
+    p.add_argument("--tanteo-k", action="store_true",
+                   help="el eje k a K fijo: k in {3,5,7,9} x lambda in {0, calibrada}. "
+                        "8 runs, ~1,7 h. Es el eje que lleva la premisa del encargo")
+    p.add_argument("--canales", type=int, default=16,
+                   help="el K del --tanteo-k (por defecto 16)")
+    p.add_argument("--calibrar", action="store_true",
+                   help="lambda se CALIBRA por celda hasta la banda de activacion, "
+                        "en vez de tomarse de la rejilla")
+    p.add_argument("--objetivo-activa", type=float, default=0.10)
+    p.add_argument("--tolerancia-activa", type=float, default=0.03)
+    p.add_argument("--limite-calibrar", type=int, default=8000,
+                   help="ventanas para la biseccion (los runs usan el train entero)")
     p.add_argument("--tabla", action="store_true",
                    help="rehace tabla.md/tabla.csv desde los runs en disco")
     p.add_argument("--figuras", action="store_true",
@@ -165,13 +177,14 @@ def main() -> int:
     semillas = [int(s) for s in a.semillas.split(",")]
 
     # --- lo que NO entrena: se contesta sin tocar los datos pesados
-    if a.tabla and not (a.rejilla or a.solo or a.repetir_mejores or a.cronometrar):
+    hace_runs = a.rejilla or a.solo or a.repetir_mejores or a.cronometrar or a.tanteo_k
+    if a.tabla and not hace_runs:
         _tabla(salida, _leer_runs(salida))
         return 0
 
     datos = prepare(a.dataset, dict(NETWORK_DEFAULTS), a.sigma, a.eps, cache, a.limite)
 
-    if a.figuras and not (a.rejilla or a.solo or a.repetir_mejores or a.cronometrar):
+    if a.figuras and not hace_runs:
         filas = _leer_runs(salida)
         for f in filas:
             _hoja(salida, f)
@@ -198,6 +211,13 @@ def main() -> int:
         print(json.dumps(r, indent=2, ensure_ascii=False))
         return 0
 
+    if a.tanteo_k:
+        # Punto 3 de la revision del dueno: el tanteo cubria UN punto del eje k,
+        # y el eje k es la premisa entera del experimento. Ocho runs antes de las
+        # 12-15 h de la rejilla.
+        combos = [(a.canales, k, 0.0) for k in (GRID_KS_ANCHOR + GRID_KS)]
+        a.calibrar = True
+
     if a.repetir_mejores:
         previos = _leer_runs(salida)
         if not previos:
@@ -212,30 +232,60 @@ def main() -> int:
         elegidas = [n for n, _ in rank[:a.repetir_mejores]]
         print(f"[mejores] por Gabor D: {', '.join(elegidas)}")
         combos = [c for c in _combos(True) if run_name(c[0], c[1], c[2]) in elegidas]
-    elif not (a.rejilla or a.solo):
-        p.error("elige --cronometrar, --rejilla, --solo, --repetir-mejores, "
-                "--tabla o --figuras")
+    elif not (a.rejilla or a.solo or a.tanteo_k):
+        p.error("elige --cronometrar, --tanteo-k, --rejilla, --solo, "
+                "--repetir-mejores, --tabla o --figuras")
 
     salida.mkdir(parents=True, exist_ok=True)
+    # La bisección corre sobre un subconjunto: son 2 épocas x 5-6 evaluaciones y
+    # lo que se busca es el ORDEN de λ, no su cuarta cifra. Los runs de verdad
+    # usan el train entero -- `--limite` es una variable de confusión JUSTO sobre
+    # la métrica principal (menos ventanas -> kernels más ruidosos -> el ajuste
+    # Gabor baja), así que sesga hacia el fracaso.
+    dcal = datos
+    if a.calibrar and a.limite_calibrar < datos["train"].shape[0]:
+        gsub = torch.Generator().manual_seed(0)
+        sub = torch.randperm(datos["train"].shape[0], generator=gsub)[:a.limite_calibrar]
+        dcal = dict(datos, train=datos["train"][sub.numpy()])
+
     t0 = time.time()
     for idx, (K, k, lam) in enumerate(combos, 1):
+        extra = {}
+        if a.calibrar:
+            print(f"\n[{idx}/{len(combos)}] calibrando λ para k={k} K={K}...")
+            cal = calibrate_lambda(dcal, K, k, seed=semillas[0],
+                                   objetivo=a.objetivo_activa,
+                                   tolerancia=a.tolerancia_activa,
+                                   val_log=a.val_log)
+            extra = {"calibracion": cal}
+            print(f"    → λ={cal['lambda']:.4g}  activa {cal['activa_calibrada']*100:.1f} %"
+                  f"  en_banda={cal['en_banda']}  saturado={cal['saturado']}")
+            if not cal["en_banda"]:
+                print(f"    ⚠ esta celda NO alcanza la banda "
+                      f"{a.objetivo_activa*100:.0f}±{a.tolerancia_activa*100:.0f} %: "
+                      f"se corre igual y queda anotado en summary.json")
         for s in semillas:
-            n = f"{run_name(K, k, lam)}-s{s}"
-            if (salida / n / "summary.json").exists():
-                print(f"\n[{idx}/{len(combos)}] {n}: ya está, se salta")
-                continue
-            print(f"\n[{idx}/{len(combos)}] {n}  ({K*k*k*2+K} parámetros)")
-            r = train(datos, K, k, lam, s, a.epocas, a.lote, a.lr,
-                      out_dir=salida, val_log=a.val_log)
-            r.pop("_curva", None)
-            print(f"    Gabor D {r['gabor_delta']:+.3f} "
-                  f"(R2 {r['gabor_r2']:.3f} vs nulo {r['gabor_r2_base']:.3f})  "
-                  f"enriq {r['enriquecimiento']:.2f}x  "
-                  f"R2rec_int {r['r2_rec_int']:.3f}  "
-                  f"activa {r['frac_activa']*100:.1f}%  "
-                  f"muertos {r['kernels_muertos']}  "
-                  f"cos_max {r['coseno_max']:.2f}")
-            _hoja(salida, r)
+            for lam_run, sufijo in ([(lam, "")] if not a.calibrar
+                                    else [(0.0, "-l0"), (cal["lambda"], "-lcal")]):
+                n = f"k{k}-K{K}{sufijo or f'-l{lam_run}'}-s{s}"
+                if (salida / n / "summary.json").exists():
+                    print(f"[{idx}/{len(combos)}] {n}: ya está, se salta")
+                    continue
+                print(f"[{idx}/{len(combos)}] {n}  ({K*k*k*2+K} parámetros)")
+                r = train(datos, K, k, lam_run, s, a.epocas, a.lote, a.lr,
+                          out_dir=salida, val_log=a.val_log, name=n,
+                          extra=extra if sufijo == "-lcal" else {})
+                r.pop("_curva", None)
+                print(f"    Gabor Δ/margen {r['gabor_delta_rel']:+.3f} "
+                      f"({'SUPERA' if r['gabor_supera_p95'] else 'no supera'} el p95)  "
+                      f"orient {r['conc_orient_delta']:+.3f}"
+                      f"{'*' if r['conc_orient_supera_p95'] else ' '}  "
+                      f"banda {r['conc_banda_delta']:+.3f}"
+                      f"{'*' if r['conc_banda_supera_p95'] else ' '}  "
+                      f"enriq {r['enriquecimiento']:.2f}x  "
+                      f"R2rec_int {r['r2_rec_int']:.3f}  "
+                      f"activa {r['frac_activa']*100:.1f}%")
+                _hoja(salida, r)
 
     filas = _leer_runs(salida)
     (salida / "resumen.json").write_text(json.dumps(

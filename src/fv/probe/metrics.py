@@ -27,6 +27,8 @@ import torch
 
 from fv.probe.gabor import fit_gabor_r2, random_baseline_r2
 from fv.probe.model import L1Probe
+from fv.probe.spectrum import (bootstrap_p95, random_spectral_baseline,
+                               spectral_metrics)
 
 # "active in < 0.1 % of positions", straight from section 5.3 of the brief.
 DEAD_KERNEL_FRAC = 1e-3
@@ -126,6 +128,24 @@ def final_metrics(m: L1Probe, val: torch.Tensor, var: float, lam: float,
     gab, gab_base = float(g_run.median()), float(g_base.median())
     gab_base_K = float(g_base[:K].median())
 
+    # -- 4b. The criterion the owner asked for on 2026-09-02, because an
+    #        ABSOLUTE threshold is three different demands along the k axis: with
+    #        the measured nulls, 0.25 is 52 % of the available margin at k=5,
+    #        38 % at k=7 and 32 % at k=9.
+    #
+    #        `gabor_p95` is the p95 of the median of K RANDOM kernels (bootstrap),
+    #        so "median > p95" is a one-sided 5 % test with no units.
+    #        `gabor_delta_rel` = delta / (1 - null) puts the magnitude on the
+    #        scale of what is REACHABLE at that k, which is the comparable one.
+    gab_p95 = bootstrap_p95(g_base, K)
+    margen = max(1.0 - gab_base, 1e-9)
+
+    # -- 4c. Two template-free metrics (`fv.probe.spectrum`). They exist because
+    #        metric 5 stops meaning the same thing once the input is contrast
+    #        normalised -- measured, see that module.
+    esp = spectral_metrics(W, k)
+    esp_base = random_spectral_baseline(k, n_base)
+
     # -- 1, 2, 3. over the whole validation split
     err, err_int, act, n = 0.0, 0.0, None, 0
     edge = k // 2
@@ -155,14 +175,29 @@ def final_metrics(m: L1Probe, val: torch.Tensor, var: float, lam: float,
         # 3
         "kernels_muertos": int((act < DEAD_KERNEL_FRAC).sum()),
         "umbral_muerto": DEAD_KERNEL_FRAC,
-        # 4 -- the main one. `gabor_delta` is what the criterion reads.
+        # 4 -- the main one. `gabor_delta_rel` and `gabor_supera_p95` are what
+        #      the criterion reads; `gabor_delta` is kept because it is what the
+        #      brief names, and it is NOT comparable across k on its own.
         "gabor_r2": gab,
         "gabor_r2_base": gab_base,
         "gabor_r2_base_K": gab_base_K,
         "gabor_r2_base_n": n_base,
         "gabor_delta": gab - gab_base,
+        "gabor_delta_rel": (gab - gab_base) / margen,
+        "gabor_p95": gab_p95,
+        "gabor_supera_p95": bool(gab > gab_p95),
         "gabor_r2_max": float(g_run.max()),
         "gabor_r2_min": float(g_run.min()),
+        # 4c -- sin plantillas, y por eso sobreviven a la normalizacion
+        **{f"{n}{suf}": v for n in ("conc_banda", "conc_orient")
+           for suf, v in (
+               ("", float(esp[n].median())),
+               ("_base", float(esp_base[n].median())),
+               ("_delta", float(esp[n].median() - esp_base[n].median())),
+               ("_p95", bootstrap_p95(esp_base[n], K)),
+               ("_supera_p95", bool(float(esp[n].median()) > bootstrap_p95(esp_base[n], K))))},
+        "frec_central": float(esp["frec_central"].median()),
+        "frec_central_base": float(esp_base["frec_central"].median()),
         # 5
         "energia_6d": float(energy.mean()),
         "energia_6d_sd": float(energy.std()),

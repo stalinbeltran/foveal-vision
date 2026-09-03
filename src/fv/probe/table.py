@@ -21,11 +21,17 @@ COLUMNS = [
     ("K", "K"),
     ("lambda", "lam"),
     ("n", "n"),
-    ("gabor_delta", "[4] Gabor D"),
-    ("gabor_r2", "  R2"),
+    # -- el criterio, en el orden en que se lee (revision del dueno 2026-09-02)
+    ("gabor_delta_rel", "[4] GaborD/margen"),
+    ("gabor_supera_p95", "  >p95"),
+    ("conc_orient_delta", "[4c] orient D"),
+    ("conc_orient_supera_p95", "  >p95"),
+    ("conc_banda_delta", "[4c] banda D"),
+    ("conc_banda_supera_p95", "  >p95"),
+    # -- la cifra cruda, que NO es comparable entre k por si sola
+    ("gabor_delta", "  Gabor D"),
     ("gabor_r2_base", "  nulo"),
     ("r2_rec_int", "[1] R2 rec int"),
-    ("r2_rec", "  R2 rec"),
     ("frac_activa", "[2] activa %"),
     ("kernels_muertos", "[3] muertos"),
     ("enriquecimiento", "[5] enriq x"),
@@ -56,6 +62,8 @@ def _group(rows: list[dict]) -> list[dict]:
 def _fmt(key: str, v) -> str:
     if isinstance(v, str):
         return v
+    if key.endswith("_supera_p95"):
+        return "SI" if v >= 0.999 else ("si" if v > 0 else "no")   # >0 = alguna semilla
     if key in ("k", "K", "n", "kernels_muertos"):
         return f"{v:.0f}" if key != "kernels_muertos" else f"{v:.1f}".rstrip("0").rstrip(".")
     if key == "frac_activa":
@@ -77,13 +85,23 @@ def comparison_table(rows: list[dict], out_md: Path | None = None,
                                        for k, _ in COLUMNS) + " |")
     md = "\n".join(lines)
     legend = (
-        "\n\n**[4] es la metrica principal**: `Gabor D` = R2 del ajuste a Gabor "
-        "menos el de kernels ALEATORIOS del mismo tamano. El valor absoluto no "
-        "significa nada -- un Gabor tiene 7 parametros libres y ajusta ruido "
-        "mejor de lo que uno espera.\n"
-        "**[5] lleva su nulo dentro**: `enriq x` ya es `energia_6d / (6/k2)`, "
-        "que vale 1 cuando el kernel es indistinguible de uno aleatorio. La "
-        "fraccion cruda NO es comparable entre columnas de `k` distinto.\n"
+        "\n\n**El criterio se lee en las seis primeras columnas de metrica**, y "
+        "ninguna es un valor absoluto:\n"
+        "· `GaborD/margen` = (R2 del ajuste - su nulo) / (1 - su nulo). Dividir "
+        "por el margen ALCANZABLE es lo que lo hace comparable entre `k`: con los "
+        "nulos medidos, un 0,25 absoluto es el 52 % del margen en k=5, el 38 % en "
+        "k=7 y el 32 % en k=9, o sea tres exigencias distintas.\n"
+        "· `>p95` = la mediana del run supera el p95 de la mediana de K kernels "
+        "ALEATORIOS (bootstrap). Es la prueba, sin unidades; la magnitud la da la "
+        "columna de al lado.\n"
+        "· `orient D` y `banda D` no dependen de ninguna plantilla, y por eso "
+        "sobreviven a que la entrada este normalizada en contraste -- que es lo "
+        "que rompe a `enriq` (ver `fv/probe/spectrum.py`).\n"
+        "⚠ `Gabor D` en crudo se conserva porque es lo que nombra el encargo, "
+        "pero NO es comparable entre `k` por si solo.\n"
+        "⚠ `enriq x` vale 1 cuando el kernel es indistinguible de uno aleatorio, "
+        "y esta MEDIDO que cae a 0,47-0,61 en toda la sonda por la normalizacion "
+        "de contraste: leelo como diagnostico, no como criterio.\n"
         "**[1] R2 rec int** es la cifra limpia: el anillo exterior de k//2 px lo "
         "reconstruye un decodificador que ve ceros donde el codificador vio "
         "borde replicado (torch no admite `padding_mode` en `ConvTranspose2d`).\n"
