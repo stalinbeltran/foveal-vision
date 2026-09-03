@@ -164,8 +164,29 @@ extrayendo los parámetros ajustados (ciclos de la sinusoide dentro de la envolv
 | aleatorio k=5 | 0,515 | 0,93 | 31 % |
 | aleatorio k=9 | 0,228 | 1,30 | 25 % |
 
-**La sospecha era falsa**: los kernels aprendidos **no** son más degenerados que los aleatorios —
-el de λ=0 lo es la mitad. O sea que el ajuste mejora de verdad.
+**La sospecha parecía falsa** — en k=3 los kernels aprendidos no son más degenerados que los
+aleatorios, el de λ=0 lo es la mitad.
+
+⚠⚠ **CORRECCIÓN (2026-09-03): esa conclusión se midió SÓLO en k=3 y no se sostiene en el resto
+del eje.** Al terminar el tanteo se midió la **anchura** de la envolvente ajustada, que es el
+parámetro que de verdad delata un delta:
+
+| | R² Gabor | σ ajustada | % con σ < 0,5 px |
+|---|---:|---:|---:|
+| k5-**λ0** | 0,813 | **0,56 px** | 25 % |
+| k5-λcal | 0,610 | 1,05 px | 0 % |
+| k7-**λ0** | 0,858 | **0,57 px** | 31 % |
+| k7-λcal | 0,527 | 0,88 px | 0 % |
+| k9-**λ0** | 0,873 | **0,49 px** | **50 %** |
+| k9-λcal | 0,497 | 0,73 px | 0 % |
+| aleatorio k=5 / 7 / 9 | 0,515 / 0,337 / 0,228 | **1,49 / 1,41 / 1,41 px** | 0 / 2 / 0 % |
+
+**La sospecha era CORRECTA; lo que estaba mal era el mecanismo que busqué.** No es «frecuencia
+≈0» (que es lo que miré en k=3, y ahí no pasaba): es la **envolvente al mínimo**. Un Gabor con
+σ ≈ 0,5 px sobre una rejilla de enteros **es un delta**, y ajustar un delta con un delta da R²
+alto sin que haya ningún filtro. La lección para la próxima: al buscar una degeneración hay que
+mirar **todos** los parámetros de la familia, no el que uno sospecha primero — y no extrapolar
+desde el punto del eje donde todo está comprimido.
 
 **Pero la lectura correcta es otra, y es la que importa:** a k=3 el mejor Gabor tiene **0,7
 ciclos dentro de su envolvente**, o sea que apenas oscila. Una «Gabor» de menos de un ciclo es
@@ -496,10 +517,31 @@ Y una quinta cosa que él encontró revisando el código, que resultó ser la m�
 
 ### 6.2 ⏳ ABIERTA: las dos cláusulas del criterio que tiran en direcciones opuestas
 
+⚠⚠ **RETIRADA el 2026-09-03: con los 8 runs, la cláusula SÍ es satisfacible.** Lo escrito abajo
+salía de los tres primeros runs, y dos de ellos eran del brazo λ=0. Con el tanteo completo:
+
+| brazo | muertos | saturados | vivos | activación de los vivos |
+|---|---:|---:|---:|---:|
+| **λ calibrada**, k=5 · 7 · 9 | **0 · 0 · 0** | 0 · 0 · 0 | 16 · 16 · 16 | 6,7 % · 5,1 % · 5,0 % |
+| λ calibrada, k=3 | 3 | 0 | 13 | 9,7 % |
+| λ=0, k=3 · 5 · 7 · 9 | 4 · 7 · 7 · 1 | 7 · 9 · 7 · 9 | 5 · **0** · 2 · 6 | — |
+
+**Tres de los ocho cumplen «cero kernels muertos» Y caen en la banda de activación a la vez.**
+La tensión que describí abajo no existe: la produce el brazo **λ=0**, que no tiene esparsidad
+que la cause. Lo que de verdad falla es la cláusula de **magnitud** (`Δ/(1−nulo) ≥ 0,40`), que
+es el número que el dueño marcó como negociable.
+
+⚠ Y sí queda en pie una cifra de esa tabla: **`k5-K16-λ0` tiene CERO canales vivos** (7 muertos
++ 9 saturados = 16). Ese run no tiene ningún filtro que mirar.
+
+<details>
+<summary>Lo que decía antes de tener los 8 runs (se conserva, no se borra)</summary>
+
 **Pendiente de decisión suya, y sale de medir (§3.7), no de opinar.** El encargo pide para el
 éxito, a la vez, **activación 5-15 %** y **cero kernels muertos**. Bajar la activación con L1
 **mata unidades** — es el mecanismo de la L1 — así que las dos cláusulas se estorban. En los
 tres primeros runs mueren 4, 3 y 7 de 16, así que **tal cual, nada puede pasar**.
+</details>
 
 Tres salidas, sin recomendación todavía porque faltan k=7 y k=9:
 
@@ -507,9 +549,8 @@ Tres salidas, sin recomendación todavía porque faltan k=7 y k=9:
    unidades y sigue rechazando el caso degenerado.
 2. **Contarlo sobre los canales VIVOS**: pedir que los vivos estén en banda y reportar el K
    efectivo aparte. Es lo que de verdad se quiere saber — *«¿cuántos filtros útiles salen?»*.
-3. **Dejarlo literal** y aceptar que el veredicto sea «fracaso» por esta cláusula. Es una opción
-   legítima, pero entonces hay que decir en el reporte que el fracaso es por ahí y no por la
-   forma de los kernels.
+3. **Dejarlo literal.** ⚠ Con los 8 runs esta salida ya **no cambia el veredicto**: el brazo
+   calibrado cumple la cláusula, así que no es por ahí por donde se cae.
 
 
 ### 6.1 Una cosa suya que NO se aplicó, y por qué
@@ -549,3 +590,79 @@ con la receta `plan40` y comparar contra el **f1 0,954** y el error de posición
 ⚠ **La fase 2 no está implementada**, y es deliberado: depende de qué `k` y `K` gane, y escribir
 hoy el cableado de una geometría que aún no se conoce es escribir la mitad que habrá que
 rehacer.
+
+---
+
+## 9. RESULTADO del tanteo del eje `k` — 2026-09-03
+
+**Corrido el 2026-09-03 02:33 → 04:40 UTC, 8 runs, 2,1 h, 0 máquinas alquiladas, 0 $** (el coste
+es reloj de este droplet). Dataset `dirty1000-80px-16px-r20260827`, K=16, 30 épocas, train
+entero, semilla 1. Artefactos en `foveal-vision-data/sondas/l1/`.
+
+### 9.1 La tabla
+
+| run | λ | Gabor Δ/m | p95 | orient Δ/m | p95 | banda Δ/m | p95 | R² rec int | vivos | muertos | saturados |
+|---|---:|---:|:--:|---:|:--:|---:|:--:|---:|---:|---:|---:|
+| k3 λ0 | 0 | **+0,651** | ✓ | −0,029 | · | −0,083 | · | 1,000 | 5 | 4 | 7 |
+| k3 λcal | 28,3 | +0,360 | ✓ | −0,025 | · | +0,006 | · | 0,883 | 13 | 3 | 0 |
+| k5 λ0 | 0 | **+0,615** | ✓ | +0,183 | ✓ | −0,018 | · | 1,000 | **0** | 7 | 9 |
+| k5 λcal | 28,3 | +0,197 | ✓ | +0,056 | ✓ | +0,006 | · | 0,875 | 16 | **0** | 0 |
+| k7 λ0 | 0 | **+0,786** | ✓ | +0,067 | ✓ | −0,005 | · | 1,000 | 2 | 7 | 7 |
+| k7 λcal | 28,3 | +0,287 | ✓ | −0,003 | · | +0,015 | · | 0,883 | 16 | **0** | 0 |
+| k9 λ0 | 0 | **+0,836** | ✓ | +0,036 | · | −0,059 | · | 1,000 | 6 | 1 | 9 |
+| k9 λcal | 28,3 | +0,349 | ✓ | +0,017 | · | +0,049 | ✓ | 0,885 | 16 | **0** | 0 |
+
+### 9.2 Veredicto: **ninguna de las 8 pasa el criterio del §4.2**
+
+Y falla de forma **estructurada**, que es lo informativo:
+
+- **El brazo λ=0 pasa la magnitud del Gabor en los cuatro `k`** (0,615-0,836, subiendo con `k`)
+  **y lo hace con kernels DELTA.** σ ajustada 0,49-0,57 px contra 1,41-1,49 de un kernel
+  aleatorio (§3.3): la envolvente está en el suelo. Es la **solución identidad** —kernel delta →
+  `z` copia de `x` → decodificador delta— y por eso su `R² rec int` es exactamente **1,000** con
+  7-9 canales saturados y 1-7 muertos. En `k5 λ0` **no queda ni un canal vivo**. No son filtros.
+- **El brazo λ calibrada da códigos SANOS** —0 muertos, 0 saturados, 16 vivos, activación
+  5,0-6,7 % en banda— **y su señal de forma es débil**: Gabor Δ/margen 0,197-0,360 y orientación
+  ≤ 0,056, todos por debajo del 0,40. Pasan la **prueba** del p95, no la **magnitud**.
+
+**La respuesta a la pregunta del encargo —*«¿pueden los kernels de L1 aprender filtros genéricos
+cuando sí hay presión?»*— es, con esta evidencia: NO.** Bajo presión real (código disperso y
+sano) los kernels salen **localizados y no orientados**, no Gabors; sin presión, el modelo coge
+el atajo de la identidad.
+
+Y contesta la tercera cláusula del §7 del encargo: **la esparsidad no aportó estructura de
+Gabor.** λ=0 puntúa *más alto*, pero sólo degenerando.
+
+### 9.3 ⚠ Lo que este resultado le debe a las métricas sin plantilla
+
+**Sin `conc_orient` y `conc_banda` este estudio habría dicho lo contrario.** El Gabor supera el
+p95 en **las 8** configuraciones, y con el umbral absoluto del encargo (0,25) los cuatro runs de
+λ=0 lo habrían pasado holgadamente. El veredicto habría sido *«éxito: salen filtros tipo
+Gabor»* — sobre kernels delta. Las métricas espectrales fueron las que dijeron que no, porque un
+delta tiene espectro **plano e isótropo**: ni orientación ni banda.
+
+Fueron una petición del dueño (§6), y son la razón de que el resultado sea legible.
+
+### 9.4 Recomendación: **NO lanzar la rejilla de 12-15 h**
+
+El eje `k` está barrido y el patrón es **idéntico en los cuatro valores**. Variar `K` no cambia
+ni la degeneración del brazo λ=0 ni la debilidad de la señal en el calibrado.
+
+⚠ **Y una ambigüedad de mi propia redacción, que hay que resolver antes de decidir:** el §4.5
+dice *«si ninguna pasa la prueba del §4.2, el estudio se cierra»*, pero el §4.2 tiene **dos**
+condiciones. Con la lectura estricta (prueba **y** magnitud) no pasa ninguna → se cierra. Con la
+laxa (sólo el p95) pasan las 8 → se lanzaría la rejilla entera. **Lo escribí mal**, y la decisión
+es del dueño. Mi lectura: la estricta, porque la laxa la satisfacen kernels delta.
+
+### 9.5 Lo que quedó pendiente
+
+1. **Una sola semilla.** El patrón es consistente en los cuatro `k`, pero nada aquí declara al
+   5 %: haría falta repetir con 3 semillas (~1 h más) si se quiere afirmar y no acotar.
+2. **`K` no se barrió**: todo es K=16. La sobrecompletitud (K=32 con k=9 es 32×) es justo el eje
+   que el encargo asociaba a que emergiera estructura, y no se ha tocado.
+3. **El 0,40 de la magnitud es del dueño y sigue negociable.** Con 0,30 pasarían `k3 λcal` y
+   `k9 λcal`; con 0,20, seis de los ocho. **No se cambia después de mirar.**
+4. **La fase 2 no se ejecuta**: pedía que la fase 1 tuviera éxito.
+5. **El brazo λ=0 merece un control mejor.** «Sin esparsidad» acabó siendo «solución identidad»;
+   para separar *«¿ayuda la esparsidad?»* de *«¿evita el atajo?»* haría falta un control que
+   bloquee la identidad de otra forma (p. ej. atar decodificador y codificador).

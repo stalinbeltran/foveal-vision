@@ -104,6 +104,29 @@ la vigila y la **destruye** no se contaría. Si se va por Vast, **esa línea va 
 
 ## Estado actual — léelo primero
 
+> **✅ 2026-09-03 — SONDA L1, TANTEO DEL EJE `k` CORRIDO: la respuesta es NO.**
+> 8 runs, 02:33→04:40 UTC, **2,1 h, 0 máquinas, 0 $** (el coste es reloj). Veredicto contra el
+> criterio —escrito antes— en el **§9** de
+> [`docs/plan-sonda-l1-2026-09-02.md`](docs/plan-sonda-l1-2026-09-02.md);
+> [reporte #22](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/estudios/2026/09-septiembre/2026-09-03-sonda-l1-tanteo-eje-k.md).
+> 1. **Ninguna de las 8 pasa**, y falla estructurado: con **λ calibrada** el código es sano
+>    (0 muertos, 0 saturados, 16 vivos, activación 5-6,7 %) pero la señal de forma es **débil**
+>    (Gabor Δ/margen 0,197-0,360, orientación ≤0,056, todos bajo el 0,40); con **λ=0** la
+>    magnitud del Gabor se pasa de sobra (0,615-0,836) **pero con kernels DELTA** — σ ajustada
+>    **0,49-0,57 px** contra **1,41-1,49** de uno aleatorio, `R² rec` = **1,000**, 7-9 canales
+>    saturados, y en `k5` **cero canales vivos**. Es la solución identidad, no filtros.
+> 2. ⚠⚠ **Sin las métricas SIN PLANTILLA el estudio habría dicho lo contrario.** El ajuste a
+>    Gabor supera su nulo al 5 % en **las 8** configuraciones, y con el umbral absoluto del
+>    encargo (0,25) los cuatro runs de λ=0 lo habrían pasado holgadamente: *«éxito, salen
+>    Gabors»* sobre deltas. Las desmintió `conc_orient`/`conc_banda`, porque un delta tiene
+>    espectro **plano e isótropo**. **Una métrica con el nulo bien puesto sigue pudiendo ser
+>    engañada por una degeneración de la familia que ajusta**: hay que mirar los PARÁMETROS del
+>    ajuste, no sólo su R².
+> 3. **Recomendación: NO lanzar la rejilla de 12-15 h.** El eje `k` está barrido y el patrón es
+>    idéntico en los cuatro valores. ⚠ Es **1 semilla**: acota, **no declara**.
+>
+> <details><summary>Cómo se llegó aquí (implementación, revisión del dueño y las dos medidas retiradas)</summary>
+>
 > **⏳ 2026-09-02 — SONDA L1: implementada entera y probada; la rejilla NO se ha lanzado.**
 > El encargo ([`instruccioneslargas.md`](instruccioneslargas.md)) pregunta si los kernels de L1
 > podrían aprender filtros genéricos **cuando sí hay presión sobre ellos** — en
@@ -188,6 +211,8 @@ la vigila y la **destruye** no se contaría. Si se va por Vast, **esa línea va 
 > Lo que sí se aplicó entero: **`--limite` es variable de confusión JUSTO sobre la métrica
 > principal** (menos ventanas → kernels más ruidosos → Gabor más bajo), así que sesga hacia el
 > fracaso. El tanteo corre con el train entero.
+>
+> </details>
 
 > **🔒 2026-08-31 — REGLA DEL DUEÑO: los pesos de un run NO se guardan por defecto.**
 > Sólo se conservan —y **sólo ésas puede usar la web app para inferir**— las redes que
