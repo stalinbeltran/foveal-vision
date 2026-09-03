@@ -16,6 +16,20 @@ That is 2 values (`0` = control, `calibrada`) instead of 4 or 5.
 
 THREE THINGS THAT MAKE THIS HONEST
 ----------------------------------
+0. ⚠⚠ **It measures after a fixed number of OPTIMISER STEPS, not epochs.** This
+   is the correction of 2026-09-02, and the first version got it wrong in a way
+   that INVERTED its own conclusion. What settles the activation is steps:
+   measured at k=3/K=16, lambda=80, with the SAME 8,000 windows throughout --
+
+       64 steps -> 24.3 %      256 steps -> 4.3 %      640 steps -> 3.6 %
+
+   ...and the real run (84,000 windows, 329 steps in its first epoch) reached
+   4.1 % at epoch 1 and 1.8 % at epoch 30. So "2 epochs on a small subset" is 64
+   steps, which overestimates the settled activation SIX-fold. The calibration
+   then reported that cell as `saturado=True, en_banda=False` -- "cannot get
+   sparse enough" -- when the truth is the opposite: it ends up far BELOW the
+   band. A calibration whose proxy does not transfer is worse than none, because
+   it makes the sparsity look matched across cells when it is not.
 1. **It bisects in log(lambda)**, because the effect is multiplicative: measured
    on 2026-09-02, going from 0.03 to 3.0 (100x) moved the activation from 44.9 %
    to 22.3 %, and the useful range spans two decades. A linear bisection would
@@ -42,6 +56,13 @@ TOLERANCIA = 0.03        # ...+-3, la banda que pidio el dueno
 
 # Si un x8 en lambda mueve la activacion MENOS que esto, la celda ha tocado su
 # suelo: seguir subiendo solo destruye la reconstruccion. Medido en k=3/K=8.
+# Pasos del optimizador por evaluacion. 256 ya deja la activacion asentada
+# (4,3 % contra 3,6 % con 640, medido), asi que 400 da margen sin pagar de mas.
+# El coste de una evaluacion es `PASOS x coste_de_un_paso` y NO depende de
+# cuantas ventanas haya, asi que se usa el train ENTERO: mas variedad, mismo
+# precio, y el mismo regimen que el run de verdad.
+PASOS = 400
+
 SATURA = 0.01
 # Dos lambdas cuya activacion difiere menos que esto empatan, y entre las que
 # empatan gana la menor.
@@ -49,9 +70,11 @@ EMPATE = 0.01
 
 
 def _activacion(data: dict, channels: int, k: int, lam: float, seed: int,
-                epochs: int, batch: int, lr: float, val_log: int) -> float:
-    m, _, _ = fit(data, channels, k, lam, seed, epochs, batch, lr,
-                  out_dir=None, val_log=val_log, verbose=False)
+                epochs: int, batch: int, lr: float, val_log: int,
+                pasos: int = PASOS) -> float:
+    epocas = max(1, -(-pasos * batch // max(data["train"].shape[0], 1)))
+    m, _, _ = fit(data, channels, k, lam, seed, epocas, batch, lr,
+                  out_dir=None, val_log=val_log, verbose=False, max_steps=pasos)
     va = torch.from_numpy(data["val"])
     _, act = _val_pass(m, va[:val_log], data["var"], batch)
     return act
@@ -60,7 +83,7 @@ def _activacion(data: dict, channels: int, k: int, lam: float, seed: int,
 def calibrate_lambda(data: dict, channels: int, k: int, *, seed: int = 1,
                      objetivo: float = OBJETIVO, tolerancia: float = TOLERANCIA,
                      epochs: int = 2, batch: int = 256, lr: float = 3e-3,
-                     val_log: int = 4096, max_evals: int = 7,
+                     val_log: int = 4096, max_evals: int = 7, pasos: int = PASOS,
                      lam0: float = 10.0, verbose: bool = True) -> dict:
     """Bisect lambda until activation is `objetivo` +- `tolerancia`.
 
@@ -72,7 +95,7 @@ def calibrate_lambda(data: dict, channels: int, k: int, *, seed: int = 1,
     evals: list[dict] = []
 
     def prueba(lam: float) -> float:
-        a = _activacion(data, channels, k, lam, seed, epochs, batch, lr, val_log)
+        a = _activacion(data, channels, k, lam, seed, epochs, batch, lr, val_log, pasos)
         evals.append({"lambda": lam, "activa": a})
         if verbose:
             print(f"    [calibrar k={k} K={channels}] λ={lam:<9.4g} -> activa {a*100:.1f} %")
@@ -83,12 +106,16 @@ def calibrate_lambda(data: dict, channels: int, k: int, *, seed: int = 1,
     #    objetivo. Sin esto, una celda cuyo lambda util caiga fuera del intervalo
     #    inicial devolveria un extremo sin decir que no convergio.
     #
-    # ⚠ Y se para si SATURA. Medido el 2026-09-02 en k=3/K=8: la activacion se
-    #    queda en 14,4 % y no baja mas, asi que la expansion siguio multiplicando
-    #    hasta λ=2,6e6 -- un valor absurdo, que aplasta la reconstruccion, por
-    #    0,6 puntos de activacion frente a λ=640. Hay celdas con SUELO de
-    #    activacion, y una busqueda que no lo detecta convierte "esta celda no
-    #    admite esa esparsidad" en "esta celda usa un λ de dos millones".
+    # ⚠ Y se para si SATURA: si un x8 en lambda casi no mueve la activacion,
+    #    seguir subiendo solo destruye la reconstruccion, y sin este freno la
+    #    expansion se iba a λ=2,6e6 -- un valor absurdo -- por decimas de punto.
+    #
+    #    ⚠⚠ El "suelo de activacion" que motivo este freno (k=3/K=8 clavado en
+    #    14,4 %) resulto ser un ARTEFACTO de medir a 64 pasos, no una propiedad
+    #    de la celda: con el presupuesto de pasos correcto esa misma celda baja
+    #    sin problema. El freno se conserva porque un suelo real es posible y
+    #    porque protege del λ absurdo, pero NO hay ninguna celda medida que
+    #    sature de verdad. Si alguna satura, sospecha primero del presupuesto.
     lo = hi = lam0
     a = prueba(lam0)
     a_lo = a_hi = a
@@ -119,13 +146,22 @@ def calibrate_lambda(data: dict, channels: int, k: int, *, seed: int = 1,
         else:
             hi = med
 
-    # 3. de entre las que empatan en activacion, gana la lambda MAS PEQUENA. El
-    #    objetivo es una esparsidad dada; entre dos lambdas que la consiguen, la
-    #    menor distorsiona menos la reconstruccion. Sin esto, k=3/K=8 devolvia
-    #    2,6e6 en vez de 640 por 0,6 puntos.
-    cerca = min(abs(e["activa"] - objetivo) for e in evals)
-    mejor = min((e for e in evals if abs(e["activa"] - objetivo) <= cerca + EMPATE),
-                key=lambda e: e["lambda"])
+    # 3. de entre las que empatan en activacion, gana la lambda MAS PEQUENA: el
+    #    objetivo es una esparsidad dada, y entre dos lambdas que la consiguen la
+    #    menor distorsiona menos la reconstruccion.
+    #
+    # ⚠ Pero el empate se decide DENTRO de la banda primero. Con `EMPATE` (1
+    #    punto) mas ancho que lo que separa a una candidata en banda de una
+    #    fuera, la regla "la mas pequena" cambiaba una en banda por una fuera:
+    #    medido el 2026-09-02 en k=3/K=16, elegia λ=10 (13,4 %, FUERA) en vez de
+    #    λ=28 (7,5 %, dentro). Un desempate no puede tirar el criterio.
+    dentro = [e for e in evals if abs(e["activa"] - objetivo) <= tolerancia]
+    if dentro:
+        mejor = min(dentro, key=lambda e: e["lambda"])
+    else:
+        cerca = min(abs(e["activa"] - objetivo) for e in evals)
+        mejor = min((e for e in evals if abs(e["activa"] - objetivo) <= cerca + EMPATE),
+                    key=lambda e: e["lambda"])
     return {
         "lambda": mejor["lambda"],
         "activa_calibrada": mejor["activa"],
@@ -135,5 +171,6 @@ def calibrate_lambda(data: dict, channels: int, k: int, *, seed: int = 1,
         "n_evaluaciones": len(evals),
         "objetivo": objetivo,
         "tolerancia": tolerancia,
+        "pasos_por_evaluacion": pasos,
         "segundos_calibracion": round(time.time() - t0, 1),
     }

@@ -65,7 +65,8 @@ def _val_pass(m: L1Probe, val: torch.Tensor, var: float, batch: int) -> tuple[fl
 def fit(data: dict, channels: int, k: int, lam: float, seed: int,
         epochs: int, batch: int, lr: float, out_dir: Path | None = None,
         val_log: int = 4096, verbose: bool = True,
-        name: str | None = None) -> tuple[L1Probe, list[dict], dict]:
+        name: str | None = None, max_steps: int | None = None
+        ) -> tuple[L1Probe, list[dict], dict]:
     """The training loop alone: returns the model and its per-epoch curve.
 
     Split out from `train` so that `fv.probe.calibrate` can reuse it without a
@@ -75,6 +76,10 @@ def fit(data: dict, channels: int, k: int, lam: float, seed: int,
     `val_log` subsamples validation for the PER-EPOCH line of `metrics.jsonl`
     (a full 28,000-window pass every epoch is ~11 % overhead for a curve nobody
     reads at that precision). The FINAL metrics always use the whole split.
+
+    `max_steps` stops after N optimiser steps regardless of `epochs`. It exists
+    for the lambda calibration: what settles the activation is STEPS, not epochs
+    and not dataset size -- measured 2026-09-02, see `fv.probe.calibrate`.
     """
     torch.manual_seed(seed)
     tr = torch.from_numpy(data["train"])
@@ -104,10 +109,15 @@ def fit(data: dict, channels: int, k: int, lam: float, seed: int,
         jsonl = (out_dir / "metrics.jsonl").open("w")
 
     t0 = time.time()
+    pasos = 0
     for ep in range(epochs):
+        if max_steps is not None and pasos >= max_steps:
+            break
         perm = torch.randperm(tr.shape[0], generator=g)
         tot, rec_tot, pen_tot, nb = 0.0, 0.0, 0.0, 0
         for i in range(0, tr.shape[0], batch):
+            if max_steps is not None and pasos >= max_steps:
+                break
             x = tr[perm[i:i + batch]]
             xh, z = m(x)
             rec = ((xh - x) ** 2).mean() / var
@@ -118,7 +128,9 @@ def fit(data: dict, channels: int, k: int, lam: float, seed: int,
             opt.step()
             m.renormalize()             # after EVERY step -- see model.py
             tot += float(loss.detach()); rec_tot += float(rec.detach())
-            pen_tot += float(pen.detach()); nb += 1
+            pen_tot += float(pen.detach()); nb += 1; pasos += 1
+        if nb == 0:
+            break
         v_err, v_act = _val_pass(m, va_log, var, batch)
         fila = {"epoca": ep + 1, "loss": tot / nb, "rec": rec_tot / nb,
                 "pena": pen_tot / nb, "val_err_rec": v_err, "val_frac_activa": v_act,
@@ -133,7 +145,8 @@ def fit(data: dict, channels: int, k: int, lam: float, seed: int,
                   f"({time.time()-t0:.0f} s)")
     if jsonl is not None:
         jsonl.close()
-    return m, lines, {"salida": out_dir, "segundos": time.time() - t0, "nombre": name}
+    return m, lines, {"salida": out_dir, "segundos": time.time() - t0,
+                      "nombre": name, "pasos": pasos}
 
 
 def train(data: dict, channels: int, k: int, lam: float, seed: int,

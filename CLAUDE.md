@@ -156,10 +156,16 @@ la vigila y la **destruye** no se contaría. Si se va por Vast, **esa línea va 
 >    10 % ± 3, y la λ resultante se guarda como dato del run. Su motivo, que yo no había visto:
 >    mi mapa λ→activación salía de **un** punto (k=7, K=16), así que una rejilla fija más el
 >    filtro por banda dejaba celdas enteras sin combinación admisible.
-> 2. ⚠⚠ **Hay celdas con SUELO de activación**, y calibrar es lo que lo enseñó. *Medido*:
->    k=3/K=8 se queda en **14,4 %** y k=3/K=16 en **24,3 %** por mucho que suba λ. En k=3 la
->    banda **no es alcanzable**, y es una propiedad de la celda, no del barrido. Se declara
->    (`saturado`, `en_banda`), nunca se devuelve un número que parezca convergido.
+> 2. ⚠⚠ **Lo que asienta la activación son los PASOS del optimizador, no las épocas ni el
+>    tamaño del dataset** — y medirlo mal invierte la conclusión. La primera calibración
+>    evaluaba con «2 épocas sobre 8.000», o sea **64 pasos**, y *medido con las MISMAS 8.000
+>    ventanas*: 64 pasos → **24,3 %**, 256 → 4,3 %, 640 → 3,6 %; el run real (329 pasos en su
+>    primera época) dio 4,1 %. El proxy **sobreestimaba seis veces**, y por eso declaró k=3
+>    como *«satura, no puede esparcirse»* cuando en realidad se esparce de sobra. Con el
+>    presupuesto correcto (400 pasos) **las cuatro celdas llegan a la banda y ninguna satura**.
+>    ⚠ Si alguna vez una celda «satura», **sospecha primero del presupuesto de pasos**.
+>    La lección: **una calibración cuyo proxy no transfiere es peor que no calibrar**, porque
+>    hace que la esparsidad *parezca* igualada cuando no lo está.
 > 3. **El criterio se normaliza**: manda `Δ > p95 de la mediana de K kernels aleatorios`
 >    (bootstrap, sin unidades) y la magnitud es `Δ/(1−nulo)`. Un 0,25 **absoluto** es el 52 %
 >    del margen alcanzable en k=5 y el 32 % en k=9 — tres exigencias escritas como una.

@@ -311,22 +311,45 @@ justo en el eje que lleva la premisa. Así que se bisecta en log(λ) hasta **act
 `{0 = control, calibrada}`. La esparsidad queda constante entre celdas y el barrido mide lo que
 dice medir.
 
-⚠⚠ **Y calibrar destapó algo que ninguna rejilla habría enseñado: hay celdas con SUELO de
-activación.** *Medido el 2026-09-02:*
+⚠⚠ **Y la calibración se midió MAL la primera vez, de una forma que invirtió su propia
+conclusión.** Queda escrito porque la lección vale más que el número:
 
-| celda | activación mínima alcanzable | ¿llega a 10 % ± 3? |
-|---|---:|---|
-| k=3, K=8 | **14,4 %** | ❌ no, satura |
-| k=3, K=16 | **24,3 %** | ❌ no, satura |
-| k=5, K=16 | 9,2 % (λ=80) | ✅ |
-| k=7, K=16 | 7,0 % (λ=80) | ✅ |
-| k=9, K=16 | 7,0 % (λ=80) | ✅ |
-| k=9, K=32 | 9,4 % (λ=80) | ✅ |
+La primera versión evaluaba cada λ con «2 épocas sobre un subconjunto de 8.000», o sea **64
+pasos del optimizador**. Lo que asienta la activación son los **pasos**, no las épocas ni el
+tamaño del dataset — *medido el 2026-09-02 en k=3/K=16, λ=80, con las MISMAS 8.000 ventanas*:
 
-Por mucho que suba λ, **en k=3 la activación no baja de ahí**. Es una propiedad de la celda, no
-del barrido, y significa que **el ancla no se puede correr con la misma esparsidad que el
-resto**. Se corre igual, y `saturado`/`en_banda` quedan en su `summary.json` para que nadie lo
-lea como si fuera comparable.
+| pasos | 64 | 256 | 640 |
+|---|---:|---:|---:|
+| activación | **24,3 %** | 4,3 % | 3,6 % |
+
+...y el run de verdad (84.000 ventanas, 329 pasos en su primera época) dio **4,1 % en la época 1**
+y 1,8 % en la 30. O sea que el proxy **sobreestimaba la activación asentada seis veces**.
+
+**Lo que eso produjo fue peor que imprecisión: fue la conclusión al revés.** La calibración
+declaró k=3/K=8 y k=3/K=16 como `saturado=True, en_banda=False` — *«esta celda no puede
+esparcirse hasta la banda»* — cuando la verdad es lo contrario: se esparcen de sobra. Con el
+presupuesto de pasos correcto (400, `fv/probe/calibrate.py:PASOS`):
+
+| celda | λ calibrada | activación | ¿en banda? | ¿satura? |
+|---|---:|---:|---|---|
+| k=3, K=8 | 28,3 | **9,6 %** | ✅ | no |
+| k=3, K=16 | 28,3 | **7,5 %** | ✅ | no |
+| k=5, K=16 | 28,3 | 8,7 % | ✅ | no |
+| k=9, K=16 | 28,3 | 8,7 % | ✅ | no |
+
+**No hay ninguna celda medida que sature.** El freno de saturación se conserva —un suelo real es
+posible, y protege del λ absurdo— pero con una nota: si alguna celda satura, **sospecha primero
+del presupuesto de pasos**.
+
+⚠ Y un segundo fallo del mismo día, más pequeño y de la misma familia: el desempate «entre λ que
+empatan gana la menor» usaba una tolerancia (1 punto) **más ancha que la banda misma**, así que
+cambiaba una λ *dentro* de banda por una *fuera* — en k=3/K=16 elegía λ=10 (13,4 %, fuera) en vez
+de λ=28 (7,5 %, dentro). Un desempate no puede tirar el criterio. Ahora se desempata **dentro de
+la banda primero**. Los dos fallos tienen test.
+
+**La lección, que es la que hay que llevarse:** una calibración cuyo proxy **no transfiere** es
+peor que no calibrar, porque hace que la esparsidad *parezca* igualada entre celdas cuando no lo
+está — y ese es exactamente el fallo silencioso que calibrar venía a evitar.
 
 ### 4.4 ⚠ Y el ancla ya no se puede leer por el enriquecimiento
 

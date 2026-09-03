@@ -598,7 +598,7 @@ def test_el_relleno_a_ceros_deja_la_MISMA_rejilla_de_frecuencia_en_todo_k():
 
 def _calibrador_falso(mapa):
     """Sustituye el entrenamiento por una funcion lambda -> activacion."""
-    def fake(data, channels, k, lam, seed, epochs, batch, lr, val_log):
+    def fake(data, channels, k, lam, seed, epochs, batch, lr, val_log, pasos=None):
         return mapa(lam)
     return fake
 
@@ -614,10 +614,13 @@ def test_la_calibracion_encuentra_la_lambda_de_la_banda(monkeypatch):
 
 
 def test_una_celda_que_SATURA_se_declara_en_vez_de_irse_a_lambda_dos_millones(monkeypatch):
-    """Medido en k=3/K=8: la activacion se queda en 14,4 % y no baja mas.
+    """Si la activacion toca un suelo, se DICE en vez de subir lambda sin fin.
 
-    Sin detectar el suelo, la expansion multiplicaba por 8 hasta λ=2,6e6 --
-    un valor que aplasta la reconstruccion-- por 0,6 puntos de activacion.
+    ⚠ El caso que motivo este freno (k=3/K=8 clavado en 14,4 %) resulto ser un
+    ARTEFACTO de medir a 64 pasos: con el presupuesto correcto esa celda baja
+    sin problema y NO hay ninguna celda medida que sature. El freno se conserva
+    porque un suelo real es posible y porque protege del λ=2,6e6, pero el caso
+    de aqui es SINTETICO a proposito -- no se apoya en una medida retirada.
     """
     mapa = lambda lam: max(0.144, 0.46 - 0.085 * math.log10(max(lam, 1e-6) * 1e3))
     monkeypatch.setattr(probe_cal, "_activacion", _calibrador_falso(mapa))
@@ -645,6 +648,43 @@ def test_entre_lambdas_que_EMPATAN_gana_la_mas_pequena(monkeypatch):
     assert len(empatan) > 1, "el caso no reproduce el empate que se quiere probar"
     assert r["lambda"] == min(empatan)
     assert r["lambda"] < max(e["lambda"] for e in ev), "no se va al extremo"
+
+
+def test_el_desempate_NO_cambia_una_lambda_en_banda_por_una_fuera(monkeypatch):
+    """El fallo del 2026-09-02: `EMPATE` (1 punto) es mas ancho que la banda, asi
+    que "gana la menor" elegia λ=10 (13,4 %, FUERA) en vez de λ=28 (7,5 %,
+    dentro). Un desempate no puede tirar el criterio que lo precede."""
+    # a tramos, no por clave exacta: la biseccion produce sqrt(10*80) y comparar
+    # floats por igualdad hacia que el falso devolviera otra cosa
+    mapa = lambda lam: 0.134 if lam <= 15 else (0.075 if lam <= 40 else 0.039)
+    monkeypatch.setattr(probe_cal, "_activacion", _calibrador_falso(mapa))
+    r = probe_cal.calibrate_lambda({}, 16, 3, verbose=False)
+    assert r["en_banda"] is True
+    assert abs(r["activa_calibrada"] - 0.10) <= 0.03
+    assert r["lambda"] != 10.0, "λ=10 esta FUERA de banda: no puede ganar el desempate"
+
+
+def test_la_calibracion_mide_por_PASOS_no_por_epocas(monkeypatch):
+    """Lo que asienta la activacion son los pasos del optimizador. Medir con
+    "2 epocas de un subconjunto" son 64 pasos y sobreestima 6x -- hasta el punto
+    de declarar "satura, no puede esparcirse" una celda que se esparce de sobra."""
+    vistos = {}
+
+    def espia(data, channels, k, lam, seed, epochs, batch, lr, val_log, pasos=None):
+        vistos["pasos"] = pasos
+        return 0.10
+    monkeypatch.setattr(probe_cal, "_activacion", espia)
+    r = probe_cal.calibrate_lambda({}, 16, 5, verbose=False)
+    assert vistos["pasos"] == probe_cal.PASOS >= 256
+    assert r["pasos_por_evaluacion"] == probe_cal.PASOS
+
+
+def test_fit_respeta_un_tope_de_pasos(tmp_path):
+    datos = _datos_sinteticos(n_train=512, n_val=64)
+    _, lineas, meta = probe_cal.fit(datos, 4, 3, 0.1, 1, 50, 64, 3e-3,
+                                    out_dir=None, val_log=64, verbose=False,
+                                    max_steps=5)
+    assert meta["pasos"] == 5, meta
 
 
 def test_la_calibracion_corre_de_verdad_sobre_datos(tmp_path):
