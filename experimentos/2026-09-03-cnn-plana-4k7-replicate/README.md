@@ -79,7 +79,7 @@ porque no hay relleno). Es lo que mide
 | [`nn/avances.sh`](nn/avances.sh) | la cadena de avances a los mismos stops |
 | `evaluacion/stop-*/` | los cinco stops |
 | [`../comun/`](../comun/) | evaluador, set de 10 ventanas y entradas — **compartidos** con los demás |
-| los pesos | **fuera de git**, en `foveal-vision-data/2026/09-septiembre/runs/plana-4k7rep-s1/` |
+| `nn/pesos/` | **los pesos, en git** (`best.pt`, `last.pt` + config, métricas y resumen del run) |
 
 ![entrada y salidas](evaluacion/stop-04-37epocas/entrada-y-salidas.png)
 
@@ -92,3 +92,26 @@ porque no hay relleno). Es lo que mide
    entra 4 px por lado y toca el **64 %** de las celdas de la periferia — mucho más que aquí. Que
    no importe con una capa no dice que no importe con cuatro.
 3. **`reflect` y `circular` no se probaron.** El campo los admite; nadie los ha medido.
+
+---
+
+## Los pesos
+
+**Guardados en `nn/pesos/` por orden del dueño (2026-09-03).** `best.pt` para evaluar, `last.pt`
+para continuar, y con ellos el `config.json`, el `metrics.jsonl` (una línea por época) y el
+`summary.json` del run — o sea el registro completo, no sólo los números.
+
+```bash
+# cargarlos y comprobar que son los que dicen ser
+python experimentos/comun/cargar_pesos.py --exp 2026-09-03-cnn-plana-4k7-replicate
+```
+
+⚠ **Se comprueba que cargan, no sólo que están.** Un `.pt` que no carga es peor que no tenerlo:
+ocupa sitio y parece un respaldo. `cargar_pesos.py` los carga de verdad y contrasta la norma L2
+de sus kernels contra la que quedó escrita en el `resumen.json` del último stop, calculada en su
+momento con el modelo vivo.
+
+⚠ **Y esto es una EXCEPCIÓN a la regla del proyecto**, que dice que los pesos de un run no se
+guardan por defecto y viven sólo en `foveal-vision-data`. Aquí caben: son de 356 KB y el dueño los
+pidió. Siguen estando también en su sitio de siempre,
+`foveal-vision-data/2026/09-septiembre/runs/plana-4k7rep-s1/`.

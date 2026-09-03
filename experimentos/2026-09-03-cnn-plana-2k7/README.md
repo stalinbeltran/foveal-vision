@@ -51,23 +51,33 @@ En el experimento de 4 kernels se observó que **k1 se apagaba** (respuesta 8× 
 apuntó como posible lectura que *«la red está usando la mitad de su primera capa»*, con la idea
 implícita de que 4 kernels pudieran sobrar. **El gemelo dice que no.**
 
-Respuesta media por kernel en cada stop, y el ratio entre el más activo y el menos:
+Respuesta media por kernel en cada stop, medida **en el interior y sin el nivel**
+([`../comun/concentracion.py`](../comun/concentracion.py)), y el ratio entre el más activo y el
+menos:
 
 | stop | 4 kernels | ratio | 2 kernels | ratio |
 |---|---|---:|---|---:|
-| sin entrenar | 0,171 · 0,406 · 0,430 · 0,504 | 2,9× | 0,204 · 0,519 | 2,5× |
-| ép. 3 | 0,339 · 0,222 · 0,303 · 0,459 | **2,1×** | 0,649 · 0,360 | **1,8×** |
-| ép. 11 | 0,686 · 0,154 · 0,420 · 0,962 | 6,2× | 1,094 · 0,240 | 4,6× |
-| ép. 24 | 0,838 · 0,142 · 0,432 · 1,125 | 7,9× | 1,297 · 0,169 | 7,7× |
-| **ép. 37** | 0,811 · 0,147 · 0,436 · 1,096 | **7,5×** | 1,436 · 0,170 | **8,5×** |
+| sin entrenar | 0,016 · 0,028 · 0,022 · 0,024 | 1,8× | 0,016 · 0,028 | 1,8× |
+| ép. 3 | 0,034 · 0,033 · 0,042 · 0,037 | **1,3×** | 0,029 · 0,045 | **1,5×** |
+| ép. 11 | 0,044 · 0,028 · 0,063 · 0,103 | 3,8× | 0,060 · 0,041 | 1,5× |
+| ép. 24 | 0,048 · 0,032 · 0,068 · 0,157 | 4,9× | 0,091 · 0,036 | 2,5× |
+| **ép. 37** | 0,048 · 0,037 · 0,069 · 0,161 | **4,3×** | 0,099 · 0,045 | **2,2×** |
 
-**La concentración pasa igual con 2 kernels que con 4, y acaba en el mismo sitio** (7,5× y 8,5×).
-En los dos, el ratio **baja** al principio —los kernels se reparten— y luego **crece de forma
-monótona** desde la época 3.
+**La concentración pasa también con 2 kernels**, y en los dos el ratio **baja** al principio —los
+kernels se reparten— y luego **crece** desde la época 3. Pero **no llega al mismo sitio**: con 4
+acaba en 4,3× y con 2 en 2,2×.
 
 Así que no es «sobran kernels»: es cómo entrena esta configuración. Y el gemelo añade la prueba
 que faltaba — **con 2 kernels también se concentra, y además rinde peor**. Si el kernel apagado
 fuera capacidad desperdiciada, quitarlo saldría gratis; cuesta 0,10 de f1.
+
+> ⚠ **Esta tabla se corrigió el 2026-09-03.** Antes traía el `abs_media` que guarda cada
+> `resumen.json`, que se calcula sobre el **mapa entero** — y ese mapa está dominado por el anillo
+> del borde, así que el número medía sobre todo *qué kernel hace más anillo*. Con esa medida salía
+> «7,5× y 8,5×, acaba en el mismo sitio», y lo delata el run de `replicate`: **menos anillo y más
+> concentración aparente** (16,6×). Lo que **no** cambia es la conclusión, que no dependía del
+> número. El detalle, en el
+> [§4 de `cnn-plana-2k7-sinpadding`](../2026-09-03-cnn-plana-2k7-sinpadding/README.md).
 
 ![entrada y salidas](evaluacion/stop-04-37epocas/entrada-y-salidas.png)
 
@@ -85,7 +95,7 @@ semillas cuesta ~2,5 h.
 | [`nn/avances.sh`](nn/avances.sh) | la cadena de avances a los mismos stops (3 → 11 → 24 → 37), con su evaluación entre uno y otro |
 | `evaluacion/stop-*/` | los cinco stops: 20 PNG, `mapas.npy`, `resumen.json` y tres figuras cada uno |
 | [`../comun/`](../comun/) | **el evaluador, el set de 10 ventanas y las entradas — compartidos con el gemelo** |
-| los pesos | **fuera de git**, en `foveal-vision-data/2026/09-septiembre/runs/plana-2k7-s1/` |
+| `nn/pesos/` | **los pesos, en git** (`best.pt`, `last.pt` + config, métricas y resumen del run) |
 
 ⚠ **Lo compartido está en `../comun/` a propósito.** Comparar los stops de los dos gemelos sólo
 significa algo si la medida es **la misma**: mismo evaluador, mismas 10 ventanas, mismas
@@ -115,3 +125,26 @@ $E/nn/avances.sh                                    # el resto de stops, ~24 min
 4. **El anillo del borde sigue ahí**, y por el mismo motivo: el relleno de ceros de la
    convolución. Ver [el §3 del gemelo](../2026-09-03-cnn-plana-4k7/README.md), que lo mide y
    propone cuatro salidas — ninguna implementada.
+
+---
+
+## Los pesos
+
+**Guardados en `nn/pesos/` por orden del dueño (2026-09-03).** `best.pt` para evaluar, `last.pt`
+para continuar, y con ellos el `config.json`, el `metrics.jsonl` (una línea por época) y el
+`summary.json` del run — o sea el registro completo, no sólo los números.
+
+```bash
+# cargarlos y comprobar que son los que dicen ser
+python experimentos/comun/cargar_pesos.py --exp 2026-09-03-cnn-plana-2k7
+```
+
+⚠ **Se comprueba que cargan, no sólo que están.** Un `.pt` que no carga es peor que no tenerlo:
+ocupa sitio y parece un respaldo. `cargar_pesos.py` los carga de verdad y contrasta la norma L2
+de sus kernels contra la que quedó escrita en el `resumen.json` del último stop, calculada en su
+momento con el modelo vivo.
+
+⚠ **Y esto es una EXCEPCIÓN a la regla del proyecto**, que dice que los pesos de un run no se
+guardan por defecto y viven sólo en `foveal-vision-data`. Aquí caben: son de 204 KB y el dueño los
+pidió. Siguen estando también en su sitio de siempre,
+`foveal-vision-data/2026/09-septiembre/runs/plana-2k7-s1/`.

@@ -93,10 +93,26 @@ parámetros a la foveada. **El bug de `network_trace` es anterior a este experim
 (`builder.py:338`, commit `5432c9c15`) y **no lo he tocado**: ese número está citado en varios
 sitios y cambiarlo de tapadillo desalinearía la documentación. Queda dicho para que lo decidas.
 
-**Los pesos están en `foveal-vision-data/2026/09-septiembre/runs/plana-4k7-s1/`** (`best.pt` para
-evaluar, `last.pt` para continuar). ⚠ **Sin commitear a propósito**: el encargo dice «guarda los
-pesos localmente… no hace falta commit hasta que yo te indique». Lo que **sí** entra en git son
-las salidas de la evaluación.
+## Los pesos
+
+**Guardados en `nn/pesos/` por orden del dueño (2026-09-03).** `best.pt` para evaluar, `last.pt`
+para continuar, y con ellos el `config.json`, el `metrics.jsonl` (una línea por época) y el
+`summary.json` del run — o sea el registro completo, no sólo los números.
+
+```bash
+# cargarlos y comprobar que son los que dicen ser
+python experimentos/comun/cargar_pesos.py --exp 2026-09-03-cnn-plana-4k7
+```
+
+⚠ **Se comprueba que cargan, no sólo que están.** Un `.pt` que no carga es peor que no tenerlo:
+ocupa sitio y parece un respaldo. `cargar_pesos.py` los carga de verdad y contrasta la norma L2
+de sus kernels contra la que quedó escrita en el `resumen.json` del último stop, calculada en su
+momento con el modelo vivo.
+
+⚠ **Y esto es una EXCEPCIÓN a la regla del proyecto**, que dice que los pesos de un run no se
+guardan por defecto y viven sólo en `foveal-vision-data`. Aquí caben: son de 356 KB y el dueño los
+pidió. Siguen estando también en su sitio de siempre,
+`foveal-vision-data/2026/09-septiembre/runs/plana-4k7-s1/`.
 
 ## 3. La evaluación de este experimento
 
@@ -197,6 +213,17 @@ respuesta no cambia — el reparto es estable. **k3 responde 7,5× más que k1.*
 la red está usando la mitad de su primera capa.
 
 ⚠ Con una semilla y 24 épocas esto **acota, no declara**.
+
+> ⚠⚠ **Y el número está inflado — corregido el 2026-09-03.** La `|respuesta| media` de esta tabla
+> se calcula sobre el **mapa entero**, que está dominado por el anillo del borde (mide 9,43× el
+> interior, §3 más abajo). Medido sólo en el interior y sin el nivel
+> ([`../comun/concentracion.py`](../comun/concentracion.py)), el reparto de la época 37 es
+> **0,048 · 0,037 · 0,069 · 0,161** y k3 responde **4,3×** más que k1, no 7,5×. Lo delata el run
+> de [`replicate`](../2026-09-03-cnn-plana-4k7-replicate/): tiene **menos** anillo y sale con
+> **más** concentración aparente (16,6×) — un número que se mueve al revés que el mecanismo que
+> dice medir. La lectura de fondo aguanta (el reparto es desigual, estable, y **quitar kernels
+> cuesta 0,10 de f1**); el factor, no. Detalle en el
+> [§4 de `cnn-plana-2k7-sinpadding`](../2026-09-03-cnn-plana-2k7-sinpadding/README.md).
 
 ⚠ **Hay DOS montajes, y el crudo engaña.** `montaje.png` es la salida tal cual y sale como
 placas planas de color. No es un fallo del pintado: está **medido** que el nivel constante de

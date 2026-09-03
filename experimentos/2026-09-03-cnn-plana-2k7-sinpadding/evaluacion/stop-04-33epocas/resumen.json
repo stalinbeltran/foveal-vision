@@ -1,0 +1,37 @@
+{
+  "stop": "04-33epocas",
+  "modelo": "plana-2k7sp-s1 · epoca 33",
+  "run": "plana-2k7sp-s1",
+  "n_kernels": 2,
+  "n_entradas": 10,
+  "vmax_comun": 0.7430298328399658,
+  "kernels": {
+    "forma": [
+      2,
+      2,
+      7,
+      7
+    ],
+    "norma_l2": [
+      1.02253,
+      1.13853
+    ]
+  },
+  "respuesta_por_kernel": {
+    "kernel0": {
+      "abs_media": 0.14414,
+      "abs_max": 0.63687,
+      "aporte_vista": 0.54075,
+      "aporte_relleno": 0.0169,
+      "frac_vista": 0.9697
+    },
+    "kernel1": {
+      "abs_media": 0.18062,
+      "abs_max": 0.74303,
+      "aporte_vista": 0.44787,
+      "aporte_relleno": 0.03019,
+      "frac_vista": 0.9369
+    }
+  },
+  "nota": "paro solo por patience en la epoca 33 de las 37 pedidas; la mejor fue la 23"
+}
