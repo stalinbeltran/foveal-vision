@@ -109,16 +109,33 @@ delante al leer los mapas: **5 de las 10 ventanas tocan el borde de la imagen** 
 la #9, que toca dos a la vez). En esas, parte de lo que responde el kernel es relleno, no imagen.
 
 Cada stop trae **40 PNG** (`entradaNN-kernelJ.png`), `mapas.npy` con los valores crudos,
-`resumen.json` y dos montajes.
+`resumen.json` y **tres** figuras:
+
+| figura | para qué |
+|---|---|
+| **`entrada-y-salidas.png`** | **la de revisar**: una columna por entrada y una fila por kernel, como `entradas.png`. «Qué hace el kernel 2 en las diez» se lee recorriendo **una** fila |
+| `montaje.png` | la salida **cruda**, entradas en filas. ⚠ Sale como placas planas de color: ver el aviso de abajo |
+| `montaje-sin-nivel.png` | lo mismo que el montaje, con la mediana de cada mapa restada |
+
+⚠ **Un stop es una foto en el tiempo, y `--run` lee siempre `last.pt`.** Volver a correr la
+etiqueta de un stop viejo después de seguir entrenando lo **reescribe con los pesos de hoy**.
+Pasó el 2026-09-03 al añadir la tira: `stop-01-3epocas` quedó con los pesos de la época 11
+—montaje y tira idénticos a los del `stop-02`— y sólo se notó porque dos ficheros tenían
+exactamente el mismo tamaño. Se recuperó de git. Ahora:
+
+- el script **se niega** si la etiqueta del stop ya existe con otro modelo (hace falta `--rehacer`);
+- **`--solo-figuras`** rehace las figuras de un stop viejo **desde su `mapas.npy`**, sin tocar la
+  red. El artefacto de registro de un stop es su `mapas.npy`; las figuras son **derivadas**.
 
 ```bash
-python nn/aplicar_kernels.py --stop 00-sin-entrenar               # red sin entrenar
-python nn/aplicar_kernels.py --stop 02-Nepocas --run plana-4k7-s1  # tras el siguiente avance
+python nn/aplicar_kernels.py --stop 00-sin-entrenar                # red sin entrenar
+python nn/aplicar_kernels.py --stop 03-Nepocas --run plana-4k7-s1  # tras el siguiente avance
+python nn/aplicar_kernels.py --stop 01-3epocas --solo-figuras      # rehacer figuras de un stop viejo
 ```
 
 ### Qué se ve, tras 11 épocas
 
-![sin nivel](evaluacion/stop-02-11epocas/montaje-sin-nivel.png)
+![entrada y salidas](evaluacion/stop-02-11epocas/entrada-y-salidas.png)
 
 **Los kernels cogen las líneas de texto** — claro en las entradas #3, #6 y #8, y el canto
 vertical del bloque en la #4 y la #9.

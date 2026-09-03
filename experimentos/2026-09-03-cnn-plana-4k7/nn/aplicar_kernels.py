@@ -236,18 +236,131 @@ def montaje(vistas, mapas, out, titulo, cel=92, gap=8, vmax=None, pie_extra=""):
     return out
 
 
+def tira(vistas, mapas, out, titulo, vmax, cel=104, gap=8):
+    """La misma disposicion que `entradas.png`: UNA COLUMNA POR ENTRADA.
+
+    Pedida por el dueno el 2026-09-03: `montaje.png` pone las entradas en filas y
+    los kernels en columnas, y para revisar de un vistazo resulta mas comodo al
+    reves -- cada entrada una columna y cada kernel una fila, asi que "que hace
+    el kernel 2 en las diez" se lee recorriendo UNA fila.
+    Es la MISMA informacion que el montaje, girada. No sustituye a nada.
+    """
+    n, K = mapas.shape[0], mapas.shape[1]
+    f_tit, f_lab, f_fil = _font(19), _font(12), _font(13)
+    filas = ["la ventana"] + [f"kernel {j}" for j in range(K)]
+    sonda = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    izq = max(int(sonda.textlength(t, font=f_fil)) for t in filas) + 14
+    cab, pie = 62, 26
+    # El ancho lo deciden el titulo Y EL PIE, los dos medidos. Es la tercera vez
+    # que un rotulo se corta por dar el ancho por supuesto.
+    al_pie = (f"los {K*n} mapas comparten escala ±{vmax:.3f} (azul negativo · blanco cero · rojo "
+              f"positivo) · sin activar, con signo · a cada mapa se le resto su mediana y la "
+              f"escala sale del p99 del INTERIOR: el anillo del borde queda saturado")
+    W = max(izq + n * (cel + gap) + 8,
+            int(sonda.textlength(titulo, font=f_tit)) + 20,
+            int(sonda.textlength(al_pie, font=f_lab)) + 20)
+    H = cab + len(filas) * (cel + gap) + pie
+    im = Image.new("RGB", (W, H), "white")
+    d = ImageDraw.Draw(im)
+    d.text((10, 8), titulo, fill="black", font=f_tit)
+    for i in range(n):
+        d.text((izq + i * (cel + gap), cab - 18), f"#{i+1}", fill=(120, 120, 120), font=f_lab)
+    for r, nombre in enumerate(filas):
+        y0 = cab + r * (cel + gap)
+        d.text((8, y0 + cel // 2 - 8), nombre, fill=(60, 60, 60), font=f_fil)
+        for i in range(n):
+            t = _gris(vistas[i]) if r == 0 else _diverge(mapas[i, r - 1], vmax)
+            x0 = izq + i * (cel + gap)
+            im.paste(t.resize((cel, cel), Image.NEAREST), (x0, y0))
+            d.rectangle([x0, y0, x0 + cel - 1, y0 + cel - 1], outline=(175, 175, 175))
+    d.text((10, H - 19), al_pie, fill=(95, 95, 95), font=f_lab)
+    im.save(out)
+    return out
+
+
+def figuras(vistas, mapas, dest: Path, etiqueta: str, k: int) -> None:
+    """Los 40 PNG y los TRES montajes. Todo DERIVADO de `mapas.npy`, nada mas.
+
+    Lo comparten las dos rutas --evaluar y `--solo-figuras`-- para que una figura
+    nueva se pueda anadir a un stop VIEJO sin volver a pasar la red por delante.
+    Ver el aviso de `main()` sobre por que eso importa.
+    """
+    K = mapas.shape[1]
+    vmax = float(np.abs(mapas).max())
+    for i in range(mapas.shape[0]):
+        for j in range(K):
+            _diverge(mapas[i, j], vmax).resize((160, 160), Image.NEAREST).save(
+                dest / f"entrada{i+1:02d}-kernel{j}.png")
+    montaje(vistas, mapas, dest / "montaje.png",
+            f"CNN plana 4×7×7 — los {K} kernels sobre el set de visualización  ·  {etiqueta}")
+    # Quitando a cada mapa su nivel (mediana). Hace falta porque esta MEDIDO que
+    # el nivel constante es ~8x la estructura del texto (0,300 contra 0,037 en la
+    # epoca 3): con la escala comun, el rizo que dice si el kernel ha aprendido
+    # algo es invisible. El nivel sale de la media del kernel multiplicada por un
+    # papel casi uniforme, o sea que NO es informacion del texto.
+    # ⚠ Es una vista de PINTADO. Los 40 PNG y `mapas.npy` son la salida cruda.
+    sinniv = mapas - np.median(mapas, axis=(2, 3), keepdims=True)
+    # ⚠ Y la escala sale del INTERIOR: el anillo de k//2 px llega a valores ~5x
+    # los del interior (padding de ceros contra un papel de valor ~1). Se recorta
+    # el borde para ELEGIR la escala, no para pintarlo.
+    b = k // 2
+    c = slice(b, -b)
+    vmax_int = float(np.quantile(np.abs(sinniv[..., c, c]), 0.99))
+    montaje(vistas, sinniv, dest / "montaje-sin-nivel.png",
+            f"Lo mismo SIN el nivel de cada mapa (mediana restada)  ·  {etiqueta}",
+            vmax=vmax_int,
+            pie_extra=f" · escala del p99 del INTERIOR: el anillo de {b} px queda saturado")
+    tira(vistas, sinniv, dest / "entrada-y-salidas.png",
+         f"Entrada y salidas de los {K} kernels  ·  {etiqueta}", vmax_int)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="aplica los kernels al set de visualizacion")
     p.add_argument("--stop", required=True, help="etiqueta, p.ej. 00-sin-entrenar")
     p.add_argument("--run", default=None, help="sin esto: la red SIN entrenar")
     p.add_argument("--n", type=int, default=10)
+    p.add_argument("--solo-figuras", action="store_true",
+                   help="rehace las figuras de un stop YA hecho desde su "
+                        "mapas.npy, sin tocar la red")
+    p.add_argument("--rehacer", action="store_true",
+                   help="permite sobrescribir un stop con OTROS pesos. Sin esto "
+                        "se niega, y con razon: ver el aviso del codigo")
     p.add_argument("--semilla", type=int, default=2026)
     a = p.parse_args()
 
     vent = set_visualizacion(a.n, a.semilla)
     x, e, vistas = entradas(vent)
     guardar_entradas(vent, x, vistas)
+    dest = EXP / "evaluacion" / f"stop-{a.stop}"
+
+    if a.solo_figuras:
+        if not (dest / "mapas.npy").exists():
+            raise SystemExit(f"no esta {dest/'mapas.npy'}: ese stop no existe")
+        etiqueta = json.loads((dest / "resumen.json").read_text())["modelo"]
+        figuras(vistas, np.load(dest / "mapas.npy"), dest, etiqueta,
+                int(_net()["k_center"]))
+        print(f"[{a.stop}] figuras rehechas desde mapas.npy · {etiqueta}")
+        return 0
+
     m, etiqueta = modelo(a.run)
+    # ⚠⚠ UN STOP ES UNA FOTO EN EL TIEMPO, Y `--run` LEE SIEMPRE `last.pt`.
+    # Volver a correr la etiqueta de un stop viejo despues de seguir entrenando
+    # lo REESCRIBE con los pesos de HOY, en silencio, y se pierde el registro de
+    # como estaba entonces. Paso el 2026-09-03 al anadir la tira: `stop-01-3epocas`
+    # quedo con los pesos de la epoca 11 --montaje y tira IDENTICOS a los del
+    # stop-02-- y solo se noto porque dos ficheros tenian exactamente el mismo
+    # tamano. Se recupero de git, que es el unico motivo por el que no se perdio.
+    # Para anadir una figura a un stop viejo: `--solo-figuras`.
+    previo = dest / "resumen.json"
+    if previo.exists() and not a.rehacer:
+        antes = json.loads(previo.read_text()).get("modelo")
+        if antes != etiqueta:
+            raise SystemExit(
+                f"NEGADO: el stop '{a.stop}' se hizo con «{antes}» y ahora traes "
+                f"«{etiqueta}».\n"
+                "  Un stop es una foto en el tiempo; sobrescribirlo pierde el registro.\n"
+                "  · para rehacer sus FIGURAS sin tocar la red: --solo-figuras\n"
+                "  · si de verdad quieres reescribirlo: --rehacer")
     conv = m.center_convs[0]
     with torch.no_grad():
         mapas = conv(x)                       # (B, K, N, N) SIN activar
@@ -264,19 +377,13 @@ def main() -> int:
     mapas = mapas.numpy()
     aporte = [np.abs(t.numpy()).mean(axis=(0, 2, 3)) for t in porcanal]   # [K] por canal
 
-    dest = EXP / "evaluacion" / f"stop-{a.stop}"
     dest.mkdir(parents=True, exist_ok=True)
-    vmax = float(np.abs(mapas).max())
-    for i in range(mapas.shape[0]):
-        for j in range(mapas.shape[1]):
-            _diverge(mapas[i, j], vmax).resize((160, 160), Image.NEAREST).save(
-                dest / f"entrada{i+1:02d}-kernel{j}.png")
     np.save(dest / "mapas.npy", mapas.astype(np.float32))
     W = m.center_convs[0].weight.detach()
     (dest / "resumen.json").write_text(json.dumps({
         "stop": a.stop, "modelo": etiqueta, "run": a.run,
         "n_kernels": int(mapas.shape[1]), "n_entradas": int(mapas.shape[0]),
-        "vmax_comun": vmax,
+        "vmax_comun": float(np.abs(mapas).max()),
         "kernels": {"forma": list(W.shape),
                     "norma_l2": [round(float(v), 5) for v in W.flatten(1).norm(dim=1)]},
         "respuesta_por_kernel": {
@@ -289,29 +396,7 @@ def main() -> int:
                 "frac_vista": round(float(aporte[0][j] / max(aporte[0][j] + aporte[1][j], 1e-9)), 4),
             } for j in range(mapas.shape[1])},
     }, indent=2, ensure_ascii=False))
-    png = montaje(vistas, mapas, dest / "montaje.png",
-                  f"CNN plana 4×7×7 — los 4 kernels sobre el set de visualización  ·  {etiqueta}")
-    # Y la MISMA cosa quitando a cada mapa su nivel (mediana). Hace falta porque
-    # esta MEDIDO que el nivel constante es ~8x la estructura del texto (0,300
-    # contra 0,037 en la epoca 3): con la escala comun, el rizo que dice si el
-    # kernel ha aprendido algo es invisible. El nivel sale de la media del kernel
-    # multiplicada por un papel casi uniforme, o sea que NO es informacion del
-    # texto.
-    # ⚠ Es una vista de PINTADO. Los 40 PNG y `mapas.npy` son la salida cruda.
-    nivel = np.median(mapas, axis=(2, 3), keepdims=True)
-    sinniv = mapas - nivel
-    # ⚠ Y la escala sale del INTERIOR, no del mapa entero: el anillo de k//2 px
-    # llega a valores ~5x los del interior (padding de ceros contra un papel de
-    # valor ~1), asi que con la escala global el rizo del texto sigue invisible.
-    # Se recorta el borde para elegir la escala, no para pintarlo.
-    b = m.center_convs[0].kernel_size[0] // 2
-    c = slice(b, -b)
-    vmax_int = float(np.quantile(np.abs(sinniv[..., c, c]), 0.99))
-    montaje(vistas, sinniv, dest / "montaje-sin-nivel.png",
-            f"Lo mismo SIN el nivel de cada mapa (mediana restada)  ·  {etiqueta}",
-            vmax=vmax_int,
-            pie_extra=" · escala del p99 del INTERIOR: el anillo de "
-                      f"{b} px queda saturado a proposito")
+    figuras(vistas, mapas, dest, etiqueta, m.center_convs[0].kernel_size[0])
 
     print(f"\n[{a.stop}] {etiqueta}")
     print(f"  norma L2 de cada kernel: "
@@ -321,7 +406,7 @@ def main() -> int:
     print(f"  de la VISTA (resto: relleno): "
           + "  ".join(f"k{j} {aporte[0][j]/max(aporte[0][j]+aporte[1][j],1e-9)*100:4.1f}%"
                       for j in range(mapas.shape[1])))
-    print(f"  {mapas.shape[0]*mapas.shape[1]} PNG + montaje.png + mapas.npy en {dest}")
+    print(f"  {mapas.shape[0]*mapas.shape[1]} PNG + 3 montajes + mapas.npy en {dest}")
     return 0
 
 
