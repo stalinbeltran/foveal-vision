@@ -1,143 +1,20 @@
-# Encargo: sonda L1 — ¿pueden los kernels de la primera capa aprender filtros genéricos?
 
-## Contexto
+Respondo las cuatro, y luego una quinta cosa que salió al revisar el código y que creo que es la más importante de todas.
 
-En `fov16-optimo-mask` los 16 kernels de L1 no aprendieron filtros genéricos. Medido
-sobre `best.pt` del run `fov16-mask-p20`: energía en el subespacio clásico 6D
-(DC, Sobel-x/y, laplaciano, dos diagonales) = **0.688**, contra 6/9 = **0.667** de un
-kernel aleatorio. Enriquecimiento nulo. Dimensión efectiva por PCA: 5–6 de 9. Y hay un
-par duplicado (k5/k7, coseno +0.96), ambos DC negativo puro.
+**1. ¿E1? Sí en la dirección, no en la forma.** El diagnóstico es correcto: con el tope en 0.3 el criterio es inalcanzable por aritmética. Pero subir la rejilla a `{0, 0.3, 3, 10, 30}` arrastra un defecto que se agrava al combinarse con E2: **λ no significa lo mismo en cada celda.** Su tanteo mapea λ→activación en un único punto (k=7, K=16); con k=9 y K=32 la misma λ=10 caerá en otra activación, porque cambian el tamaño del átomo y la sobrecompletitud. Entonces E2 filtra por banda, y puede dejar celdas —o un `k` entero— sin ninguna combinación admisible. El eje que más nos importa se queda con agujeros.
 
-Hipótesis: L1 no está bajo presión. No hay reducción tras ella y detrás hay una cabeza
-de 153.660 parámetros que puede extraer las esquinas de casi cualquier proyección.
-Además 3×3 tiene 9 dimensiones y el subespacio clásico ya ocupa 6: no hay sitio para
-que emerja estructura.
+Alternativa: **calibrar λ por celda** con una bisección corta (5-6 evaluaciones de 2 épocas, `--limite` bajo) hasta activación 10 % ± 3, y registrar la λ resultante como dato del run. La esparsidad queda constante entre celdas y el barrido mide lo que dice medir. λ deja de ser eje y pasa a `{0 control, calibrada}`: **18 runs en vez de 60**, más unas 4 corridas-equivalentes de calibración. Sale más barato y más limpio.
 
-Este experimento es **aparte**. No modifica `src/fv/models/builder.py`, ni los configs
-de `configs/networks/`, ni nada que cambie el significado de un checkpoint en disco.
+**2. ¿E2 y E3? Sí, pero E3 se queda corta.** E2 es correcta y con la calibración pasa a ser una red de seguridad casi redundante — déjala igual. E3 acierta en excluir k=3 del Gabor, pero no arregla que 0.25 tampoco sea comparable entre 5, 7 y 9. Con sus propios nulos, 0.25 absoluto equivale al **52 % del margen en k=5, 38 % en k=7 y 32 % en k=9**. Sigue siendo tres exigencias distintas. Normalízalo: criterio principal `Δ > p95 del nulo de esa celda` (prueba de permutación, sin unidades), y criterio de magnitud `Δ/(1−nulo) ≥ 0.40`, donde el 0.40 es mío y es negociable.
 
-## 1. Estructura
+**3. ¿Rejilla entera o `--limite`? Ninguna de las dos todavía.** Tres razones: (a) `--limite 20000` es una variable de confusión justo sobre la métrica principal — menos ventanas dan kernels más ruidosos y el ajuste Gabor baja, así que sesga hacia el fracaso; (b) 101 s/época en un modelo de ~1.500 parámetros no es cómputo, es sobrecarga, casi seguro la normalización de contraste recalculada por época — cachear las ventanas normalizadas una vez debería llevarlo a segundos y hacer irrelevante la pregunta; (c) su tanteo cubre **un** punto del eje `k`, y el eje `k` es la premisa entera del experimento. Antes de las 15 h yo gastaría ~1 h en 8 runs: k ∈ {3,5,7,9} × λ ∈ {0, calibrada}, K=16.
 
-Autoencoder convolucional de una sola capa por lado. El modelo *son* los kernels.
+**4. ¿Se quedan 0.25 / 0.10? No.** Y hay que decir en voz alta lo que ya insinúa su tabla: a k=7 el Δ es +0.07, o sea **10.6 % del margen disponible**, y es plano entre λ=0 y λ=3 y luego baja. Si eso aguanta, la respuesta a "¿aporta la esparsidad?" es no, y la respuesta a "¿salen filtros genéricos?" también. Es un resultado válido y barato, y el tanteo del punto 3 lo confirma o lo tumba por una fracción del coste.
 
-```
-x (1,20,20)  →  Conv2d(1, K, k, stride=1, padding=k//2, bias=True)  →  ReLU
-             →  z (K,20,20)   ← la "imagen simplificada", el entregable
-             →  ConvTranspose2d(K, 1, k, stride=1, padding=k//2, bias=False)
-             →  x̂ (1,20,20)
-```
+**5. Lo que encontré revisando `metrics.py`: `enriq` está por debajo de 1 en todo el tanteo.** 0.47 a 0.61, cuando 1.0 es "indistinguible de aleatorio". Los kernels aprendidos tienen **menos** energía en el subespacio clásico que kernels al azar.
 
-No negociable:
+Sospecho el motivo, y no es que sean basura. `classic_basis` construye los filtros a k>3 con suavizado binomial, o sea plantillas suaves y de baja frecuencia. La normalización de contraste local que exige el §2 quita justamente DC y las bajas frecuencias de la entrada, así que los kernels aprendidos viven en alta frecuencia y salen casi ortogonales a esa base. Si es eso, **la métrica 5 no significa a k=7 lo que significaba a k=3** — y E3 apoya toda la lectura del ancla k=3 precisamente en ella.
 
-- **Decodificador lineal, sin sesgo, una sola capa.** Si puede compensar un `z` malo,
-  la presión sobre los kernels desaparece — que es el fallo que esto quiere evitar.
-- **Nada entre codificador y decodificador**: sin batchnorm, sin pooling.
-- **Stride 1 y padding `k//2`**: la resolución se conserva. No queremos una imagen más
-  pequeña, queremos una más genérica al mismo tamaño.
-- `pad_mode` replica el borde, igual que la red de producción.
+Eso deja el estudio sin una sola métrica comparable a lo largo del eje principal: el Gabor se rompe abajo y el subespacio clásico se rompe arriba. Antes de lanzar nada, yo pediría dos cosas: verificar la hipótesis midiendo `enriq` con y sin normalización de contraste en una celda, y añadir una métrica invariante a escala que no dependa de plantillas fijas — de la FFT 2D de cada kernel, concentración de energía en una banda (¿es paso banda?) y en una orientación (¿es orientado?). Son dos números por kernel, sin nulo que explote, y comparables entre k=3 y k=9.
 
-## 2. Preprocesado (obligatorio)
-
-Normalización de contraste local por ventana: restar la media local (gaussiana σ≈2 px)
-y dividir por la desviación local con un ε en el denominador.
-
-Sin esto, la componente de mayor varianza es el nivel medio de intensidad y la pérdida
-gasta ahí sus primeros grados de libertad — es literalmente lo que produjo k5 y k7.
-
-## 3. Esparsidad
-
-```
-loss = mse(x̂, x) / var(x)  +  λ · mean(|z|)
-```
-
-- El primer término, normalizado por la varianza, hace que λ signifique lo mismo entre
-  configuraciones.
-- El segundo penaliza **activaciones**, no pesos. Penalizar pesos hace la red pequeña;
-  penalizar activaciones la hace selectiva, que es lo que produce filtros con
-  significado. Sin este término el autoencoder converge a algo equivalente a PCA:
-  base válida pero difusa, sin estructura local.
-
-**Bloqueo de la salida degenerada:** tal cual, el modelo puede multiplicar el
-codificador por 0.01 y el decodificador por 100 — misma reconstrucción, penalización
-cien veces menor. Aprendería a hacer `z` pequeño en vez de disperso. Por eso: tras cada
-paso del optimizador, **renormalizar cada kernel del decodificador a norma L2 = 1**. El
-codificador queda libre. Sin esto el experimento no mide lo que dice medir.
-
-**Diagnóstico de λ:** registrar la fracción de activaciones positivas en `z`. Objetivo
-5–15 %. Por encima del 30 %, λ es baja; por debajo del 2 % o con kernels muertos, alta.
-Es un diagnóstico, no va en la pérdida.
-
-## 4. Barrido
-
-Rejilla completa (36 combinaciones), no OAT: interesa la interacción entre `k` y λ.
-
-| Eje | Valores | Motivo |
-|---|---|---|
-| `k` | **5, 7, 9** | Eje principal: en 3×3 no cabe la estructura |
-| `K` | **8, 16, 32** | Con k=9 y K=32 el código es 32× sobrecompleto |
-| `λ` | **0.0, 0.03, 0.1, 0.3** | λ=0 es el control obligatorio (caso tipo PCA) |
-
-Modelos diminutos (`K·k²·2 + K` parámetros). ~30 épocas por run; cronometra una
-combinación antes de lanzar las 36. Semilla fija, y repetir las 3 mejores con 3
-semillas para separar señal de ruido.
-
-Datos: `dirty1000-80px-16px-r20260827`, canal imagen únicamente, mismo split de
-validación. Sin máscaras, sin ramas, sin cabeza de esquinas.
-
-## 5. Métricas (sobre validación, al final de cada run)
-
-1. **R² de reconstrucción** = 1 − mse/var.
-2. **Fracción de activaciones positivas** en `z`.
-3. **Kernels muertos**: activos en <0.1 % de las posiciones.
-4. **Ajuste a Gabor** — métrica principal. Ajustar un Gabor 2D a cada kernel por
-   mínimos cuadrados no lineales; reportar la mediana del R² sobre los K kernels.
-   ⚠ Calcular la **misma métrica sobre K kernels aleatorios del mismo tamaño**. Un
-   Gabor tiene muchos parámetros libres y ajusta ruido mejor de lo que uno espera. Se
-   compara la diferencia, nunca el valor absoluto.
-5. **Energía en el subespacio clásico**, generalizada a k×k. Su línea base es 6/k², que
-   cambia con `k` y **no es comparable entre columnas**. Reportar valor y línea base
-   juntos.
-6. **Dimensión efectiva**: componentes de PCA para el 95 % de la varianza, entre k².
-7. **Redundancia**: coseno máximo entre pares distintos.
-8. **Alineación codificador/decodificador**: coseno entre el kernel i de cada uno. Si
-   convergen (>0.8) son el mismo objeto; si no, hay que decidir cuál es el entregable.
-
-## 6. Artefactos
-
-- Módulo aislado `src/fv/probe/`, sin importar `fv.models` ni `fv.fovea` salvo el
-  cargador de ventanas.
-- Por run: config, `metrics.jsonl`, checkpoint, kernels del codificador y del
-  decodificador en `.npy`.
-- Hoja de contactos por run: los K kernels del codificador como mapas divergentes,
-  escala de color común, norma en el título.
-- Para las 3 mejores: figura con la entrada y sus K mapas `z` al lado — es la que
-  responde visualmente a "¿la imagen resultante es más genérica?".
-- Tabla comparativa de las 36 combinaciones con las 8 métricas.
-
-## 7. Criterios — escribir ANTES de entrenar
-
-Crea `docs/plan-sonda-l1-<fecha>.md` y **párate a que el dueño confirme los umbrales
-antes de escribir el entrenamiento**. Propuesta de partida:
-
-- **Éxito** si alguna configuración logra a la vez: mediana de R² Gabor ≥ 0.25 por
-  encima de su línea base aleatoria, R² de reconstrucción ≥ 0.80, activación entre 5 % y
-  15 %, y cero kernels muertos.
-- **Fracaso** si ninguna separa el Gabor de su línea base por más de 0.10. Sería un
-  resultado válido: la reconstrucción tampoco produce filtros genéricos en este dominio.
-- Si el mejor λ=0 iguala al mejor λ>0 en la métrica Gabor, la esparsidad no aportó nada
-  y hay que decirlo.
-
-## 8. Fase 2 (solo si la fase 1 tiene éxito)
-
-Congelar el codificador de la mejor configuración como L1 de la **rama central** de
-`fov16-optimo-mask`, con `k_center` y `channels[0]` iguales a sus `k` y `K`. La rama
-periférica se entrena normal: la sonda se entrenó con 1 canal y la periferia recibe 2.
-Entrenar el resto con la receta `plan40` y comparar contra el f1 **0.954** y el error de
-posición **1.05 px** de `fov16-mask-p20`.
-
-Si el f1 aguanta con L1 congelada, los kernels son transferibles. Si se hunde,
-aprendieron a reconstruir y nada más — también es un resultado, y sale barato.
-
-⚠ Ese modelo cambia la forma de L2 y **no debe intentar cargar checkpoints anteriores**.
-
-Guarda todos los scripts empleados.
+Aparte: el hallazgo de §3.5 sobre `ConvTranspose2d` y `replicate` es correcto, y reportar `r2_rec_int` sobre el interior es la solución adecuada. Con k=9 el anillo contaminado es casi la mitad de la ventana; leer el R² global habría dado una cifra falsa.
