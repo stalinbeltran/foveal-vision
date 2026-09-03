@@ -1,0 +1,36 @@
+{
+  "stop": "00-sin-entrenar",
+  "modelo": "sin entrenar (semilla 1)",
+  "run": null,
+  "n_kernels": 2,
+  "n_entradas": 10,
+  "vmax_comun": 0.7961203455924988,
+  "kernels": {
+    "forma": [
+      2,
+      2,
+      7,
+      7
+    ],
+    "norma_l2": [
+      0.53844,
+      0.59415
+    ]
+  },
+  "respuesta_por_kernel": {
+    "kernel0": {
+      "abs_media": 0.21183,
+      "abs_max": 0.56804,
+      "aporte_vista": 0.16126,
+      "aporte_relleno": 0.00868,
+      "frac_vista": 0.9489
+    },
+    "kernel1": {
+      "abs_media": 0.54388,
+      "abs_max": 0.79612,
+      "aporte_vista": 0.48841,
+      "aporte_relleno": 0.01523,
+      "frac_vista": 0.9698
+    }
+  }
+}
