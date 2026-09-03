@@ -1,8 +1,8 @@
 # CNN plana de 1 capa y 4 kernels 7×7 — misma entrada y salida que la foveada
 
 **Encargo del 2026-09-03** ([`instrucciones/01-encargo.md`](instrucciones/01-encargo.md)).
-Entrenamiento **en curso, por avances**. Primer avance hecho: **3 épocas, 112,7 s** en este
-droplet (2 vCPU). **0 máquinas alquiladas, 0 $.**
+Entrenamiento **en curso, por avances**. Hechos dos: **11 épocas, 7,0 min** en este droplet
+(2 vCPU). **0 máquinas alquiladas, 0 $.**
 
 ---
 
@@ -49,9 +49,15 @@ estado del optimizador y el RNG del barajado, así que la época 2 no vuelve a v
 | avance | épocas | reloj | `val_loss` | f1 | err. posición |
 |---|---:|---:|---:|---:|---:|
 | `fv-train --epochs 1` | 1 | 37,5 s | 0,5218 | 0,109 | 3,71 px |
-| `fv-continue --more 2` | 2 → 3 | 75,2 s | **0,3749** | **0,582** | **2,89 px** |
+| `fv-continue --more 2` | 2 → 3 | 75,2 s | 0,3749 | 0,582 | 2,89 px |
+| `fv-continue --more 8` | 4 → 11 | 5 min 05 s | **0,2691** | **0,792** | **2,44 px** |
 
-**Total: 3 épocas, 112,7 s ≈ 1,9 min** — el «~2 minutos» que pedía el encargo.
+**Total: 11 épocas, 7,0 min.** El primer avance fue el «~2 minutos» que pedía el encargo; el
+segundo lo eligió el dueño (8 épocas).
+
+⚠ **Sigue bajando: no hay meseta.** La `val_loss` mejora en 9 de las 10 épocas y la mejor es la
+**última**, así que el contador de `patience` está a cero y el próximo avance no corre riesgo de
+parar solo.
 *(la foveada de referencia está en f1 0,954 y 1,05 px, con 8,5× los parámetros y 4 capas)*
 
 ⚠ **La foveada tiene 168.044 parámetros, no los 168.844 que dicen otros documentos del repo.**
@@ -85,6 +91,7 @@ las salidas de la evaluación.
 | **las 10 entradas** | [`evaluacion/entradas/`](evaluacion/entradas/) |
 | `stop-00-sin-entrenar` — red recién inicializada | [`evaluacion/stop-00-sin-entrenar/`](evaluacion/stop-00-sin-entrenar/) |
 | `stop-01-3epocas` — tras el primer avance (~2 min) | [`evaluacion/stop-01-3epocas/`](evaluacion/stop-01-3epocas/) |
+| `stop-02-11epocas` — tras el segundo avance (+8 épocas) | [`evaluacion/stop-02-11epocas/`](evaluacion/stop-02-11epocas/) |
 
 ### Las entradas
 
@@ -109,14 +116,31 @@ python nn/aplicar_kernels.py --stop 00-sin-entrenar               # red sin entr
 python nn/aplicar_kernels.py --stop 02-Nepocas --run plana-4k7-s1  # tras el siguiente avance
 ```
 
-### Qué se ve, tras 2 minutos
+### Qué se ve, tras 11 épocas
 
-![sin nivel](evaluacion/stop-01-3epocas/montaje-sin-nivel.png)
+![sin nivel](evaluacion/stop-02-11epocas/montaje-sin-nivel.png)
 
-**Los kernels ya cogen las líneas de texto** — se ve en las entradas #3, #6 y #8 (líneas
-horizontales), en la #4 (el canto vertical del bloque) y en la #9 (textura sin estructura). Y
-**k2 pasó de media 0,93 a 0,023** en `|suma|/L2`, o sea que ya es un filtro de media cero. Con 3
-épocas eso es un principio, no un resultado.
+**Los kernels cogen las líneas de texto** — claro en las entradas #3, #6 y #8, y el canto
+vertical del bloque en la #4 y la #9.
+
+**Y los cuatro kernels se están repartiendo el trabajo**, que es lo que más se ve al comparar
+stops:
+
+| | k0 | k1 | k2 | k3 |
+|---|---:|---:|---:|---:|
+| norma L2 · época 3 | 0,845 | 0,735 | 0,771 | 0,847 |
+| norma L2 · **época 11** | **1,274** | 0,743 | 0,976 | **1,485** |
+| \|respuesta\| media · época 3 | 0,339 | 0,222 | 0,303 | 0,459 |
+| \|respuesta\| media · **época 11** | **0,686** | **0,154** | 0,420 | **0,962** |
+| `\|suma\|/L2` · época 3 | 0,378 | 0,909 | **0,023** | 1,269 |
+| `\|suma\|/L2` · **época 11** | 0,529 | 1,338 | **0,268** | 1,567 |
+
+**k0 y k3 crecen** (norma ×1,5 y ×1,8, respuesta ×2) mientras **k1 se apaga**: su norma no se
+mueve y su respuesta **baja** de 0,222 a 0,154. Y `|suma|/L2` —0 sería media cero, o sea un
+filtro puro; 7 es el máximo— **sube** en los cuatro, así que van hacia detectores con más
+componente de nivel, no hacia filtros de media cero.
+
+⚠ Con 11 épocas esto **acota, no declara**: una semilla, y la curva aún baja.
 
 ⚠ **Hay DOS montajes, y el crudo engaña.** `montaje.png` es la salida tal cual y sale como
 placas planas de color. No es un fallo del pintado: está **medido** que el nivel constante de
@@ -155,13 +179,13 @@ El encargo dice avisarte al terminar el primer avance para decidir si seguimos c
 
 | paso | épocas | acumulado |
 |---|---:|---:|
-| 2 min | +3 | 6 |
-| 5 min | +8 | 11 |
-| 15 min | +24 | 27 |
-| 30 min | +48 | 51 |
+| 2 min | +3 | 14 |
+| 5 min | +8 | 19 |
+| 15 min | +24 | 35 |
+| 30 min | +48 | 59 |
 
 Un paso se lanza con `fv-continue --name plana-4k7-s1 --more N` y luego
-`python nn/aplicar_kernels.py --stop 02-<N>epocas --run plana-4k7-s1`.
+`python nn/aplicar_kernels.py --stop 03-<N>epocas --run plana-4k7-s1`.
 
 ⚠ **Y un aviso sobre `patience`:** la receta trae `patience: 10`, así que si en algún avance
 pasan 10 épocas sin mejorar la `val_loss`, el run **para solo** antes de agotar las épocas

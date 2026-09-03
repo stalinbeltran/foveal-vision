@@ -1,0 +1,52 @@
+{
+  "stop": "02-11epocas",
+  "modelo": "plana-4k7-s1 · epoca 11",
+  "run": "plana-4k7-s1",
+  "n_kernels": 4,
+  "n_entradas": 10,
+  "vmax_comun": 3.672773599624634,
+  "kernels": {
+    "forma": [
+      4,
+      2,
+      7,
+      7
+    ],
+    "norma_l2": [
+      1.27397,
+      0.74271,
+      0.9762,
+      1.48504
+    ]
+  },
+  "respuesta_por_kernel": {
+    "kernel0": {
+      "abs_media": 0.686,
+      "abs_max": 1.78621,
+      "aporte_vista": 0.53764,
+      "aporte_relleno": 0.04159,
+      "frac_vista": 0.9282
+    },
+    "kernel1": {
+      "abs_media": 0.15414,
+      "abs_max": 0.80447,
+      "aporte_vista": 0.82363,
+      "aporte_relleno": 0.01175,
+      "frac_vista": 0.9859
+    },
+    "kernel2": {
+      "abs_media": 0.41982,
+      "abs_max": 3.67277,
+      "aporte_vista": 0.495,
+      "aporte_relleno": 0.08214,
+      "frac_vista": 0.8577
+    },
+    "kernel3": {
+      "abs_media": 0.96206,
+      "abs_max": 2.30173,
+      "aporte_vista": 1.21027,
+      "aporte_relleno": 0.06394,
+      "frac_vista": 0.9498
+    }
+  }
+}
