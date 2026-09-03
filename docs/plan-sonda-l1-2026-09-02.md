@@ -144,7 +144,40 @@ kernels **aleatorios** del mismo tamaño, 2026-09-02):
 | 7 | 0,337 | 0,663 | sí |
 | 9 | 0,228 | 0,772 | sí |
 
-Con 7 parámetros libres sobre 9 muestras, un Gabor ajusta **cualquier** 3×3. **Esto no invalida
+Con 7 parámetros libres sobre 9 muestras, un Gabor ajusta **cualquier** 3×3.
+
+#### Qué NO implica pasar la prueba del Gabor — medido mientras corría el tanteo
+
+⚠ **Esto no cambia el criterio del §4.2, que está congelado.** Es una caracterización del
+instrumento, y va aquí porque hace falta para leer la tabla sin sobreinterpretarla.
+
+Al ver que en los dos primeros runs el Gabor superaba el p95 mientras `conc_orient` no, la
+sospecha fue que el ajuste se estuviera satisfaciendo de forma **degenerada** — un Gabor con
+frecuencia ≈0 es una mancha gaussiana, no una onda orientada. *Medido el 2026-09-02*
+extrayendo los parámetros ajustados (ciclos de la sinusoide dentro de la envolvente):
+
+| | R² mediano | ciclos medianos | % con < 0,5 ciclos |
+|---|---:|---:|---:|
+| `k3-K16-λ0` | 0,958 | 0,71 | **19 %** |
+| `k3-K16-λcal` | 0,923 | 0,62 | 38 % |
+| **aleatorio k=3** | 0,879 | 0,75 | **38 %** |
+| aleatorio k=5 | 0,515 | 0,93 | 31 % |
+| aleatorio k=9 | 0,228 | 1,30 | 25 % |
+
+**La sospecha era falsa**: los kernels aprendidos **no** son más degenerados que los aleatorios —
+el de λ=0 lo es la mitad. O sea que el ajuste mejora de verdad.
+
+**Pero la lectura correcta es otra, y es la que importa:** a k=3 el mejor Gabor tiene **0,7
+ciclos dentro de su envolvente**, o sea que apenas oscila. Una «Gabor» de menos de un ciclo es
+una forma suave genérica —un bulto, un borde— cuyo espectro es ancho, no un lóbulo orientado.
+Por eso un kernel puede **ajustar bien un Gabor sin tener energía concentrada en una
+orientación**: las dos métricas no miden lo mismo, y en 3×3 la familia Gabor es tan flexible que
+ajustar bien **no es evidencia de estructura orientada**.
+
+Los ciclos suben con `k` (0,75 → 0,93 → 1,30 en el nulo), así que este solapamiento **se afloja
+solo** al subir el eje: es en k=7 y k=9 donde «ajusta un Gabor» empieza a significar «oscila».
+**Las columnas informativas del tanteo son ésas**, y el ancla k=3 —donde el plan ya dice que
+manda `conc_orient`— es la que menos peso tiene aquí. **Esto no invalida
 el ancla k=3** —sigue siendo el único brazo comparable con el 0,688 de la premisa por la métrica
 5— pero sí dice que **el ancla no puede juzgarse con la métrica 4**, y que un umbral único para
 los cuatro `k` no significa lo mismo en cada uno.
