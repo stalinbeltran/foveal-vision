@@ -79,6 +79,16 @@ EDGE_MODES = ("off", "pad", "dist")
 # inventado en vez de imagen real. `off` = un solo canal, que es lo que habia.
 MASK_MODES = ("off", "coverage")
 
+# Con que rellena la CONVOLUCION fuera del borde de la vista. Es un eje aparte de
+# `pad_mode`, que es con que se rellena la VISTA al recortarla de la imagen.
+#
+# ⚠ Que existan los dos y signifiquen cosas distintas es la razon de este
+# comentario: `pad_mode: edge` cumple la decision C10 --nunca ceros, porque cero
+# significa "no hay tinta" y ensena una regla falsa-- y la convolucion la
+# incumplia un paso mas adentro, porque `nn.Conv2d` rellena con ceros por defecto
+# y nadie se lo habia dicho.
+CONV_PAD_MODES = ("zeros", "replicate", "reflect", "circular")
+
 # The order of the four numbers, declared ONCE — the same reason CORNER_NAMES is
 # declared once in fv.metrics. Left, Top, Right, Bottom.
 EDGE_SIDES = ("L", "T", "R", "B")

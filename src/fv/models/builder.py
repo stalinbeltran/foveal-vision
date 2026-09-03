@@ -27,7 +27,8 @@ import torch.nn.functional as F
 
 from fv.fovea import (EDGE_MODES, EDGE_SIDES, GEOMETRY_FIELDS, MASK_MODES, REGIONS,
                       FoveaError, build_masks, dims_of, is_single_region,
-                      n_edge_features, n_input_channels, normalize_geometry)
+                      n_edge_features, n_input_channels, normalize_geometry,
+                      CONV_PAD_MODES)
 
 DEFAULT_CHANNEL = 16  # D-C2: a derived net defaults to [16]*n_layers (constant 16)
 
@@ -60,6 +61,27 @@ NETWORK_DEFAULTS = {
     # existed -- the module has no parameters, so checkpoints keep loading
     # strict (tested).
     "dropout": 0.0,
+    # Con que rellena la CONVOLUCION fuera del borde de la vista.
+    #
+    # ⚠ El defecto es `zeros` y NO es una recomendacion: es lo que hacia
+    # `nn.Conv2d` antes de que este campo existiera, y cambiarlo aqui alteraria
+    # el significado de TODAS las redes guardadas sin que ningun checkpoint
+    # dejara de cargar --no cambia ni un parametro--, o sea un fallo silencioso
+    # sobre las tablas ya publicadas.
+    #
+    # POR QUE EXISTE (medido 2026-09-03, experimentos/2026-09-03-cnn-plana-4k7):
+    #   la vista es papel con valor ~1 casi en todas partes, asi que rellenar con
+    #   CEROS mete un salto sistematico en el anillo de k//2 px: en la plana de
+    #   7x7 el anillo es 9,4x el interior (2,7x con `replicate`), y en la foveada
+    #   ENTRENADA `fov16-mask-p20` el 64 % de las celdas de la periferia cambian
+    #   de valor si se cambia el relleno. La vista se recorta de una imagen MAS
+    #   GRANDE: para una ventana que no toque el borde, esos pixeles EXISTEN, y
+    #   ponerles cero es sustituir contexto real por "no hay tinta" -- la misma
+    #   regla falsa que `pad_mode: edge` evita (decision C10).
+    #
+    # ⚠ Y que la red sea SENSIBLE al relleno NO es que el relleno le haga dano:
+    #   eso solo lo dice un run de control entrenado con el otro valor.
+    "conv_pad_mode": "zeros",
     # Extra head inputs about the IMAGE edge (fv.fovea.EDGE_MODES). They skip the
     # conv branches entirely and are concatenated to the flattened features right
     # before the Linear -- see `forward` for why that is the only place they can
@@ -140,14 +162,22 @@ class FoveatedRegionalNN(nn.Module):
         # comentario de mas abajo sobre `edge_inputs`, y aqui aplica entero.
         self.mask_channel = str(cfg["mask_channel"])
         cin = n_input_channels(self.mask_channel)
+        cpm = str(cfg["conv_pad_mode"])
+        if cpm not in CONV_PAD_MODES:
+            raise FoveaError(
+                "unknown_conv_pad_mode",
+                f"conv_pad_mode '{cpm}' no existe",
+                f"usa uno de {sorted(CONV_PAD_MODES)}")
+        self.conv_pad_mode = cpm
         self.center_convs = self._make_branch(channels, kc, pc, cfg["s_center"],
-                                              in_ch=1 if not self.single else cin)
+                                              in_ch=1 if not self.single else cin,
+                                              pad_mode=cpm)
         # 'single': no second branch and NO MASKS AT ALL — build_masks is never
         # called, so the geometry every other domain imports stays untouched. The
         # module names of 'split' are unchanged, so existing checkpoints load.
         if not self.single:
             self.periph_convs = self._make_branch(channels, kp, pp, cfg["s_periph"],
-                                                  in_ch=cin)
+                                                  in_ch=cin, pad_mode=cpm)
             cm, pm = build_masks(dims)
             self.register_buffer("center_mask", torch.from_numpy(cm)[None, None])
             self.register_buffer("periph_mask", torch.from_numpy(pm)[None, None])
@@ -182,13 +212,14 @@ class FoveatedRegionalNN(nn.Module):
 
     @staticmethod
     def _make_branch(channels: list[int], k: int, pad: int, stride: int,
-                     in_ch: int = 1) -> nn.ModuleList:
+                     in_ch: int = 1, pad_mode: str = "zeros") -> nn.ModuleList:
         layers = nn.ModuleList()
         # 1 canal (la composicion enmascarada) salvo que esta rama reciba ademas
         # el canal de relleno -- ver el porque en __init__
         for i, out_ch in enumerate(channels):
             s = stride if i == 0 else 1
-            layers.append(nn.Conv2d(in_ch, out_ch, k, stride=s, padding=pad))
+            layers.append(nn.Conv2d(in_ch, out_ch, k, stride=s, padding=pad,
+                                    padding_mode=pad_mode))
             in_ch = out_ch
         return layers
 
