@@ -104,6 +104,21 @@ la vigila y la **destruye** no se contaría. Si se va por Vast, **esa línea va 
 
 ## Estado actual — léelo primero
 
+> **📁 2026-09-03 — `experimentos/`: una carpeta por experimento, con la nn y sus pesos dentro.**
+> Pedido por el dueño. Cada experimento en `experimentos/<fecha>-<nombre>/` es **autocontenido**:
+> encargo, criterio, código congelado, resultados y **la red con sus pesos**. El primero es
+> [`experimentos/2026-09-03-sonda-l1/`](experimentos/2026-09-03-sonda-l1/), y **ahí van sus
+> ajustes futuros**.
+> ⚠ **Los pesos SÍ entran en el repo de código aquí, y es una excepción con motivo.** La regla
+> general —pesos sólo en `foveal-vision-data`, aprobados uno a uno— existe **por tamaño**: 862
+> runs × 2,7 MB ≈ 2,3 GB. Estas redes tienen **304-2.608 parámetros** y los ocho pesos ocupan
+> **84 KB**. La razón de la regla no aplica, y el dueño los pidió explícitamente.
+> **Esto NO cambia nada para la red de producción**: un `best.pt` de `fov16-optimo-mask` son
+> 665 KB y sigue yendo al repo de datos, gobernado por `inferencia.json`.
+> ⚠ Y `nn/modelo.py` **no importa nada del repo**, a propósito: es lo único que garantiza que los
+> pesos se puedan cargar cuando `src/fv/probe/` haya cambiado. `codigo/` es un **snapshot muerto**,
+> nunca una copia de trabajo — dos copias vivas divergen y nadie se entera.
+
 > **✅ 2026-09-03 — SONDA L1, TANTEO DEL EJE `k` CORRIDO: la respuesta es NO.**
 > 8 runs, 02:33→04:40 UTC, **2,1 h, 0 máquinas, 0 $** (el coste es reloj). Veredicto contra el
 > criterio —escrito antes— en el **§9** de
