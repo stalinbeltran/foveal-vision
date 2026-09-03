@@ -194,19 +194,71 @@ cada mapa es **8,2× la estructura del texto** (0,300 contra 0,037), así que co
 el rizo que interesa es invisible. `montaje-sin-nivel.png` le resta a cada mapa su mediana y
 toma la escala del **p99 del interior** — el anillo de 3 px queda saturado a propósito.
 
-**Tres hipótesis que probé para explicar el marco, y las dos primeras eran falsas:**
+### El anillo rojo del borde: es el PADDING DE CEROS, no las máscaras
 
-| hipótesis | medida | veredicto |
-|---|---|---|
-| domina el canal de **relleno** | el 90-97 % de la respuesta viene de la **vista** | ❌ |
-| domina el **DC** del kernel | `|suma|/L2` entre 0,02 y 1,27, con máximo posible 7 | ❌ *(mal criterio: ver abajo)* |
-| **el nivel constante aplasta la escala** | nivel 0,300 contra estructura 0,037 → **8,2×** | ✅ |
+Preguntado por el dueño el 2026-09-03. Tres cosas se confunden fácil aquí, así que se separaron
+midiendo, sobre el modelo de la época 37 y las 10 ventanas del set:
 
-El nivel **sí** nace de la media del kernel multiplicada por un papel casi uniforme, así que la
-segunda hipótesis era correcta en el mecanismo — la rechacé con el criterio equivocado
-(`|suma|/L2` contra su máximo teórico, cuando lo que decide es nivel **contra rizo**).
-Y el anillo del borde aporta poco: el marco es **1,18×** el interior con padding de ceros y
-**1,08×** con `replicate`.
+**1. Esta red NO tiene máscaras.** Con `regions: single`, `build_masks` no se llama nunca
+(`builder.py:145`) y el modelo no tiene **ningún** buffer — comprobado listando `named_buffers()`:
+sale vacío. Las máscaras `center_mask`/`periph_mask` sólo existen con `regions: split`.
+
+**2. Tampoco es el canal de relleno** (el que se llama `mask_channel`, de ahí la confusión). Si
+lo fuera, el anillo saldría sólo en las 5 ventanas que tocan el borde de la imagen. Sale en las
+**diez** — y las dos que **no** tocan borde son justo las de **mayor** ratio anillo/interior:
+
+| | #1 | #2 ✎ | #3 | #4 ✎ | #5 | #6 ✎ | #7 ✎ | #8 | #9 ✎ | #10 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| anillo / interior | **39,8×** | 12,1× | 6,2× | 8,0× | 13,0× | 5,6× | 9,9× | 7,1× | 7,2× | **38,8×** |
+
+*(✎ = la ventana toca el borde de la imagen)*. Y separando por canal, el anillo viene **0,927 de
+la vista** contra **0,119 del relleno**: el 11 %.
+
+**3. Es el padding de ceros de la convolución.** Mismo modelo, misma entrada, cambiando **sólo**
+el relleno:
+
+| relleno de la conv | \|anillo\| | \|interior\| | ratio |
+|---|---:|---:|---:|
+| **`zeros`** (el real, es el defecto de `nn.Conv2d`) | **0,741** | 0,079 | **9,4×** |
+| `replicate` | 0,211 | 0,079 | 2,7× |
+
+**El mecanismo:** la vista es papel con valor ≈1 casi en todas partes. `nn.Conv2d(..., padding=3)`
+rellena con **ceros** fuera del borde, así que en el anillo de 3 px el kernel ve una mezcla de
+papel y ceros y su respuesta se desplaza en ≈ (suma de los pesos truncados) × 1. Ese salto es del
+orden del **nivel**, que a su vez es ~8× el rizo del texto — por eso el anillo domina la figura.
+
+#### ⚠ Y esto destapa una incoherencia del proyecto, que no es sólo de este experimento
+
+La vista se construye con `pad_mode: edge` **precisamente para no rellenar con ceros**:
+
+> *decisión C10: never plain zeros — zero means "no ink" and teaches a false rule*
+> — `fv/fovea/__init__.py:603`
+
+Pero la **convolución** sí rellena con ceros (`builder.py:191`, sin `padding_mode`), y eso
+reintroduce un paso más adentro exactamente lo que `pad_mode: edge` evita. **Aplica igual a
+producción**: `fov16-optimo-mask` usa la misma línea. Ahí el kernel es 3×3, así que el anillo es
+de **1 px** (el 19 % de las celdas de una vista 20×20, contra el 51 % aquí con 7×7).
+
+⚠ **NO lo he cambiado**, y no es un cambio menor: `padding_mode='replicate'` en `_make_branch`
+alteraría **todas** las redes del repo y dejaría los checkpoints guardados con otro significado.
+Y no está medido que perjudique al f1 — la cabeza es una `Linear` sobre las 1.600 features y
+puede aprender a ignorar el anillo. Lo que sí está medido es que **gasta capacidad y domina la
+visualización**. Queda dicho para que lo decidas.
+
+#### ⚠ Corrección de lo que decía antes este README
+
+Esta sección decía que *«el anillo del borde aporta poco: el marco es 1,18× el interior con
+padding de ceros y 1,08× con replicate»*. **Ese número comparaba mal**: era la media de
+`|respuesta|` **con el nivel dentro**, y el nivel es común a todo el mapa, así que diluía el
+efecto. Comparado como se ve en la figura —quitando a cada mapa su nivel— es **9,4× contra
+2,7×**, no 1,18× contra 1,08×.
+
+**Las tres hipótesis que probé para el aspecto de placa plana** (que es otra cosa, y sigue
+valiendo): dominaba el canal de relleno ❌ (el 90-97 % viene de la vista) · dominaba el DC del
+kernel ❌ *(rechazada con el criterio equivocado: ver abajo)* · **el nivel constante aplasta la
+escala ✅** (0,300 contra 0,037, o sea 8,2×). El nivel sí nace de la media del kernel por un papel
+casi uniforme, así que la segunda era correcta en el mecanismo — la descarté comparando
+`|suma|/L2` contra su máximo teórico, cuando lo que decide es nivel **contra rizo**.
 
 ## 4. Qué hay aquí
 
