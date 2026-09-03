@@ -218,6 +218,46 @@ rango, **no** un resultado):
 semilla; las cifras se moverán con 30 épocas sobre 84.000. Lo que sí es estructural es el
 **orden de magnitud** del desajuste: 20–130× no lo explica el presupuesto de épocas.
 
+### 3.7 ⚠⚠ `frac_activa` es una MEDIA que esconde una distribución bimodal
+
+Salió al mirar por qué ningún run cumple la cláusula de «cero kernels muertos». *Medido el
+2026-09-02*, activación **por canal** sobre validación, ordenada:
+
+| run | activación de cada uno de los 16 canales (%) |
+|---|---|
+| `k5-K16-λ0` | `0 0 0 0 0 0,01 0,10` ┃ `99,91 99,94 99,95 99,96 99,97 99,97 99,97 99,97 99,97` |
+| `k3-K16-λ0` | `0 0 0,01 0,03` ┃ `24,2 24,2 24,2` ┃ `75,8 75,8` ┃ `100 100 100 100 100 100 100` |
+| `k3-K16-λcal` | `0 0 0` ┃ `3,4 4,3 4,9 4,9 5,4 5,4 9,1 9,2 10,5 16,2 17,0 17,5 22,2` |
+
+**Con λ=0 el modelo se parte en dos: canales muertos y canales encendidos el 99,97 % del
+tiempo.** Y un canal que nunca se apaga es, a efectos prácticos, **lineal**: su ReLU no recorta
+nunca, así que no aporta ni no-linealidad ni selectividad. Es exactamente el desenlace que el
+encargo predijo — *«sin este término el autoencoder converge a algo equivalente a PCA: base
+válida pero difusa, sin estructura local»* — y explica de paso el `R² rec int` de **1,000**.
+
+**Tres consecuencias, y ninguna es cosmética:**
+
+1. **`frac_activa` = 56,2 % no describe a ningún canal.** No hay un solo canal cerca del 56 %:
+   es la media de un montón de ceros y un montón de cienes. La banda 5-15 % del encargo supone
+   una distribución unimodal, y aquí no lo es. **Hace falta reportar la distribución**, no su
+   media — un diagnóstico que promedia dos poblaciones no diagnostica nada.
+2. **El brazo λ=0 no es «el mismo modelo sin esparsidad»: es un autoencoder casi LINEAL.** Sigue
+   siendo el control que el encargo pide, pero hay que leerlo como tal.
+3. ⚠ **La calibración sí produce distribuciones sanas** (`λcal`: 3 muertos y el resto entre 3 %
+   y 22 %), o sea que el problema no es la esparsidad: es su ausencia.
+
+⚠ **Y esto pone en tensión dos cláusulas del criterio del encargo**, que hay que resolver antes
+de leer el resultado: pide **activación 5-15 %** *y* **cero kernels muertos**. Empujar la
+activación hacia abajo con L1 **mata unidades** — es el mecanismo de la L1, no un defecto — así
+que las dos cláusulas tiran en direcciones opuestas. **Ningún run de los tres primeros cumple la
+de cero muertos** (4, 3 y 7 de 16). Es la misma clase de problema que la rejilla de λ del §3.4:
+una cláusula que nada puede satisfacer convierte el «fracaso» en aritmética en vez de en
+resultado. **Es decisión del dueño**, y va al §6.
+
+⚠ El diagnóstico por canal **no se añade al código con el tanteo en vuelo**: dejaría media
+tanda instrumentada y media no. Se añade al terminar, y se recalcula para los 8 runs desde sus
+checkpoints, que para eso se guardan.
+
 ### 3.5 `ConvTranspose2d` no admite `padding_mode='replicate'`
 
 *Comprobado con torch 2.14*: lanza `ValueError`. El codificador replica el borde (igual que
@@ -453,6 +493,24 @@ fin en UTC, **máquinas: 0** (no alquila) y **coste: 0 $** — aquí el coste es
 
 Y una quinta cosa que él encontró revisando el código, que resultó ser la más importante: el
 **§3.6** de arriba.
+
+### 6.2 ⏳ ABIERTA: las dos cláusulas del criterio que tiran en direcciones opuestas
+
+**Pendiente de decisión suya, y sale de medir (§3.7), no de opinar.** El encargo pide para el
+éxito, a la vez, **activación 5-15 %** y **cero kernels muertos**. Bajar la activación con L1
+**mata unidades** — es el mecanismo de la L1 — así que las dos cláusulas se estorban. En los
+tres primeros runs mueren 4, 3 y 7 de 16, así que **tal cual, nada puede pasar**.
+
+Tres salidas, sin recomendación todavía porque faltan k=7 y k=9:
+
+1. **Aflojar a «menos del X % de kernels muertos»** (p. ej. 25 %). Reconoce que la L1 mata
+   unidades y sigue rechazando el caso degenerado.
+2. **Contarlo sobre los canales VIVOS**: pedir que los vivos estén en banda y reportar el K
+   efectivo aparte. Es lo que de verdad se quiere saber — *«¿cuántos filtros útiles salen?»*.
+3. **Dejarlo literal** y aceptar que el veredicto sea «fracaso» por esta cláusula. Es una opción
+   legítima, pero entonces hay que decir en el reporte que el fracaso es por ahí y no por la
+   forma de los kernels.
+
 
 ### 6.1 Una cosa suya que NO se aplicó, y por qué
 
