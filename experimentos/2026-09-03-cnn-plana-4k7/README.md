@@ -80,10 +80,26 @@ las salidas de la evaluación.
   *la misma* red que luego entrena: la init se reproduce con la semilla de la receta, y está
   **comprobado** que construir los datasets en medio no consume el RNG global.
 
-| stop | qué | dónde |
-|---|---|---|
-| `00-sin-entrenar` | red recién inicializada | [`evaluacion/stop-00-sin-entrenar/`](evaluacion/stop-00-sin-entrenar/) |
-| `01-3epocas` | tras el primer avance (~2 min) | [`evaluacion/stop-01-3epocas/`](evaluacion/stop-01-3epocas/) |
+| qué | dónde |
+|---|---|
+| **las 10 entradas** | [`evaluacion/entradas/`](evaluacion/entradas/) |
+| `stop-00-sin-entrenar` — red recién inicializada | [`evaluacion/stop-00-sin-entrenar/`](evaluacion/stop-00-sin-entrenar/) |
+| `stop-01-3epocas` — tras el primer avance (~2 min) | [`evaluacion/stop-01-3epocas/`](evaluacion/stop-01-3epocas/) |
+
+### Las entradas
+
+![las 10 entradas](evaluacion/entradas/entradas.png)
+
+`evaluacion/entradas/` trae `entradaNN.png` (la vista 20×20) y `entradaNN-relleno.png` (el
+segundo canal), más la hoja de arriba. **Están fuera de los `stop-*/` a propósito**: el set está
+congelado, así que son idénticas en todos los stops — copiarlas en cada uno invitaría a creer que
+pueden cambiar entre uno y otro, que es justo lo que no puede pasar para que dos stops se
+comparen.
+
+⚠ **Se guardan los DOS canales porque la red ve los dos.** El de relleno es `1 − cobertura`:
+0 = píxel real, 1 = inventado por `pad_mode: edge`. Y sale un dato del sorteo que conviene tener
+delante al leer los mapas: **5 de las 10 ventanas tocan el borde de la imagen** (#2, #4, #6, #7 y
+la #9, que toca dos a la vez). En esas, parte de lo que responde el kernel es relleno, no imagen.
 
 Cada stop trae **40 PNG** (`entradaNN-kernelJ.png`), `mapas.npy` con los valores crudos,
 `resumen.json` y dos montajes.
@@ -128,6 +144,7 @@ Y el anillo del borde aporta poco: el marco es **1,18×** el interior con paddin
 |---|---|
 | [`instrucciones/01-encargo.md`](instrucciones/01-encargo.md) | el encargo tal como llegó (commit `9926bd0b2`) |
 | [`nn/aplicar_kernels.py`](nn/aplicar_kernels.py) | la evaluación: congela el set, aplica los kernels, guarda las 40 imágenes y los montajes |
+| [`evaluacion/entradas/`](evaluacion/entradas/) | las 10 entradas en PNG: vista y canal de relleno |
 | `evaluacion/stop-*/` | un directorio por stop |
 | los pesos | **fuera de git**, en `foveal-vision-data/2026/09-septiembre/runs/plana-4k7-s1/` |
 

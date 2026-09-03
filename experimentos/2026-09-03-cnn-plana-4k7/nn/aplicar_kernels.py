@@ -98,6 +98,49 @@ def entradas(vent: list[dict]) -> tuple[torch.Tensor, torch.Tensor, np.ndarray]:
             np.stack(vistas))
 
 
+def guardar_entradas(vent, x, vistas) -> Path:
+    """Las 10 entradas como PNG sueltos, UNA vez y fuera de los stops.
+
+    ⚠ Van en `evaluacion/entradas/` y NO dentro de cada `stop-*/` a proposito: el
+    set esta CONGELADO, asi que son identicas en todos los stops. Copiarlas en
+    cada stop invitaria a creer que pueden cambiar entre uno y otro, que es justo
+    lo que no puede pasar para que dos stops se comparen.
+
+    Se guardan los DOS canales, porque la red ve los dos: la vista y el RELLENO
+    (`1 - cobertura`: 0 = pixel real, 1 = inventado por `pad_mode: edge`).
+    """
+    dest = EXP / "evaluacion" / "entradas"
+    dest.mkdir(parents=True, exist_ok=True)
+    for i, v in enumerate(vistas):
+        _gris(v).resize((200, 200), Image.NEAREST).save(dest / f"entrada{i+1:02d}.png")
+        rell = x[i, 1].numpy()
+        _calor(rell, 1.0).resize((200, 200), Image.NEAREST).save(
+            dest / f"entrada{i+1:02d}-relleno.png")
+    # y una hoja con las diez juntas, para verlas de un vistazo
+    n, cel, gap = len(vistas), 104, 8
+    f_tit, f_lab = _font(19), _font(12)
+    W, H = 14 + n * (cel + gap), 44 + 2 * (cel + 20) + 24
+    im = Image.new("RGB", (W, H), "white")
+    d = ImageDraw.Draw(im)
+    d.text((10, 8), "El set de visualización: las 10 entradas, congeladas", fill="black", font=f_tit)
+    for i in range(n):
+        x0 = 14 + i * (cel + gap)
+        for fila, (tile, rot) in enumerate((
+                (_gris(vistas[i]), f"#{i+1}  vista"),
+                (_calor(x[i, 1].numpy(), 1.0), f"#{i+1}  relleno"))):
+            y0 = 44 + fila * (cel + 20)
+            im.paste(tile.resize((cel, cel), Image.NEAREST), (x0, y0))
+            d.rectangle([x0, y0, x0 + cel - 1, y0 + cel - 1], outline=(175, 175, 175))
+            d.text((x0, y0 + cel + 3), rot, fill=(60, 60, 60), font=f_lab)
+    d.text((10, H - 18),
+           "arriba la vista 20x20 (estirada a su propio rango para verla) · abajo el canal de "
+           "RELLENO, 0 = pixel real, 1 = inventado por el borde",
+           fill=(95, 95, 95), font=f_lab)
+    im.save(dest / "entradas.png")
+    print(f"[entradas] {2*n} PNG + entradas.png en {dest}")
+    return dest
+
+
 def modelo(run: str | None):
     """El modelo del run, o la red SIN ENTRENAR con la semilla de la receta.
 
@@ -140,6 +183,13 @@ def _gris(a):
     t = np.clip((a - a.min()) / max(a.max() - a.min(), 1e-9), 0, 1)
     v = (t * 255).astype(np.uint8)
     return Image.fromarray(np.stack([v, v, v], -1), "RGB")
+
+
+def _calor(a, vmax):
+    """blanco (0) -> rojo (vmax). Para el canal de RELLENO, que no tiene signo."""
+    t = np.clip(a / max(vmax, 1e-9), 0.0, 1.0)
+    rgb = np.stack([255 - t * 40, 255 - t * 215, 255 - t * 235], -1)
+    return Image.fromarray(rgb.clip(0, 255).astype(np.uint8), "RGB")
 
 
 def _diverge(a, vmax):
@@ -196,6 +246,7 @@ def main() -> int:
 
     vent = set_visualizacion(a.n, a.semilla)
     x, e, vistas = entradas(vent)
+    guardar_entradas(vent, x, vistas)
     m, etiqueta = modelo(a.run)
     conv = m.center_convs[0]
     with torch.no_grad():
