@@ -1,7 +1,7 @@
 # Plan — sonda L1: ¿pueden los kernels de la primera capa aprender filtros genéricos? (2026-09-02)
 
 > **Estado: criterio CONGELADO el 2026-09-02, antes de mirar ningún resultado.** El dueño
-> contestó las cuatro preguntas del §6 en [`instruccioneslargas.md`](../instruccioneslargas.md)
+> contestó las cuatro preguntas del §6 en [`instruccioneslargas.md`](02-respuestas-del-dueno.md)
 > (commit `7959c558d`), y sus respuestas cambiaron el diseño lo bastante como para que el §4
 > de aquí se reescribiera **entero** — con la rejilla todavía sin correr, que es lo que hace
 > que siga siendo un criterio y no una explicación de lo que salió.
@@ -16,7 +16,7 @@
 *Ver si los 16 kernels de L1, que en `fov16-optimo-mask` no aprendieron nada parecido a un
 filtro genérico, podrían aprenderlo **cuando sí hay presión sobre ellos**.*
 
-El encargo completo está en [`instruccioneslargas.md`](../instruccioneslargas.md) de este mismo
+El encargo completo está en [`instruccioneslargas.md`](02-respuestas-del-dueno.md) de este mismo
 repo. Este documento es el §7 de aquél: el criterio, más lo que se ha podido medir **sin
 gastar** y que cambia tres de sus umbrales.
 
