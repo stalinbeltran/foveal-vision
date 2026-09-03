@@ -1,0 +1,36 @@
+{
+  "stop": "02-11epocas",
+  "modelo": "plana-2k7-s1 · epoca 11",
+  "run": "plana-2k7-s1",
+  "n_kernels": 2,
+  "n_entradas": 10,
+  "vmax_comun": 2.558699369430542,
+  "kernels": {
+    "forma": [
+      2,
+      2,
+      7,
+      7
+    ],
+    "norma_l2": [
+      1.5839,
+      0.82688
+    ]
+  },
+  "respuesta_por_kernel": {
+    "kernel0": {
+      "abs_media": 1.09407,
+      "abs_max": 2.5587,
+      "aporte_vista": 0.89586,
+      "aporte_relleno": 0.04794,
+      "frac_vista": 0.9492
+    },
+    "kernel1": {
+      "abs_media": 0.23988,
+      "abs_max": 0.971,
+      "aporte_vista": 0.84009,
+      "aporte_relleno": 0.01868,
+      "frac_vista": 0.9782
+    }
+  }
+}

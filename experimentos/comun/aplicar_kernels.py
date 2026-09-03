@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""La evaluacion de ESTE experimento: aplicar los 4 kernels a 10 entradas fijas.
+"""La evaluacion: aplicar los kernels de la red a 10 entradas fijas.
 
-    python nn/aplicar_kernels.py --stop 00-sin-entrenar          # red sin entrenar
-    python nn/aplicar_kernels.py --stop 01-2min --run plana-4k7-s1
+    python ../comun/aplicar_kernels.py --exp <carpeta> --red <config> --stop <etiqueta> [--run <run>]
+
+⚠ VIVE EN `comun/` Y NO DENTRO DE UN EXPERIMENTO, Y ESA ES LA CLAVE
+   `cnn-plana-4k7` y `cnn-plana-2k7` son GEMELOS: lo unico que cambia entre ellos
+   es `channels`. Comparar sus stops solo significa algo si la medida es LA MISMA,
+   asi que el evaluador, el set de 10 ventanas y las imagenes de entrada son
+   compartidos. Dos copias de esto derivarian y la comparacion se volveria una
+   ilusion sin que nada fallara.
 
 ⚠ NO se evalua la salida tipica de la red (las 12 cifras de las esquinas). El
 encargo lo dice explicitamente: lo que se mira es la ENTRADA pasada por los
@@ -34,9 +40,8 @@ import torch
 import yaml
 from PIL import Image, ImageDraw, ImageFont
 
-AQUI = Path(__file__).resolve().parent
-EXP = AQUI.parent
-REPO = EXP.parents[1]
+AQUI = Path(__file__).resolve().parent          # experimentos/comun
+REPO = AQUI.parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from fv import settings                                          # noqa: E402
@@ -45,18 +50,22 @@ from fv.models.builder import build_model, full_config           # noqa: E402
 from fv.training.registry import RunStore                        # noqa: E402
 
 DATASET = "dirty1000-80px-16px-r20260827"
-RED = REPO / "configs" / "networks" / "plana-20-4k7.yaml"
 SEMILLA_RECETA = 1          # `seed` de configs/recipes/plan40.yaml
+# Lo COMPARTIDO por todos los experimentos gemelos. Se resuelve aqui y no por
+# experimento: si cada uno tuviera su set, sus stops no serian comparables.
+SET = AQUI / "set-visualizacion.json"
+ENTRADAS = AQUI / "entradas"
+RED = None                  # lo fija --red
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 
 def _net() -> dict:
-    return full_config(yaml.safe_load(RED.read_text()))
+    return full_config(yaml.safe_load(Path(RED).read_text()))
 
 
 def set_visualizacion(n: int, semilla: int, split: int = 1) -> list[dict]:
     """Los n indices, elegidos UNA vez y guardados. Si ya existen, se releen."""
-    fich = EXP / "evaluacion" / "set-visualizacion.json"
+    fich = SET
     if fich.exists():
         d = json.loads(fich.read_text())
         print(f"[set] releo el set congelado: {len(d['ventanas'])} ventanas "
@@ -109,7 +118,7 @@ def guardar_entradas(vent, x, vistas) -> Path:
     Se guardan los DOS canales, porque la red ve los dos: la vista y el RELLENO
     (`1 - cobertura`: 0 = pixel real, 1 = inventado por `pad_mode: edge`).
     """
-    dest = EXP / "evaluacion" / "entradas"
+    dest = ENTRADAS
     dest.mkdir(parents=True, exist_ok=True)
     for i, v in enumerate(vistas):
         _gris(v).resize((200, 200), Image.NEAREST).save(dest / f"entrada{i+1:02d}.png")
@@ -316,6 +325,10 @@ def figuras(vistas, mapas, dest: Path, etiqueta: str, k: int) -> None:
 
 def main() -> int:
     p = argparse.ArgumentParser(description="aplica los kernels al set de visualizacion")
+    p.add_argument("--exp", required=True,
+                   help="la carpeta del experimento (ahi caen los stop-*)")
+    p.add_argument("--red", required=True,
+                   help="nombre de la config de red, p.ej. plana-20-2k7")
     p.add_argument("--stop", required=True, help="etiqueta, p.ej. 00-sin-entrenar")
     p.add_argument("--run", default=None, help="sin esto: la red SIN entrenar")
     p.add_argument("--n", type=int, default=10)
@@ -327,6 +340,14 @@ def main() -> int:
                         "se niega, y con razon: ver el aviso del codigo")
     p.add_argument("--semilla", type=int, default=2026)
     a = p.parse_args()
+
+    global EXP, RED
+    EXP = Path(a.exp).resolve()
+    RED = REPO / "configs" / "networks" / f"{a.red}.yaml"
+    if not EXP.is_dir():
+        raise SystemExit(f"no existe la carpeta del experimento: {EXP}")
+    if not RED.exists():
+        raise SystemExit(f"no existe la red: {RED}")
 
     vent = set_visualizacion(a.n, a.semilla)
     x, e, vistas = entradas(vent)

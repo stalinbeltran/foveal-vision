@@ -1,5 +1,10 @@
 # CNN plana de 1 capa y 4 kernels 7×7 — misma entrada y salida que la foveada
 
+> **Tiene un GEMELO de 2 kernels**: [`../2026-09-03-cnn-plana-2k7/`](../2026-09-03-cnn-plana-2k7/).
+> Lo único que cambia entre los dos es `channels`; todo lo demás —geometría, receta, semilla, y
+> las **mismas 10 ventanas**— es idéntico, y los stops caen en las mismas épocas (0, 3, 11, 24,
+> 37) para poder ponerlos uno al lado del otro.
+
 **Encargo del 2026-09-03** ([`instrucciones/01-encargo.md`](instrucciones/01-encargo.md)).
 Entrenamiento **en curso, por avances**. Hechos cuatro: **37 épocas, 24,1 min** en este droplet
 (2 vCPU). **0 máquinas alquiladas, 0 $.**
@@ -99,15 +104,20 @@ las salidas de la evaluación.
 **entrada pasada por los kernels** — 4 imágenes por cada imagen de entrada.
 
 - **El set de visualización son 10 ventanas de validación**, elegidas al azar **una vez** y
-  congeladas en [`evaluacion/set-visualizacion.json`](evaluacion/set-visualizacion.json). Se
-  reusan en todos los stops: dos stops sólo son comparables sobre las mismas entradas.
+  congeladas en [`../comun/set-visualizacion.json`](../comun/set-visualizacion.json). Se reusan en
+  todos los stops **y en el experimento gemelo de 2 kernels**: dos stops sólo son comparables
+  sobre las mismas entradas.
+- ⚠ **El evaluador, el set y las imágenes de entrada viven en [`../comun/`](../comun/)**, no aquí.
+  Desde que existe [`cnn-plana-2k7`](../2026-09-03-cnn-plana-2k7/) —idéntico salvo `channels`—
+  comparar sus stops con los de aquí sólo significa algo si la medida es **la misma**. Dos copias
+  del evaluador derivarían y la comparación se volvería una ilusión sin que nada fallara.
 - **Se evalúa antes de entrenar y en cada stop.** El `stop-00` es la red **sin entrenar**, y es
   *la misma* red que luego entrena: la init se reproduce con la semilla de la receta, y está
   **comprobado** que construir los datasets en medio no consume el RNG global.
 
 | qué | dónde |
 |---|---|
-| **las 10 entradas** | [`evaluacion/entradas/`](evaluacion/entradas/) |
+| **las 10 entradas** *(compartidas con el gemelo)* | [`../comun/entradas/`](../comun/entradas/) |
 | `stop-00-sin-entrenar` — red recién inicializada | [`evaluacion/stop-00-sin-entrenar/`](evaluacion/stop-00-sin-entrenar/) |
 | `stop-01-3epocas` — tras el primer avance (~2 min) | [`evaluacion/stop-01-3epocas/`](evaluacion/stop-01-3epocas/) |
 | `stop-02-11epocas` — tras el segundo avance (+8 épocas) | [`evaluacion/stop-02-11epocas/`](evaluacion/stop-02-11epocas/) |
@@ -116,9 +126,9 @@ las salidas de la evaluación.
 
 ### Las entradas
 
-![las 10 entradas](evaluacion/entradas/entradas.png)
+![las 10 entradas](../comun/entradas/entradas.png)
 
-`evaluacion/entradas/` trae `entradaNN.png` (la vista 20×20) y `entradaNN-relleno.png` (el
+`../comun/entradas/` trae `entradaNN.png` (la vista 20×20) y `entradaNN-relleno.png` (el
 segundo canal), más la hoja de arriba. **Están fuera de los `stop-*/` a propósito**: el set está
 congelado, así que son idénticas en todos los stops — copiarlas en cada uno invitaría a creer que
 pueden cambiar entre uno y otro, que es justo lo que no puede pasar para que dos stops se
@@ -149,9 +159,9 @@ exactamente el mismo tamaño. Se recuperó de git. Ahora:
   red. El artefacto de registro de un stop es su `mapas.npy`; las figuras son **derivadas**.
 
 ```bash
-python nn/aplicar_kernels.py --stop 00-sin-entrenar                # red sin entrenar
-python nn/aplicar_kernels.py --stop 03-Nepocas --run plana-4k7-s1  # tras el siguiente avance
-python nn/aplicar_kernels.py --stop 01-3epocas --solo-figuras      # rehacer figuras de un stop viejo
+E=experimentos/2026-09-03-cnn-plana-4k7
+python experimentos/comun/aplicar_kernels.py --exp $E --red plana-20-4k7 --stop 05-Nepocas --run plana-4k7-s1
+python experimentos/comun/aplicar_kernels.py --exp $E --red plana-20-4k7 --stop 01-3epocas --solo-figuras
 ```
 
 ### Qué se ve, tras 37 épocas
@@ -330,10 +340,10 @@ las dos primeras hipótesis del anillo.
 | | |
 |---|---|
 | [`instrucciones/01-encargo.md`](instrucciones/01-encargo.md) | el encargo tal como llegó (commit `9926bd0b2`) |
-| [`nn/aplicar_kernels.py`](nn/aplicar_kernels.py) | la evaluación: congela el set, aplica los kernels, guarda las 40 imágenes y los montajes |
+| [`../comun/aplicar_kernels.py`](../comun/aplicar_kernels.py) | la evaluación, **compartida con el gemelo**: congela el set, aplica los kernels, guarda las imágenes y los montajes |
 | [`nn/porque_el_anillo.py`](nn/porque_el_anillo.py) | separa las tres causas del anillo (máscaras · canal de relleno · padding) |
 | [`nn/contaminacion_produccion.py`](nn/contaminacion_produccion.py) | cuánto del mapa de `fov16-mask-p20` depende del relleno |
-| [`evaluacion/entradas/`](evaluacion/entradas/) | las 10 entradas en PNG: vista y canal de relleno |
+| [`../comun/entradas/`](../comun/entradas/) | las 10 entradas en PNG: vista y canal de relleno |
 | `evaluacion/stop-*/` | un directorio por stop |
 | los pesos | **fuera de git**, en `foveal-vision-data/2026/09-septiembre/runs/plana-4k7-s1/` |
 

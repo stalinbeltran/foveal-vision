@@ -7,8 +7,15 @@ depender de que el resto del repo siga teniendo la misma forma.
 
 | | |
 |---|---|
-| [`2026-09-03-cnn-plana-4k7/`](2026-09-03-cnn-plana-4k7/) | CNN **plana** de 1 capa y 4 kernels 7×7, con la misma entrada y salida que la foveada con máscara. **En curso, por avances**: 37 épocas (24,1 min) hechas |
+| [`2026-09-03-cnn-plana-4k7/`](2026-09-03-cnn-plana-4k7/) | CNN **plana** de 1 capa y **4** kernels 7×7, misma entrada y salida que la foveada con máscara. 37 épocas (24,0 min) · f1 **0,840** |
+| [`2026-09-03-cnn-plana-2k7/`](2026-09-03-cnn-plana-2k7/) | **El gemelo con 2 kernels.** Mismos stops, misma semilla, mismas 10 ventanas. 37 épocas (24,7 min) · f1 **0,739** — **quitar dos kernels cuesta 0,10 de f1** |
+| [`comun/`](comun/) | el evaluador, el set de 10 ventanas y las entradas que **comparten los dos gemelos**. Dos copias derivarían y la comparación se volvería una ilusión |
 | [`2026-09-03-sonda-l1/`](2026-09-03-sonda-l1/) | ¿Pueden los kernels de la primera capa aprender filtros genéricos si SÍ hay presión sobre ellos? **Respuesta: no.** 8 redes entrenadas, 2,1 h, 0 $ |
+
+⚠ **Dos experimentos gemelos comparten su medida, no la copian.** `cnn-plana-4k7` y
+`cnn-plana-2k7` sólo se diferencian en `channels`, y sus stops caen en las mismas épocas; para
+que ponerlos uno al lado del otro signifique algo, el evaluador y las 10 ventanas viven en
+[`comun/`](comun/) y no dentro de ninguno de los dos.
 
 ## La forma
 
