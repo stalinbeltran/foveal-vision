@@ -41,11 +41,31 @@ def test_el_defecto_es_zeros_y_eso_es_lo_que_habia_antes():
 
 
 @pytest.mark.parametrize("red", [f.stem for f in REDES])
-def test_ninguna_config_del_repo_cambia_al_anadir_el_campo(red):
-    """El campo es nuevo: ninguna config lo declara, asi que todas tienen que
-    seguir construyendose con `zeros`."""
+def test_cada_config_del_repo_construye_con_el_relleno_QUE_DECLARA(red):
+    """Anadir el campo no pudo cambiar ninguna red que no lo declare.
+
+    ⚠ Se lee del YAML en vez de exigir `zeros` a todas, y por un motivo: la
+    primera version exigia `zeros` a TODAS y empezo a fallar en cuanto se creo
+    `plana-20-4k7-rep`, que declara `replicate` a proposito. El test hacia lo
+    correcto --avisar de que una config construye con otro relleno-- pero la
+    afirmacion estaba mal escrita: lo que hay que garantizar es que ninguna red
+    construya con un relleno DISTINTO DEL QUE PIDE, no que todas pidan `zeros`.
+    """
+    declarado = yaml.safe_load(
+        (RAIZ / "configs" / "networks" / f"{red}.yaml").read_text()
+    ).get("conv_pad_mode", "zeros")
     m = build_model(_cfg(red))
-    assert m.center_convs[0].padding_mode == "zeros"
+    assert m.center_convs[0].padding_mode == declarado
+
+
+def test_las_configs_que_NO_lo_declaran_siguen_en_zeros():
+    """La otra mitad, y la que de verdad protege: el campo es nuevo, asi que una
+    config que no lo mencione tiene que seguir significando lo de siempre."""
+    sin_declarar = [f.stem for f in REDES
+                    if "conv_pad_mode" not in yaml.safe_load(f.read_text())]
+    assert len(sin_declarar) >= 9, "esperaba las redes preexistentes del repo"
+    for red in sin_declarar:
+        assert build_model(_cfg(red)).center_convs[0].padding_mode == "zeros", red
 
 
 def test_declararlo_como_zeros_da_EXACTAMENTE_la_misma_red():
