@@ -1,0 +1,89 @@
+{
+  "dataset": "dirty1000-80px-16px-r20260827",
+  "split": "validacion",
+  "semilla": 2026,
+  "n": 10,
+  "ventanas": [
+    {
+      "indice": 4379,
+      "fila_imagen": 31,
+      "ventana_xy": [
+        55,
+        10
+      ]
+    },
+    {
+      "indice": 57537,
+      "fila_imagen": 410,
+      "ventana_xy": [
+        55,
+        44
+      ]
+    },
+    {
+      "indice": 23488,
+      "fila_imagen": 167,
+      "ventana_xy": [
+        50,
+        35
+      ]
+    },
+    {
+      "indice": 92673,
+      "fila_imagen": 661,
+      "ventana_xy": [
+        35,
+        44
+      ]
+    },
+    {
+      "indice": 117364,
+      "fila_imagen": 838,
+      "ventana_xy": [
+        10,
+        15
+      ]
+    },
+    {
+      "indice": 61191,
+      "fila_imagen": 437,
+      "ventana_xy": [
+        55,
+        0
+      ]
+    },
+    {
+      "indice": 10074,
+      "fila_imagen": 71,
+      "ventana_xy": [
+        40,
+        44
+      ]
+    },
+    {
+      "indice": 73001,
+      "fila_imagen": 521,
+      "ventana_xy": [
+        25,
+        20
+      ]
+    },
+    {
+      "indice": 62033,
+      "fila_imagen": 443,
+      "ventana_xy": [
+        64,
+        0
+      ]
+    },
+    {
+      "indice": 92775,
+      "fila_imagen": 662,
+      "ventana_xy": [
+        55,
+        30
+      ]
+    }
+  ],
+  "por_que": "congelado: dos stops solo son comparables sobre las MISMAS entradas"
+}

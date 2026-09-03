@@ -1,0 +1,60 @@
+format_version: 2
+# CNN PLANA de UNA capa y CUATRO kernels 7x7, encargada por el dueno el
+# 2026-09-03. Misma entrada y misma salida que `fov16-optimo-mask`; lo unico que
+# cambia es la estructura de en medio.
+#
+# QUE SE CONSERVA DE `fov16-optimo-mask`, Y POR QUE ESO ES EL EXPERIMENTO
+#   La geometria entera (fovea_px 16, border_px 8, border_reduce 4,
+#   overlap_fovea_px 7) esta copiada tal cual, asi que la entrada es la MISMA
+#   vista 20x20 -- N = 16 + 2*(8//4) = 20 -- y `mask_channel: coverage` le da los
+#   MISMOS 2 canales (vista + relleno). La cabeza es la de siempre:
+#   `nn.Linear(flat + n_edge, 12)`, o sea 4 esquinas x [existe, x, y].
+#   Comparar dos redes que ven o predicen cosas distintas no compara nada.
+#
+# QUE CAMBIA
+#   regions: split -> single   una sola rama sobre las 20x20, sin fovea ni
+#                              periferia y SIN mascaras (builder.py:145)
+#   n_layers: 4 -> 1           una unica capa
+#   channels: [16]*4 -> [4]    cuatro kernels
+#   k_center: 3 -> 7           de 7x7
+#   19.656 parametros contra 168.044 de la foveada (medido 2026-09-03 con
+#   `sum(p.numel() for p in model.parameters())`).
+#
+# ⚠ OJO CON EL 168.844 que dice el comentario de `fov16-optimo-mask.yaml`: ese
+#   numero sale de `network_trace`, que cuenta `state_dict().values()` en vez de
+#   `parameters()`, y por tanto suma los dos buffers de mascara de 20x20 (400 +
+#   400 = 800) que NO se aprenden. Con `regions: single` no hay mascaras, asi que
+#   aqui los dos metodos dan lo mismo -- y por eso comparar los dos numeros tal
+#   cual regala 800 parametros a la foveada.
+#
+# ⚠ `k_periph`, `s_periph` y `merge` NO APLICAN con `regions: single` y la puerta
+#   no los valida; se dejan escritos porque el formato los pide, no porque hagan
+#   algo. Lo mismo pasa en `plana-16-single.yaml`.
+#
+# ⚠ Y `mask_channel: coverage` SI llega a la rama aqui. En `split` va solo a la
+#   periferia --bajo la mascara del centro la cobertura es 1,000 siempre, asi que
+#   al centro serian pesos muertos-- pero en `single` no hay dos ramas: la unica
+#   rama recibe los 2 canales (`in_ch=cin`, builder.py:144). Comprobado
+#   construyendola: el kernel de L1 sale (4, 2, 7, 7).
+#
+# ⚠ NADA DE ESTO ESTA MEDIDO COMO MEJORA, y no se espera que lo sea: los
+#   parametros son los OPTIMOS DE LA FOVEADA y nadie los ha ajustado a una plana
+#   de una capa. Se usan porque es lo que pidio el dueno y porque un punto de
+#   partida medido vale mas que uno inventado.
+regions: single
+fovea_px: 16
+border_px: 8
+border_reduce: 4
+overlap_fovea_px: 7
+overlap_border_px: 0
+n_layers: 1
+k_center: 7
+k_periph: 3
+s_center: 1
+s_periph: 1
+channels: [4]
+merge: concat
+pool_mode: avg
+pad_mode: edge
+edge_inputs: pad
+mask_channel: coverage

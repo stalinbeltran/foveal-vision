@@ -7,6 +7,7 @@ depender de que el resto del repo siga teniendo la misma forma.
 
 | | |
 |---|---|
+| [`2026-09-03-cnn-plana-4k7/`](2026-09-03-cnn-plana-4k7/) | CNN **plana** de 1 capa y 4 kernels 7×7, con la misma entrada y salida que la foveada con máscara. **En curso, por avances**: 3 épocas (1,9 min) hechas |
 | [`2026-09-03-sonda-l1/`](2026-09-03-sonda-l1/) | ¿Pueden los kernels de la primera capa aprender filtros genéricos si SÍ hay presión sobre ellos? **Respuesta: no.** 8 redes entrenadas, 2,1 h, 0 $ |
 
 ## La forma

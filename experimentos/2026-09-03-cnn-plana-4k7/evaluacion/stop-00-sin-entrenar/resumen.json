@@ -1,0 +1,52 @@
+{
+  "stop": "00-sin-entrenar",
+  "modelo": "sin entrenar (semilla 1)",
+  "run": null,
+  "n_kernels": 4,
+  "n_entradas": 10,
+  "vmax_comun": 0.9343127012252808,
+  "kernels": {
+    "forma": [
+      4,
+      2,
+      7,
+      7
+    ],
+    "norma_l2": [
+      0.53844,
+      0.59415,
+      0.60311,
+      0.52549
+    ]
+  },
+  "respuesta_por_kernel": {
+    "kernel0": {
+      "abs_media": 0.17128,
+      "abs_max": 0.53507,
+      "aporte_vista": 0.15556,
+      "aporte_relleno": 0.01143,
+      "frac_vista": 0.9316
+    },
+    "kernel1": {
+      "abs_media": 0.40649,
+      "abs_max": 0.80477,
+      "aporte_vista": 0.45781,
+      "aporte_relleno": 0.0202,
+      "frac_vista": 0.9577
+    },
+    "kernel2": {
+      "abs_media": 0.43014,
+      "abs_max": 0.93431,
+      "aporte_vista": 0.33266,
+      "aporte_relleno": 0.02015,
+      "frac_vista": 0.9429
+    },
+    "kernel3": {
+      "abs_media": 0.50407,
+      "abs_max": 0.83664,
+      "aporte_vista": 0.50078,
+      "aporte_relleno": 0.01856,
+      "frac_vista": 0.9643
+    }
+  }
+}

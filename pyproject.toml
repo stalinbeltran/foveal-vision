@@ -38,5 +38,25 @@ fv-api = "fv.api.__main__:main"
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+[tool.pytest.ini_options]
+# `experimentos/` NO se recolecta, y esto es un ARREGLO, no una preferencia.
+#
+# Cada experimento guarda un SNAPSHOT congelado del codigo que lo produjo, tests
+# incluidos. Ese snapshot tiene el mismo nombre de fichero que el test vivo
+# (`test_sonda_l1.py`) y ningun `__init__.py`, asi que pytest les asigna el mismo
+# nombre de modulo top-level y aborta la RECOLECCION ENTERA:
+#
+#   import file mismatch: imported module 'test_sonda_l1' has this __file__ ...
+#   Interrupted: 1 error during collection
+#
+# Lo rompio el commit f893eb560 (2026-09-03) al crear el primer snapshot, y no se
+# vio porque la suite se corrio ANTES de copiarlo. Resultado: `pytest -q` daba
+# CERO tests, que es peor que un test rojo -- un rojo se ve.
+#
+# ⚠ Se ignora la carpeta y NO se renombran los snapshots: un snapshot tiene que
+# ser el fichero tal cual estaba, con su nombre, o deja de servir para lo que
+# existe. Y los tests VIVOS de `tests/` siguen corriendo igual.
+norecursedirs = ["experimentos", ".venv", "web", "node_modules", "*.egg-info"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
