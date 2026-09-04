@@ -28,8 +28,17 @@ SERIE = [
 STOPS = (1, 3, 11, 24, 37)
 
 
-def leer(carpeta):
-    p = RAIZ / carpeta / "nn" / "pesos" / "metrics.jsonl"
+def leer(carpeta, sub: str = ""):
+    """Las métricas de un run, leídas de su `metrics.jsonl` commiteado.
+
+    `sub` es la subcarpeta dentro de `nn/pesos/` cuando un experimento tiene
+    VARIOS runs (los brazos de `2026-09-04-preproceso-kernel-congelado`). Vacío
+    —el caso de los siete gemelos, un run por carpeta— deja la ruta como estaba.
+    Existe para que la tabla de aquel experimento y ésta lean los mismos ficheros
+    con el mismo código: dos lectores de la misma medida acaban discrepando en
+    qué es «mejor f1», y entonces las dos tablas dejan de poder compararse.
+    """
+    p = RAIZ / carpeta / "nn" / "pesos" / sub / "metrics.jsonl"
     if not p.exists():
         return None
     L = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
