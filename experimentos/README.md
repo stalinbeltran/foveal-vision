@@ -34,6 +34,50 @@ set viven en [`comun/`](comun/) y no dentro de ninguno. La tabla de los seis la 
 [`comun/serie.py`](comun/serie.py), leída de los `metrics.jsonl` commiteados — transcribirla a
 mano es como nacen los números que nadie puede auditar.
 
+## ⏳ PENDIENTE: medir el efecto del relleno **en la FOVEADA**
+
+**Anotado el 2026-09-04 a petición del dueño.** Toda la evidencia sobre el relleno de la
+convolución que hay en este repo es de **redes planas**. En la foveada —la red de producción—
+**nadie lo ha medido nunca**.
+
+### Lo que sí está medido (y por qué no se puede extrapolar)
+
+Misma receta en los cuatro: se resta a cada mapa el nivel mediano de su interior y se compara el
+anillo de `k//2` px contra el interior ([`porque_el_anillo.py`](2026-09-03-cnn-plana-4k7/nn/porque_el_anillo.py)).
+
+| | anillo / interior | f1 |
+|---|---:|---:|
+| `4k7` **`zeros`** *(lo que hace producción)* | **9,43×** | **0,840** |
+| `4k7` `replicate` | 2,17× | **0,820** |
+| `2k7` **sin relleno** | 2,15× | 0,656 ⚠ *confundido: la cabeza cae a 392 features* |
+
+⚠⚠ **El arreglo obvio NO era una mejora**: `replicate` baja el anillo 4,3× y el f1 **también
+baja**. Eso es exactamente lo que hace que este eje merezca medirse en vez de darse por sabido.
+
+### Por qué la foveada puede comportarse distinto — no es una suposición gratuita
+
+El [reporte #19](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/reportes/estudios/2026/09-septiembre/2026-09-01-canal-de-relleno.md)
+midió que el problema del borde **no es qué píxeles inventas, es que la red no sabe que son
+inventados**: `pad_mode` sale plano, y `mask_channel` (decírselo) mueve el recall de la esquina de
+**0,608 a 0,974**. La foveada tiene ese canal y las planas de la serie no, así que el anillo puede
+dejar de doler cuando la red sabe que está ahí. **Es una hipótesis, no un resultado.**
+
+### ⚠ Lo que hay que saber antes de lanzarlo
+
+1. **El tamaño del relleno NO es un dato hoy.** `builder.py:145` hace `pc, pp = kc // 2, kp // 2`:
+   es una expresión, no un campo de config. Barrerlo pide **tocar producción** o parchear en local
+   como hacen los experimentos de esta carpeta. `conv_pad_mode` (`zeros`/`replicate`) **sí** es
+   dato desde `efb8d5d05`.
+2. **Sin relleno la cabeza encoge, y en esta serie manda la cabeza.** Es el confound que arrastró
+   el `2k7-sinpadding` y que haría ilegible una comparación ingenua: hay que igualar features o
+   declarar el confound, como en el resto de la serie.
+3. **Son DOS ejes, no uno**: el *tamaño* (`k//2` contra 0) y el *modo* (`zeros` contra
+   `replicate`). El primero cambia la geometría; el segundo no.
+
+Estado en el repo central:
+[`ESTADO.md`](https://github.com/stalinbeltran/estudios-redes-neuronales/blob/main/ESTADO.md),
+fila «relleno de la convolución» — **sin medir en la foveada**.
+
 ## La forma
 
 ```
