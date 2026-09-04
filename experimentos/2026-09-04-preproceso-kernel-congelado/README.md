@@ -7,7 +7,7 @@ Encargo del dueño del 2026-09-04, literal en
 [`instrucciones/01-encargo.md`](instrucciones/01-encargo.md). El criterio, **escrito antes de
 correr nada**, en [`instrucciones/02-criterio.md`](instrucciones/02-criterio.md).
 
-## Estado: **época 3 de 37. NO hay veredicto, y es a propósito**
+## Estado: **época 11 de 37 — primer veredicto, y es PROVISIONAL**
 
 ```
 $ .venv/bin/python experimentos/2026-09-04-preproceso-kernel-congelado/nn/comparativa.py
@@ -15,21 +15,32 @@ $ .venv/bin/python experimentos/2026-09-04-preproceso-kernel-congelado/nn/compar
 
 | brazo | feat. | ép. 3 | ép. 11 | ép. 24 | ép. 37 | ancla iso-features | Δ misma época |
 |---|---|---|---|---|---|---|---|
-| pre-1k3 | 256 | 0.569 | — | — | — | 1k5 crudo | **+0.186** (ép. 3) |
-| pre-1k5 | 196 | 0.509 | — | — | — | 1k7 crudo | **+0.309** (ép. 3) |
-| pre-1k7 | 144 | 0.449 | — | — | — | — | sin ancla |
+| pre-1k3 | 256 | 0.569 | 0.625 | — | — | 1k5 crudo | **+0.030** → NEUTRO |
+| pre-1k5 | 196 | 0.509 | 0.579 | — | — | 1k7 crudo | **+0.055** → aporta |
+| pre-1k7 | 144 | 0.449 | 0.542 | — | — | — | sin ancla |
 
 *referencia cruda (324 feat., **37 épocas**, ya corrida y en git): f1 **0,680***
 
-⚠⚠ **Los tres brazos van muy por delante de su ancla a la época 3, y eso NO es el resultado.**
-Está declarado en el criterio **antes** de mirar: su L1 ya viene entrenada, así que la cabeza
-empieza a aprender sobre features útiles en vez de sobre ruido, y **la ventaja de las primeras
-épocas es esperada por construcción**. Lo que el estudio pregunta es si sobrevive a la época 37.
+### ⚠⚠ Lo que hay que llevarse de aquí: **la ventaja se DESPLOMA**
 
-⚠⚠ **Y el orden a 3 épocas está MEDIDO como no fiable en esta misma serie:** `1k3` es el **peor**
-de los tres gemelos a la ép. 3 (0,099) y el **mejor** a la 37 (0,680). Un informe leído a la
-época 3 habría concluido lo contrario de lo que resultó. Por eso `comparativa.py` **se niega a
-declarar** antes de la época 11 en vez de dejarlo a la prudencia del que lea.
+| | ép. 3 | ép. 11 | |
+|---|---:|---:|---|
+| `pre-1k3` vs `1k5 crudo` | **+0,186** | **+0,030** | ÷6,2 |
+| `pre-1k5` vs `1k7 crudo` | **+0,309** | **+0,055** | ÷5,6 |
+
+**Es exactamente lo que el criterio escribió antes de mirar**: la L1 congelada ya viene
+entrenada, así que la cabeza arranca sobre features útiles en vez de sobre ruido — y esa ventaja
+es de **velocidad de convergencia**, no de calidad. El kernel libre la alcanza en cuanto tiene
+épocas para aprender el suyo.
+
+⚠ **`pre-1k5` sale «aporta» por +0,055 contra una banda de ±0,04: está a un pelo del ruido y la
+tendencia va a la baja.** Leerlo hoy como «el preproceso funciona» sería justo el error que este
+diseño intenta evitar. El criterio dice que la ép. 11 es **provisional** y que sólo la 37 entra en
+el reporte central; a este ritmo, lo esperable es que los dos brazos con ancla acaben en NEUTRO.
+
+⚠ **Y a la época 3 el veredicto habría sido el contrario** (+0,186 y +0,309, o sea «aporta» con
+holgura en los dos). Ésa es la razón de que `comparativa.py` se niegue a declarar antes de la 11,
+y de que ni siquiera la 11 sea firme.
 
 ## Qué es cada brazo
 
@@ -73,7 +84,7 @@ Los 256 y 196 caen justo sobre `1k5` y `1k7`, así que dos de los tres brazos ti
 
 ```bash
 cd ~/src/foveal-vision
-.venv/bin/python experimentos/2026-09-04-preproceso-kernel-congelado/nn/avanzar.py --hasta 11
+.venv/bin/python experimentos/2026-09-04-preproceso-kernel-congelado/nn/avanzar.py --hasta 24
 .venv/bin/python experimentos/2026-09-04-preproceso-kernel-congelado/nn/comparativa.py
 ```
 
@@ -98,7 +109,7 @@ números seguirían saliendo igual de creíbles.
 
 ## Coste, medido
 
-**0 máquinas alquiladas · 0 $ · CPU de este dev.** 3 épocas × 3 brazos = **~7 min**.
+**0 máquinas alquiladas · 0 $ · CPU de este dev.** 11 épocas × 3 brazos = **~25 min** acumulados (los 3 primeras épocas fueron ~7 min; el tramo 3→11, ~18 min).
 
 ⚠ Un brazo cuesta **44-46 s/época** contra los **32,4-34,1 s** de los gemelos (*medido
 2026-09-04, este droplet de 2 vCPU, máquina descargada*): **+33 %** por la convolución congelada
