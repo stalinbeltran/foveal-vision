@@ -1,7 +1,45 @@
 # Planas de verdad sobre datasets preprocesados **construidos antes de entrenar**
 
-**Estado: los TRES DATASETS y las TRES ESTRUCTURAS de red están hechos** (2026-09-04).
-Falta el entrenamiento.
+## ⚠⚠ ENTRENADO a la época 3 — y el resultado es un **COLAPSO**, no una tabla
+
+**Los tres brazos dan f1 = 0,000.** La red predice «no hay esquina» en todas partes, que con un
+13,2 % de esquinas positivas es un mínimo local cómodo. La pérdida sí baja (1,04 → 0,80) y ahí se
+queda.
+
+⚠ **Esto NO dice nada sobre el preproceso.** Dice que **este régimen no da para la tarea** — y era
+el desenlace nº 2 que el [criterio](instrucciones/02-criterio.md) escribió *antes* de mirar:
+*«si los tres brazos salen mal a la vez, el desenlace más probable no es "el preproceso no sirve"
+sino "este régimen no da para esta tarea"»*.
+
+### El suelo de coste, aislado: **son los CANALES, no el stride ni las capas**
+
+Mismo `.npz`, misma receta `plan40`, mismas 3 épocas. Sólo cambia la red *(medido 2026-09-04,
+este droplet)*:
+
+| variante | params | features | **f1 @ép. 3** |
+|---|---:|---:|---:|
+| **la mínima** (2 capas · **2 can.** · s=2) | 286 | 18 | **0,000** |
+| stride 1 (2 capas · **2 can.** · s=1) | 4.774 | **392** | **0,000** |
+| 3 capas (3 capas · **2 can.** · s=2) | 132 | 2 | **0,000** |
+| **16 canales** (2 capas · **16 can.** · s=2) | 4.220 | 144 | **0,544** |
+| control (4 capas · 16 can. · s=1) | — | — | **0,688** |
+
+**Lo decisivo es la segunda fila contra la cuarta:** `stride 1` tiene **más** parámetros (4.774 vs
+4.220) y **2,7× más features** (392 vs 144) — y da 0,000 mientras la de 16 canales da 0,544. O sea
+que **no es capacidad en parámetros ni anchura de cabeza: son los canales**.
+
+**Se pueden conservar las 2 capas, el stride 2 y el sin-relleno.** El único mando que hay que
+soltar es `channels`.
+
+### Lo que sí quedó verificado
+
+- El **dataset y el camino de entrenamiento son correctos**: el mismo `.npz` con una red mayor da
+  f1 0,688 a la época 3. Si el fallo fuera de datos, ninguna red aprendería.
+- **7,3-8,6 s/época** contra los 44-46 s de la versión de 4 capas: los tres brazos a la época 3 en
+  **1 min 36 s**, 0 $.
+- La reanudación incremental está montada (`avanzar.py --hasta N`, `--patience 0`).
+
+**Estado: los 3 datasets, las 3 estructuras y el entrenamiento incremental están hechos.**
 
 | dataset | carpeta (repo de DATOS) | forma | en git | en crudo | muestra |
 |---|---|---|---:|---:|---|
