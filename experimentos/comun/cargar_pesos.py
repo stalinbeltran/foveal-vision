@@ -42,6 +42,7 @@ EXPERIMENTOS = [
     ("2026-09-03-cnn-plana-2k7-sinpadding", "plana-20-2k7", True),
     ("2026-09-04-cnn-plana-1k7-sinpadding", "plana-20-1k7", True),
     ("2026-09-04-cnn-plana-1k5-sinpadding", "plana-20-1k5", True),
+    ("2026-09-04-cnn-plana-1k3-sinpadding", "plana-20-1k3", True),
 ]
 
 

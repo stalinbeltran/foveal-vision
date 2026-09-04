@@ -23,6 +23,7 @@ SERIE = [
     ("2k7 sin relleno","2026-09-03-cnn-plana-2k7-sinpadding",  392),
     ("1k7 sin relleno","2026-09-04-cnn-plana-1k7-sinpadding",  196),
     ("1k5 sin relleno","2026-09-04-cnn-plana-1k5-sinpadding",  256),
+    ("1k3 sin relleno","2026-09-04-cnn-plana-1k3-sinpadding",  324),
 ]
 STOPS = (1, 3, 11, 24, 37)
 
