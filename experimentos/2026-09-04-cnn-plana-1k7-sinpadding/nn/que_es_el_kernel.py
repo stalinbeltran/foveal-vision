@@ -47,15 +47,32 @@ CANALES = ("la vista", "el relleno")
 N_NULO = 2000
 
 
+NOMBRES_6D = ("DC", "Sobel-x", "Sobel-y", "lapl.", "diag-1", "diag-2")
+
+
 def energia_6d(plano: torch.Tensor) -> float:
     """Fraccion de la energia del plano k x k que cae en el subespacio clasico."""
+    return float(desglose_6d(plano).sum())
+
+
+def desglose_6d(plano: torch.Tensor) -> torch.Tensor:
+    """La fraccion de energia en CADA UNO de los 6, por separado.
+
+    ⚠ Hace falta porque la base 6-D INCLUYE el DC, y un kernel casi constante
+    pasa el nulo del subespacio entero sin tener nada de estructura orientada.
+    Medido el 2026-09-04: el kernel del 7x7 da 2,24x su nulo --por encima del
+    p95-- y al desglosarlo casi todo es DC. Leer el agregado sin el desglose
+    habria dicho «aprendio filtros clasicos» sobre un promediador.
+    Es la misma leccion del reporte #22, donde el R2 del Gabor pasaba su nulo
+    sobre kernels DELTA.
+    """
     k = plano.shape[-1]
     B = classic_basis(k).to(torch.float64)           # (6, k*k), ortonormal
     v = plano.reshape(-1).to(torch.float64)
     n = float(v @ v)
     if n == 0:
-        return float("nan")
-    return float(((B @ v) ** 2).sum() / n)
+        return torch.full((6,), float("nan"), dtype=torch.float64)
+    return (B @ v) ** 2 / n
 
 
 def nulo_empirico(k: int, canales: int, n: int = N_NULO) -> tuple[float, float]:
@@ -105,6 +122,12 @@ def main() -> int:
         seis = energia_6d(w[c])
         print(f"  {CANALES[c]:<12} {frac:>7.1%} {dc:>+11.4f} {abs(dc) / max(nrm, 1e-9):>11.3f}"
               f" {seis:>7.3f} {seis / nulo_m:>6.2f}x")
+    print(f"\n  desglose del 6-D en el canal de la vista (el agregado INCLUYE el DC):")
+    d = desglose_6d(w[0])
+    print("   " + "  ".join(f"{NOMBRES_6D[i]} {float(d[i]):.3f}" for i in range(6)))
+    sin_dc = float(d[1:].sum())
+    print(f"    -> sin el DC: {sin_dc:.3f} contra un nulo de {5 / k ** 2:.3f} = "
+          f"{sin_dc / (5 / k ** 2):.2f}x")
     print(f"\n  nulo del 6-D: teorico 6/k² = {nulo_t:.4f} · EMPIRICO (n={N_NULO*w.shape[0]}) "
           f"media {nulo_m:.4f}, p95 {nulo_p95:.4f}")
     print(f"  ⚠ se compara contra el EMPIRICO: la init de PyTorch no es gaussiana isotropa.")

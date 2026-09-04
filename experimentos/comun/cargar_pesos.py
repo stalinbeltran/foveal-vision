@@ -40,6 +40,8 @@ EXPERIMENTOS = [
     ("2026-09-03-cnn-plana-2k7", "plana-20-2k7", False),
     ("2026-09-03-cnn-plana-4k7-replicate", "plana-20-4k7-rep", False),
     ("2026-09-03-cnn-plana-2k7-sinpadding", "plana-20-2k7", True),
+    ("2026-09-04-cnn-plana-1k7-sinpadding", "plana-20-1k7", True),
+    ("2026-09-04-cnn-plana-1k5-sinpadding", "plana-20-1k5", True),
 ]
 
 
@@ -72,7 +74,8 @@ def _comprobar(exp: str, red: str, local: bool) -> bool:
     guardadas = json.loads(stops[-1].read_text())["kernels"]["norma_l2"]
     ok = all(abs(a - b) < 1e-4 for a, b in zip(normas, guardadas))
     epoca = e.get("epoch", "?")
-    print(f"  {exp.replace('2026-09-03-','') :<34} last.pt · epoca {epoca:<3} "
+    import re as _re  # noqa
+    print(f"  {_re.sub(r'^2026-09-0\d-', '', exp):<34} last.pt · epoca {epoca:<3} "
           f"· L1 {tuple(W.shape)} · {'✓ casa con ' + stops[-1].parent.name if ok else '✗ NO CASA'}")
     if not ok:
         print(f"      guardadas {guardadas}\n      del .pt   {normas}")

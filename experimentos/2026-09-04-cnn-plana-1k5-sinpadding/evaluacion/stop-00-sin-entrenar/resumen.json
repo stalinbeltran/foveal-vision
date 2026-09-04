@@ -1,0 +1,28 @@
+{
+  "stop": "00-sin-entrenar",
+  "modelo": "sin entrenar (semilla 1)",
+  "run": null,
+  "n_kernels": 1,
+  "n_entradas": 10,
+  "vmax_comun": 0.6023112535476685,
+  "kernels": {
+    "forma": [
+      1,
+      2,
+      5,
+      5
+    ],
+    "norma_l2": [
+      0.5227
+    ]
+  },
+  "respuesta_por_kernel": {
+    "kernel0": {
+      "abs_media": 0.14849,
+      "abs_max": 0.60231,
+      "aporte_vista": 0.01739,
+      "aporte_relleno": 0.00865,
+      "frac_vista": 0.6678
+    }
+  }
+}

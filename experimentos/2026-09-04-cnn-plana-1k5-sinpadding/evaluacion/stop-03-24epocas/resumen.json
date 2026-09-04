@@ -1,0 +1,28 @@
+{
+  "stop": "03-24epocas",
+  "modelo": "plana-1k5sp-s1 · epoca 24",
+  "run": "plana-1k5sp-s1",
+  "n_kernels": 1,
+  "n_entradas": 10,
+  "vmax_comun": 0.5300549864768982,
+  "kernels": {
+    "forma": [
+      1,
+      2,
+      5,
+      5
+    ],
+    "norma_l2": [
+      0.73092
+    ]
+  },
+  "respuesta_por_kernel": {
+    "kernel0": {
+      "abs_media": 0.12393,
+      "abs_max": 0.53005,
+      "aporte_vista": 1.57726,
+      "aporte_relleno": 0.00788,
+      "frac_vista": 0.995
+    }
+  }
+}
