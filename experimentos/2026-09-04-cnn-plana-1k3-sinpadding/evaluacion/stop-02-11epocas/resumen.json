@@ -1,0 +1,28 @@
+{
+  "stop": "02-11epocas",
+  "modelo": "plana-1k3sp-s1 · epoca 11",
+  "run": "plana-1k3sp-s1",
+  "n_kernels": 1,
+  "n_entradas": 10,
+  "vmax_comun": 0.24580934643745422,
+  "kernels": {
+    "forma": [
+      1,
+      2,
+      3,
+      3
+    ],
+    "norma_l2": [
+      0.59028
+    ]
+  },
+  "respuesta_por_kernel": {
+    "kernel0": {
+      "abs_media": 0.0517,
+      "abs_max": 0.24581,
+      "aporte_vista": 0.73445,
+      "aporte_relleno": 0.00604,
+      "frac_vista": 0.9918
+    }
+  }
+}
