@@ -1,8 +1,29 @@
 # Planas de verdad sobre datasets preprocesados **construidos antes de entrenar**
 
-**Estado: PLANIFICADO. No se ha construido ni entrenado nada** (2026-09-04). El dueño paró el
-intento anterior y pidió que los datasets de entrada se construyan **antes** del entrenamiento,
-y que la no-linealidad la apliquen **las propias funciones `aplicaKernel`**.
+**Estado: los TRES DATASETS ESTAN CONSTRUIDOS** (2026-09-04). Falta la red y el entrenamiento.
+
+| dataset | carpeta | forma | disco | muestra |
+|---|---|---|---|---|
+| `1k3` | `data/preprocesado/1k3-relu/` | (140000, 1, **18, 18**) | 180 MB | [`muestras/1k3.png`](muestras/1k3.png) |
+| `1k5` | `data/preprocesado/1k5-relu/` | (140000, 1, **16, 16**) | 144 MB | [`muestras/1k5.png`](muestras/1k5.png) |
+| `1k7` | `data/preprocesado/1k7-relu/` | (140000, 1, **14, 14**) | 112 MB | [`muestras/1k7.png`](muestras/1k7.png) |
+
+Construidos en **1 min 20 s cada uno** (este droplet, 2 vCPU, 0 $), y `--comprobar` valida los
+tres contra su manifiesto. Cada uno lleva su `manifiesto.json` con la huella de los pesos del
+kernel, y su propia copia de la muestra.
+
+### Las muestras: las MISMAS 10 ventanas en los tres
+
+Una fila por ventana: la vista 20×20 que entró y el mapa que el dataset guarda. Los índices salen
+de `comun/set-visualizacion.json`, el set congelado que comparten los siete gemelos, así que las
+tres imágenes se pueden poner una al lado de otra — es la misma ventana en la misma fila.
+
+⚠ **Se leen DEL `.npz` construido, no se recalculan.** Es la diferencia entre una figura y una
+comprobación: si el constructor tuviera un fallo —el lookup de imágenes, el orden de las filas, la
+escala— una figura recalculada saldría perfecta y el dataset seguiría roto.
+
+⚠ **Y se ve la ReLU**: no hay una sola celda azul en los tres PNG, porque no quedan negativos.
+Ceros por la ReLU: **15 %** (1k3), 13 % (1k5), 7 % (1k7).
 
 ## Qué arregla respecto al intento anterior
 

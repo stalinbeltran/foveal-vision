@@ -208,8 +208,17 @@ def _diverge(a, vmax):
     return Image.fromarray(rgb.clip(0, 255).astype(np.uint8), "RGB")
 
 
-def montaje(vistas, mapas, out, titulo, cel=92, gap=8, vmax=None, pie_extra=""):
-    """Una fila por entrada: la ventana y sus N_KERNELS mapas."""
+def montaje(vistas, mapas, out, titulo, cel=92, gap=8, vmax=None, pie_extra="",
+            nota_escala="sin activar, con signo"):
+    """Una fila por entrada: la ventana y sus N_KERNELS mapas.
+
+    `nota_escala` describe QUE son los valores pintados. El defecto es lo que
+    vale para los siete gemelos --su mapa es la salida cruda de la capa L1--,
+    pero un dataset preprocesado con `aplicaKernel` viene ACTIVADO y ahi ese
+    texto seria falso: no hay negativos que pintar de azul. Se parametriza en vez
+    de cablearlo porque un pie que miente sobre la escala hace leer mal la figura,
+    y estas figuras existen para leerse.
+    """
     n, K = mapas.shape[0], mapas.shape[1]
     # Escala COMUN a todos los mapas del stop: por-kernel escondería que un
     # kernel responde diez veces mas fuerte que otro, que es parte de lo que se
@@ -220,9 +229,22 @@ def montaje(vistas, mapas, out, titulo, cel=92, gap=8, vmax=None, pie_extra=""):
     cols = ["la ventana"] + [f"kernel {j}" for j in range(K)]
     izq, cab, pie = 40, 74, 28
     sonda = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    # ⚠ El PIE entra en el ancho. No entraba, y con pocas columnas la imagen salia
+    # mas estrecha que su propio pie: el texto se cortaba a media frase («...sin
+    # activar, con si») sin que nada fallara. Un pie truncado es documentacion que
+    # no llega, y estas figuras existen para leerse. La otra funcion de montaje de
+    # este fichero ya lo hacia bien; esta no.
+    # DOS lineas, no una concatenada: junto, el pie de un montaje con `pie_extra`
+    # medía el triple que la figura y la imagen salia casi toda en blanco. Partirlo
+    # mantiene la anchura pegada al contenido sin perder texto.
+    lineas = [f"los {K*n} mapas comparten escala ±{vmax:.3f} (azul negativo · blanco cero · "
+              f"rojo positivo) · {nota_escala} · la ventana se estira para verla"]
+    if pie_extra:
+        lineas.append(pie_extra.lstrip(" ·"))
     W = max(izq + len(cols) * (cel + gap) + 20,
-            int(sonda.textlength(titulo, font=f_tit)) + 20)
-    H = cab + n * (cel + gap) + pie
+            int(sonda.textlength(titulo, font=f_tit)) + 20,
+            max(int(sonda.textlength(l, font=f_lab)) for l in lineas) + 20)
+    H = cab + n * (cel + gap) + pie + 14 * (len(lineas) - 1)
     im = Image.new("RGB", (W, H), "white")
     d = ImageDraw.Draw(im)
     d.text((10, 8), titulo, fill="black", font=f_tit)
@@ -236,11 +258,9 @@ def montaje(vistas, mapas, out, titulo, cel=92, gap=8, vmax=None, pie_extra=""):
             x0 = izq + j * (cel + gap)
             im.paste(t.resize((cel, cel), Image.NEAREST), (x0, y0))
             d.rectangle([x0, y0, x0 + cel - 1, y0 + cel - 1], outline=(175, 175, 175))
-    d.text((10, H - 20),
-           f"los {K*n} mapas comparten escala ±{vmax:.3f} (azul negativo · blanco cero · "
-           f"rojo positivo) · sin activar, con signo · la ventana se estira para verla"
-           + pie_extra,
-           fill=(95, 95, 95), font=f_lab)
+    for i, l in enumerate(lineas):
+        d.text((10, H - 20 - 14 * (len(lineas) - 1 - i)), l,
+               fill=(95, 95, 95), font=f_lab)
     im.save(out)
     return out
 
