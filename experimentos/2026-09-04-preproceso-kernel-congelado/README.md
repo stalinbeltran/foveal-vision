@@ -7,7 +7,42 @@ Encargo del dueño del 2026-09-04, literal en
 [`instrucciones/01-encargo.md`](instrucciones/01-encargo.md). El criterio, **escrito antes de
 correr nada**, en [`instrucciones/02-criterio.md`](instrucciones/02-criterio.md).
 
-## Estado: **época 11 de 37 — primer veredicto, y es PROVISIONAL**
+## ⛔ DETENIDO en la época 11 de 37 por orden del dueño (2026-09-04)
+
+**No se avanza más, y sus números NO contestan el encargo.** El dueño detectó el fallo al leer la
+tabla de estructura: *«las entradas de las cnn son siempre data 20x20???»*.
+
+**El fallo, dicho claro: el encargo pedía TRES CNN PLANAS sobre TRES DATASETS PREPROCESADOS, y
+esto son tres redes de DOS convoluciones sobre el dataset de siempre.** Una «plana» en esta serie
+es **una** convolución + cabeza (así son los siete gemelos). Al meter el kernel congelado *dentro*
+del modelo como capa 0:
+
+- la entrada siguió siendo `(2,20,20)` en vez de ser el mapa preprocesado (18×18 · 16×16 · 14×14);
+- las redes pasaron a tener **dos** convoluciones, o sea que dejaron de ser planas;
+- y el preproceso dejó de ser un **paso previo** para ser **parte de la red**, que es justo la
+  distinción que el encargo pedía.
+
+La decisión de meterlo en el modelo está razonada en este README (coste, corrección del canal de
+relleno) y **el razonamiento no era falso** — pero contestaba a otra pregunta. Un argumento
+correcto sobre la pregunta equivocada sigue siendo un fallo.
+
+⚠ **Lo que SÍ vale de aquí, y por qué no se borra.** Sus tres brazos son exactamente *«el mismo
+preproceso PERO con una ReLU en medio»*, y su geometría y su ancho de cabeza (256 · 196 · 144)
+son **idénticos** a los del experimento nuevo. O sea que queda como el **brazo con ReLU** de una
+comparación que ahora tiene sentido:
+
+| | preproceso | convs | entrada a la red | ReLU entre convs |
+|---|---|---|---|---|
+| **este (detenido)** | capa 0 del modelo | **2** | (2,20,20) | **sí** |
+| **el nuevo** | dataset construido antes | **1** (plana de verdad) | mapa preprocesado | no |
+
+Y su hallazgo se sostiene solo: **la ventaja del kernel congelado se desploma ÷6 entre la época 3
+y la 11**, o sea que es velocidad de convergencia y no calidad. Eso vale para el nuevo también.
+
+→ **El experimento que contesta el encargo es
+[`2026-09-04-planas-sobre-preprocesado/`](../2026-09-04-planas-sobre-preprocesado/).**
+
+## Lo que quedó medido antes de parar (época 11 de 37)
 
 ```
 $ .venv/bin/python experimentos/2026-09-04-preproceso-kernel-congelado/nn/comparativa.py
