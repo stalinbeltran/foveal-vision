@@ -19,13 +19,28 @@ EXP = RAIZ / "experimentos" / "2026-09-04-preproceso-kernel-congelado"
 COMUN = RAIZ / "experimentos" / "comun"
 
 
+def _modulo(nombre: str, ruta: Path):
+    """Carga un fichero como modulo con nombre PROPIO.
+
+    ⚠ No vale `sys.path.insert` + `import red_local`: hay DOS experimentos con un
+    `nn/red_local.py`, y el primero que importe se queda con el nombre en
+    `sys.modules` -- el segundo recibe el modulo del otro y sus tests fallan por
+    algo que no tiene nada que ver. Medido el 2026-09-04: 9 fallos en el
+    experimento detenido en cuanto se anadio el test del nuevo.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(nombre, ruta)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[nombre] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
 @pytest.fixture(scope="module")
 def red_local():
-    sys.path.insert(0, str(EXP / "nn"))
     sys.path.insert(0, str(COMUN))
     sys.path.insert(0, str(RAIZ / "src"))
-    import red_local
-    return red_local
+    return _modulo("red_local_congelado", EXP / "nn" / "red_local.py")
 
 
 # --------------------------------------------------------------- la geometria

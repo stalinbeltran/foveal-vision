@@ -1,6 +1,7 @@
 # Planas de verdad sobre datasets preprocesados **construidos antes de entrenar**
 
-**Estado: los TRES DATASETS ESTAN CONSTRUIDOS** (2026-09-04). Falta la red y el entrenamiento.
+**Estado: los TRES DATASETS y las TRES ESTRUCTURAS de red están hechos** (2026-09-04).
+Falta el entrenamiento.
 
 | dataset | carpeta (repo de DATOS) | forma | en git | en crudo | muestra |
 |---|---|---|---:|---:|---|
@@ -46,22 +47,80 @@ esta serie es **una** convolución + cabeza, como los siete gemelos. Eso es lo q
 
 ```
 paso 1 (una vez, antes de entrenar)
-  ventana 32×32 px → build_view → vista (2,20,20) → aplicaKernel_1k<kf> (pad 0)
-                                                  → mapa (1, 20−kf+1, 20−kf+1)   ← EL DATASET
+  ventana 32×32 px → build_view → vista (2,20,20) → aplicaKernel_1k<kf> (pad 0, ReLU)
+                                                  → mapa (1, 20−kf+1, ·)   ← EL DATASET
 
-paso 2 (entrenamiento, una plana de verdad)
-  mapa (1,H,W) → Conv2d(1→1, 3, pad 0) → flatten → ReLU → concat 4 edge → Linear(→12)
+paso 2 (la red: CNN plana con los ÓPTIMOS de la foveada)
+  mapa (1,H,W) → 4 × [Conv2d(→16, k=3, pad=1) + ReLU entre capas]
+               → flatten → ReLU → Linear(→12) → (4 esquinas × 3)
 ```
 
-| brazo | kernel | **dataset** | tras conv k=3 | features | ancla iso-features ya pagada |
-|---|---|---|---|---:|---|
-| `pre-1k3` | 3×3 | **18×18** | 16×16 | 256 | `1k5 crudo` → f1 0,642 |
-| `pre-1k5` | 5×5 | **16×16** | 14×14 | 196 | `1k7 crudo` → f1 0,618 |
-| `pre-1k7` | 7×7 | **14×14** | 12×12 | 144 | ninguna |
-| *referencia* | — | *(2,20,20)* | 18×18 | 324 | **es** `1k3 crudo` → f1 0,680 |
+### Los parámetros, y de dónde sale cada uno
 
-⚠ **La referencia sigue sin haber que lanzarla**: una plana de un 3×3 sin relleno sobre la
-entrada cruda **es** `2026-09-04-cnn-plana-1k3-sinpadding`, ya corrida, 37 épocas, 0 $.
+Salen de **`estudios-redes-neuronales/ESTADO.md`**, sección «Red foveada». ⚠ El encargo decía
+`reportes/README.md`, pero ése es el **historial cronológico** y él mismo avisa: *«el estado no
+vive aquí: en qué quedó cada parámetro está en `../ESTADO.md`»*.
+
+⚠⚠ **Y esa tabla tiene dos columnas que no siempre coinciden: «vigente» y «óptimo medido».** El
+encargo pide los **óptimos**, así que es lo que se toma.
+
+| parámetro | valor | evidencia en ESTADO.md |
+|---|---|---|
+| `n_layers` | **4** | cerrado: 2 → 0,9066 · 3 → 0,9246 · **4 → 0,9341** · 5 → 0,9136 |
+| `k_center` | **3** | cerrado: 5 y 7 son peores **y más caros** |
+| `channels` | **[16]×4** | cerrado 20/20: 24 y 32 no aportan, 8 hace daño. 16 es el suelo útil |
+| `s_center` | **1** | no barrible: un solo valor legal con esta geometría |
+| `dropout` | **0,0** | tanteo; 0,1 es el **peor** de los cuatro |
+| `regions` | **single** | es lo que significa «plana» aquí (`plana-24-single.yaml`), no «una capa» |
+
+**Los que NO se heredan** — y son exactamente *«los parámetros afectados por los datasets de
+entrada»* del encargo: `fovea_px`, `border_px`, `border_reduce`, `overlap_*` describen cómo se
+construye la **vista** desde la página, y aquí la entrada ya es un mapa preprocesado de tamaño
+fijo. Esos mandos **ya se aplicaron** al construir el dataset — que usa la geometría de
+`plana-20-1k3.yaml`, con los óptimos medidos `border_px: 8` y `overlap_fovea_px: 7`.
+`k_periph`/`s_periph`/`mask_channel` tampoco: no hay rama periférica, y el canal de relleno lo
+consumió el kernel congelado.
+
+### ⚠⚠ El relleno de la convolución es `k//2`, como la foveada — NO 0
+
+`builder.py:145` calcula `pad = k_center // 2`, así que *«los parámetros óptimos de la foveada»*
+traen relleno **`same`**, y con él la resolución **no cae** por las capas: 18×18 sigue siendo
+18×18 tras las cuatro.
+
+Los siete gemelos usan `padding=0` —por eso se llaman `-sinpadding`—, pero eso era **el eje de
+aquellos experimentos, no un óptimo medido**: ESTADO.md no tiene ninguna fila que diga que 0 gane.
+⚠ La otra opción existe y **cambia el ancho de la cabeza 3,2×** (5.184 → 1.600 en el `1k3`); si
+prefieres ésa, es un parámetro y se cambia en una línea.
+
+### Las tres estructuras
+
+```
+$ .venv/bin/python experimentos/2026-09-04-planas-sobre-preprocesado/nn/red_local.py
+```
+
+| brazo | entrada | tras las 4 convs | features | convs | cabeza | **total** |
+|---|---|---|---:|---:|---:|---:|
+| `1k3` | (1, **18, 18**) | (16, 18, 18) | 5.184 | 7.120 | 62.220 | **69.340** |
+| `1k5` | (1, **16, 16**) | (16, 16, 16) | 4.096 | 7.120 | 49.164 | **56.284** |
+| `1k7` | (1, **14, 14**) | (16, 14, 14) | 3.136 | 7.120 | 37.644 | **44.764** |
+
+**Las convoluciones son idénticas en las tres — 7.120 parámetros exactos — y lo único que cambia
+es la cabeza.** No es una intención: es una invariante, y `red_local.py --comprobar` la verifica
+capa por capa, además de contrastar la forma declarada contra el `.npz` real. 12 tests en
+`tests/test_planas_preprocesado.py`.
+
+⚠ **La cabeza sigue siendo el 84-90 % del modelo** (62.220 de 69.340), así que el confound de
+siempre no desaparece: la comparación válida es a igualdad de ancho de cabeza, no entre brazos.
+
+### ⚠ Un hueco que hay que tapar ANTES de entrenar: los escalares de borde
+
+El `.npz` guarda `x`, `y` y `split` — **no `window_xy`**, así que `edge_features` (los 4 escalares
+que le dicen a la cabeza si la ventana toca el borde de la página) **no se puede calcular al
+entrenar**. Las redes se construyen con `n_edge=0`, o sea **sin** esa entrada, y la foveada sí la
+lleva (`edge_inputs: pad`).
+
+Se arregla añadiendo los 4 escalares —o `window_xy`— al dataset y reconstruyendo. Hay un test que
+lo fija: si algún día se añaden, **falla** y obliga a mirar la cabeza.
 
 ## La no-linealidad va DENTRO de `aplicaKernel` — decidido por el dueño (2026-09-04)
 
@@ -152,10 +211,8 @@ EXP=experimentos/2026-09-04-planas-sobre-preprocesado
 
 ## Lo que falta por escribir
 
-- `nn/red_local.py` — la plana sobre el mapa preprocesado: `Conv2d(1→1, 3, pad 0)` + cabeza.
-  ⚠ No puede usar `FoveatedRegionalNN` tal cual: `_infer_flat_features` dimensiona la cabeza
-  con `dims.N` (= 20) y aquí la entrada es 18/16/14, así que saldría una cabeza de 324 y
-  reventaría al primer lote. Hace falta un `Dataset` propio y dimensionar con la forma real.
+- **Los 4 escalares de borde en el dataset** (ver arriba): hoy las redes van con `n_edge=0`.
+- `nn/dataset.py` — un `Dataset` que sirva el `.npz` preprocesado con su `split`.
 - `nn/entrenar_local.py`, `nn/avanzar.py`, `nn/comparativa.py` — se heredan casi enteros del
   experimento detenido, que ya los tiene probados (`--patience 0`, la negativa a declarar antes
   de la ép. 11, el lector único de `metrics.jsonl`).
