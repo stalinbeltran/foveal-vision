@@ -238,10 +238,11 @@ __marimo__/
 # fuente: si un proceso la crea en local, tiene que quedar fuera de git en vez
 # de volver a entrar por accidente y resucitar la mitad que se acaba de quitar.
 /data/window-datasets/
+# Los mapas preprocesados de `2026-09-04-planas-sobre-preprocesado` NO viven aqui:
+# por orden del dueno (2026-09-04) van COMMITEADOS al repo de DATOS, en
+# `foveal-vision-data/preprocesado/`. Esta linea se queda como red por si alguien
+# corre una version antigua del constructor, que escribia aqui.
 /data/preprocesado/
-# ~435 MB de mapas preprocesados (2026-09-04-planas-sobre-preprocesado).
-# Re-derivables exactamente de (kernel commiteado + dataset origen + opciones):
-# lo que va a git es `nn/construir_datasets.py` y el manifiesto con su huella.
 # --- los datos de los estudios viven en el repo hermano foveal-vision-data
 # (desde 2026-08-27; ver CLAUDE.md). runs/, sweeps/ y studies/ ya no se
 # versionan aqui. Se ignoran ademas de borrarse porque la cascada de

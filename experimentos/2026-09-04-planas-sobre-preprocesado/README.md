@@ -2,11 +2,11 @@
 
 **Estado: los TRES DATASETS ESTAN CONSTRUIDOS** (2026-09-04). Falta la red y el entrenamiento.
 
-| dataset | carpeta | forma | disco | muestra |
-|---|---|---|---|---|
-| `1k3` | `data/preprocesado/1k3-relu/` | (140000, 1, **18, 18**) | 180 MB | [`muestras/1k3.png`](muestras/1k3.png) |
-| `1k5` | `data/preprocesado/1k5-relu/` | (140000, 1, **16, 16**) | 144 MB | [`muestras/1k5.png`](muestras/1k5.png) |
-| `1k7` | `data/preprocesado/1k7-relu/` | (140000, 1, **14, 14**) | 112 MB | [`muestras/1k7.png`](muestras/1k7.png) |
+| dataset | carpeta (repo de DATOS) | forma | en git | en crudo | muestra |
+|---|---|---|---:|---:|---|
+| `1k3` | `preprocesado/1k3-relu/` | (140000, 1, **18, 18**) | 34 MB | 181 MB | [`muestras/1k3.png`](muestras/1k3.png) |
+| `1k5` | `preprocesado/1k5-relu/` | (140000, 1, **16, 16**) | 31 MB | 143 MB | [`muestras/1k5.png`](muestras/1k5.png) |
+| `1k7` | `preprocesado/1k7-relu/` | (140000, 1, **14, 14**) | 33 MB | 110 MB | [`muestras/1k7.png`](muestras/1k7.png) |
 
 Construidos en **1 min 20 s cada uno** (este droplet, 2 vCPU, 0 $), y `--comprobar` valida los
 tres contra su manifiesto. Cada uno lleva su `manifiesto.json` con la huella de los pesos del
@@ -114,15 +114,28 @@ el relleno por su cuenta. El reporte #19 midió que ese canal sube el recall del
 **0,608 a 0,974**. `--con-relleno` lo conserva recortado como 2º canal; por defecto **no**, que
 es la lectura literal del encargo. **Sigue abierto** si quieres conservarlo.
 
-## Dónde caen los datasets, y por qué no en git
+## Dónde caen los datasets: **commiteados en el repo de datos**
 
-**~435 MB** en float32 los tres, contra un repo de datos de **197 MiB**. Y son re-derivables
-exactamente de (kernel commiteado + dataset origen commiteado + opciones), así que la regla 4 de
-[`../README.md`](../README.md) manda enlazarlos, no guardarlos. Van a `data/preprocesado/`
-(**fuera de git**); lo que se commitea es el script y el `manifiesto.json` con su huella.
+**Orden del dueño (2026-09-04): «has push de los datasets».** Van a
+[`foveal-vision-data/preprocesado/`](https://github.com/stalinbeltran/foveal-vision-data/tree/main/preprocesado),
+con su manifiesto y su muestra al lado.
 
-⚠ **Este server es efímero, así que reconstruir es un paso del arranque, no un extra.**
-`--comprobar` distingue **«no está»** de **«está y no casa con su manifiesto»**, que es el caso
+⚠ **Lo propuesto era lo contrario** —enlazarlos en vez de guardarlos, porque se rehacen
+exactamente en 1 min 20 s cada uno y la regla 4 de [`../README.md`](../README.md) dice que lo
+regenerable se enlaza—. El dueño decidió guardarlos; la excepción queda anotada con su motivo en
+vez de darse por inaplicable.
+
+⚠⚠ **Y caben SÓLO porque se comprimen.** GitHub rechaza cualquier fichero de más de **100 MB**, y
+en crudo miden 180/144/112 MB — **los tres lo pasaban**. `savez_compressed` los deja en 34/31/33 MB
+(~4×, sin perder un bit) porque el 12-15 % de las celdas son **cero exacto** (la ReLU) y el resto
+es suave. Si alguien vuelve a `np.savez` a secas, **el push se rechaza**.
+
+⚠ **Y no se bajó a float16**, que era la salida obvia para caber: habría cambiado el dato de
+entrada del estudio (pérdida máxima medida **1,2e-04**). Comprimir no pierde nada y ya basta.
+
+El pack del repo de datos pasa de 196,76 MiB a ~295 MiB.
+
+⚠ **`--comprobar` distingue «no está» de «está y no casa con su manifiesto»**, que es el caso
 peligroso: un `best.pt` reentrenado daría otro dataset con el mismo nombre. Por eso la huella se
 calcula sobre los **pesos** del kernel, no sobre su nombre.
 
@@ -133,13 +146,9 @@ cd ~/src/foveal-vision
 EXP=experimentos/2026-09-04-planas-sobre-preprocesado
 
 .venv/bin/python $EXP/nn/construir_datasets.py --plan       # no escribe nada
-.venv/bin/python $EXP/nn/construir_datasets.py --todos      # ~435 MB, unos minutos
+.venv/bin/python $EXP/nn/construir_datasets.py --todos      # ~4 min los tres
 .venv/bin/python $EXP/nn/construir_datasets.py --comprobar
 ```
-
-⚠ **Estado real (2026-09-04):** `--plan` y `--comprobar` **sí** se han corrido y funcionan
-(ninguno escribe nada). `--plan` da 434,6 MB los tres. La **construcción de verdad**
-(`--todos`) **no se ha lanzado nunca**, así que esa parte sigue sin probar.
 
 ## Lo que falta por escribir
 

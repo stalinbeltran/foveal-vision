@@ -6,9 +6,8 @@
     python nn/construir_datasets.py --todos           # los tres
     python nn/construir_datasets.py --comprobar       # ¿casan con su manifiesto?
 
-⚠ ESTADO (2026-09-04): `--plan` y `--comprobar` SI se han corrido y funcionan (ninguno
-   escribe nada). La CONSTRUCCION de verdad --`--todos`-- **no se ha lanzado nunca**, asi
-   que esa parte sigue sin probar. `--plan` dice 434,6 MB los tres.
+⚠ ESTADO (2026-09-04): los tres CONSTRUIDOS y commiteados en el repo de datos.
+   `--comprobar` los valida contra su manifiesto. 1 min 20 s cada uno, 0 $.
 
 POR QUE EXISTE ESTE FICHERO, Y QUE ARREGLA
    El experimento anterior (`2026-09-04-preproceso-kernel-congelado`) metió el kernel
@@ -63,14 +62,22 @@ LA NO-LINEALIDAD LA APLICA `aplicaKernel`, NO ESTE FICHERO
    recall del último píxel de 0,608 a 0,974. `--con-relleno` lo conserva como segundo
    canal del dataset; por defecto NO se conserva, que es la lectura literal del encargo.
 
-DONDE SE GUARDA, Y POR QUE NO EN GIT
-   ~435 MB en float32 los tres, contra un repo de datos de 197 MiB. Y son
-   **re-derivables exactamente** de (kernel commiteado + dataset origen commiteado +
-   opciones), así que la regla 4 de `experimentos/README.md` dice que se enlazan, no se
-   guardan. Lo que SI se commitea es este script y el `manifiesto.json` de cada uno: con
-   eso, una máquina nueva los reconstruye en ~1-2 min.
-   ⚠ Este server es efímero. Reconstruir NO es opcional al rehacerlo: es un paso del
-   arranque, y por eso `--comprobar` distingue «no está» de «está y no casa».
+DONDE SE GUARDA: EN EL REPO DE DATOS, Y COMMITEADO
+   Orden del dueno (2026-09-04): «has push de los datasets». Van a
+   `foveal-vision-data/preprocesado/<brazo>-<activacion>/`, con su manifiesto y su
+   muestra al lado.
+
+   ⚠ Lo propuesto era lo contrario --enlazarlos en vez de guardarlos, por la regla 4 de
+   `experimentos/README.md`: son re-derivables exactamente en 1 min 20 s cada uno-- y el
+   dueno decidio guardarlos. Queda anotado aqui con su motivo, no dado por inaplicable.
+
+   ⚠⚠ Y CABEN SOLO PORQUE SE COMPRIMEN. GitHub rechaza ficheros de mas de 100 MB y en
+   crudo miden 180/144/112 MB. Comprimidos son ~56/44/34 MB (medido: el 1k7 pasa de
+   109,8 a 33,9 MB, 3,2x, en 3 s). Si alguien vuelve a `np.savez` a secas, el push se
+   rechaza -- por eso esta escrito aqui y no solo en el commit.
+
+   ⚠ `*.npz` esta ignorado en el repo de datos; hace falta la excepcion
+   `!/preprocesado/*/preprocesado.npz`, como la que ya existe para `window-datasets`.
 """
 
 from __future__ import annotations
@@ -103,9 +110,10 @@ DATASET = "dirty1000-80px-16px-r20260827"
 RED_GEOMETRIA = "plana-20-1k3"      # de aquí sale la vista 20x20 (fovea 16 + borde 8/4)
 PESOS = "best"                      # de un preprocesador se quiere el mejor estado
 
-# Fuera de git a propósito (ver cabecera). Bajo el repo de CODIGO y no el de datos
-# para que un `git status` del repo de datos no se llene de 435 MB ignorados.
-DESTINO = REPO / "data" / "preprocesado"
+# EN el repo de DATOS y COMMITEADOS, por orden del dueno (2026-09-04: «has push de
+# los datasets»). Ver la cabecera: no era el plan y el plan estaba razonado, pero es
+# su decision y aqui esta lo que hace falta para que quepa.
+DESTINO = Path(settings.data_root()) / "preprocesado"
 
 
 def _huella(kern, con_relleno: bool, origen_fp: str) -> str:
@@ -144,7 +152,7 @@ def plan(brazos, con_relleno: bool) -> int:
     print(f"huella   : {fp[:24] or '(sin manifest)'}...")
     print(f"activacion: {ACTIVACION_POR_DEFECTO} (la aplica aplicaKernel)   ·   canal de relleno: "
           f"{'SI (2 canales)' if con_relleno else 'no (1 canal)'}")
-    print(f"destino  : {DESTINO}   (FUERA de git)\n")
+    print(f"destino  : {DESTINO}   (repo de DATOS, commiteado)\n")
     total = 0
     print(f"{'brazo':6} {'kernel':8} {'salida':>12} {'canales':>8} {'MB (f32)':>9}")
     for b in brazos:
@@ -155,8 +163,8 @@ def plan(brazos, con_relleno: bool) -> int:
         total += mb
         print(f"{b:6} {kern.k}x{kern.k:<6} {f'{lado}x{lado}':>12} {canales:>8} {mb:>9.1f}")
     print(f"{'':6} {'':8} {'':>12} {'TOTAL':>8} {total:>9.1f}")
-    print(f"\n⚠ NO commiteado: se reconstruye con este script. Lo que va a git es el "
-          f"script y el manifiesto.")
+    print(f"\n⚠ En crudo son {total:.0f} MB; se escriben COMPRIMIDOS (~3,2x) porque "
+          f"GitHub rechaza ficheros de mas de 100 MB.")
     return 0
 
 
@@ -201,10 +209,14 @@ def construir(brazo: str, con_relleno: bool) -> int:
 
     dest = DESTINO / f"{brazo}-{ACTIVACION_POR_DEFECTO}{'-relleno' if con_relleno else ''}"
     dest.mkdir(parents=True, exist_ok=True)
-    # SIN comprimir a propósito: son floats casi incompresibles, comprimir cuesta
-    # minutos y no va a git de todas formas (73 GB libres, medido 2026-08-28). Si
-    # algún día hubiera que moverlo a otra máquina, se comprime al enviarlo.
-    np.savez(dest / "preprocesado.npz", x=salida, y=y, split=split)
+    # COMPRIMIDO, y no es por ahorrar disco: GitHub RECHAZA cualquier fichero de mas
+    # de 100 MB, y en crudo los tres miden 180/144/112 MB. Medido el 2026-09-04 sobre
+    # el 1k7: 109,8 -> 33,9 MB, o sea 3,2x, y en 3 s. Comprime tanto porque el 12-15 %
+    # de las celdas son CERO exacto (la ReLU) y el resto es suave.
+    # ⚠ float32, NO float16: la mitad de tamano sonaba bien y habria cambiado el dato
+    #   de entrada del estudio (perdida maxima medida 1,2e-04). Comprimir no pierde
+    #   un solo bit y ya basta para caber.
+    np.savez_compressed(dest / "preprocesado.npz", x=salida, y=y, split=split)
     manifiesto = {
         "brazo": brazo, "kernel": CARPETAS[brazo], "pesos": PESOS,
         "k": kern.k, "activacion": ACTIVACION_POR_DEFECTO,
