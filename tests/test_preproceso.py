@@ -96,7 +96,12 @@ def test_da_lo_mismo_que_pasar_la_entrada_por_la_convolucion_de_la_red(nombre, k
         conv.weight.copy_(kernels[nombre].peso)
         conv.bias.copy_(kernels[nombre].sesgo)
         esperado = conv(x)
-    assert torch.allclose(aplicaKernel(x, kernels[nombre]), esperado, atol=1e-6)
+    # ⚠ `activacion="ninguna"`: la IDENTIDAD con la capa L1 se prueba sobre el
+    # mapa sin activar, que es como se guardaron los `mapas.npy` y como lo lee
+    # la cabeza de esas redes. El DEFECTO de hoy activa (orden del dueno,
+    # 2026-09-04) y lo fija `test_por_defecto_activa_*` mas abajo.
+    assert torch.allclose(aplicaKernel(x, kernels[nombre], activacion='ninguna'),
+                          esperado, atol=1e-6)
 
 
 @pytest.mark.parametrize("nombre", TODOS)
@@ -126,7 +131,12 @@ def test_reproduce_el_mapas_npy_que_dejo_escrito_su_experimento(nombre, monkeypa
     esperado = np.load(RAIZ / "experimentos" / CARPETAS[nombre] / "evaluacion"
                        / "stop-04-37epocas" / "mapas.npy")
     # los stops se pintaron con `last.pt`, no con `best.pt`
-    salida = aplicaKernel(x.numpy(), cargar_kernel(nombre, pesos="last"))
+    # ⚠ `activacion="ninguna"`: la IDENTIDAD con la capa L1 se prueba sobre el
+    # mapa sin activar, que es como se guardaron los `mapas.npy` y como lo lee
+    # la cabeza de esas redes. El DEFECTO de hoy activa (orden del dueno,
+    # 2026-09-04) y lo fija `test_por_defecto_activa_*` mas abajo.
+    salida = aplicaKernel(x.numpy(), cargar_kernel(nombre, pesos="last"),
+                          activacion="ninguna")
     assert salida.shape == esperado.shape
     assert np.allclose(salida, esperado, atol=1e-6)
 
@@ -175,12 +185,19 @@ def test_una_imagen_de_un_canal_recibe_el_relleno_DECLARADO(kernels):
     k = kernels["1k5"]
     gris = np.random.default_rng(7).random((20, 20)).astype(np.float32)
     dos = np.stack([gris, np.zeros_like(gris)])
-    assert np.allclose(aplicaKernel(gris, k), aplicaKernel(dos, k), atol=1e-7)
-
-    unos = np.stack([gris, np.ones_like(gris)])
-    assert np.allclose(aplicaKernel(gris, k, relleno=1.0), aplicaKernel(unos, k), atol=1e-7)
-    # y que el canal de relleno IMPORTA: si no, este test no probaria nada
-    assert not np.allclose(aplicaKernel(gris, k), aplicaKernel(gris, k, relleno=1.0))
+    # el defecto (activado) y la convolucion cruda: el relleno se rellena igual en
+    # los dos, asi que la equivalencia tiene que valer en ambos modos.
+    for act in ("relu", "ninguna"):
+        assert np.allclose(aplicaKernel(gris, k, activacion=act),
+                           aplicaKernel(dos, k, activacion=act), atol=1e-7)
+        unos = np.stack([gris, np.ones_like(gris)])
+        assert np.allclose(aplicaKernel(gris, k, relleno=1.0, activacion=act),
+                           aplicaKernel(unos, k, activacion=act), atol=1e-7)
+    # y que el canal de relleno IMPORTA: si no, este test no probaria nada.
+    # ⚠ Se mira SIN activar: la ReLU puede llevar a cero las dos respuestas y
+    # entonces «no cambia nada» seria un artefacto de la activacion, no del canal.
+    assert not np.allclose(aplicaKernel(gris, k, activacion="ninguna"),
+                           aplicaKernel(gris, k, relleno=1.0, activacion="ninguna"))
 
 
 def test_uint8_se_divide_por_255_igual_que_build_view(kernels):
@@ -225,7 +242,10 @@ def test_sin_sesgo_la_diferencia_es_EXACTAMENTE_el_sesgo(kernels):
     """`con_sesgo=False` no es «casi lo mismo»: es el mapa menos una constante."""
     k = kernels["1k7"]
     x = np.random.default_rng(3).random((2, 20, 20)).astype(np.float32)
-    dif = aplicaKernel(x, k) - aplicaKernel(x, k, con_sesgo=False)
+    # sin activar: con ReLU la diferencia deja de ser una constante (por eso
+    # este test mira la convolucion, que es de lo que habla).
+    dif = (aplicaKernel(x, k, activacion='ninguna')
+           - aplicaKernel(x, k, con_sesgo=False, activacion='ninguna'))
     assert np.allclose(dif, float(k.sesgo[0]), atol=1e-6)
 
 
@@ -264,3 +284,44 @@ def test_los_pesos_estan_TRACKEADOS_por_git(nombre, fichero):
     r = subprocess.run(["git", "ls-files", "--error-unmatch", rel],
                        capture_output=True, text=True, cwd=str(RAIZ))
     assert r.returncode == 0, f"{rel} NO esta trackeado por git:\n{r.stderr}"
+
+
+# --------------------------------------------------- la no-linealidad, por orden
+# del dueno (2026-09-04): «el dataset debe ser generado con las funciones que
+# aplican kernel, y esas funciones ya deben aplicar la no-linearidad».
+def test_por_defecto_ACTIVA_y_es_relu(kernels):
+    """El defecto no es un detalle de formato: sin no-linealidad, una plana
+    entrenada encima colapsa a UNA convolucion y el estudio es degenerado."""
+    k = kernels["1k5"]
+    x = np.random.default_rng(11).random((2, 20, 20)).astype(np.float32)
+    crudo = aplicaKernel(x, k, activacion="ninguna")
+    assert np.allclose(aplicaKernel(x, k), np.maximum(crudo, 0.0), atol=1e-7)
+    assert (aplicaKernel(x, k) >= 0).all()
+
+
+def test_por_defecto_activa_tambien_en_los_atajos_ligados():
+    """`aplicaKernel_1k*` son los que usa el constructor del dataset: si el
+    defecto no viajara por ahi, el dataset saldria sin activar sin avisar."""
+    x = np.random.default_rng(12).random((2, 20, 20)).astype(np.float32)
+    for f, n in ((aplicaKernel_1k3, "1k3"), (aplicaKernel_1k5, "1k5"),
+                 (aplicaKernel_1k7, "1k7")):
+        assert (f(x) >= 0).all(), n
+        assert np.allclose(f(x), np.maximum(f(x, activacion="ninguna"), 0.0), atol=1e-7)
+
+
+def test_la_relu_TIRA_algo_o_este_contrato_no_probaria_nada(kernels):
+    """Si sobre una entrada realista no hubiera negativos, activar o no daria lo
+    mismo y los tests de arriba pasarian sin decir nada."""
+    k = kernels["1k5"]
+    x = np.random.default_rng(13).random((2, 20, 20)).astype(np.float32)
+    crudo = aplicaKernel(x, k, activacion="ninguna")
+    assert (crudo < 0).any(), "sin negativos, la ReLU seria la identidad aqui"
+    assert not np.allclose(aplicaKernel(x, k), crudo)
+
+
+def test_una_activacion_que_no_existe_se_NIEGA(kernels):
+    """R2: o defecto declarado, o fallar antes de empezar. Un typo que se tragara
+    en silencio dejaria el dataset sin activar."""
+    with pytest.raises(PreprocesoError, match="activacion"):
+        aplicaKernel(np.zeros((2, 20, 20), dtype=np.float32), kernels["1k3"],
+                     activacion="reLU")

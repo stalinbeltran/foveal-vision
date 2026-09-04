@@ -31,10 +31,23 @@ preproceso PERO con una ReLU en medio»*, y su geometría y su ancho de cabeza (
 son **idénticos** a los del experimento nuevo. O sea que queda como el **brazo con ReLU** de una
 comparación que ahora tiene sentido:
 
-| | preproceso | convs | entrada a la red | ReLU entre convs |
+| | preproceso | convs entrenables | entrada a la red | no-linealidad tras el kernel |
 |---|---|---|---|---|
-| **este (detenido)** | capa 0 del modelo | **2** | (2,20,20) | **sí** |
-| **el nuevo** | dataset construido antes | **1** (plana de verdad) | mapa preprocesado | no |
+| **este (detenido)** | capa 0 del modelo, al vuelo | 1 (+1 congelada) | (2,20,20) | sí, en el forward |
+| **el nuevo** | **dataset construido antes** | **1** (plana de verdad) | el mapa preprocesado | sí, **dentro de `aplicaKernel`** |
+
+⚠⚠ **Y desde que la ReLU vive dentro de `aplicaKernel` (orden del dueño, 2026-09-04), los dos
+calculan EXACTAMENTE LA MISMA FUNCION**: `relu(kernel ⊛ x)` → conv entrenable → flatten → ReLU →
+cabeza. Lo único que cambia es **dónde** ocurre el preproceso —al construir el dataset o en cada
+forward— y que el nuevo entrena una red de **una** convolución en vez de dos.
+
+Eso tiene dos consecuencias que conviene no confundirse:
+
+1. **Los números de aquí son una PREVISION de los del nuevo**, no evidencia independiente. Mismo
+   dataset, misma receta, misma semilla y misma función; sólo cambiará la inicialización de la
+   conv entrenable, así que se espera lo mismo dentro de la banda de ruido.
+2. **El nuevo será ~33 % más rápido por época**, porque la convolución congelada deja de
+   recalcularse en cada época (aquí costaba 44-46 s/época contra los 32-34 de los gemelos).
 
 Y su hallazgo se sostiene solo: **la ventaja del kernel congelado se desploma ÷6 entre la época 3
 y la 11**, o sea que es velocidad de convergencia y no calidad. Eso vale para el nuevo también.

@@ -6,9 +6,9 @@
     python nn/construir_datasets.py --todos           # los tres
     python nn/construir_datasets.py --comprobar       # ¿casan con su manifiesto?
 
-⚠⚠ NO EJECUTADO TODAVIA (2026-09-04). El dueño pidió parar y no correr nada más, así
-   que este fichero está escrito pero **no se ha lanzado ni una vez**. No lo des por
-   bueno: `--plan` y `--comprobar` existen precisamente para mirarlo antes de gastar.
+⚠ ESTADO (2026-09-04): `--plan` y `--comprobar` SI se han corrido y funcionan (ninguno
+   escribe nada). La CONSTRUCCION de verdad --`--todos`-- **no se ha lanzado nunca**, asi
+   que esa parte sigue sin probar. `--plan` dice 434,6 MB los tres.
 
 POR QUE EXISTE ESTE FICHERO, Y QUE ARREGLA
    El experimento anterior (`2026-09-04-preproceso-kernel-congelado`) metió el kernel
@@ -37,30 +37,25 @@ QUE SE GUARDA, EXACTAMENTE
    reproducir lo que vio la L1 original y aproximarlo; equivocarse ahí no falla, sale
    otro número.
 
-⚠⚠ LA DECISION ABIERTA: `--activacion`, Y CAMBIA SI EL ESTUDIO ES DEGENERADO
-   `aplicaKernel` devuelve el mapa SIN ACTIVAR y con signo (es la capa L1 de esas redes,
-   cuya última capa no lleva ReLU a propósito). Guardarlo así o pasarle una ReLU no es un
-   detalle de formato:
+LA NO-LINEALIDAD LA APLICA `aplicaKernel`, NO ESTE FICHERO
+   Orden del dueno (2026-09-04): «el dataset debe ser generado con las funciones que
+   aplican kernel, y esas funciones ya deben aplicar la no-linearidad». Asi que aqui
+   NO hay ningun flag de activacion: se llama a `aplicaKernel` y punto, y lo que
+   salga es lo que el preprocesador define como su salida.
 
-   · `--activacion ninguna` (lo literal): el dataset guarda el mapa con signo. Entonces
-     la plana que entrene encima hace `conv(conv(x))` SIN no-linealidad en medio, y eso
-     es **una sola convolución** de tamaño `kf+k2-1` con los pesos atados. O sea que cada
-     brazo sería un SUBCONJUNTO ESTRICTO de un gemelo ya corrido:
+   Hoy eso es `relu` (`preproceso.ACTIVACION_POR_DEFECTO`), y queda escrito en el
+   manifiesto de cada dataset -- no porque se pueda elegir desde aqui, sino porque un
+   dataset construido con otra activacion no seria comparable y el nombre del fichero
+   no lo diria.
 
-         1k3 + plana k=3  ==  una 5x5 atada  ->  gemelo libre `1k5 crudo`, f1 0,642
-         1k5 + plana k=3  ==  una 7x7 atada  ->  gemelo libre `1k7 crudo`, f1 0,618
-         1k7 + plana k=3  ==  una 9x9 atada  ->  no existe gemelo
+   ⚠ Por que importa: sin no-linealidad el preproceso es una operacion LINEAL, asi que
+   la plana que entrene encima haria `conv(conv(x))` sin nada en medio -- una sola
+   convolucion de tamano `k+2` con los pesos atados-- y cada brazo seria un subconjunto
+   estricto de un gemelo ya corrido, capaz solo de empatar o perder. Con la ReLU dentro
+   del preproceso eso no pasa. El detalle esta en el docstring de `aplicaKernel`.
 
-     Sólo puede EMPATAR O PERDER contra un número ya pagado. Sigue siendo una pregunta
-     legítima («¿cuánto cuesta congelar y factorizar?») pero no puede salir a favor.
-
-   · `--activacion relu`: el dataset guarda `max(0, mapa)`. Deja de colapsar y el
-     preproceso pasa a ser un extractor de rasgos de verdad. Es lo que hacía el
-     experimento anterior, y por eso sus tres brazos sirven de comparación.
-
-   **No se elige aquí por defecto**: es una decisión del dueño y va escrita en el
-   manifiesto de cada dataset, porque dos datasets construidos con distinta activación no
-   son comparables y el fichero no lo diría por su nombre.
+   ⚠ Y su precio, medido el 2026-09-04 sobre las 10 ventanas del set congelado: la ReLU
+   tira el 15 % de las celdas en 1k3, el 13 % en 1k5 y el 7 % en 1k7.
 
 ⚠ EL CANAL DE RELLENO SE PIERDE, y está medido que vale
    El kernel consume `(vista, relleno)` y devuelve UN mapa, así que aguas abajo la red ya
@@ -99,7 +94,8 @@ sys.path.insert(0, str(EXP.parent / "comun"))
 from fv import settings                                          # noqa: E402
 from fv.fovea import build_view, derive_dims, input_stack        # noqa: E402
 from fv.models.builder import full_config                        # noqa: E402
-from preproceso import CARPETAS, aplicaKernel, cargar_kernel     # noqa: E402
+from preproceso import (ACTIVACION_POR_DEFECTO, CARPETAS,        # noqa: E402
+                        aplicaKernel, cargar_kernel)
 
 # Los MISMOS que los siete gemelos: si el dataset origen cambia, esto no es
 # comparable con nada de la serie.
@@ -112,7 +108,7 @@ PESOS = "best"                      # de un preprocesador se quiere el mejor est
 DESTINO = REPO / "data" / "preprocesado"
 
 
-def _huella(kern, activacion: str, con_relleno: bool, origen_fp: str) -> str:
+def _huella(kern, con_relleno: bool, origen_fp: str) -> str:
     """Identidad del dataset: si cambia cualquier ingrediente, cambia la huella.
 
     Incluye los PESOS del kernel (no su nombre): un `best.pt` reentrenado daría otro
@@ -122,7 +118,7 @@ def _huella(kern, activacion: str, con_relleno: bool, origen_fp: str) -> str:
     h = hashlib.sha256()
     h.update(kern.peso.numpy().tobytes())
     h.update(kern.sesgo.numpy().tobytes())
-    h.update(f"{activacion}|{con_relleno}|{origen_fp}|{DATASET}".encode())
+    h.update(f"{ACTIVACION_POR_DEFECTO}|{con_relleno}|{origen_fp}|{DATASET}".encode())
     return h.hexdigest()
 
 
@@ -136,7 +132,7 @@ def _origen():
     return z, fp
 
 
-def plan(brazos, activacion: str, con_relleno: bool) -> int:
+def plan(brazos, con_relleno: bool) -> int:
     """Qué se construiría y cuánto ocupa. NO escribe nada."""
     z, fp = _origen()
     n = int(z["y"].shape[0])
@@ -146,7 +142,7 @@ def plan(brazos, activacion: str, con_relleno: bool) -> int:
     print(f"origen   : {DATASET}  ({n} ventanas · vista {d.N}x{d.N} de una ventana "
           f"de {d.original_size}x{d.original_size} px)")
     print(f"huella   : {fp[:24] or '(sin manifest)'}...")
-    print(f"activacion: {activacion}   ·   canal de relleno: "
+    print(f"activacion: {ACTIVACION_POR_DEFECTO} (la aplica aplicaKernel)   ·   canal de relleno: "
           f"{'SI (2 canales)' if con_relleno else 'no (1 canal)'}")
     print(f"destino  : {DESTINO}   (FUERA de git)\n")
     total = 0
@@ -164,7 +160,7 @@ def plan(brazos, activacion: str, con_relleno: bool) -> int:
     return 0
 
 
-def construir(brazo: str, activacion: str, con_relleno: bool) -> int:
+def construir(brazo: str, con_relleno: bool) -> int:
     z, fp = _origen()
     cfg = full_config(yaml.safe_load(
         (REPO / "configs" / "networks" / f"{RED_GEOMETRIA}.yaml").read_text()))
@@ -192,11 +188,8 @@ def construir(brazo: str, activacion: str, con_relleno: bool) -> int:
         vista, cov = build_view(img, wx0, wy0, d,
                                 pool_mode=cfg["pool_mode"], pad_mode=cfg["pad_mode"])
         x = torch.from_numpy(input_stack(vista, cov, cfg["mask_channel"]))
+        # SIN tocar la activacion: la aplica `aplicaKernel`, que es el encargo.
         mapa = aplicaKernel(x, kern, escala="0-1")               # (1, lado, lado)
-        if activacion == "relu":
-            mapa = torch.relu(mapa)
-        elif activacion != "ninguna":
-            raise SystemExit(f"--activacion '{activacion}': usa 'ninguna' o 'relu'")
         if con_relleno:
             # el relleno RECORTADO al centro valido, para que case con el mapa
             r = kern.k // 2
@@ -206,7 +199,7 @@ def construir(brazo: str, activacion: str, con_relleno: bool) -> int:
         if i % 20000 == 0:
             print(f"  {i}/{n}", flush=True)
 
-    dest = DESTINO / f"{brazo}-{activacion}{'-relleno' if con_relleno else ''}"
+    dest = DESTINO / f"{brazo}-{ACTIVACION_POR_DEFECTO}{'-relleno' if con_relleno else ''}"
     dest.mkdir(parents=True, exist_ok=True)
     # SIN comprimir a propósito: son floats casi incompresibles, comprimir cuesta
     # minutos y no va a git de todas formas (73 GB libres, medido 2026-08-28). Si
@@ -214,9 +207,10 @@ def construir(brazo: str, activacion: str, con_relleno: bool) -> int:
     np.savez(dest / "preprocesado.npz", x=salida, y=y, split=split)
     manifiesto = {
         "brazo": brazo, "kernel": CARPETAS[brazo], "pesos": PESOS,
-        "k": kern.k, "activacion": activacion, "con_relleno": con_relleno,
+        "k": kern.k, "activacion": ACTIVACION_POR_DEFECTO,
+        "con_relleno": con_relleno,
         "dataset_origen": DATASET, "fingerprint_origen": fp,
-        "forma": list(salida.shape), "huella": _huella(kern, activacion, con_relleno, fp),
+        "forma": list(salida.shape), "huella": _huella(kern, con_relleno, fp),
         "construido_por": "nn/construir_datasets.py",
     }
     (dest / "manifiesto.json").write_text(json.dumps(manifiesto, indent=2))
@@ -237,7 +231,7 @@ def comprobar(brazos) -> int:
             continue
         for m in encontrados:
             d = json.loads(m.read_text())
-            esperada = _huella(kern, d["activacion"], d["con_relleno"], fp)
+            esperada = _huella(kern, d["con_relleno"], fp)
             casa = esperada == d.get("huella")
             malo |= not casa
             print(f"  {b} [{d['activacion']}"
@@ -253,19 +247,17 @@ def main() -> int:
     p.add_argument("--todos", action="store_true")
     p.add_argument("--plan", action="store_true")
     p.add_argument("--comprobar", action="store_true")
-    p.add_argument("--activacion", default="ninguna", choices=("ninguna", "relu"),
-                   help="ver la cabecera: cambia si el estudio es degenerado")
     p.add_argument("--con-relleno", action="store_true",
                    help="conserva el canal de relleno recortado como 2º canal")
     a = p.parse_args()
     brazos = [a.brazo] if a.brazo else sorted(CARPETAS)
     if a.plan:
-        return plan(brazos, a.activacion, a.con_relleno)
+        return plan(brazos, a.con_relleno)
     if a.comprobar:
         return comprobar(brazos)
     if a.brazo or a.todos:
         for b in brazos:
-            construir(b, a.activacion, a.con_relleno)
+            construir(b, a.con_relleno)
         return 0
     print(__doc__)
     return 2

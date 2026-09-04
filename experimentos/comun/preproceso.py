@@ -80,9 +80,27 @@ __all__ = ["KernelEntrenado", "cargar_kernel", "aplicaKernel",
            "CARPETAS"]
 
 
+# La no-linealidad va DENTRO del preproceso, por orden del dueno (2026-09-04).
+# El porque -- y por que 'ninguna' sigue existiendo -- en el docstring de
+# `aplicaKernel`. Es `relu` y no otra porque es la que usa la red en todas partes
+# (`builder.py:_branch_forward` entre capas, y `F.relu(feat)` antes de la cabeza):
+# un preproceso que activara distinto que la red no seria «su capa L1 activada».
+ACTIVACION_POR_DEFECTO = "relu"
+ACTIVACIONES = ("relu", "ninguna")
+
+
 class PreprocesoError(ValueError):
     """Lo que esta funcion se niega a adivinar. Ver R2: o defecto declarado, o
     fallar ANTES de empezar; nunca a mitad."""
+
+
+def _activar(y: torch.Tensor, activacion: str) -> torch.Tensor:
+    if activacion == "relu":
+        return torch.relu(y)
+    if activacion == "ninguna":
+        return y
+    raise PreprocesoError(
+        f"activacion '{activacion}': usa {' o '.join(repr(a) for a in ACTIVACIONES)}")
 
 
 @dataclass(frozen=True)
@@ -236,8 +254,9 @@ def _lote(entrada, canales: int, relleno: float, escala: str) -> tuple[torch.Ten
 
 def aplicaKernel(entrada, kernel: KernelEntrenado | str | Path = "1k5", *,
                  con_sesgo: bool = True, relleno: float = 0.0,
-                 escala: str = "auto", pesos: str = "best"):
-    """Aplica el kernel entrenado a `entrada` SIN RELLENO (`padding=0`).
+                 escala: str = "auto", pesos: str = "best",
+                 activacion: str = ACTIVACION_POR_DEFECTO):
+    """Aplica el kernel entrenado a `entrada` SIN RELLENO (`padding=0`) y ACTIVA.
 
     entrada
         `(H,W)` en gris · `(C,H,W)` · `(B,C,H,W)`. numpy, torch o lista.
@@ -253,13 +272,31 @@ def aplicaKernel(entrada, kernel: KernelEntrenado | str | Path = "1k5", *,
     relleno
         el valor del segundo canal cuando la entrada trae uno solo. 0.0 = «todo
         pixel es real», que es el caso normal fuera del borde de la pagina.
+    activacion
+        'relu' (POR DEFECTO) o 'ninguna'. Ver abajo: no es un detalle de formato.
 
     Devuelve `(K, H-k+1, W-k+1)` --o `(B, K, ...)` si entraste con lote--, en
     numpy o torch segun como entraste. K es 1 en los tres experimentos.
 
-    ⚠ SIN ACTIVAR y CON SIGNO, igual que el mapa que lee la cabeza: la ultima
-    capa de estas redes no lleva ReLU a proposito. Poner uno aqui tiraria la
-    mitad de lo que hay.
+    ⚠⚠ LA NO-LINEALIDAD VA AQUI DENTRO, Y ES UNA DECISION DEL DUENO (2026-09-04):
+    «el dataset debe ser generado con las funciones que aplican kernel, y esas
+    funciones ya deben aplicar la no-linearidad».
+
+    No es cosmetico, y este es el motivo. Un preprocesador SIN activar es una
+    operacion LINEAL, asi que una red plana entrenada encima hace `conv(conv(x))`
+    sin nada en medio -- y eso es **una sola convolucion** de tamano `k1+k2-1` con
+    los pesos atados. El estudio entero seria degenerado: cada brazo un
+    subconjunto estricto de un gemelo ya corrido, capaz solo de empatar o perder.
+    Con la ReLU dentro, el preproceso es un extractor de rasgos de verdad y la
+    pregunta deja de tener respuesta conocida de antemano.
+
+    ⚠ EL PRECIO, dicho: `relu` tira la parte negativa del mapa, que es informacion
+    real (la respuesta del kernel viene con signo). Por eso `activacion='ninguna'`
+    sigue existiendo y es lo que usa `--comprobar` para demostrar que este kernel
+    es LITERALMENTE la capa L1 de su red: esa comprobacion se hace contra los
+    `mapas.npy` guardados, que estan SIN activar. Las dos cosas tienen que poder
+    convivir -- la identidad se prueba sin activar, y el preproceso se usa activado.
+
     ⚠ Sin relleno la salida ENCOGE `k-1` px por lado: 20x20 -> 18x18 (k=3),
     16x16 (k=5), 14x14 (k=7). Encadenar dos preprocesos encoge dos veces.
     """
@@ -274,6 +311,7 @@ def aplicaKernel(entrada, kernel: KernelEntrenado | str | Path = "1k5", *,
     with torch.no_grad():
         y = F.conv2d(x, kernel.peso, kernel.sesgo if con_sesgo else None,
                      stride=kernel.stride, padding=0)
+        y = _activar(y, activacion)
     if not lote:
         y = y[0]
     return y.numpy() if era_np else y
@@ -288,11 +326,12 @@ def _liga(nombre: str):
     cache: dict[str, KernelEntrenado] = {}
 
     def aplica(entrada, *, con_sesgo: bool = True, relleno: float = 0.0,
-               escala: str = "auto", pesos: str = "best"):
+               escala: str = "auto", pesos: str = "best",
+               activacion: str = ACTIVACION_POR_DEFECTO):
         if pesos not in cache:
             cache[pesos] = cargar_kernel(nombre, pesos=pesos)
         return aplicaKernel(entrada, cache[pesos], con_sesgo=con_sesgo,
-                            relleno=relleno, escala=escala)
+                            relleno=relleno, escala=escala, activacion=activacion)
 
     aplica.__name__ = f"aplicaKernel_{nombre}"
     aplica.__doc__ = (f"`aplicaKernel` con el kernel de `{CARPETAS[nombre]}` "
@@ -324,7 +363,10 @@ def _comprobar() -> int:
                   / f"plana-20-{nombre}.yaml")
         x, _, _ = ak.entradas(ak.set_visualizacion(10, 2026))
         esperado = np.load(kern.carpeta / "evaluacion" / "stop-04-37epocas" / "mapas.npy")
-        salida = aplicaKernel(x.numpy(), kern)
+        # ⚠ SIN activar: los `mapas.npy` se guardaron pre-activacion, que es lo que
+        # lee la cabeza de esas redes. La identidad con la L1 se prueba aqui; el
+        # preproceso se USA activado (ver el docstring de `aplicaKernel`).
+        salida = aplicaKernel(x.numpy(), kern, activacion="ninguna")
         casa = (salida.shape == esperado.shape
                 and bool(np.allclose(salida, esperado, atol=1e-6)))
         dif = float(np.abs(salida - esperado).max()) if salida.shape == esperado.shape else float("nan")
@@ -332,7 +374,17 @@ def _comprobar() -> int:
               f"{tuple(x.shape[2:])} · {'✓ casa' if casa else '✗ NO CASA'} con "
               f"stop-04 (dif max {dif:.2e})")
         ok &= casa
-    print("los tres reproducen la capa L1 de su red."
+
+        # ...y que el DEFECTO de hoy es la version activada de eso mismo. Sin este
+        # segundo paso, cambiar el defecto por accidente no rompe nada visible.
+        act = aplicaKernel(x.numpy(), kern)
+        bien = bool(np.allclose(act, np.maximum(esperado, 0.0), atol=1e-6))
+        negativos = float((esperado < 0).mean()) * 100
+        ok &= bien
+        print(f"      -> por defecto ACTIVA ({ACTIVACION_POR_DEFECTO}): "
+              f"{'✓' if bien else '✗ NO'} es max(0, ese mapa) · "
+              f"la ReLU tira el {negativos:.0f} % de las celdas")
+    print("los tres reproducen la capa L1 de su red, y por defecto la ACTIVAN."
           if ok else "⚠ alguno NO reproduce lo que su experimento dejo escrito")
     return 0 if ok else 1
 
