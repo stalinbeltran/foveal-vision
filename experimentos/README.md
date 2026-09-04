@@ -13,7 +13,8 @@ depender de que el resto del repo siga teniendo la misma forma.
 | [`2026-09-03-cnn-plana-2k7-sinpadding/`](2026-09-03-cnn-plana-2k7-sinpadding/) | El 2k7 con `padding=0` **de verdad**: sin anillo porque no hay relleno. Cae a 2,15× — **el mismo residuo que `replicate`, por otro camino**. f1 **0,656**, y arrastra el confound de que la cabeza baja a 392 features. **Código local**, sin tocar `src/fv/` |
 | [`2026-09-04-cnn-plana-1k7-sinpadding/`](2026-09-04-cnn-plana-1k7-sinpadding/) | **UN kernel 7×7**, sin relleno. 196 features · f1 **0,618**. La tendencia de «~0,09 de f1 por mitad de features» **no continúa**: esta mitad cuesta 0,038, dentro del ruido. Y el único kernel resulta ser un **promediador** (24 % de su energía en el DC) |
 | [`2026-09-04-cnn-plana-1k5-sinpadding/`](2026-09-04-cnn-plana-1k5-sinpadding/) | **UN kernel 5×5**, sin relleno. 256 features · f1 **0,642** — el más rápido de los seis. Bajar el campo receptivo de 7 a 5 px **no cuesta nada medible**: manda el tamaño de la cabeza |
-| [`comun/`](comun/) | el evaluador, el set de 10 ventanas y las entradas que **comparten los seis**, más `serie.py`, `concentracion.py` y `cargar_pesos.py`. Dos copias derivarían y la comparación se volvería una ilusión |
+| [`2026-09-04-cnn-plana-1k3-sinpadding/`](2026-09-04-cnn-plana-1k3-sinpadding/) | **UN kernel 3×3**, sin relleno — el valor que usa la foveada de producción. 324 features · f1 **0,680**, el mejor de los tres de un kernel. ⚠ **Su README y su lectura del criterio están PENDIENTES**: el run terminó (37 épocas) y sus stops están, pero nadie ha escrito qué salió contra lo que `instrucciones/02-criterio.md` pedía |
+| [`comun/`](comun/) | el evaluador, el set de 10 ventanas y las entradas que **comparten los siete**, más `serie.py`, `concentracion.py`, `cargar_pesos.py` y [`preproceso.py`](comun/preproceso.py). Dos copias derivarían y la comparación se volvería una ilusión |
 | [`2026-09-03-sonda-l1/`](2026-09-03-sonda-l1/) | ¿Pueden los kernels de la primera capa aprender filtros genéricos si SÍ hay presión sobre ellos? **Respuesta: no.** 8 redes entrenadas, 2,1 h, 0 $ |
 
 ⚠ **El código de producción NO se toca para probar una idea.** Instrucción del dueño
@@ -77,3 +78,65 @@ mano es como nacen los números que nadie puede auditar.
 Copia la forma de arriba. Lo mínimo que no puede faltar: **qué se preguntó**, **el criterio
 escrito antes de mirar**, **qué salió**, y **cómo volver a correrlo**. Un experimento sin
 criterio previo no es un experimento: es una anécdota con números.
+
+## Usar un kernel entrenado como PREPROCESO: `aplicaKernel`
+
+**Encargo del dueño, 2026-09-04:** *«de estos 3 experimentos toma sus kernels, y para cada uno
+crea una función `aplicaKernel` que tome una entrada cualquiera (imagen, como las que empleamos
+en nuestros entrenamientos) y le aplique este kernel sin padding. La salida de esta función será
+luego empleada (opcionalmente) como pre-procesador de las imágenes de entrada»*.
+
+```python
+from preproceso import aplicaKernel_1k3, aplicaKernel_1k5, aplicaKernel_1k7
+
+y = aplicaKernel_1k5(imagen)      # (20,20) -> (1, 16,16);  (B,2,H,W) -> (B,1,H-4,W-4)
+```
+
+…o desde dentro de un experimento, con su kernel ya puesto:
+
+```python
+from aplica_kernel import aplicaKernel     # experimentos/<el que sea>/nn/aplica_kernel.py
+```
+
+**Es literalmente la capa L1 de esa red, no algo parecido.** Las tres son `regions: single` y
+`n_layers: 1`, así que su única convolución ve la entrada entera **sin máscara** y su mapa se
+queda **sin activar** — la última capa no lleva ReLU a propósito (`builder.py:197`). Y eso no se
+afirma: `python experimentos/comun/preproceso.py --comprobar` lo contrasta contra el
+`stop-04/mapas.npy` que cada experimento dejó escrito, calculado en su momento con el modelo
+vivo. *Medido el 2026-09-04: diferencia máxima **0,0** en los tres.*
+
+| | k | entrada | salida | features |
+|---|---|---|---|---|
+| `aplicaKernel_1k3` | 3×3 | 20×20 | **18×18** | 324 |
+| `aplicaKernel_1k5` | 5×5 | 20×20 | **16×16** | 256 |
+| `aplicaKernel_1k7` | 7×7 | 20×20 | **14×14** | 196 |
+
+**Las cuatro decisiones que hay que respetar si se toca**, y las cuatro tienen test
+([`tests/test_preproceso.py`](../tests/test_preproceso.py), 37):
+
+1. **No depende de `fv` ni de `red_local.py`.** El tensor se saca del `state_dict` a pelo, así que
+   la carpeta del experimento se puede abrir dentro de un año con poco más. El precio es que
+   `center_convs.0.weight` pasa a ser un contrato, y hay un test que lo fija contra la red
+   construida — si el builder renombra esa capa, se rompe **ahí** y no en un entrenamiento seis
+   meses después.
+2. **La entrada trae DOS canales** (la vista y el **relleno**, `1 - coverage`). Una imagen suelta
+   sólo trae uno, y el segundo se rellena con el **defecto declarado** `relleno=0` = *«todo píxel
+   es real»*, que es lo que vale en el interior de una página. No es un detalle: con `relleno=1`
+   la salida es otra, y hay test de las dos.
+3. **Un float que se sale de [0,1] se NIEGA.** Es *el* fallo caro de un preprocesador: el kernel se
+   entrenó sobre vistas en [0,1] (`build_view` divide por 255), y una entrada en niveles 0..255 no
+   revienta — sale 255× y entrena algo. `uint8` sí se divide solo; para lo demás, `escala='0-255'`
+   explícito. Igual con un 3-D ambiguo: `(C,H,W)` y `(B,H,W)` no se distinguen por la forma, así
+   que se niega en vez de elegir.
+4. **Vive en `comun/` porque los tres son gemelos.** Si sus salidas van a compararse como
+   preproceso, la operación tiene que ser **la misma**; tres copias derivarían y la comparación
+   sería una ilusión sin que nada fallara. Los `nn/aplica_kernel.py` son atajos de veinte líneas
+   que sólo le atan su kernel.
+
+⚠ **Es OPCIONAL y no toca producción.** `src/fv/` sigue intacto: la instrucción del dueño es que un
+experimento no cambia el código de producción hasta que el número lo respalde. Esto es el material
+con el que decidirlo, no la decisión.
+
+⚠ **Y nadie ha medido todavía que preprocesar así sirva de algo.** Que la función exista y
+reproduzca la capa L1 no dice nada sobre si una red entrenada sobre su salida va mejor. Eso es un
+experimento, con su criterio escrito antes de mirar, y **no se ha hecho**.

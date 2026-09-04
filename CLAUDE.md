@@ -104,6 +104,24 @@ la vigila y la **destruye** no se contaría. Si se va por Vast, **esa línea va 
 
 ## Estado actual — léelo primero
 
+> **🧩 2026-09-04 — `aplicaKernel`: el kernel de las tres planas de 1 kernel, suelto y aplicable.**
+> Pedido por el dueño: *«de estos 3 experimentos toma sus kernels, y para cada uno crea una función
+> `aplicaKernel` … le aplique este kernel sin padding. La salida … será luego empleada
+> (opcionalmente) como pre-procesador de las imágenes de entrada»*. Vive en
+> [`experimentos/comun/preproceso.py`](experimentos/comun/preproceso.py) —`aplicaKernel_1k3/_1k5/_1k7`—
+> y **no importa `fv`**: saca el tensor del `state_dict`, así que la carpeta del experimento se abre
+> sin el repo. 20×20 → **18×18 · 16×16 · 14×14**.
+> ⚠ **Es literalmente la capa L1 de esas redes**, y eso está comprobado, no afirmado:
+> `python experimentos/comun/preproceso.py --comprobar` lo contrasta contra el `stop-04/mapas.npy`
+> commiteado — *diferencia máxima 0,0 en los tres, medido el 2026-09-04*. 37 tests en
+> `tests/test_preproceso.py`.
+> ⚠ **`src/fv/` NO se toca**: es material para decidir, no la decisión. **Y nadie ha medido que
+> preprocesar así sirva de algo** — que la función exista no dice nada sobre el f1 de una red
+> entrenada sobre su salida. Ése es un experimento y no se ha hecho.
+> ⚠ **De paso: el 1k3 no tenía sus pesos en git.** Terminó sus 37 épocas y sus `.pt` se quedaron
+> sólo en el run de `foveal-vision-data` (donde tampoco están trackeados). Ya están en
+> `nn/pesos/`, y **su README sigue pendiente**: f1 **0,680** medido, sin leer contra su criterio.
+
 > **📁 2026-09-03 — `experimentos/`: una carpeta por experimento, con la nn y sus pesos dentro.**
 > Pedido por el dueño. Cada experimento en `experimentos/<fecha>-<nombre>/` es **autocontenido**:
 > encargo, criterio, código congelado, resultados y **la red con sus pesos**. El primero es
