@@ -1,0 +1,24 @@
+{
+  "dataset": "dirty1000-80px-16px-r20260827",
+  "red": "plana-20-4k7",
+  "window_size": 16,
+  "umbral_pos_px": 0.15,
+  "umbral_f1": 0.01,
+  "brazos": {
+    "ancla": {
+      "f1": 0.8397504077146707,
+      "precision": 0.878430499925827,
+      "recall": 0.804333061668025,
+      "pos_err_px": 2.224001407623291,
+      "pos_err_px_borde": 3.0884742736816406,
+      "pos_err_px_interior": 1.96116042137146,
+      "n_esquinas": 14724,
+      "frac_borde": 0.23315675556659698,
+      "run": "plana-4k7-s1",
+      "epoca_best": 34,
+      "epocas_corridas": 37,
+      "val_loss_best": 0.22970548211173578,
+      "params_cabeza": 19260
+    }
+  }
+}
