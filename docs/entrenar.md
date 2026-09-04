@@ -126,11 +126,20 @@ cd ~/src/foveal-vision
     set -a; . "$HOME/.config/dev-secrets.env"; set +a
     .venv/bin/fv-train --name mi-run --window-dataset dirty1000-80px-16px-r20260827 \
         --network fov16-optimo --recipe plan40 --epochs 40
-    node "$COORD_HOME/scripts/notify.mjs" "entrenamiento mi-run terminado"'
+    node "$COORD_HOME/scripts/notify.mjs" "entrenamiento mi-run terminado" || true'
 
 systemctl status entrenar-mi-run     # cómo va
 tail -f /tmp/entrenar-mi-run.log     # el log
 ```
+
+⚠ **El `|| true` del aviso no es cosmético.** A una unidad **no le viajan los secretos**
+(deliberado: `sudo` los escribiría en claro en el journal), así que `notify.mjs` sale con ≠ 0
+diciendo *«Falta BOT_TOKEN»* — y como es el **último** comando, ése pasa a ser el código de la
+unidad, que lleva `Restart=on-failure`. **Un aviso que falla relanza el entrenamiento entero.**
+Medido dos veces (2026-09-02 con la sonda L1, 2026-09-04 con una cadena de 37 épocas: **62
+reinicios**). Desde el 2026-09-04 `desacoplar-persistente.sh` **acota** el bucle —se rinde a los
+5 intentos y queda en `failed`, visible— pero el `|| true` sigue siendo lo correcto: el aviso es
+una comodidad, y una comodidad no puede tumbar el trabajo.
 
 ## 4. Continuar un entrenamiento
 
