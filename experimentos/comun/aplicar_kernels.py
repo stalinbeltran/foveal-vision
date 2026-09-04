@@ -301,7 +301,8 @@ def figuras(vistas, mapas, dest: Path, etiqueta: str, k: int) -> None:
             _diverge(mapas[i, j], vmax).resize((160, 160), Image.NEAREST).save(
                 dest / f"entrada{i+1:02d}-kernel{j}.png")
     montaje(vistas, mapas, dest / "montaje.png",
-            f"CNN plana 4×7×7 — los {K} kernels sobre el set de visualización  ·  {etiqueta}")
+            f"CNN plana {K}×7×7 — {"el kernel" if K == 1 else f"los {K} kernels"} sobre el set "
+            f"de visualización  ·  {etiqueta}")
     # Quitando a cada mapa su nivel (mediana). Hace falta porque esta MEDIDO que
     # el nivel constante es ~8x la estructura del texto (0,300 contra 0,037 en la
     # epoca 3): con la escala comun, el rizo que dice si el kernel ha aprendido
@@ -320,7 +321,8 @@ def figuras(vistas, mapas, dest: Path, etiqueta: str, k: int) -> None:
             vmax=vmax_int,
             pie_extra=f" · escala del p99 del INTERIOR: el anillo de {b} px queda saturado")
     tira(vistas, sinniv, dest / "entrada-y-salidas.png",
-         f"Entrada y salidas de los {K} kernels  ·  {etiqueta}", vmax_int)
+         f"Entrada y salidas {"del kernel" if K == 1 else f"de los {K} kernels"}  ·  {etiqueta}",
+         vmax_int)
 
 
 def main() -> int:
