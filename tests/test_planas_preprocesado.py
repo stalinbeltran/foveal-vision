@@ -57,30 +57,52 @@ def _npz(brazo: str):
     return carp[0] / "preprocesado.npz"
 
 
-# ------------------------------------------------- los optimos, con procedencia
-def test_los_optimos_son_los_de_ESTADO_md(red):
-    """Si alguien los cambia sin querer, las tres redes dejan de ser «la foveada
-    optima» y el experimento mide otra cosa. Los valores y su evidencia estan en
-    `estudios-redes-neuronales/ESTADO.md`, seccion «Red foveada»."""
-    assert red.OPTIMOS_FOVEADA == {
-        "n_layers": 4,      # cerrado: 4 -> 0,9341 contra 3 -> 0,9246 y 5 -> 0,9136
-        "k": 3,             # `k_center` cerrado: 5 y 7 peores Y mas caros
-        "canales": 16,      # `channels` cerrado 20/20: 16 es el suelo util
-        "stride": 1,        # `s_center`: un solo valor legal
-        "dropout": 0.0,     # tanteo; 0,1 es el PEOR de los cuatro
-    }
+# ----------------------------------------- la definicion, con su procedencia
+def test_los_parametros_son_los_que_pidio_el_dueno(red):
+    """Redefinicion del 2026-09-04: «Las capas de la nn seran 2... Cada capa va a
+    tener solo 2 canales. El padding va a ser siempre sin padding... el stride va a
+    ser la mitad del ancho del kernel (redondeado)». Si alguien los mueve sin
+    querer, las tres redes dejan de ser lo pedido y el preliminar mide otra cosa."""
+    assert red.PARAMS == {"n_layers": 2, "canales": 2, "k": 3, "pad": 0,
+                          "dropout": 0.0}
+    assert red.STRIDE == 2                       # (3+1)//2: la mitad, REDONDEADA
 
 
-def test_el_relleno_es_k_medios_como_la_foveada_NO_cero(red):
-    """`builder.py:145` calcula `pad = k_center // 2`. Los siete gemelos usan 0,
-    pero eso era su EJE, no un optimo medido: ESTADO.md no tiene ninguna fila que
-    diga que 0 gane. Cambiarlo mueve la cabeza 3,2x (5.184 -> 1.600 en el 1k3)."""
+def test_sin_relleno_y_el_stride_va_en_TODAS_las_capas(red):
+    """«El padding del kernel va a ser siempre sin padding» y «cada capa va a
+    reducir el tamano de los features». `builder.py` pone el stride solo en la
+    primera capa (D-S1); aqui va en las dos, y es deliberado."""
     m = red.construir("1k3")
-    assert m.pad == red.OPTIMOS_FOVEADA["k"] // 2 == 1
+    assert m.pad == 0
     for c in m.convs:
-        assert c.padding == (1, 1)
-    # y con `same` la resolucion NO cae por las capas
-    assert m.forma()[-3][1] == (16, 18, 18)
+        assert c.padding == (0, 0)
+        assert c.stride == (2, 2)
+    lados = [f[1][-1] for f in m.forma()[:3]]
+    assert lados == [18, 8, 3]
+    assert lados[0] > lados[1] > lados[2], "cada capa tiene que reducir"
+
+
+def test_k3_es_lo_UNICO_que_cabe_con_estas_condiciones(red):
+    """El encargo no dijo el tamano del kernel. Con 2 capas, sin relleno y stride =
+    mitad de k, solo k=3 sobrevive: k=5 y k=7 dejan el mapa en 0 o negativo. Esto lo
+    fija para que nadie lo suba «porque el optimo foveado lo permite»."""
+    def lado(n, k, s, capas=2):
+        for _ in range(capas):
+            n = (n - k) // s + 1
+        return n
+    for n0 in (18, 16, 14):
+        assert lado(n0, 3, 2) >= 1, "k=3 tiene que caber en los tres brazos"
+    # y los otros dos NO caben
+    assert min(lado(n0, 5, 3) for n0 in (18, 16, 14)) <= 0
+    assert min(lado(n0, 7, 4) for n0 in (18, 16, 14)) <= 0
+
+
+def test_el_coste_es_MINIMO_y_esta_medido(red):
+    """«Queremos resultados preliminares, vamos a reducir el coste al minimo»."""
+    tot = {b: sum(p.numel() for p in red.construir(b).parameters())
+           for b in red.ENTRADAS}
+    assert tot == {"1k3": 286, "1k5": 286, "1k7": 166}
+    assert max(tot.values()) < 69_340 / 100, "242x menos que la version de 4 capas"
 
 
 # ------------------------------ LA premisa del encargo: identicas salvo la entrada
@@ -90,21 +112,23 @@ def test_las_convoluciones_son_IDENTICAS_entre_brazos(red, brazo):
     datasets de entrada». Las convs no dependen del tamano de entrada, asi que
     tienen que salir iguales hasta en el numero de parametros."""
     a, b = red.construir("1k3"), red.construir(brazo)
-    assert len(a.convs) == len(b.convs) == 4
+    assert len(a.convs) == len(b.convs) == 2
     for ca, cb in zip(a.convs, b.convs):
         assert (ca.kernel_size, ca.stride, ca.padding, ca.out_channels, ca.in_channels) \
             == (cb.kernel_size, cb.stride, cb.padding, cb.out_channels, cb.in_channels)
     n = lambda m: sum(p.numel() for c in m.convs for p in c.parameters())
-    assert n(a) == n(b) == 7120
+    assert n(a) == n(b) == 58
     assert a.drop.p == b.drop.p == 0.0
 
 
-def test_lo_UNICO_que_cambia_es_la_cabeza(red):
-    """El complemento del anterior: si las cabezas salieran iguales, el test de
-    arriba pasaria sin probar nada (los tres brazos serian la misma red)."""
+def test_lo_unico_que_cambia_es_la_cabeza_y_1k3_y_1k5_EMPATAN(red):
+    """⚠ Con k=3 y stride 2 el `1k3` y el `1k5` caen los DOS en 18 features, o sea
+    que son ISO-FEATURES por construccion -- justo el confound que en la version de
+    4 capas habia que corregir con anclas externas. No se buscaba; se fija aqui
+    porque es lo que hace comparables esos dos brazos."""
     anchos = {b: red.construir(b).flat_features for b in red.ENTRADAS}
-    assert anchos == {"1k3": 5184, "1k5": 4096, "1k7": 3136}
-    assert len(set(anchos.values())) == 3
+    assert anchos == {"1k3": 18, "1k5": 18, "1k7": 8}
+    assert anchos["1k3"] == anchos["1k5"], "iso-features por construccion"
 
 
 # --------------------------------------------- la forma casa con el dato de verdad

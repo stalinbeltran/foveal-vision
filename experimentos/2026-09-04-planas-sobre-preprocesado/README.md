@@ -55,42 +55,39 @@ paso 2 (la red: CNN plana con los ÓPTIMOS de la foveada)
                → flatten → ReLU → Linear(→12) → (4 esquinas × 3)
 ```
 
-### Los parámetros, y de dónde sale cada uno
+### Los parámetros — **redefinidos el 2026-09-04 para abaratar**
 
-Salen de **`estudios-redes-neuronales/ESTADO.md`**, sección «Red foveada». ⚠ El encargo decía
-`reportes/README.md`, pero ése es el **historial cronológico** y él mismo avisa: *«el estado no
-vive aquí: en qué quedó cada parámetro está en `../ESTADO.md`»*.
+> *«Como queremos resultados preliminares, vamos a reducir el "costo" al mínimo. Las capas de la
+> nn serán 2, por ahora. Cada capa va a tener solo 2 canales. El padding del kernel va a ser
+> siempre 'sin padding'. Cada capa va a reducir el tamaño de los features. Además, el stride va a
+> ser la mitad del ancho del kernel (redondeado).»*
 
-⚠⚠ **Y esa tabla tiene dos columnas que no siempre coinciden: «vigente» y «óptimo medido».** El
-encargo pide los **óptimos**, así que es lo que se toma.
-
-| parámetro | valor | evidencia en ESTADO.md |
+| parámetro | valor | de dónde sale |
 |---|---|---|
-| `n_layers` | **4** | cerrado: 2 → 0,9066 · 3 → 0,9246 · **4 → 0,9341** · 5 → 0,9136 |
-| `k_center` | **3** | cerrado: 5 y 7 son peores **y más caros** |
-| `channels` | **[16]×4** | cerrado 20/20: 24 y 32 no aportan, 8 hace daño. 16 es el suelo útil |
-| `s_center` | **1** | no barrible: un solo valor legal con esta geometría |
-| `dropout` | **0,0** | tanteo; 0,1 es el **peor** de los cuatro |
-| `regions` | **single** | es lo que significa «plana» aquí (`plana-24-single.yaml`), no «una capa» |
+| `n_layers` | **2** | el dueño, 2026-09-04 *(antes 4, el óptimo foveado)* |
+| `channels` | **[2]×2** | el dueño, 2026-09-04 *(antes [16]×4)* |
+| `padding` | **0** — sin relleno | el dueño, 2026-09-04 |
+| `stride` | **2** | «la mitad del kernel, redondeado» → `(3+1)//2` |
+| `k` | **3** | ⚠ **no es una elección: es lo único que cabe** (abajo) |
+| `dropout` | **0,0** | ESTADO.md, sigue siendo el óptimo y no se movió |
+| `regions` | **single** | es lo que significa «plana» aquí |
 
-**Los que NO se heredan** — y son exactamente *«los parámetros afectados por los datasets de
-entrada»* del encargo: `fovea_px`, `border_px`, `border_reduce`, `overlap_*` describen cómo se
-construye la **vista** desde la página, y aquí la entrada ya es un mapa preprocesado de tamaño
-fijo. Esos mandos **ya se aplicaron** al construir el dataset — que usa la geometría de
-`plana-20-1k3.yaml`, con los óptimos medidos `border_px: 8` y `overlap_fovea_px: 7`.
-`k_periph`/`s_periph`/`mask_channel` tampoco: no hay rama periférica, y el canal de relleno lo
-consumió el kernel congelado.
+#### ⚠⚠ `k` no lo dijiste, y resulta que no hacía falta: sólo k=3 sobrevive
 
-### ⚠⚠ El relleno de la convolución es `k//2`, como la foveada — NO 0
+Con 2 capas, sin relleno y stride = mitad de `k`, el mapa se agota antes de la segunda capa para
+cualquier `k` mayor. Medido con `n₂ = (n − k)//s + 1`:
 
-`builder.py:145` calcula `pad = k_center // 2`, así que *«los parámetros óptimos de la foveada»*
-traen relleno **`same`**, y con él la resolución **no cae** por las capas: 18×18 sigue siendo
-18×18 tras las cuatro.
+| | `1k3` 18×18 | `1k5` 16×16 | `1k7` 14×14 | |
+|---|---|---|---|---|
+| **k=3, s=2** | 18→8→**3** | 16→7→**3** | 14→6→**2** | ✅ las tres viven |
+| k=5, s=3 | 18→5→1 | 16→4→**0** | 14→4→**0** | ❌ mueren dos |
+| k=7, s=4 | 18→3→**0** | 16→3→**0** | 14→2→**−1** | ❌ mueren las tres |
 
-Los siete gemelos usan `padding=0` —por eso se llaman `-sinpadding`—, pero eso era **el eje de
-aquellos experimentos, no un óptimo medido**: ESTADO.md no tiene ninguna fila que diga que 0 gane.
-⚠ La otra opción existe y **cambia el ancho de la cabeza 3,2×** (5.184 → 1.600 en el `1k3`); si
-prefieres ésa, es un parámetro y se cambia en una línea.
+Así que `k=3` está **forzado por tu propia definición**, no heredado del óptimo foveado — aunque
+coincida con él.
+
+⚠ **«Redondeado» lo leo como media hacia arriba**: `(k+1)//2` = 2. Truncar (`k//2` = 1) daría
+18→16→14 y una cabeza de **392** features en vez de 18 — 20× más. Si querías truncar, dilo.
 
 ### Las tres estructuras
 
@@ -98,19 +95,27 @@ prefieres ésa, es un parámetro y se cambia en una línea.
 $ .venv/bin/python experimentos/2026-09-04-planas-sobre-preprocesado/nn/red_local.py
 ```
 
-| brazo | entrada | tras las 4 convs | features | convs | cabeza | **total** |
-|---|---|---|---:|---:|---:|---:|
-| `1k3` | (1, **18, 18**) | (16, 18, 18) | 5.184 | 7.120 | 62.220 | **69.340** |
-| `1k5` | (1, **16, 16**) | (16, 16, 16) | 4.096 | 7.120 | 49.164 | **56.284** |
-| `1k7` | (1, **14, 14**) | (16, 14, 14) | 3.136 | 7.120 | 37.644 | **44.764** |
+| brazo | entrada | tras conv0 | tras conv1 | features | convs | cabeza | **total** |
+|---|---|---|---|---:|---:|---:|---:|
+| `1k3` | (1, **18, 18**) | (2, 8, 8) | (2, 3, 3) | **18** | 58 | 228 | **286** |
+| `1k5` | (1, **16, 16**) | (2, 7, 7) | (2, 3, 3) | **18** | 58 | 228 | **286** |
+| `1k7` | (1, **14, 14**) | (2, 6, 6) | (2, 2, 2) | 8 | 58 | 108 | **166** |
 
-**Las convoluciones son idénticas en las tres — 7.120 parámetros exactos — y lo único que cambia
-es la cabeza.** No es una intención: es una invariante, y `red_local.py --comprobar` la verifica
-capa por capa, además de contrastar la forma declarada contra el `.npz` real. 12 tests en
+**Las convoluciones son idénticas en las tres — 58 parámetros exactos — y lo único que cambia es
+la cabeza.** `red_local.py --comprobar` lo verifica capa por capa; 14 tests en
 `tests/test_planas_preprocesado.py`.
 
-⚠ **La cabeza sigue siendo el 84-90 % del modelo** (62.220 de 69.340), así que el confound de
-siempre no desaparece: la comparación válida es a igualdad de ancho de cabeza, no entre brazos.
+#### ⚠ El coste baja 242×, y eso tiene un precio que hay que decir
+
+De **69.340** parámetros a **286**. Es lo que pediste, pero con 18 features llegando a una cabeza
+de 12 salidas, el riesgo real es que un resultado malo mida **«la red es demasiado pequeña»** y no
+«el preproceso no sirve». Un preliminar acota, no declara — y menos éste.
+
+#### ⚠ Lo bueno que trae, y no se buscaba: casi desaparece el confound de la cabeza
+
+Con k=3 y stride 2, el `1k3` y el `1k5` caen **los dos en 18 features**. O sea que esos dos brazos
+son **iso-features por construcción**, que es justo lo que en la versión de 4 capas había que
+corregir con anclas externas. El `1k7` se queda en 8 y sigue sin ancla.
 
 ### ⚠ Un hueco que hay que tapar ANTES de entrenar: los escalares de borde
 
