@@ -50,6 +50,18 @@ from red_local import CabezaSoftArgmax                             # noqa: E402
 RED_YAML = REPO / "configs" / "networks" / f"{RED}.yaml"
 ESQUINAS = ("TL", "TR", "BR", "BL")
 CEL = 96
+# El set PROPIO de este experimento: ventanas que SI tienen esquinas.
+#
+# ⚠ Y no sustituye al compartido, lo COMPLEMENTA. Las 10 de `comun/` se
+#   eligieron para mirar KERNELS y solo 2 de ellas traen alguna esquina
+#   verdadera, asi que la figura de mapas de calor sale casi vacia: se ve donde
+#   pone la masa la red, pero no CONTRA QUE. Y en una ventana sin esquina la
+#   posicion NO ESTA SUPERVISADA --`corner_loss` la multiplica por `exists_true`,
+#   `losses.py:19`--, o sea que ahi la cruz azul no significa nada.
+#   El set compartido se sigue pintando (es lo que hace comparables los
+#   experimentos entre si); este anade el que se puede juzgar.
+SET_PROPIO = EXP / "evaluacion" / "set-con-esquinas.json"
+N_PROPIO = 10
 
 
 def _comun():
@@ -95,11 +107,39 @@ def _marca(d: ImageDraw.ImageDraw, ox: int, oy: int, u: float, v: float,
         d.line([cx - r, cy + r, cx + r, cy - r], fill=color, width=2)
 
 
-def figura(brazo: str, dest: Path) -> Path:
+def set_con_esquinas(ak) -> list[dict]:
+    """Las N ventanas de VALIDACION con MAS esquinas verdaderas, congeladas.
+
+    Se eligen una vez y se guardan (misma regla que el set compartido): elegirlas
+    de nuevo en cada figura haria que dos figuras no fueran comparables, que es lo
+    unico para lo que sirven. El desempate es el indice, no el azar, asi que el
+    fichero se puede reconstruir si se pierde.
+    """
+    if SET_PROPIO.exists():
+        return json.loads(SET_PROPIO.read_text())["ventanas"]
+    from fv import settings
+    z = np.load(settings.window_datasets_root() / ak.DATASET / "windows.npz")
+    val = np.nonzero(z["split"] == 1)[0]
+    n = z["y"][val][:, :, 0].sum(axis=1)
+    orden = sorted(val.tolist(), key=lambda i: (-int(z["y"][i][:, 0].sum()), i))
+    lookup = {int(a): k for k, a in enumerate(z["images_sample_idx"])}
+    vent = [{"indice": int(i), "fila_imagen": lookup[int(z["sample_idx"][i])],
+             "ventana_xy": [int(v) for v in z["window_xy"][i]],
+             "esquinas": int(z["y"][i][:, 0].sum())} for i in orden[:N_PROPIO]]
+    SET_PROPIO.parent.mkdir(parents=True, exist_ok=True)
+    SET_PROPIO.write_text(json.dumps(
+        {"dataset": ak.DATASET, "split": "validacion", "n": N_PROPIO,
+         "criterio": "las N con mas esquinas verdaderas; desempate por indice",
+         "ventanas": vent}, indent=2))
+    return vent
+
+
+def figura(brazo: str, dest: Path, propio: bool = False) -> Path:
     ak = _comun()
     cfg = full_config(yaml.safe_load(RED_YAML.read_text()))
     dims = dims_of(cfg)
-    vent = json.loads((COMUN / "set-visualizacion.json").read_text())["ventanas"]
+    vent = (set_con_esquinas(ak) if propio
+            else json.loads((COMUN / "set-visualizacion.json").read_text())["ventanas"])
     x, e, vistas = ak.entradas(vent)
 
     d = BRAZOS[brazo]
@@ -154,7 +194,7 @@ def figura(brazo: str, dest: Path) -> Path:
                 _marca(dib, ox, oy, float(verdad[i, c, 1]), float(verdad[i, c, 2]),
                        dims, "circulo", (0, 150, 0))
 
-    beta = float(torch.exp(m.log_beta))
+    beta = float(torch.exp(m.log_beta).detach())
     dib.text((gap, alto - pie + 4),
              f"brazo {brazo} ({d['run']}) · beta aprendida = {beta:.3f} · "
              f"escala por mapa (blanco 0 -> rojo el maximo DE ESE mapa)",
@@ -165,7 +205,7 @@ def figura(brazo: str, dest: Path) -> Path:
              fill="black", font=fuente)
 
     dest.mkdir(parents=True, exist_ok=True)
-    out = dest / f"mapas-de-calor-{brazo}.png"
+    out = dest / f"mapas-de-calor-{brazo}{'-con-esquinas' if propio else ''}.png"
     lienzo.save(out)
     print(f"  {out.relative_to(REPO)}  ({len(vent)} ventanas · beta {beta:.3f})")
     return out
@@ -177,7 +217,8 @@ def main() -> int:
     a = ap.parse_args()
     brazos = [a.brazo] if a.brazo else ["A", "B"]
     for b in brazos:
-        figura(b, EXP / "resultados")
+        figura(b, EXP / "resultados", propio=False)
+        figura(b, EXP / "resultados", propio=True)
     return 0
 
 

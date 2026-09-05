@@ -144,7 +144,7 @@ def main() -> int:
         r["params_cabeza"] = (sum(p.numel() for p in m.head.parameters()) if modo is None
                               else m.presupuesto()["cabeza"])
         if modo == "softargmax":
-            r["beta"] = float(torch.exp(m.log_beta))
+            r["beta"] = float(torch.exp(m.log_beta).detach())
         out["brazos"][etiqueta] = r
         print(f"  {etiqueta:6s} {run:14s} ep{r['epoca_best']:>3}  f1 {r['f1']:.4f}  "
               f"pos {r['pos_err_px']:.3f} px  (borde {r['pos_err_px_borde']:.3f} · "

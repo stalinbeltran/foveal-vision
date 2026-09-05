@@ -1,0 +1,105 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "lr": 0.0014,
+    "optimizer": "adam",
+    "momentum": 0.9,
+    "weight_decay": 0.0,
+    "batch_size": 85,
+    "epochs": 37,
+    "windows_per_epoch": 0,
+    "scheduler": "none",
+    "patience": 10,
+    "lambda_pos": 1.0,
+    "pos_weight": 1.0,
+    "smooth_l1_beta": 0.08,
+    "monitor": "val_loss",
+    "seed": 1
+  },
+  "network": {
+    "fovea_px": 16,
+    "border_px": 8,
+    "border_reduce": 4,
+    "overlap_fovea_px": 7,
+    "overlap_border_px": 0,
+    "n_layers": 1,
+    "k_center": 7,
+    "k_periph": 3,
+    "s_center": 1,
+    "s_periph": 1,
+    "channels": [
+      4
+    ],
+    "merge": "concat",
+    "pool_mode": "avg",
+    "pad_mode": "edge",
+    "regions": "single",
+    "dropout": 0.0,
+    "conv_pad_mode": "zeros",
+    "edge_inputs": "pad",
+    "mask_channel": "coverage"
+  },
+  "execution": {
+    "device": "cpu",
+    "num_workers": 0
+  },
+  "provenance": {
+    "window_dataset": {
+      "name": "dirty1000-80px-16px-r20260827",
+      "fingerprint": "sha256:3df67624f55b1ae515aea03b61e0ecd1619333d51d092d8a3d780ab2e91afda3"
+    },
+    "network": {
+      "name": "plana-20-4k7",
+      "value": {
+        "fovea_px": 16,
+        "border_px": 8,
+        "border_reduce": 4,
+        "overlap_fovea_px": 7,
+        "overlap_border_px": 0,
+        "n_layers": 1,
+        "k_center": 7,
+        "k_periph": 3,
+        "s_center": 1,
+        "s_periph": 1,
+        "channels": [
+          4
+        ],
+        "merge": "concat",
+        "pool_mode": "avg",
+        "pad_mode": "edge",
+        "regions": "single",
+        "dropout": 0.0,
+        "conv_pad_mode": "zeros",
+        "edge_inputs": "pad",
+        "mask_channel": "coverage"
+      }
+    },
+    "recipe": {
+      "name": "plan40",
+      "value": {
+        "lr": 0.0014,
+        "optimizer": "adam",
+        "momentum": 0.9,
+        "weight_decay": 0.0,
+        "batch_size": 85,
+        "epochs": 37,
+        "windows_per_epoch": 0,
+        "scheduler": "none",
+        "patience": 10,
+        "lambda_pos": 1.0,
+        "pos_weight": 1.0,
+        "smooth_l1_beta": 0.08,
+        "monitor": "val_loss",
+        "seed": 1
+      }
+    },
+    "sweep": null,
+    "git_commit": "888689f69b0be1034b1cefa3dd654546544769a8",
+    "environment": {
+      "python": "3.12.3",
+      "torch": "2.14.0+cpu",
+      "platform": "linux",
+      "device": "cpu"
+    }
+  }
+}

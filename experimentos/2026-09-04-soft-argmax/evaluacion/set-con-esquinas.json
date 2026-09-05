@@ -1,0 +1,98 @@
+{
+  "dataset": "dirty1000-80px-16px-r20260827",
+  "split": "validacion",
+  "n": 10,
+  "criterio": "las N con mas esquinas verdaderas; desempate por indice",
+  "ventanas": [
+    {
+      "indice": 6837,
+      "fila_imagen": 48,
+      "ventana_xy": [
+        25,
+        40
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 6838,
+      "fila_imagen": 48,
+      "ventana_xy": [
+        30,
+        40
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 6839,
+      "fila_imagen": 48,
+      "ventana_xy": [
+        35,
+        40
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 20909,
+      "fila_imagen": 149,
+      "ventana_xy": [
+        35,
+        15
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 20910,
+      "fila_imagen": 149,
+      "ventana_xy": [
+        40,
+        15
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 20911,
+      "fila_imagen": 149,
+      "ventana_xy": [
+        45,
+        15
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 20923,
+      "fila_imagen": 149,
+      "ventana_xy": [
+        35,
+        20
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 20924,
+      "fila_imagen": 149,
+      "ventana_xy": [
+        40,
+        20
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 20925,
+      "fila_imagen": 149,
+      "ventana_xy": [
+        45,
+        20
+      ],
+      "esquinas": 4
+    },
+    {
+      "indice": 33997,
+      "fila_imagen": 242,
+      "ventana_xy": [
+        25,
+        40
+      ],
+      "esquinas": 4
+    }
+  ]
+}
