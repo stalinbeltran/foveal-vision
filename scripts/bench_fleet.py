@@ -103,10 +103,34 @@ def lanzador(*args: str, timeout: int = 1800, check: bool = True) -> str:
     return salida
 
 
+# La clave con la que se entra en los droplets de medición. La rellena
+# `comprobaciones()` PREGUNTÁNDOSELA al lanzador (`do_droplet.py
+# clave-de-entrada`), que es quien la elige para todo lo demás.
+#
+# ⚠ Hasta el 2026-10-01 aquí estaba cableada `~/.ssh/do_droplet`, y en una
+# máquina de la flota ese fichero NO existe: la flota entra con la clave de flota
+# (`~/.ssh/do_flota`) desde el 2026-09-11. O sea que el benchmark de vCPU moría al
+# empezar en cualquier dev nuevo. Cablear la ruta otra vez es volver a ese fallo
+# la próxima vez que el lanzador cambie de clave.
+CLAVE: "Path | None" = None
+
+
+def clave_de_entrada() -> Path:
+    """La clave del lanzador. La ruta va en la ÚLTIMA línea: antes puede ir un aviso."""
+    salida = lanzador("clave-de-entrada", timeout=120, check=False)
+    lineas = [l.strip() for l in salida.splitlines() if l.strip()]
+    ruta = Path(lineas[-1]) if lineas else None
+    if ruta is None or not ruta.is_absolute() or not ruta.exists():
+        die("El lanzador no me da una clave con la que entrar en los droplets:\n"
+            f"{salida.strip()}\n"
+            "  Sin ella se crearían droplets que facturan y en los que no se puede entrar.")
+    return ruta
+
+
 def ssh_base(ip: str, puerto: int) -> list[str]:
     return [
         "ssh", "-p", str(puerto),
-        "-i", str(Path.home() / ".ssh" / "do_droplet"),
+        "-i", str(CLAVE),
         "-o", "StrictHostKeyChecking=accept-new",
         "-o", "ConnectTimeout=15",
         "-o", "ServerAliveInterval=15",
@@ -205,7 +229,7 @@ def medir_uno(size: str, repeats: int, sufijo: str, mantener: bool) -> dict:
                 raise RuntimeError(f"no está {origen}: el dataset no está preparado")
             scp = [
                 "scp", "-P", str(puerto), "-r", "-q",
-                "-i", str(Path.home() / ".ssh" / "do_droplet"),
+                "-i", str(CLAVE),
                 "-o", "StrictHostKeyChecking=accept-new",
                 str(origen), f"root@{ip}:{destino}/",
             ]
@@ -302,9 +326,10 @@ def comprobaciones() -> None:
     if not (os.environ.get("DO_TOKEN") or os.environ.get("DIGITALOCEAN_TOKEN")):
         die("No hay DO_TOKEN en el entorno: esta máquina no puede crear droplets.\n"
             "  node ~/src/telegram-coordinator/scripts/bench-preflight.mjs")
-    if not (Path.home() / ".ssh" / "do_droplet").exists():
-        die("No hay ~/.ssh/do_droplet: podrías crear droplets y no entrar en ellos.\n"
-            "  node ~/src/telegram-coordinator/scripts/bench-preflight.mjs --fix")
+    # Antes de crear nada: sin clave, los droplets existirían, facturarían y no
+    # se podría entrar en ellos.
+    global CLAVE
+    CLAVE = clave_de_entrada()
     if not shutil.which("scp"):
         die("Falta scp, que es como viaja el dataset a los droplets.")
 
