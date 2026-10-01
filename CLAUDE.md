@@ -1405,6 +1405,13 @@ organizacion.md §2. Respétalo explícitamente o actualiza el doc.
 
 ## Dónde caen los datos de un estudio: **en `foveal-vision-data`**
 
+⚠ **Desde el 2026-10-01 el `origin` de `foveal-vision-data` es el ALMACÉN** —el volumen
+`datos` del mini, servido por SSH como repo git desnudo—, no GitHub. `estudio_flota.py --git`
+y todo lo que hace `git push` ahí sigue igual (empujan al remoto por defecto); lo que cambia
+es que si el mini no contesta el push **falla ruidosamente** en vez de ir a GitHub, y que
+**lo temporal también se guarda** (logs de flota, resultados a medias → `temporal/` del repo
+de datos). La regla entera, en `telegram-coordinator/CLAUDE.md` § «EL ALMACÉN».
+
 **Aplicado el 2026-08-27.** Los artefactos de estudio —runs, recorridos, estudios— se escriben en
 el repo hermano. Este repo es **el código que mide**; aquel es **lo medido**.
 
